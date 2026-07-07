@@ -154,6 +154,30 @@ mint** (the editor creates data from scratch and imports it). The original ColDP
 Internal foreign keys use the surrogate key; export maps them back to ColDP
 string IDs.
 
+**Normalization stance: strings authoritative, relational normalization
+optional.** For both authorship and names, the **denormalized string is the
+authoritative, always-present field** (the full authorship string; the full
+`scientific_name`), because it keeps the barrier to *getting data in* low and
+keeps search trivial. The **name-parser gives a structured middle layer for
+free** — atomized author tokens + year, and genus/epithet parts — which is
+enough to facet, bulk-edit and soft-validate *without* any relational
+normalization. True relational normalization is an **opt-in overlay**, never
+forced:
+
+- *Authors* — the authorship string on each name/reference is authoritative;
+  linking to `author` person records (§5.3) is optional and additive (mirrors
+  ColDP's `combinationAuthorship` + optional `combinationAuthorshipID`, and
+  `author` + `authorID`). Small curated projects opt in; large-import projects
+  stay on strings and harmonise later with faceting/reconciliation tooling (§8).
+- *Names* — stored **denormalized** (full name + parsed parts), the botanist-
+  liked, searchable, import-friendly form. We deliberately do **not** adopt the
+  zoologist single-epithet-linked-to-parent *storage* model (it fights import
+  and search and needs cached-name triggers). Its ergonomics are provided on top
+  of the denormalized store instead: an epithet-only edit that recomposes the
+  full name via `NameFormatter`, **soft validation** of genus/epithet vs the
+  parent taxon (§6), and a **batch "rename genus / recombine subtree"** operation
+  (§8, phase 4) for auditable rename propagation.
+
 **First implementation deliverable.** The exact domain classes (fields, types,
 enum bindings), the Flyway DDL, and the ColDP-raw ↔ domain mapping are settled
 and reviewed **before** any service or UI work.
@@ -181,15 +205,30 @@ from the project.
   `alternative_id[]`, `citation` (formatted), `type` (CSL type), `author`,
   `editor`, `title`, `container_title`, `issued`, `volume`, `issue`, `page`,
   `publisher`, `doi`, `isbn`, `issn`, `link`, `remarks`, plus `modified` /
-  `modified_by`. Structured fields + a formatted citation string.
+  `modified_by`. Structured fields + a formatted citation string. The `author` /
+  `editor` **strings are authoritative**; optional `author_id[]` / `editor_id[]`
+  links to `author` records (§5.3) are the normalization overlay (§5.0).
 
-### 5.3 Author
+### 5.3 Author (optional normalization overlay)
 
-- **`author`** — project-scoped normalised persons (the ColDP Author entity):
-  `id`, `project_id`, `alternative_id[]` (incl. `orcid:` scope), `given`,
-  `family`, `suffix`, `abbreviation_botany`, `affiliation`, `link`, `remarks`,
-  `modified` / `modified_by`. A logged-in user's ORCID links a user to an
-  `author` record so authorship/attribution stay consistent.
+- **`author`** — project-scoped normalised persons (the ColDP Author entity),
+  **optional** and used only when a project chooses to normalize authorship (see
+  §5.0). `id`, `project_id`, `alternative_id[]` (incl. `orcid:` / `wikidata:`
+  scopes), `given`, `family`, `suffix`, `abbreviation_botany`, `affiliation`,
+  `link`, `remarks`, plus **disambiguation fields** — `birth`, `death`,
+  `birth_place`, `country` — which matter precisely for telling the many *Smith*s
+  apart once you normalize. `modified` / `modified_by`.
+- **Distinct from `app_user`.** Logged-in **editors** are `app_user` records
+  (§5.1) and drive audit/`modifiedBy`; historic **taxonomic authors**
+  (Linnaeus, Zeller) are `author` records. They are separate concerns — an
+  editor needs no `author` record, and Linnaeus needs no account. A modern
+  author who is also an editor *may* be linked (matching `orcid`), but that link
+  is optional, not required.
+- Names and references reference authors **only optionally**, via id links
+  (§5.2, §5.4) that sit alongside the authoritative authorship strings.
+  Populating `author` records and those links is a curation activity supported
+  by the reconciliation/faceting tooling in §8, not a prerequisite for entering
+  data.
 
 ### 5.4 NameUsage (collapsed name + taxonomic usage)
 
@@ -208,9 +247,12 @@ taxonomic usage; this table **is the classification**. (CLB keeps `Name` and
   - `scientific_name`, `authorship`, `rank`
   - atomized parts: `uninomial`, `genus`, `infrageneric_epithet`,
     `specific_epithet`, `infraspecific_epithet`, `cultivar_epithet`, `notho`
-  - atomized authorship: `combination_authorship`, `combination_ex_authorship`,
+  - atomized authorship (**strings authoritative**, parser-derived):
+    `combination_authorship`, `combination_ex_authorship`,
     `combination_authorship_year`, `basionym_authorship`,
     `basionym_ex_authorship`, `basionym_authorship_year`, `sanctioning_author`
+  - optional author-link overlay (§5.0): `combination_authorship_id[]`,
+    `basionym_authorship_id[]` → `author` records, used only when normalizing
   - `nom_status` (nomenclatural status), `published_in_reference_id`,
     `published_in_year`, `published_in_page`, `gender`, `etymology`
   - **No `code` column** — derived from `project.nom_code`.
@@ -351,8 +393,11 @@ problems; instead, rules run **asynchronously** and attach `issue` records
   "problems" view filterable by rule/severity/entity type.
 - **Starter rule set (phase 1)** — the infrastructure plus a small set, e.g.:
   unparsable scientific name; authorship/year mismatch with the linked reference;
-  rank inconsistent with parent rank; synonym linked (via `synonym_accepted`) to
-  a non-accepted usage; missing `published_in` reference; duplicate scientific
+  rank inconsistent with parent rank; **genus token inconsistent with the parent
+  genus**, and an **infraspecific epithet's species-part inconsistent with the
+  parent species** (the consistency the zoologist normalized model would enforce
+  structurally — §5.0); synonym linked (via `synonym_accepted`) to a
+  non-accepted usage; missing `published_in` reference; duplicate scientific
   name + authorship within a project; dangling reference/parent/synonym-accepted
   pointers. The rule catalogue grows over time.
 
@@ -395,9 +440,21 @@ supporting-entity editing UX. (The validation *engine* is in; the rule
   sourced this phase — a TSV/ZIP layer keyed off the `ColdpTerm` vocabulary, or a
   backend ColDP writer if one is available. Round-trips `modified` /
   `modified_by` and derives scrutinizer from the audit log.
-- **Phase 4 — Batch editing.** Multi-select in tree/search → bulk change
-  rank/status/parent, move subtrees, find-and-replace authorship, bulk delete;
-  every operation captured in the audit log and revertible.
+- **Phase 4 — Batch editing & harmonization.** Multi-select in tree/search →
+  bulk change rank/status/parent, move subtrees, find-and-replace authorship,
+  bulk delete; every operation captured in the audit log and revertible.
+  Includes:
+  - a **batch "rename genus / recombine subtree"** operation that rewrites the
+    genus token + full name across a subtree's descendants (the auditable
+    stand-in for the zoologist normalized model's rename propagation — §5.0);
+  - **OpenRefine-style faceting and bulk edit** over the authoritative authorship
+    and name *strings* (facet on parser-derived author tokens, years, genus,
+    epithets; cluster near-duplicates; bulk-apply fixes);
+  - **author reconciliation** — promote a cluster of matching author strings into
+    a shared `author` record and link the names/references to it, optionally
+    reconciled against **Wikidata** (strong historic-author coverage) and ORCID.
+    This is the opt-in on-ramp from string authorship to the normalized overlay
+    (§5.0, §5.3).
 - **Phase 5 — Supporting-entity editing UX** (type material, distributions,
   vernacular names, relations, etc.) + reference enrichment (DOI/CrossRef
   lookup, BibTeX/CSL-JSON import).
@@ -426,6 +483,10 @@ supporting-entity editing UX. (The validation *engine* is in; the rule
 - Backend: Spring Boot + MyBatis + Postgres + Flyway + Spring Security.
 - Postgres-only search (`pg_trgm`), no Elasticsearch.
 - Name and taxonomic usage **collapsed into one `name_usage` entity** (1:1 here); parent/child classification only (accepted usages), flat higher ranks ignored. Synonyms are not tree nodes and appear on taxon detail pages only. All synonym→accepted links (including pro parte, multiple accepted taxa) live in a single **`synonym_accepted`** relation table, keeping `parent_id` purely for the accepted tree; no record duplication. Export fans out to one Name + N Synonym rows, import re-collapses.
+- **Strings authoritative, relational normalization optional** (§5.0). The authorship string and the full `scientific_name` are the always-present authoritative fields; name-parser's atomized tokens/parts give a free structured layer for faceting/validation. Relational normalization is an opt-in overlay, never forced.
+- **`author` entity is optional and distinct from `app_user`** (§5.3). Editors are `app_user` (drive audit/`modifiedBy`); historic taxonomic authors are optional `author` records with disambiguation fields (birth/death/place). Name/reference→author links are optional and sit beside the authoritative strings (mirrors ColDP's string + optional ID design).
+- **No zoologist single-epithet storage model.** Names stay denormalized (full name + parsed parts); the normalized model's benefits come via soft validation (genus/epithet vs parent) and a batch rename/recombine op (§5.0), not a second schema.
+- **OpenRefine-style faceting + author reconciliation** (promote string clusters to `author` records, reconcile against Wikidata/ORCID) is later-phase (phase 4) harmonization tooling, not phase-1 critical path.
 - Two-layer model (§5.0): an authoritative editor domain model (our own lean classes, leaning on CLB's structure, reusing CLB/name-parser enums, trimmed of CLB machinery) plus a ColDP-raw DTO used only at the import/export boundary. We do not import CLB's entity classes. Surrogate project-scoped PKs, with original ColDP IDs preserved for round-trip. Exact classes/DDL/mapping are the first implementation deliverable.
 - `ltree` materialized path for subtree operations.
 - Single `nom_code` per project (drives NameFormatter and code-specific behaviour); no per-name code.
