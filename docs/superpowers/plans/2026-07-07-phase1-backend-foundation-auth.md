@@ -1717,8 +1717,13 @@ Append to `backend/src/main/resources/application.yml` under `spring:` (indented
       client:
         registration:
           orcid:
-            client-id: ${ORCID_CLIENT_ID:}
-            client-secret: ${ORCID_CLIENT_SECRET:}
+            # Non-empty defaults: Spring eagerly builds the ClientRegistration at
+            # startup and asserts a non-empty client-id, so an empty default
+            # (${ORCID_CLIENT_ID:}) crashes the whole app when ORCID creds are unset,
+            # defeating the local-account fallback. The placeholder lets the context
+            # boot; an actual ORCID login then fails gracefully at ORCID.
+            client-id: ${ORCID_CLIENT_ID:unconfigured}
+            client-secret: ${ORCID_CLIENT_SECRET:unconfigured}
             scope: openid
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/orcid"
