@@ -1,9 +1,11 @@
 package org.catalogueoflife.editor.name;
 
 import java.util.List;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
 import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
@@ -36,9 +38,33 @@ public interface ReferenceMapper {
   })
   Reference findById(long id);
 
-  @Select("SELECT * FROM reference WHERE project_id = #{projectId} ORDER BY id")
+  // Note: MyBatis annotation mappers key mapped statements by method name only (no
+  // overload resolution by signature), so this replaces the old single-arg
+  // findByProject(long) rather than overloading it.
+  @Select("""
+      SELECT * FROM reference WHERE project_id = #{projectId}
+      ORDER BY id LIMIT #{limit} OFFSET #{offset}
+      """)
   @ResultMap("referenceResult")
-  List<Reference> findByProject(long projectId);
+  List<Reference> findByProject(@Param("projectId") long projectId, @Param("limit") int limit,
+      @Param("offset") int offset);
+
+  @Select("""
+      SELECT * FROM reference
+      WHERE project_id = #{projectId} AND citation % #{q}
+      ORDER BY similarity(citation, #{q}) DESC
+      LIMIT #{limit} OFFSET #{offset}
+      """)
+  @ResultMap("referenceResult")
+  List<Reference> search(@Param("projectId") long projectId, @Param("q") String q,
+      @Param("limit") int limit, @Param("offset") int offset);
+
+  @Select("SELECT * FROM reference WHERE id = #{id} AND project_id = #{projectId}")
+  @ResultMap("referenceResult")
+  Reference findByIdInProject(@Param("id") long id, @Param("projectId") long projectId);
+
+  @Delete("DELETE FROM reference WHERE id = #{id} AND project_id = #{projectId}")
+  int delete(@Param("id") long id, @Param("projectId") long projectId);
 
   @Update("""
       UPDATE reference
