@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: coldp-editor
+server:
+  port: 8080
