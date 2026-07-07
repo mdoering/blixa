@@ -1,6 +1,7 @@
 package org.catalogueoflife.editor.name;
 
 import java.util.List;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -15,6 +16,12 @@ public interface SynonymAcceptedMapper {
       ON CONFLICT DO NOTHING
       """)
   void link(@Param("s") long synonymUsageId, @Param("a") long acceptedUsageId, @Param("o") Integer ordinal);
+
+  @Delete("""
+      DELETE FROM synonym_accepted
+      WHERE synonym_usage_id = #{s} AND accepted_usage_id = #{a}
+      """)
+  int unlink(@Param("s") long synonymUsageId, @Param("a") long acceptedUsageId);
 
   @Select("""
       SELECT accepted_usage_id FROM synonym_accepted

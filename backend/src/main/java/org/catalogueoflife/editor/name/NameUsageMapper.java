@@ -1,6 +1,7 @@
 package org.catalogueoflife.editor.name;
 
 import java.util.List;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -70,6 +71,23 @@ public interface NameUsageMapper {
   @ResultMap("nameUsageResult")
   List<NameUsage> findByProject(@Param("projectId") long projectId, @Param("limit") int limit,
       @Param("offset") int offset);
+
+  @Select("""
+      SELECT * FROM name_usage
+      WHERE project_id = #{projectId} AND scientific_name % #{q}
+      ORDER BY similarity(scientific_name, #{q}) DESC
+      LIMIT #{limit} OFFSET #{offset}
+      """)
+  @ResultMap("nameUsageResult")
+  List<NameUsage> search(@Param("projectId") long projectId, @Param("q") String q,
+      @Param("limit") int limit, @Param("offset") int offset);
+
+  @Select("SELECT * FROM name_usage WHERE id = #{id} AND project_id = #{projectId}")
+  @ResultMap("nameUsageResult")
+  NameUsage findByIdInProject(@Param("id") long id, @Param("projectId") long projectId);
+
+  @Delete("DELETE FROM name_usage WHERE id = #{id} AND project_id = #{projectId}")
+  int delete(@Param("id") long id, @Param("projectId") long projectId);
 
   @Update("""
       UPDATE name_usage
