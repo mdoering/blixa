@@ -15,9 +15,11 @@ larger number of synonyms).
 
 The editor is **standalone** — it has its own database and does not depend on
 the ChecklistBank backend at runtime — but it **reuses selected CoL/GBIF Java
-libraries** (GBIF `name-parser`, `NameFormatter`, and the ColDP reader/writer)
-so it shares parsing, formatting and I/O behaviour with the wider CoL
-ecosystem. Data leaves and enters the system as ColDP archives.
+libraries** — GBIF `name-parser` / `NameFormatter` for name atomisation and
+rendering, and the CoL `vocab` (enums) and `coldp` (terms) modules — so it
+shares parsing, formatting and vocabularies with the wider CoL ecosystem. Data
+leaves and enters the system as ColDP archives (the archive reader/writer is
+added in phases 2–3).
 
 The central entities that get the most attention, especially early on, are
 **References** and **NameUsages** (with **Authors** alongside). Nomenclatural
@@ -58,7 +60,7 @@ duplication (see §5.5).
 | Database | **PostgreSQL 17** (single DB, shared schema) |
 | Migrations | **Flyway** |
 | Auth | **Spring Security**, ORCID OAuth2/OIDC (primary), local accounts (fallback) |
-| Domain libs | GBIF **`name-parser` 4.2.0-SNAPSHOT** (+ `name-parser-api`, which also carries `NameFormatter`), ColDP reader/writer — see [Appendix A](#appendix-a--name-parser-420-snapshot-integration) |
+| Domain libs | GBIF **`name-parser` 4.2.0-SNAPSHOT** (+ `name-parser-api` for types & `NameFormatter`), **`org.catalogueoflife:vocab:1.2.3-SNAPSHOT`** for the enums (pulls in `org.catalogueoflife:coldp`, i.e. the `ColdpTerm` vocabulary) — see [Appendix A](#appendix-a--name-parser-420-snapshot-integration) & §5.0. ColDP archive `reader` module added in phase 2; writer in phase 3. |
 | Search | PostgreSQL only — `pg_trgm` (GIN) + btree indexes; no Elasticsearch |
 | Frontend | **React + TypeScript + Vite + Ant Design**, TanStack Query |
 | Tree UI | Virtualized, lazy-loaded tree (e.g. react-arborist / react-window) |
@@ -123,14 +125,24 @@ internal one**:
    out of the core.
 
 **Reuse boundaries.**
-- *Reuse as dependencies:* name-parser-api enums (`Rank`, `NomCode`, `NamePart`,
-  `NameType`) and the CLB `vocab` enums (`TaxonomicStatus`, `NomStatus`,
-  `NomRelType`, `TypeStatus`, `Gender`, `Sex`, `Environment`, `GeoTime`,
-  `Gazetteer`, `DegreeOfEstablishment`, `EstablishmentMeans`,
-  `DistributionStatus`, `EstimateType`, `Country`, `License`,
-  `IdentifierScope`). **Open item:** confirm the `vocab` artifact resolves
-  standalone from GBIF's Maven repo; if it pulls in the wider CLB build, vendor
-  just the enums we need.
+- *Reuse as dependencies:*
+  - `org.gbif:name-parser-api` — `Rank`, `NomCode`, `NamePart`, `NameType`, plus
+    `NameFormatter`.
+  - **`org.catalogueoflife:vocab:1.2.3-SNAPSHOT`** — the CLB vocabulary enums
+    (`TaxonomicStatus`, `NomStatus`, `NomRelType`, `TypeStatus`, `Gender`, `Sex`,
+    `Environment`, `GeoTime`, `Gazetteer`, `DegreeOfEstablishment`,
+    `EstablishmentMeans`, `DistributionStatus`, `EstimateType`, `Country`,
+    `License`, `IdentifierScope`, …). It is its own module with only two
+    dependencies, both of which we want anyway: `org.gbif:name-parser-api` and
+    `org.catalogueoflife:coldp`.
+  - **`org.catalogueoflife:coldp:1.2.3-SNAPSHOT`** (transitive via `vocab`) —
+    essentially the **`ColdpTerm`** enumeration (the ColDP term/column
+    vocabulary), key for column mapping on import/export. Not an archive
+    reader/writer.
+  - The ColDP archive **reader** is a separate module,
+    **`org.catalogueoflife:reader`** (`life.catalogue.csv.ColdpReader`, also DwC-A
+    and ACEF readers), added in **phase 2** for import. A ColDP **writer** for
+    export is sourced in **phase 3** (see §8).
 - *Define ourselves:* every entity class (Reference, Author, Name, NameUsage,
   supporting) as lean records tailored to editing.
 - *Exclude entirely:* DSID keys, `VerbatimRecord`, sector/source/decision/matching,
@@ -371,13 +383,17 @@ supporting-entity editing UX. (The validation *engine* is in; the rule
 
 ## 8. Phasing roadmap (after v1)
 
-- **Phase 2 — ColDP import.** Upload a ColDP archive; choose which entities to
-  import; **dedup/merge** against existing records. Matching keys: shared
-  identifiers first, then parsed name + author/year (via name-parser) for names,
-  DOI/title for references. Present a per-record **merge / skip / replace**
-  decision UI, with a bulk "apply to all similar" affordance.
+- **Phase 2 — ColDP import.** Read the archive with `org.catalogueoflife:reader`
+  (`ColdpReader`); choose which entities to import; **dedup/merge** against
+  existing records. Matching keys: shared identifiers first, then parsed name +
+  author/year (via name-parser) for names, DOI/title for references. Present a
+  per-record **merge / skip / replace** decision UI, with a bulk "apply to all
+  similar" affordance. (The `reader` module also parses DwC-A and ACEF, a
+  possible future import source.)
 - **Phase 3 — ColDP export.** Write a valid ColDP ZIP (normalized entity files +
-  `metadata.yaml`) via the ColDP writer library. Round-trips `modified` /
+  `metadata.yaml`). The `reader` module is read-only, so export uses a writer
+  sourced this phase — a TSV/ZIP layer keyed off the `ColdpTerm` vocabulary, or a
+  backend ColDP writer if one is available. Round-trips `modified` /
   `modified_by` and derives scrutinizer from the audit log.
 - **Phase 4 — Batch editing.** Multi-select in tree/search → bulk change
   rank/status/parent, move subtrees, find-and-replace authorship, bulk delete;
@@ -403,7 +419,7 @@ supporting-entity editing UX. (The validation *engine* is in; the rule
 
 ## 10. Decisions on record
 
-- Standalone app; reuse CoL/GBIF Java libraries (name-parser, NameFormatter, ColDP I/O).
+- Standalone app; reuse CoL/GBIF Java libraries: `name-parser` / `NameFormatter`, and `org.catalogueoflife:vocab` (enums) + transitively `org.catalogueoflife:coldp` (terms). ColDP archive reader/writer sourced in phases 2–3.
 - Async multi-user with optimistic locking **and** soft (advisory) subtree/record locks.
 - Phase 1 = foundation + core editing; import/export/batch deferred.
 - ORCID login primary, local accounts as fallback; ORCID doubles as the authorship identifier.
