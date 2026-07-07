@@ -20,15 +20,21 @@ so it shares parsing, formatting and I/O behaviour with the wider CoL
 ecosystem. Data leaves and enters the system as ColDP archives.
 
 The central entities that get the most attention, especially early on, are
-**References**, **Names**, and **NameUsages**. The classification is built as a
-**parent/child hierarchy** (`NameUsage.parent_id`); the flat, denormalised
-higher-rank columns of the ColDP `Taxon` entity are deliberately **not** used.
+**References** and **NameUsages** (with **Authors** alongside). Nomenclatural
+name facts and taxonomic usage are **collapsed into a single `name_usage`
+entity** — in this editor the Name↔usage relation is always 1:1, so keeping
+them apart only adds a join and a second form (see §5.0). The classification is
+built as a **parent/child hierarchy** (`NameUsage.parent_id`); the flat,
+denormalised higher-rank columns of the ColDP `Taxon` entity are deliberately
+**not** used. Pro parte synonyms (one synonym under several accepted taxa) are
+modelled as a single record with multiple accepted parents rather than by
+duplication (see §5.5).
 
 ## 2. Goals and non-goals
 
 ### Goals
 - Host multiple independent projects with per-project users and roles on one instance.
-- Comfortable editing of References, Names, and NameUsages, and the parent/child classification tree, at genus-to-Lepidoptera scale.
+- Comfortable editing of References and NameUsages (collapsed name + usage), and the parent/child classification tree, at genus-to-Lepidoptera scale.
 - Track who edited what, with a recent-changes log and the ability to revert.
 - Async multi-user collaboration with optimistic concurrency and soft (advisory) locks on records/subtrees.
 - Async, **non-blocking validation**: users may enter bad data and are warned *softly* about problems (never hard-blocked).
@@ -41,7 +47,7 @@ higher-rank columns of the ColDP `Taxon` entity are deliberately **not** used.
 - Being a public read/search portal — this is an editing tool. Published data is exported to ColDP / ChecklistBank.
 - Runtime coupling to the ChecklistBank backend or its database.
 - Storing or maintaining the denormalised flat higher-rank classification columns.
-- Managing `accordingTo` on usages, or a separately-managed scrutinizer (see §5.5).
+- Managing `accordingTo` on usages, or a separately-managed scrutinizer (see §5.4).
 
 ## 3. Technology stack
 
@@ -70,9 +76,9 @@ checklistbank UI (React/Ant Design) for team familiarity.
 
 - **One Postgres database, shared schema.** Every data row carries a
   `project_id`. Roles are per-project. This supports many projects with easy
-  cross-project lookups and simple operations. The large tables (`name`,
-  `name_usage`) can be **partitioned by `project_id`** later if a single project
-  grows very large; the schema is designed so this is a non-breaking change.
+  cross-project lookups and simple operations. The large `name_usage` table can
+  be **partitioned by `project_id`** later if a single project grows very large;
+  the schema is designed so this is a non-breaking change.
 - **REST/JSON API** served by Spring Boot; the React SPA is the only client,
   consuming it via TanStack Query. The read API is deliberately shaped as a
   handful of **view-oriented endpoints** (e.g. `tree-children`, `usage-detail`,
@@ -81,15 +87,18 @@ checklistbank UI (React/Ant Design) for team familiarity.
   considered and **deferred** (see §10); Spring makes it additive on the read
   side later if over/under-fetching becomes painful.
 - **ORCID OAuth2** for login; a signed session/JWT authorises API calls.
-- **Server-side tree traversal.** Children are fetched lazily per node and
-  paginated, so a 200k-node classification is never materialised at once in the
+- **Server-side tree traversal.** The tree shows **accepted usages only**
+  (accepted / provisionally accepted); synonyms are never tree nodes — they load
+  on the accepted taxon's detail page. Children are fetched lazily per node and
+  paginated, so a 200k-taxon classification is never materialised at once in the
   browser or the API response.
 
 ## 5. Data model
 
-**Name and NameUsage are separate entities.** The column lists in §5.1–§5.10 are
-indicative, not exhaustive; the exact classes are the first implementation
-deliverable (§5.0) and the full DDL lives in Flyway migrations.
+**Name facts and taxonomic usage are collapsed into a single `name_usage`
+entity** (§5.0, §5.4). The column lists in §5.1–§5.10 are indicative, not
+exhaustive; the exact classes are the first implementation deliverable (§5.0)
+and the full DDL lives in Flyway migrations.
 
 ### 5.0 Modeling approach: editor domain model vs ColDP raw
 
@@ -97,14 +106,17 @@ Two distinct models are kept separate, and **the wire format never dictates the
 internal one**:
 
 1. **Editor domain model — authoritative, editing-optimized (our own classes).**
-   It *leans on* the ChecklistBank internal model's structure (the normalized
-   Name / NameUsage / Reference split; Taxon/Synonym/BareName expressed as a
-   `NameUsage` + `status`) and *reuses* CLB/name-parser enums, but it is
-   **trimmed of all CLB machinery** — no `sectorKey`, `verbatimKey`,
-   `datasetKey`, `namesIndexId`, no sectors/sources/decisions/matching, no DSID
-   key scheme, no `VerbatimRecord`. It adds editor-only concerns instead
-   (`project_id`, a surrogate id, `version`, and links to audit/lock/issue).
-   We **do not** import CLB's `Name`/`NameUsage`/`Taxon`/`Synonym` classes.
+   It *leans on* the ChecklistBank internal model's structure (Taxon/Synonym/
+   BareName expressed as a `NameUsage` + `status`; the normalized Reference and
+   Author entities) and *reuses* CLB/name-parser enums, but it **diverges where
+   the editor is simpler**: name facts and taxonomic usage are **collapsed into
+   one `name_usage` entity** (CLB keeps `Name` and `NameUsage` separate; here the
+   relation is always 1:1 — see §5.4). It is **trimmed of all CLB machinery** —
+   no `sectorKey`, `verbatimKey`, `datasetKey`, `namesIndexId`, no
+   sectors/sources/decisions/matching, no DSID key scheme, no `VerbatimRecord` —
+   and adds editor-only concerns instead (`project_id`, a surrogate id,
+   `version`, links to audit/lock/issue). We **do not** import CLB's
+   `Name`/`NameUsage`/`Taxon`/`Synonym` classes.
 2. **ColDP raw — a boundary DTO only.** Faithful to the tabular format (TEXT ids,
    the merged-NameUsage option, all-string fields), used *solely* by the ColDP
    reader/writer at import/export and mapped to/from the domain model. It stays
@@ -167,51 +179,90 @@ from the project.
   `modified` / `modified_by`. A logged-in user's ORCID links a user to an
   `author` record so authorship/attribution stay consistent.
 
-### 5.4 Name (nomenclature)
+### 5.4 NameUsage (collapsed name + taxonomic usage)
 
-- **`name`** — pure nomenclatural facts, project-scoped:
-  - `id`, `project_id`, `alternative_id[]`, `basionym_id` (self-ref)
+A single **`name_usage`** entity holds both the nomenclatural name facts and the
+taxonomic usage; this table **is the classification**. (CLB keeps `Name` and
+`NameUsage` separate; we collapse them because the relation is always 1:1 here.)
+
+- Identity & classification:
+  - `id`, `project_id`, `alternative_id[]`
+  - `parent_id` → `name_usage` (self-ref, **accepted usages only**) — **builds
+    the parent/child tree**; synonym→accepted links live in `synonym_accepted`
+    (§5.5), not here
+  - `basionym_id` → `name_usage` (self-ref, the original combination)
+  - `ordinal` (sibling sort order)
+- Nomenclatural (name) fields:
   - `scientific_name`, `authorship`, `rank`
   - atomized parts: `uninomial`, `genus`, `infrageneric_epithet`,
     `specific_epithet`, `infraspecific_epithet`, `cultivar_epithet`, `notho`
   - atomized authorship: `combination_authorship`, `combination_ex_authorship`,
     `combination_authorship_year`, `basionym_authorship`,
-    `basionym_ex_authorship`, `basionym_authorship_year`
+    `basionym_ex_authorship`, `basionym_authorship_year`, `sanctioning_author`
   - `nom_status` (nomenclatural status), `published_in_reference_id`,
-    `published_in_year`, `published_in_page`, `gender`, `etymology`, `link`,
-    `remarks`, `modified` / `modified_by`
+    `published_in_year`, `published_in_page`, `gender`, `etymology`
   - **No `code` column** — derived from `project.nom_code`.
-- On entry the **GBIF name-parser** atomizes `scientific_name` + `authorship`
-  into the parts above; the user can also edit atomized fields directly. The
-  parser API in 4.2.0-SNAPSHOT differs substantially from older versions — the
-  exact contract we bind to is documented in
-  [Appendix A](#appendix-a--name-parser-420-snapshot-integration).
-- Display strings are produced by GBIF **`NameFormatter`** using the project code.
-
-### 5.5 NameUsage (taxonomic usage)
-
-- **`name_usage`** — the taxonomic usage of a name; this table **is the
-  classification**:
-  - `id`, `project_id`, `alternative_id[]`
-  - `name_id` → `name`
-  - `parent_id` → `name_usage` (self-ref) — **builds the parent/child tree**
+- Taxonomic (usage) fields:
   - `status` ∈ {accepted, provisionally accepted, synonym, ambiguous synonym,
     misapplied, bare name}
   - `name_phrase` (free-text qualifier, e.g. `auct. non …`, `sensu lato`)
   - `reference_id[]` (taxonomic references supporting the usage)
-  - `extinct`, `environment[]`, `temporal_range_start/end`, `ordinal`
-    (sibling sort order), `link`, `remarks`, `modified` / `modified_by`
+  - `extinct`, `environment[]`, `temporal_range_start/end`
   - **No `according_to_reference_id` / `accordingToPage`** (dropped per decision).
   - **No scrutinizer fields** — the scrutinizer is derived from the audit log
     (last editor + `modified` timestamp) whenever it needs to be shown or
     exported.
-  - Accepted usages `parent_id` → an accepted usage; **synonyms `parent_id` →
-    the accepted usage they belong to** (mirrors ColDP merged-NameUsage
-    semantics). Bare names have no parent.
+- Common: `link`, `remarks`, `version`, `modified` / `modified_by`.
+- Parent semantics: `parent_id` links **accepted** usages into the classification
+  tree (accepted → parent accepted). Synonyms, ambiguous synonyms and misapplied
+  names do **not** use `parent_id`; their link(s) to accepted taxa live in the
+  `synonym_accepted` table (§5.5). Bare names have neither.
+- **The tree shows accepted usages only.** Synonyms are not tree nodes; they
+  surface on their accepted taxon's detail page, loaded via `synonym_accepted`
+  (§5.5). The tree "children of X" query is therefore a clean `parent_id = X`
+  over accepted usages, while the taxon detail view loads that taxon's synonyms
+  separately.
+- On entry the **GBIF name-parser** atomizes `scientific_name` + `authorship`
+  into the parts above; the user can also edit atomized fields directly. The
+  4.2.0-SNAPSHOT parser API differs substantially from older versions — the
+  exact contract we bind to is in
+  [Appendix A](#appendix-a--name-parser-420-snapshot-integration). Display
+  strings come from GBIF **`NameFormatter`** using the project code.
 - **Subtree operations** (move subtree, descendant counts, subtree locking):
   `name_usage` carries a **Postgres `ltree` materialized path** (or a closure
   table) maintained on insert/move, so subtree queries and locks are cheap and
   don't require deep recursive scans on the hot path.
+
+### 5.5 Synonymy — the `synonym_accepted` relation
+
+All synonym→accepted links live in one relation table, keeping `parent_id`
+purely for the accepted classification tree:
+
+- **`synonym_accepted`** — `(synonym_usage_id, accepted_usage_id, ordinal?)`.
+  Each row links a non-accepted usage (synonym / ambiguous synonym / misapplied)
+  to an accepted taxon it belongs under. `accepted_usage_id` must reference an
+  accepted usage. Optional `ordinal` gives a stable display/export order.
+- A normal synonym has **exactly one** row. A **pro parte** synonym — one name
+  used as a synonym under several accepted taxa — has **several** rows: it stays
+  a single `name_usage` record and gains multiple accepted links, so we never
+  duplicate nomenclatural facts (the traditional `ambiguous synonym`/duplication
+  workaround is unnecessary). `status` stays `synonym` (or `ambiguous synonym`
+  only when placement is genuinely uncertain).
+- A taxon detail page lists its synonyms with a single join
+  `synonym_accepted.accepted_usage_id = X`; a pro parte synonym therefore
+  appears on **each** of its accepted taxa's pages. Synonyms are never tree
+  nodes (§5.4), so this relation feeds only detail pages, not the tree.
+- **Why the unified table** (vs. a primary `parent_id` + overflow table):
+  because synonyms are not tree nodes, reserving `parent_id` for accepted edges
+  costs nothing and makes both queries trivial — the tree is a pure
+  `parent_id` scan and synonymy is a pure `synonym_accepted` join, with no
+  per-node union.
+- **Round-trip.** Export to the normalized ColDP files emits **one `Name` row +
+  N `Synonym` rows** (one per accepted link, all sharing that `Name.ID`) — the
+  representation ColDP prescribes, with no field drift. Import re-collapses
+  multiple `Synonym` rows sharing a `nameID` (or duplicate merged-NameUsage rows
+  for one name) back into a single record with multiple `synonym_accepted` rows
+  — a natural fit for the phase-2 dedup work.
 
 ### 5.6 Supporting entities
 
@@ -219,7 +270,9 @@ Schema present from the start; **editing UX phased in later** (phase 5):
 `name_relation`, `type_material`, `distribution`, `vernacular_name`,
 `taxon_property`, `species_estimate`, `species_interaction`,
 `taxon_concept_relation`, `media`. All project-scoped with `modified` /
-`modified_by`.
+`modified_by`. Since name and usage are collapsed, ColDP's `nameID` and
+`taxonID` foreign keys both resolve to a single `name_usage` id here (e.g.
+`type_material` and `name_relation` reference name usages directly).
 
 ### 5.7 Audit / change log
 
@@ -265,9 +318,9 @@ problems; instead, rules run **asynchronously** and attach `issue` records
 - **Trigger.** Each create/update/delete emits a change event (same source as
   the audit log). A background worker consumes events and (re)validates the
   affected entity plus a bounded set of directly related entities (e.g. editing
-  a `name` re-checks its `name_usage`; reparenting re-checks the moved node and
-  its new/old parent). A **full project re-validation** can also be run on
-  demand (and after import in phase 2).
+  a `reference` re-checks the usages that cite it; reparenting re-checks the
+  moved node and its old/new parents). A **full project re-validation** can also
+  be run on demand (and after import in phase 2).
 - **Execution model.** Rules run out-of-band on a worker pool / queue so large
   edits and bulk operations don't stall the UI. Results are written idempotently
   (a rule replaces its own prior findings for an entity), so re-running is safe.
@@ -286,10 +339,10 @@ problems; instead, rules run **asynchronously** and attach `issue` records
   "problems" view filterable by rule/severity/entity type.
 - **Starter rule set (phase 1)** — the infrastructure plus a small set, e.g.:
   unparsable scientific name; authorship/year mismatch with the linked reference;
-  rank inconsistent with parent rank; synonym whose parent is itself a
-  synonym; missing `published_in` reference; duplicate scientific name +
-  authorship within a project; dangling reference/name/parent pointers. The rule
-  catalogue grows over time.
+  rank inconsistent with parent rank; synonym linked (via `synonym_accepted`) to
+  a non-accepted usage; missing `published_in` reference; duplicate scientific
+  name + authorship within a project; dangling reference/parent/synonym-accepted
+  pointers. The rule catalogue grows over time.
 
 ## 7. Phase 1 scope (first working version)
 
@@ -300,11 +353,12 @@ The buildable slice:
 2. **Project ColDP metadata** editing, including selecting the single
    `nom_code`.
 3. **References**: CRUD + fuzzy search.
-4. **Names**: CRUD + fuzzy search, GBIF name-parser auto-atomization on entry,
-   `NameFormatter` rendering using the project code.
-5. **NameUsages + classification tree**: create / rename / move / change-status,
-   lazy-loaded and virtualized, sibling ordering; synonyms attach to their
-   accepted usage.
+4. **NameUsages** (collapsed name + usage): CRUD + fuzzy search, GBIF
+   name-parser auto-atomization on entry, `NameFormatter` rendering using the
+   project code.
+5. **Classification tree**: create / rename / move / change-status, lazy-loaded
+   and virtualized, sibling ordering; synonyms attach to their accepted usage,
+   including pro parte synonyms with multiple accepted parents (§5.5).
 6. **Soft locks** on records/subtrees + optimistic-locking conflict handling.
 7. **Audit log** with a per-project recent-changes view and single-record
    revert.
@@ -355,7 +409,7 @@ supporting-entity editing UX. (The validation *engine* is in; the rule
 - ORCID login primary, local accounts as fallback; ORCID doubles as the authorship identifier.
 - Backend: Spring Boot + MyBatis + Postgres + Flyway + Spring Security.
 - Postgres-only search (`pg_trgm`), no Elasticsearch.
-- Normalized Name / NameUsage split; parent/child classification only, flat higher ranks ignored.
+- Name and taxonomic usage **collapsed into one `name_usage` entity** (1:1 here); parent/child classification only (accepted usages), flat higher ranks ignored. Synonyms are not tree nodes and appear on taxon detail pages only. All synonym→accepted links (including pro parte, multiple accepted taxa) live in a single **`synonym_accepted`** relation table, keeping `parent_id` purely for the accepted tree; no record duplication. Export fans out to one Name + N Synonym rows, import re-collapses.
 - Two-layer model (§5.0): an authoritative editor domain model (our own lean classes, leaning on CLB's structure, reusing CLB/name-parser enums, trimmed of CLB machinery) plus a ColDP-raw DTO used only at the import/export boundary. We do not import CLB's entity classes. Surrogate project-scoped PKs, with original ColDP IDs preserved for round-trip. Exact classes/DDL/mapping are the first implementation deliverable.
 - `ltree` materialized path for subtree operations.
 - Single `nom_code` per project (drives NameFormatter and code-specific behaviour); no per-name code.
@@ -410,9 +464,9 @@ epithet (e.g. a genus author cited inside a larger name) and are not part of a
 proper name for our purposes. Only the name-level combination/basionym
 authorship above is mapped and stored.
 
-Mapping `ParsedName` → ColDP `name` columns:
+Mapping `ParsedName` → the name fields of `name_usage`:
 
-| ColDP `name` field | Source |
+| `name_usage` name field | Source |
 |---|---|
 | `combination_authorship` / `combination_ex_authorship` / `combination_authorship_year` | `getCombinationAuthorship()` → `getAuthors()` / `getExAuthors()` / `getYear()` |
 | `basionym_authorship` / `basionym_ex_authorship` / `basionym_authorship_year` | `getBasionymAuthorship()` → `getAuthors()` / `getExAuthors()` / `getYear()` |
