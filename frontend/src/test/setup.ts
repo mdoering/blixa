@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
+import { afterAll, afterEach as afterEachTest, beforeAll } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { server } from './server';
 
 // Ant Design (and other libs) call matchMedia; jsdom doesn't implement it.
 Object.defineProperty(window, 'matchMedia', {
@@ -21,3 +23,7 @@ Object.defineProperty(window, 'matchMedia', {
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 afterEach(() => cleanup());
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterEachTest(() => server.resetHandlers());
+afterAll(() => server.close());
