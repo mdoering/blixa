@@ -42,6 +42,10 @@ test('viewer role sees a disabled Save button', async () => {
     http.get('/api/projects/3', () => HttpResponse.json({ ...project, role: 'viewer' })),
   );
   renderPage();
-  await screen.findByLabelText('Title');
+  const title = await screen.findByLabelText('Title');
+  // Wait until the fetched role=viewer project has populated the form, so the
+  // assertion reflects the loaded role (canEdit=false because viewer ∉ owner/editor),
+  // not the pre-fetch `data === undefined` default.
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
   expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();
 });
