@@ -1,7 +1,8 @@
-import { Form, Input, Modal, Select } from 'antd';
+import { Form, Input, Modal, Select, App as AntApp } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { createProject } from '../api/projects';
+import { messageFor } from '../api/client';
 import type { CreateProjectPayload } from '../api/types';
 
 export const NOM_CODES = ['zoological', 'botanical', 'virus', 'bacterial', 'cultivars', 'phytosociological'];
@@ -10,6 +11,7 @@ export default function CreateProjectModal({ open, onClose }: { open: boolean; o
   const [form] = Form.useForm<CreateProjectPayload>();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { message } = AntApp.useApp();
 
   const mutation = useMutation({
     mutationFn: (values: CreateProjectPayload) => createProject(values),
@@ -19,6 +21,7 @@ export default function CreateProjectModal({ open, onClose }: { open: boolean; o
       onClose();
       navigate(`/projects/${project.id}/metadata`);
     },
+    onError: (e) => message.error(messageFor(e, 'Could not create project')),
   });
 
   return (

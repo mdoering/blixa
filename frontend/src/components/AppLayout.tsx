@@ -11,9 +11,12 @@ export default function AppLayout() {
   const queryClient = useQueryClient();
 
   async function onLogout() {
-    await logout();
-    await queryClient.invalidateQueries({ queryKey: ['me'] });
-    navigate('/login', { replace: true });
+    try {
+      await logout();
+    } finally {
+      queryClient.clear();
+      navigate('/login', { replace: true });
+    }
   }
 
   return (

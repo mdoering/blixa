@@ -1,6 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { afterEach, vi } from 'vitest';
-import { afterAll, afterEach as afterEachTest, beforeAll } from 'vitest';
+import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { server } from './server';
 
@@ -25,5 +24,5 @@ window.HTMLElement.prototype.scrollIntoView = vi.fn();
 afterEach(() => cleanup());
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEachTest(() => server.resetHandlers());
+afterEach(() => server.resetHandlers());
 afterAll(() => server.close());

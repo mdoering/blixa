@@ -2,6 +2,7 @@ import { Button, Form, Input, Popconfirm, Select, Table, App as AntApp } from 'a
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { getProject, listMembers, removeMember, setMember } from '../api/projects';
+import { messageFor } from '../api/client';
 import type { Member, Role } from '../api/types';
 
 const ROLES: Role[] = ['owner', 'editor', 'reviewer', 'viewer'];
@@ -22,12 +23,12 @@ export default function MembersPage() {
   const setMut = useMutation({
     mutationFn: ({ username, role }: { username: string; role: Role }) => setMember(id, username, role),
     onSuccess: async () => { await invalidate(); form.resetFields(); },
-    onError: () => message.error('Could not update member'),
+    onError: (e) => message.error(messageFor(e, 'Could not update member')),
   });
   const removeMut = useMutation({
     mutationFn: (userId: number) => removeMember(id, userId),
     onSuccess: invalidate,
-    onError: () => message.error('Could not remove member'),
+    onError: (e) => message.error(messageFor(e, 'Could not remove member')),
   });
 
   return (

@@ -36,3 +36,12 @@ test('prefills the form and saves updated metadata', async () => {
   await userEvent.click(screen.getByRole('button', { name: /save/i }));
   await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument());
 });
+
+test('viewer role sees a disabled Save button', async () => {
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json({ ...project, role: 'viewer' })),
+  );
+  renderPage();
+  await screen.findByLabelText('Title');
+  expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();
+});
