@@ -60,7 +60,7 @@ duplication (see §5.5).
 | Database | **PostgreSQL 17** (single DB, shared schema) |
 | Migrations | **Flyway** |
 | Auth | **Spring Security**, ORCID OAuth2/OIDC (primary), local accounts (fallback) |
-| Domain libs | GBIF **`name-parser` 4.2.0-SNAPSHOT** (+ `name-parser-api` for types & `NameFormatter`), **`org.catalogueoflife:vocab:1.2.3-SNAPSHOT`** for the enums (pulls in `org.catalogueoflife:coldp`, i.e. the `ColdpTerm` vocabulary) — see [Appendix A](#appendix-a--name-parser-420-snapshot-integration) & §5.0. ColDP archive `reader` module added in phase 2; writer in phase 3. |
+| Domain libs | GBIF **`name-parser` 4.2.0** (+ `name-parser-api` for types & `NameFormatter`), **`org.catalogueoflife:vocab:1.2.3-SNAPSHOT`** for the enums (pulls in `org.catalogueoflife:coldp`, i.e. the `ColdpTerm` vocabulary) — see [Appendix A](#appendix-a--name-parser-420-integration) & §5.0. ColDP archive `reader` module added in phase 2; writer in phase 3. |
 | Search | PostgreSQL only — `pg_trgm` (GIN) + btree indexes; no Elasticsearch |
 | Frontend | **React + TypeScript + Vite + Ant Design**, TanStack Query |
 | Tree UI | Virtualized, lazy-loaded tree (e.g. react-arborist / react-window) |
@@ -280,9 +280,9 @@ taxonomic usage; this table **is the classification**. (CLB keeps `Name` and
   separately.
 - On entry the **GBIF name-parser** atomizes `scientific_name` + `authorship`
   into the parts above; the user can also edit atomized fields directly. The
-  4.2.0-SNAPSHOT parser API differs substantially from older versions — the
+  4.2.0 parser API differs substantially from older versions — the
   exact contract we bind to is in
-  [Appendix A](#appendix-a--name-parser-420-snapshot-integration). Display
+  [Appendix A](#appendix-a--name-parser-420-integration). Display
   strings come from GBIF **`NameFormatter`** using the project code.
 - **Protologue page link (`published_in_page_link`) + BHL tooling.** The field
   holds a deep link to the exact page where the name's protologue starts. A bit
@@ -504,22 +504,21 @@ supporting-entity editing UX. (The validation *engine* is in; the rule
 - Single `nom_code` per project (drives NameFormatter and code-specific behaviour); no per-name code.
 - `accordingTo` dropped from usages; scrutinizer derived from the audit log, not managed separately.
 - Async, non-blocking validation: rules run out-of-band and attach advisory `issue` findings; bad data is allowed and only softly flagged. Engine + starter rules land in phase 1.
-- Name parsing/formatting binds to GBIF **name-parser 4.2.0-SNAPSHOT**, whose API differs substantially from older releases (see Appendix A). Only name-level combination/basionym authorship is used; per-epithet `genericAuthorship`/`specificAuthorship` are ignored.
+- Name parsing/formatting binds to GBIF **name-parser 4.2.0**, whose API differs substantially from older releases (see Appendix A). Only name-level combination/basionym authorship is used; per-epithet `genericAuthorship`/`specificAuthorship` are ignored.
 - **REST/JSON, not GraphQL**, for phase 1. GraphQL's flexible nested reads suit the relational data, but its costs (N+1/DataLoader complexity on the 200k-node tree, loss of HTTP/Varnish caching, divergence from the REST CLB/portal ecosystem) outweigh the gain for a single first-party client. The API is shaped as view-oriented read endpoints; GraphQL can be layered onto reads later if needed. Middle path if end-to-end typing is wanted: OpenAPI + TS codegen.
 
-## Appendix A — name-parser 4.2.0-SNAPSHOT integration
+## Appendix A — name-parser 4.2.0 integration
 
-We depend on the **4.2.0-SNAPSHOT** GBIF name-parser, whose API differs
+We depend on the **4.2.0** GBIF name-parser, whose API differs
 substantially from the 3.x / earlier 4.x releases. The implementation and any
 future work must bind to *this* contract, verified against the local checkout at
 `~/code/gbif/name-parser`. Do **not** assume the older `NameParserGBIF`
 singleton / two-arg `parse` shapes.
 
-**Coordinates.** `org.gbif:name-parser:4.2.0-SNAPSHOT` (impl) and
-`org.gbif:name-parser-api:4.2.0-SNAPSHOT` (types + `NameFormatter` +
-`RankUtils`). Being a SNAPSHOT, it is sourced from the GBIF snapshots repository
-or a local `mvn install` of the checkout; pin the resolved timestamped snapshot
-in CI for reproducibility.
+**Coordinates.** `org.gbif:name-parser:4.2.0` (impl) and
+`org.gbif:name-parser-api:4.2.0` (types + `NameFormatter` + `RankUtils`) — the
+**released 4.2.0** version (no longer a SNAPSHOT), resolvable from Maven Central /
+the GBIF repository.
 
 **Instantiation.** `NameParser parser = new NameParserImpl();` — a direct
 constructor, not a static singleton. The instance is thread-safe and reusable;
