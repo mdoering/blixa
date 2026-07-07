@@ -52,7 +52,7 @@ higher-rank columns of the ColDP `Taxon` entity are deliberately **not** used.
 | Database | **PostgreSQL 17** (single DB, shared schema) |
 | Migrations | **Flyway** |
 | Auth | **Spring Security**, ORCID OAuth2/OIDC (primary), local accounts (fallback) |
-| Domain libs | GBIF `name-parser`, `NameFormatter`, ColDP reader/writer (JVM deps) |
+| Domain libs | GBIF **`name-parser` 4.2.0-SNAPSHOT** (+ `name-parser-api`, which also carries `NameFormatter`), ColDP reader/writer — see [Appendix A](#appendix-a--name-parser-420-snapshot-integration) |
 | Search | PostgreSQL only — `pg_trgm` (GIN) + btree indexes; no Elasticsearch |
 | Frontend | **React + TypeScript + Vite + Ant Design**, TanStack Query |
 | Tree UI | Virtualized, lazy-loaded tree (e.g. react-arborist / react-window) |
@@ -133,7 +133,10 @@ from the project.
     `remarks`, `modified` / `modified_by`
   - **No `code` column** — derived from `project.nom_code`.
 - On entry the **GBIF name-parser** atomizes `scientific_name` + `authorship`
-  into the parts above; the user can also edit atomized fields directly.
+  into the parts above; the user can also edit atomized fields directly. The
+  parser API in 4.2.0-SNAPSHOT differs substantially from older versions — the
+  exact contract we bind to is documented in
+  [Appendix A](#appendix-a--name-parser-420-snapshot-integration).
 - Display strings are produced by GBIF **`NameFormatter`** using the project code.
 
 ### 5.5 NameUsage (taxonomic usage)
@@ -308,3 +311,79 @@ supporting-entity editing UX. (The validation *engine* is in; the rule
 - Single `nom_code` per project (drives NameFormatter and code-specific behaviour); no per-name code.
 - `accordingTo` dropped from usages; scrutinizer derived from the audit log, not managed separately.
 - Async, non-blocking validation: rules run out-of-band and attach advisory `issue` findings; bad data is allowed and only softly flagged. Engine + starter rules land in phase 1.
+- Name parsing/formatting binds to GBIF **name-parser 4.2.0-SNAPSHOT**, whose API differs substantially from older releases (see Appendix A). Only name-level combination/basionym authorship is used; per-epithet `genericAuthorship`/`specificAuthorship` are ignored.
+
+## Appendix A — name-parser 4.2.0-SNAPSHOT integration
+
+We depend on the **4.2.0-SNAPSHOT** GBIF name-parser, whose API differs
+substantially from the 3.x / earlier 4.x releases. The implementation and any
+future work must bind to *this* contract, verified against the local checkout at
+`~/code/gbif/name-parser`. Do **not** assume the older `NameParserGBIF`
+singleton / two-arg `parse` shapes.
+
+**Coordinates.** `org.gbif:name-parser:4.2.0-SNAPSHOT` (impl) and
+`org.gbif:name-parser-api:4.2.0-SNAPSHOT` (types + `NameFormatter` +
+`RankUtils`). Being a SNAPSHOT, it is sourced from the GBIF snapshots repository
+or a local `mvn install` of the checkout; pin the resolved timestamped snapshot
+in CI for reproducibility.
+
+**Instantiation.** `NameParser parser = new NameParserImpl();` — a direct
+constructor, not a static singleton. The instance is thread-safe and reusable;
+create one bean and share it.
+
+**Parsing entry point** (`org.gbif.nameparser.api.NameParser`):
+
+```java
+ParsedName parse(String scientificName,
+                 @Nullable String authorship,   // separate authorship, may also be inline in the name
+                 @Nullable Rank rank,           // pass the known rank when we have it
+                 @Nullable NomCode code)         // pass the project's nom code
+    throws UnparsableNameException;
+```
+
+Pass the project `nom_code` and the usage's `rank` on every call. The older
+single-/two-arg overloads are `@Deprecated`. `parseAuthorship(String, NomCode)`
+parses authorship alone and returns a `ParsedAuthorship`.
+
+**Authorship model (the biggest change).** Authorship is a
+**`CombinedAuthorship`** (implementing `CombinedAuthorshipIF`) bundling a
+combination `Authorship`, a basionym `Authorship`, and an optional
+`sanctioningAuthor`; each `Authorship` carries authors, ex-authors, and year.
+`ParsedName extends ParsedAuthorship`, and the **name-level** authorship we use
+lives on that superclass: `getCombinationAuthorship()`,
+`getBasionymAuthorship()`, `getSanctioningAuthor()`.
+
+**We deliberately ignore the per-epithet `getGenericAuthorship()` /
+`getSpecificAuthorship()` getters.** Those attach authors to a non-terminal
+epithet (e.g. a genus author cited inside a larger name) and are not part of a
+proper name for our purposes. Only the name-level combination/basionym
+authorship above is mapped and stored.
+
+Mapping `ParsedName` → ColDP `name` columns:
+
+| ColDP `name` field | Source |
+|---|---|
+| `combination_authorship` / `combination_ex_authorship` / `combination_authorship_year` | `getCombinationAuthorship()` → `getAuthors()` / `getExAuthors()` / `getYear()` |
+| `basionym_authorship` / `basionym_ex_authorship` / `basionym_authorship_year` | `getBasionymAuthorship()` → `getAuthors()` / `getExAuthors()` / `getYear()` |
+| `uninomial`, `genus`, `infrageneric_epithet`, `specific_epithet`, `infraspecific_epithet`, `cultivar_epithet` | the corresponding `ParsedName` getters (`getEpithet(NamePart)` for epithet-level access) |
+| `notho` | `getNotho()` → `Set<NamePart>` |
+| `rank` | `getRank()` (`Rank` enum) |
+
+**Rendering** — `org.gbif.nameparser.util.NameFormatter` (static):
+`canonical(ParsedName)`, `canonicalWithoutAuthorship`, `canonicalMinimal`,
+`canonicalComplete`, `canonicalCompleteHtml` for HTML (italics), and
+`authorshipComplete(ParsedName)` / `authorString(Authorship, boolean inclYear,
+NomCode)` for authorship. `buildName(...)` is the fully parameterised builder.
+All honor the `NomCode`, so pass the project code for code-correct rendering.
+
+**Enums / vocabularies** come from `name-parser-api`: `Rank`, `NomCode`,
+`NamePart`, `NameType`. Our `name.rank`, `project.nom_code`, and related
+vocabularies should map to these enums (or store the enum name) rather than
+defining parallel lists.
+
+**Parse quality → validation.** `parse(...)` throws
+`UnparsableNameException` (carrying a `NameType`, e.g. virus / hybrid-formula /
+placeholder) for names that cannot be atomised — the "unparsable scientific
+name" starter rule catches this. `ParsedName` also exposes a `State`
+(`COMPLETE` / `PARTIAL` / …) and warnings; a non-`COMPLETE` state feeds a
+"doubtful parse" warning finding.
