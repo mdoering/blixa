@@ -1,13 +1,14 @@
 package org.catalogueoflife.editor.project;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.catalogueoflife.editor.support.AbstractPostgresIT;
 import org.catalogueoflife.editor.user.AppUser;
@@ -26,6 +27,7 @@ class MemberApiIT extends AbstractPostgresIT {
 
   @Autowired MockMvc mvc;
   @Autowired AppUserService users;
+  @Autowired ProjectMemberMapper members;
   @Autowired ObjectMapper json;
 
   private void ensureUser(String u) {
@@ -67,5 +69,90 @@ class MemberApiIT extends AbstractPostgresIT {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"username\":\"ownerUser\",\"role\":\"editor\"}"))
        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @WithMockUser(username = "bossTwo")
+  void nonOwnerMemberCannotSetMembers() throws Exception {
+    ensureUser("bossTwo");
+    ensureUser("editorTwo");
+    ensureUser("thirdUser");
+
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"slug\":\"aranea\",\"title\":\"Spiders\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    long pid = json.readTree(body).get("id").asLong();
+
+    AppUser editorTwo = users.requireByUsernameOrNull("editorTwo");
+    members.upsert(new ProjectMember(pid, editorTwo.getId(), Role.EDITOR.dbValue()));
+
+    // editorTwo is a member but not an owner: setting members must be forbidden.
+    mvc.perform(put("/api/projects/" + pid + "/members").with(csrf()).with(user("editorTwo"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"username\":\"thirdUser\",\"role\":\"viewer\"}"))
+       .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(username = "bossThree")
+  void ownerCanRemoveMember() throws Exception {
+    ensureUser("bossThree");
+    ensureUser("helperThree");
+
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"slug\":\"insecta\",\"title\":\"Insects\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    long pid = json.readTree(body).get("id").asLong();
+
+    AppUser helperThree = users.requireByUsernameOrNull("helperThree");
+    members.upsert(new ProjectMember(pid, helperThree.getId(), Role.EDITOR.dbValue()));
+
+    mvc.perform(delete("/api/projects/" + pid + "/members/" + helperThree.getId()).with(csrf()))
+       .andExpect(status().is2xxSuccessful());
+
+    mvc.perform(get("/api/projects/" + pid + "/members"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$[?(@.username=='helperThree')]").isEmpty());
+  }
+
+  @Test
+  @WithMockUser(username = "bossFour")
+  void cannotRemoveLastOwner() throws Exception {
+    ensureUser("bossFour");
+
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"slug\":\"aves2\",\"title\":\"Birds Two\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    long pid = json.readTree(body).get("id").asLong();
+
+    long ownerId = users.requireByUsernameOrNull("bossFour").getId();
+
+    mvc.perform(delete("/api/projects/" + pid + "/members/" + ownerId).with(csrf()))
+       .andExpect(status().isConflict());
+  }
+
+  @Test
+  @WithMockUser(username = "bossFive")
+  void setMemberWithInvalidRoleReturnsBadRequest() throws Exception {
+    ensureUser("bossFive");
+    ensureUser("helperFive");
+
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"slug\":\"reptilia2\",\"title\":\"Reptiles Two\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    long pid = json.readTree(body).get("id").asLong();
+
+    mvc.perform(put("/api/projects/" + pid + "/members").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"username\":\"helperFive\",\"role\":\"admin\"}"))
+       .andExpect(status().isBadRequest());
   }
 }
