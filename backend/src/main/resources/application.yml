@@ -1,5 +1,14 @@
 spring:
   application:
     name: coldp-editor
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/coldp_editor}
+    username: ${DB_USER:coldp_editor}
+    password: ${DB_PASSWORD:coldp_editor}
+  flyway:
+    enabled: true
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
 server:
   port: 8080
