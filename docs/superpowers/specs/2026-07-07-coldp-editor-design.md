@@ -87,9 +87,52 @@ checklistbank UI (React/Ant Design) for team familiarity.
 
 ## 5. Data model
 
-The model follows the ChecklistBank backend's *internal* normalised model, not
-the flat ColDP export file. **Name and NameUsage are separate entities.** Column
-lists below are indicative, not exhaustive; full DDL lives in Flyway migrations.
+**Name and NameUsage are separate entities.** The column lists in §5.1–§5.10 are
+indicative, not exhaustive; the exact classes are the first implementation
+deliverable (§5.0) and the full DDL lives in Flyway migrations.
+
+### 5.0 Modeling approach: editor domain model vs ColDP raw
+
+Two distinct models are kept separate, and **the wire format never dictates the
+internal one**:
+
+1. **Editor domain model — authoritative, editing-optimized (our own classes).**
+   It *leans on* the ChecklistBank internal model's structure (the normalized
+   Name / NameUsage / Reference split; Taxon/Synonym/BareName expressed as a
+   `NameUsage` + `status`) and *reuses* CLB/name-parser enums, but it is
+   **trimmed of all CLB machinery** — no `sectorKey`, `verbatimKey`,
+   `datasetKey`, `namesIndexId`, no sectors/sources/decisions/matching, no DSID
+   key scheme, no `VerbatimRecord`. It adds editor-only concerns instead
+   (`project_id`, a surrogate id, `version`, and links to audit/lock/issue).
+   We **do not** import CLB's `Name`/`NameUsage`/`Taxon`/`Synonym` classes.
+2. **ColDP raw — a boundary DTO only.** Faithful to the tabular format (TEXT ids,
+   the merged-NameUsage option, all-string fields), used *solely* by the ColDP
+   reader/writer at import/export and mapped to/from the domain model. It stays
+   out of the core.
+
+**Reuse boundaries.**
+- *Reuse as dependencies:* name-parser-api enums (`Rank`, `NomCode`, `NamePart`,
+  `NameType`) and the CLB `vocab` enums (`TaxonomicStatus`, `NomStatus`,
+  `NomRelType`, `TypeStatus`, `Gender`, `Sex`, `Environment`, `GeoTime`,
+  `Gazetteer`, `DegreeOfEstablishment`, `EstablishmentMeans`,
+  `DistributionStatus`, `EstimateType`, `Country`, `License`,
+  `IdentifierScope`). **Open item:** confirm the `vocab` artifact resolves
+  standalone from GBIF's Maven repo; if it pulls in the wider CLB build, vendor
+  just the enums we need.
+- *Define ourselves:* every entity class (Reference, Author, Name, NameUsage,
+  supporting) as lean records tailored to editing.
+- *Exclude entirely:* DSID keys, `VerbatimRecord`, sector/source/decision/matching,
+  and the CLB `dao`/`webservice` layers.
+
+**Identifiers.** Each entity gets a **surrogate, project-scoped primary key we
+mint** (the editor creates data from scratch and imports it). The original ColDP
+`ID` and `alternativeID[]` are preserved as attributes for lossless round-trip.
+Internal foreign keys use the surrogate key; export maps them back to ColDP
+string IDs.
+
+**First implementation deliverable.** The exact domain classes (fields, types,
+enum bindings), the Flyway DDL, and the ColDP-raw ↔ domain mapping are settled
+and reviewed **before** any service or UI work.
 
 ### 5.1 Project, users, membership
 
@@ -313,6 +356,7 @@ supporting-entity editing UX. (The validation *engine* is in; the rule
 - Backend: Spring Boot + MyBatis + Postgres + Flyway + Spring Security.
 - Postgres-only search (`pg_trgm`), no Elasticsearch.
 - Normalized Name / NameUsage split; parent/child classification only, flat higher ranks ignored.
+- Two-layer model (§5.0): an authoritative editor domain model (our own lean classes, leaning on CLB's structure, reusing CLB/name-parser enums, trimmed of CLB machinery) plus a ColDP-raw DTO used only at the import/export boundary. We do not import CLB's entity classes. Surrogate project-scoped PKs, with original ColDP IDs preserved for round-trip. Exact classes/DDL/mapping are the first implementation deliverable.
 - `ltree` materialized path for subtree operations.
 - Single `nom_code` per project (drives NameFormatter and code-specific behaviour); no per-name code.
 - `accordingTo` dropped from usages; scrutinizer derived from the audit log, not managed separately.
