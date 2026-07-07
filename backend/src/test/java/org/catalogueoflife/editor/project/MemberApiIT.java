@@ -138,6 +138,25 @@ class MemberApiIT extends AbstractPostgresIT {
   }
 
   @Test
+  @WithMockUser(username = "bossSix")
+  void cannotDemoteLastOwner() throws Exception {
+    ensureUser("bossSix");
+
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"slug\":\"aves3\",\"title\":\"Birds Three\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    long pid = json.readTree(body).get("id").asLong();
+
+    // bossSix is the sole owner; demoting themselves to editor would orphan the project.
+    mvc.perform(put("/api/projects/" + pid + "/members").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"username\":\"bossSix\",\"role\":\"editor\"}"))
+       .andExpect(status().isConflict());
+  }
+
+  @Test
   @WithMockUser(username = "bossFive")
   void setMemberWithInvalidRoleReturnsBadRequest() throws Exception {
     ensureUser("bossFive");

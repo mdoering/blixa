@@ -93,19 +93,27 @@ public class ProjectService {
     if (target == null) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "unknown user: " + username);
     }
+    String currentRole = members.findRole(projectId, target.getId());
+    if (Role.OWNER.dbValue().equals(currentRole) && !Role.OWNER.dbValue().equals(role.dbValue())
+        && countOwners(projectId) <= 1) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "cannot demote the last owner");
+    }
     members.upsert(new ProjectMember(projectId, target.getId(), role.dbValue()));
   }
 
   @Transactional
   public void removeMember(long actorId, long projectId, long targetUserId) {
     requireOwner(actorId, projectId);
-    long owners = members.findByProject(projectId).stream()
-        .filter(m -> m.getRole().equals(Role.OWNER.dbValue())).count();
     String targetRole = members.findRole(projectId, targetUserId);
-    if (Role.OWNER.dbValue().equals(targetRole) && owners <= 1) {
+    if (Role.OWNER.dbValue().equals(targetRole) && countOwners(projectId) <= 1) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "cannot remove the last owner");
     }
     members.delete(projectId, targetUserId);
+  }
+
+  private long countOwners(long projectId) {
+    return members.findByProject(projectId).stream()
+        .filter(m -> m.getRole().equals(Role.OWNER.dbValue())).count();
   }
 
   private void requireOwner(long actorId, long projectId) {

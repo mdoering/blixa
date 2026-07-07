@@ -26,7 +26,11 @@ public class SecurityConfig {
             .requestMatchers("/api/ping").permitAll()
             .requestMatchers("/api/auth/login", "/login/**", "/oauth2/**").permitAll()
             .anyRequest().authenticated())
-        .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
+        .csrf(csrf -> csrf
+            .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+            .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
+        .addFilterAfter(new CsrfCookieFilter(),
+            org.springframework.security.web.authentication.www.BasicAuthenticationFilter.class)
         .formLogin(form -> form
             .loginProcessingUrl("/api/auth/login")
             .successHandler((req, res, a) -> res.setStatus(HttpStatus.OK.value()))
