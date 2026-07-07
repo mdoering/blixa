@@ -7,3 +7,6 @@ node_modules/
 .vscode/
 .DS_Store
 .superpowers/
+.classpath
+.project
+.settings/
