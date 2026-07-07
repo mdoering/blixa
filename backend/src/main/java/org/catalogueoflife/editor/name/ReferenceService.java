@@ -23,12 +23,12 @@ public class ReferenceService {
 
   public List<Reference> list(long userId, long projectId, int limit, int offset) {
     projects.requireRole(userId, projectId);
-    return references.findByProject(projectId, limit, offset);
+    return references.findByProject(projectId, Pagination.clampLimit(limit), Pagination.clampOffset(offset));
   }
 
   public List<Reference> search(long userId, long projectId, String q, int limit, int offset) {
     projects.requireRole(userId, projectId);
-    return references.search(projectId, q, limit, offset);
+    return references.search(projectId, q, Pagination.clampLimit(limit), Pagination.clampOffset(offset));
   }
 
   public Reference get(long userId, long projectId, long id) {
@@ -39,9 +39,6 @@ public class ReferenceService {
   @Transactional
   public Reference create(long userId, long projectId, CreateReferenceRequest req) {
     requireEditor(userId, projectId);
-    if (isBlank(req.citation()) && isBlank(req.title())) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "citation or title is required");
-    }
     Reference r = new Reference();
     r.setProjectId(projectId);
     r.setCitation(req.citation());
@@ -71,9 +68,6 @@ public class ReferenceService {
   @Transactional
   public Reference update(long userId, long projectId, long id, UpdateReferenceRequest req) {
     requireEditor(userId, projectId);
-    if (isBlank(req.citation()) && isBlank(req.title())) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "citation or title is required");
-    }
     Reference r = requireInProject(projectId, id);
     r.setCitation(req.citation());
     r.setType(req.type());
@@ -121,9 +115,5 @@ public class ReferenceService {
     if (!role.equals(Role.OWNER.dbValue()) && !role.equals(Role.EDITOR.dbValue())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner or editor required");
     }
-  }
-
-  private static boolean isBlank(String s) {
-    return s == null || s.isBlank();
   }
 }

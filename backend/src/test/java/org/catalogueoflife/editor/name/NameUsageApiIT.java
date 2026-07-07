@@ -181,6 +181,21 @@ class NameUsageApiIT extends AbstractPostgresIT {
     mvc.perform(put("/api/projects/" + pid + "/usages/" + synId + "/synonym-of/" + otherUsageId).with(csrf()))
         .andExpect(status().isNotFound());
 
+    // cross-project guard: a parentId pointing at a usage from a DIFFERENT project is rejected on create
+    mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Child of alien\",\"rank\":\"species\",\"status\":\"accepted\","
+                + "\"parentId\":" + otherUsageId + "}"))
+        .andExpect(status().isBadRequest());
+
+    // ... and on update
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + synId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Picea abies\",\"authorship\":\"(L.) H.Karst.\","
+                + "\"rank\":\"species\",\"status\":\"synonym\",\"parentId\":" + otherUsageId
+                + ",\"version\":0}"))
+        .andExpect(status().isBadRequest());
+
     // delete then confirm gone
     mvc.perform(delete("/api/projects/" + pid + "/usages/" + accId2).with(csrf()))
         .andExpect(status().isNoContent());

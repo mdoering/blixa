@@ -18,10 +18,6 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class NameUsageService {
 
-  // Defense-in-depth pagination clamp (flagged by the Task 3 review for ReferenceService;
-  // applied here too since neither controller bounds these query params).
-  private static final int MAX_LIMIT = 200;
-
   private final NameUsageMapper usages;
   private final SynonymAcceptedMapper synonymAccepted;
   private final ProjectService projects;
@@ -39,17 +35,15 @@ public class NameUsageService {
 
   public List<NameUsageResponse> list(long userId, long projectId, int limit, int offset) {
     projects.requireRole(userId, projectId);
-    Project project = requireProject(projectId);
-    return usages.findByProject(projectId, clampLimit(limit), clampOffset(offset)).stream()
-        .map(u -> toResponse(u, project))
+    return usages.findByProject(projectId, Pagination.clampLimit(limit), Pagination.clampOffset(offset)).stream()
+        .map(this::toListResponse)
         .toList();
   }
 
   public List<NameUsageResponse> search(long userId, long projectId, String q, int limit, int offset) {
     projects.requireRole(userId, projectId);
-    Project project = requireProject(projectId);
-    return usages.search(projectId, q, clampLimit(limit), clampOffset(offset)).stream()
-        .map(u -> toResponse(u, project))
+    return usages.search(projectId, q, Pagination.clampLimit(limit), Pagination.clampOffset(offset)).stream()
+        .map(this::toListResponse)
         .toList();
   }
 
@@ -63,6 +57,7 @@ public class NameUsageService {
   public NameUsageResponse create(long userId, long projectId, CreateNameUsageRequest req) {
     requireEditor(userId, projectId);
     Project project = requireProject(projectId);
+    requireParentInProject(projectId, req.parentId());
     NameUsage u = new NameUsage();
     u.setProjectId(projectId);
     u.setScientificName(req.scientificName());
@@ -93,6 +88,7 @@ public class NameUsageService {
   public NameUsageResponse update(long userId, long projectId, long id, UpdateNameUsageRequest req) {
     requireEditor(userId, projectId);
     Project project = requireProject(projectId);
+    requireParentInProject(projectId, req.parentId());
     NameUsage u = requireInProject(projectId, id);
     boolean reparse = changed(u.getScientificName(), req.scientificName())
         || changed(u.getAuthorship(), req.authorship())
@@ -153,6 +149,8 @@ public class NameUsageService {
     requireInProject(projectId, acceptedId);
   }
 
+  // Full response for single-usage endpoints (get/create/update): a real re-parse for the
+  // formatted display name plus the per-row synonym-link lookups.
   private NameUsageResponse toResponse(NameUsage u, Project project) {
     String formattedName = parser.formatName(u, project.getNomCode(), false);
     List<Long> acceptedParentIds = synonymAccepted.findAcceptedFor(u.getId());
@@ -160,6 +158,24 @@ public class NameUsageService {
         ? synonymAccepted.findSynonymsOf(u.getId())
         : List.of();
     return NameUsageResponse.of(u, formattedName, acceptedParentIds, synonymIds);
+  }
+
+  // Cheap response for list/search hot paths: avoids the full name-parser re-parse and the
+  // per-row synonym-link queries (an N+1 for both) by building the formatted name from the
+  // already-stored scientificName/authorship columns and leaving the link lists empty. Detail
+  // view (get/create/update, via toResponse) is where the fully-parsed/linked response belongs.
+  private NameUsageResponse toListResponse(NameUsage u) {
+    String authorship = u.getAuthorship();
+    String formattedName = (authorship == null || authorship.isBlank())
+        ? u.getScientificName()
+        : u.getScientificName() + " " + authorship;
+    return NameUsageResponse.of(u, formattedName, List.of(), List.of());
+  }
+
+  private void requireParentInProject(long projectId, Long parentId) {
+    if (parentId != null && usages.findByIdInProject(parentId, projectId) == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "parent not in project");
+    }
   }
 
   private NameUsage requireInProject(long projectId, long id) {
@@ -187,16 +203,5 @@ public class NameUsageService {
 
   private static boolean changed(String oldValue, String newValue) {
     return !Objects.equals(oldValue, newValue);
-  }
-
-  private static int clampLimit(int limit) {
-    if (limit < 1) {
-      return 1;
-    }
-    return Math.min(limit, MAX_LIMIT);
-  }
-
-  private static int clampOffset(int offset) {
-    return Math.max(offset, 0);
   }
 }

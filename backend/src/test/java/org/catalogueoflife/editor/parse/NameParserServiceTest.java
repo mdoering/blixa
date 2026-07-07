@@ -68,6 +68,30 @@ class NameParserServiceTest {
   }
 
   @Test
+  void parseIntoClearsStaleAtomizedFieldsWhenNameBecomesUnparsable() {
+    // Simulates an UPDATE: the same NameUsage instance is first parsed successfully, populating
+    // the atomized fields, then re-parsed after the scientificName was edited to something
+    // unparsable. The stale genus/specificEpithet/authorship from the first parse must not survive.
+    NameUsage u = new NameUsage();
+    u.setScientificName("Abies alba");
+    u.setAuthorship("Mill.");
+    u.setRank("species");
+    service.parseInto(u, "botanical");
+    assertEquals("Abies", u.getGenus());
+    assertEquals("alba", u.getSpecificEpithet());
+    assertEquals("Mill.", u.getCombinationAuthorship());
+
+    u.setScientificName("BOLD:AAA0001");
+    u.setAuthorship(null);
+    service.parseInto(u, "botanical");
+
+    assertEquals("UNPARSABLE", u.getParseState());
+    assertNull(u.getGenus());
+    assertNull(u.getSpecificEpithet());
+    assertNull(u.getCombinationAuthorship());
+  }
+
+  @Test
   void formatNameRendersCanonicalString() {
     NameUsage u = new NameUsage();
     u.setScientificName("Abies alba");

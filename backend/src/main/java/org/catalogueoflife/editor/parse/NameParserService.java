@@ -37,6 +37,11 @@ public class NameParserService {
    * @param nomCode the project's nomenclatural code (e.g. "botanical", "zoological"), tolerantly parsed
    */
   public void parseInto(NameUsage u, @Nullable String nomCode) {
+    // Always clear the previously-atomized fields first: on the success path
+    // ParsedNameMapping.applyTo re-populates whatever the new parse yields (so a name that no
+    // longer has, say, a basionym authorship doesn't keep a stale one from a prior parse), and on
+    // the failure path below they must reflect the now-unparsable name, i.e. all null.
+    clearParsedFields(u);
     Rank rank = parseRank(u.getRank());
     NomCode code = parseNomCode(nomCode);
     try {
@@ -46,6 +51,28 @@ public class NameParserService {
       u.setParseState("UNPARSABLE");
       u.setNameType(e.getType() == null ? null : e.getType().name());
     }
+  }
+
+  /**
+   * Nulls out all atomized name-part and authorship fields derived from a previous parse.
+   * {@code scientificName}, {@code authorship} and {@code rank} are the authoritative inputs and
+   * are deliberately left untouched.
+   */
+  private static void clearParsedFields(NameUsage u) {
+    u.setUninomial(null);
+    u.setGenus(null);
+    u.setInfragenericEpithet(null);
+    u.setSpecificEpithet(null);
+    u.setInfraspecificEpithet(null);
+    u.setCultivarEpithet(null);
+    u.setNotho(null);
+    u.setCombinationAuthorship(null);
+    u.setCombinationExAuthorship(null);
+    u.setCombinationAuthorshipYear(null);
+    u.setBasionymAuthorship(null);
+    u.setBasionymExAuthorship(null);
+    u.setBasionymAuthorshipYear(null);
+    u.setSanctioningAuthor(null);
   }
 
   /**

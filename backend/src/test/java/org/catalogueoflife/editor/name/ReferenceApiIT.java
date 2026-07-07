@@ -82,6 +82,14 @@ class ReferenceApiIT extends AbstractPostgresIT {
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.length()").value(0));
 
+    // negative limit/offset are clamped rather than passed straight through to SQL LIMIT/OFFSET
+    // (which Postgres would reject with a 500)
+    mvc.perform(get("/api/projects/" + pid + "/references").param("limit", "-1"))
+       .andExpect(status().isOk());
+    mvc.perform(get("/api/projects/" + pid + "/references").param("offset", "-1"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$[0].id").value(refId));
+
     // update with the loaded version bumps version to 1
     mvc.perform(put("/api/projects/" + pid + "/references/" + refId).with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
