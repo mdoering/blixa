@@ -19,7 +19,8 @@ public class SecurityConfig {
   }
 
   @Bean
-  SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+  SecurityFilterChain filterChain(HttpSecurity http,
+                                  org.catalogueoflife.editor.user.OrcidUserService orcidUserService) throws Exception {
     http
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/ping").permitAll()
@@ -30,6 +31,7 @@ public class SecurityConfig {
             .loginProcessingUrl("/api/auth/login")
             .successHandler((req, res, a) -> res.setStatus(HttpStatus.OK.value()))
             .failureHandler((req, res, e) -> res.setStatus(HttpStatus.UNAUTHORIZED.value())))
+        .oauth2Login(o -> o.userInfoEndpoint(u -> u.oidcUserService(orcidUserService)))
         .logout(out -> out.logoutUrl("/api/auth/logout")
             .logoutSuccessHandler((req, res, a) -> res.setStatus(HttpStatus.OK.value())))
         .exceptionHandling(ex -> ex

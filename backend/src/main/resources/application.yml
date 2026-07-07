@@ -7,6 +7,24 @@ spring:
     password: ${DB_PASSWORD:coldp_editor}
   flyway:
     enabled: true
+  security:
+    oauth2:
+      client:
+        registration:
+          orcid:
+            client-id: ${ORCID_CLIENT_ID:}
+            client-secret: ${ORCID_CLIENT_SECRET:}
+            scope: openid
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/orcid"
+            client-name: ORCID
+        provider:
+          orcid:
+            authorization-uri: https://orcid.org/oauth/authorize
+            token-uri: https://orcid.org/oauth/token
+            user-info-uri: https://orcid.org/oauth/userinfo
+            jwk-set-uri: https://orcid.org/oauth/jwks
+            user-name-attribute: sub
 mybatis:
   configuration:
     map-underscore-to-camel-case: true

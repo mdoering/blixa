@@ -29,6 +29,25 @@ public class AppUserService implements UserDetailsService {
     return u;
   }
 
+  public AppUser upsertFromOrcid(String orcid, String displayName, String given, String family) {
+    AppUser u = mapper.findByOrcid(orcid);
+    if (u == null) {
+      u = new AppUser();
+      u.setOrcid(orcid);
+      u.setUsername(orcid);
+      u.setDisplayName(displayName);
+      u.setGiven(given);
+      u.setFamily(family);
+      mapper.insert(u);
+    } else {
+      u.setDisplayName(displayName);
+      u.setGiven(given);
+      u.setFamily(family);
+      mapper.update(u);
+    }
+    return u;
+  }
+
   public AppUser requireByUsername(String username) {
     AppUser u = mapper.findByUsername(username);
     if (u == null) {
