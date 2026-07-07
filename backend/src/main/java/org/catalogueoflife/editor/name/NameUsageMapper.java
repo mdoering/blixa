@@ -97,7 +97,7 @@ public interface NameUsageMapper {
           gender = #{gender}, etymology = #{etymology}, name_type = #{nameType},
           parse_state = #{parseState}, link = #{link}, remarks = #{remarks},
           modified = now(), modified_by = #{modifiedBy}, version = version + 1
-      WHERE id = #{id}
+      WHERE id = #{id} AND version = #{version}
       """)
-  void update(NameUsage u);
+  int update(NameUsage u);
 }

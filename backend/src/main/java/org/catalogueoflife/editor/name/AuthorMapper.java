@@ -48,7 +48,7 @@ public interface AuthorMapper {
           birth = #{birth}, death = #{death}, birth_place = #{birthPlace}, country = #{country},
           link = #{link}, remarks = #{remarks}, modified = now(), modified_by = #{modifiedBy},
           version = version + 1
-      WHERE id = #{id}
+      WHERE id = #{id} AND version = #{version}
       """)
-  void update(Author a);
+  int update(Author a);
 }

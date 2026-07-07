@@ -49,7 +49,7 @@ public interface ReferenceMapper {
           volume = #{volume}, issue = #{issue}, page = #{page}, publisher = #{publisher},
           doi = #{doi}, isbn = #{isbn}, issn = #{issn}, link = #{link}, remarks = #{remarks},
           modified = now(), modified_by = #{modifiedBy}, version = version + 1
-      WHERE id = #{id}
+      WHERE id = #{id} AND version = #{version}
       """)
-  void update(Reference r);
+  int update(Reference r);
 }

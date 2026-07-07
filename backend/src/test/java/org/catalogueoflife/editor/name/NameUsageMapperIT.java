@@ -70,4 +70,49 @@ class NameUsageMapperIT extends AbstractPostgresIT {
     assertThat(synonymAccepted.findSynonymsOf(accepted.getId())).containsExactly(synonym.getId());
     assertThat(synonymAccepted.findAcceptedFor(synonym.getId())).containsExactly(accepted.getId());
   }
+
+  @Test
+  void optimisticUpdateDetectsStaleVersion() {
+    AppUser u = new AppUser();
+    u.setUsername("name-editor-cas");
+    users.insert(u);
+    assertThat(u.getId()).isNotNull();
+
+    Project p = new Project();
+    p.setSlug("cas-project");
+    p.setTitle("CAS Project");
+    projects.insert(p);
+    assertThat(p.getId()).isNotNull();
+
+    NameUsage nu = new NameUsage();
+    nu.setProjectId(p.getId());
+    nu.setColdpId("cas-1");
+    nu.setStatus("accepted");
+    nu.setScientificName("Abies alba");
+    nu.setRank("species");
+    nu.setModifiedBy(u.getId());
+    nameUsages.insert(nu);
+    assertThat(nu.getId()).isNotNull();
+
+    NameUsage loaded = nameUsages.findById(nu.getId());
+    int loadedVersion = loaded.getVersion();
+
+    // First update using the correct, just-loaded version succeeds.
+    loaded.setScientificName("Abies alba subsp. alba");
+    int rows = nameUsages.update(loaded);
+    assertThat(rows).isEqualTo(1);
+
+    NameUsage afterUpdate = nameUsages.findById(nu.getId());
+    assertThat(afterUpdate.getVersion()).isEqualTo(loadedVersion + 1);
+    assertThat(afterUpdate.getScientificName()).isEqualTo("Abies alba subsp. alba");
+
+    // Second update reusing the now-stale original version must be rejected.
+    loaded.setScientificName("Abies alba subsp. concurrent-edit");
+    int staleRows = nameUsages.update(loaded);
+    assertThat(staleRows).isEqualTo(0);
+
+    NameUsage unchanged = nameUsages.findById(nu.getId());
+    assertThat(unchanged.getVersion()).isEqualTo(loadedVersion + 1);
+    assertThat(unchanged.getScientificName()).isEqualTo("Abies alba subsp. alba");
+  }
 }

@@ -10,12 +10,10 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
-import org.apache.ibatis.type.MappedTypes;
 
 // Maps Postgres BIGINT[] columns to/from java.util.List<Long>. Registered explicitly
 // per-column via typeHandler= in the mappers (map-underscore-to-camel-case does not
 // handle arrays).
-@MappedTypes(List.class)
 public class LongArrayTypeHandler extends BaseTypeHandler<List<Long>> {
 
   @Override
