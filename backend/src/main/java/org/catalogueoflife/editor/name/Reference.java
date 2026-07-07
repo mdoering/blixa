@@ -1,0 +1,77 @@
+package org.catalogueoflife.editor.name;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+
+public class Reference {
+  private Long id;
+  private Long projectId;
+  private String coldpId;
+  private List<String> alternativeId;
+  private String citation;
+  private String type;
+  private String author;
+  private String editor;
+  private String title;
+  private String containerTitle;
+  private String issued;
+  private String volume;
+  private String issue;
+  private String page;
+  private String publisher;
+  private String doi;
+  private String isbn;
+  private String issn;
+  private String link;
+  private String remarks;
+  private OffsetDateTime modified;
+  private Long modifiedBy;
+  private Integer version;
+
+  public Long getId() { return id; }
+  public void setId(Long id) { this.id = id; }
+  public Long getProjectId() { return projectId; }
+  public void setProjectId(Long projectId) { this.projectId = projectId; }
+  public String getColdpId() { return coldpId; }
+  public void setColdpId(String coldpId) { this.coldpId = coldpId; }
+  public List<String> getAlternativeId() { return alternativeId; }
+  public void setAlternativeId(List<String> alternativeId) { this.alternativeId = alternativeId; }
+  public String getCitation() { return citation; }
+  public void setCitation(String citation) { this.citation = citation; }
+  public String getType() { return type; }
+  public void setType(String type) { this.type = type; }
+  public String getAuthor() { return author; }
+  public void setAuthor(String author) { this.author = author; }
+  public String getEditor() { return editor; }
+  public void setEditor(String editor) { this.editor = editor; }
+  public String getTitle() { return title; }
+  public void setTitle(String title) { this.title = title; }
+  public String getContainerTitle() { return containerTitle; }
+  public void setContainerTitle(String containerTitle) { this.containerTitle = containerTitle; }
+  public String getIssued() { return issued; }
+  public void setIssued(String issued) { this.issued = issued; }
+  public String getVolume() { return volume; }
+  public void setVolume(String volume) { this.volume = volume; }
+  public String getIssue() { return issue; }
+  public void setIssue(String issue) { this.issue = issue; }
+  public String getPage() { return page; }
+  public void setPage(String page) { this.page = page; }
+  public String getPublisher() { return publisher; }
+  public void setPublisher(String publisher) { this.publisher = publisher; }
+  public String getDoi() { return doi; }
+  public void setDoi(String doi) { this.doi = doi; }
+  public String getIsbn() { return isbn; }
+  public void setIsbn(String isbn) { this.isbn = isbn; }
+  public String getIssn() { return issn; }
+  public void setIssn(String issn) { this.issn = issn; }
+  public String getLink() { return link; }
+  public void setLink(String link) { this.link = link; }
+  public String getRemarks() { return remarks; }
+  public void setRemarks(String remarks) { this.remarks = remarks; }
+  public OffsetDateTime getModified() { return modified; }
+  public void setModified(OffsetDateTime modified) { this.modified = modified; }
+  public Long getModifiedBy() { return modifiedBy; }
+  public void setModifiedBy(Long modifiedBy) { this.modifiedBy = modifiedBy; }
+  public Integer getVersion() { return version; }
+  public void setVersion(Integer version) { this.version = version; }
+}

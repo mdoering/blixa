@@ -83,7 +83,35 @@
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
+
+    <dependency>
+      <groupId>org.gbif</groupId>
+      <artifactId>name-parser</artifactId>
+      <version>4.2.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.gbif</groupId>
+      <artifactId>name-parser-api</artifactId>
+      <version>4.2.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.catalogueoflife</groupId>
+      <artifactId>vocab</artifactId>
+      <version>1.2.3-SNAPSHOT</version>
+    </dependency>
   </dependencies>
+
+  <repositories>
+    <repository>
+      <id>gbif-releases</id>
+      <url>https://repository.gbif.org/repository/releases/</url>
+    </repository>
+    <repository>
+      <id>gbif-snapshots</id>
+      <snapshots><enabled>true</enabled></snapshots>
+      <url>https://repository.gbif.org/repository/snapshots/</url>
+    </repository>
+  </repositories>
 
   <build>
     <plugins>
