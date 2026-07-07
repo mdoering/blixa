@@ -3,6 +3,7 @@ package org.catalogueoflife.editor.project;
 import java.util.List;
 import org.catalogueoflife.editor.project.dto.CreateProjectRequest;
 import org.catalogueoflife.editor.project.dto.UpdateProjectMetadataRequest;
+import org.catalogueoflife.editor.user.AppUserMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,10 +14,12 @@ public class ProjectService {
 
   private final ProjectMapper projects;
   private final ProjectMemberMapper members;
+  private final AppUserMapper users;
 
-  public ProjectService(ProjectMapper projects, ProjectMemberMapper members) {
+  public ProjectService(ProjectMapper projects, ProjectMemberMapper members, AppUserMapper users) {
     this.projects = projects;
     this.members = members;
+    this.users = users;
   }
 
   @Transactional
@@ -69,5 +72,45 @@ public class ProjectService {
     p.setDoi(req.doi());
     projects.updateMetadata(p);
     return p;
+  }
+
+  public java.util.List<org.catalogueoflife.editor.project.dto.MemberResponse> listMembers(long actorId, long projectId) {
+    requireRole(actorId, projectId); // any member may read
+    return members.findByProject(projectId).stream()
+        .map(m -> {
+          var u = users.findById(m.getUserId());
+          return new org.catalogueoflife.editor.project.dto.MemberResponse(
+              m.getUserId(), u == null ? null : u.getUsername(), m.getRole());
+        })
+        .toList();
+  }
+
+  @Transactional
+  public void setMember(long actorId, long projectId, String username, String roleValue) {
+    requireOwner(actorId, projectId);
+    Role role = Role.fromDb(roleValue); // throws IllegalArgumentException -> 400 via handler below
+    var target = users.findByUsername(username);
+    if (target == null) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "unknown user: " + username);
+    }
+    members.upsert(new ProjectMember(projectId, target.getId(), role.dbValue()));
+  }
+
+  @Transactional
+  public void removeMember(long actorId, long projectId, long targetUserId) {
+    requireOwner(actorId, projectId);
+    long owners = members.findByProject(projectId).stream()
+        .filter(m -> m.getRole().equals(Role.OWNER.dbValue())).count();
+    String targetRole = members.findRole(projectId, targetUserId);
+    if (Role.OWNER.dbValue().equals(targetRole) && owners <= 1) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "cannot remove the last owner");
+    }
+    members.delete(projectId, targetUserId);
+  }
+
+  private void requireOwner(long actorId, long projectId) {
+    if (!Role.OWNER.dbValue().equals(requireRole(actorId, projectId))) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner required");
+    }
   }
 }

@@ -14,4 +14,9 @@ public class ApiExceptionHandler {
     return ResponseEntity.status(ex.getStatusCode())
         .body(Map.of("error", ex.getReason() == null ? ex.getStatusCode().toString() : ex.getReason()));
   }
+
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<Map<String, Object>> handleBadArg(IllegalArgumentException ex) {
+    return ResponseEntity.badRequest().body(Map.of("error", "invalid value: " + ex.getMessage()));
+  }
 }

@@ -60,4 +60,23 @@ public class ProjectController {
     Project p = service.updateMetadata(uid, id, req);
     return ProjectResponse.of(p, members.findRole(id, uid));
   }
+
+  @GetMapping("/{id}/members")
+  public java.util.List<org.catalogueoflife.editor.project.dto.MemberResponse> members(@PathVariable long id) {
+    long uid = currentUser.require().getId();
+    return service.listMembers(uid, id);
+  }
+
+  @PutMapping("/{id}/members")
+  public void setMember(@PathVariable long id,
+                        @jakarta.validation.Valid @RequestBody org.catalogueoflife.editor.project.dto.MemberRequest req) {
+    long uid = currentUser.require().getId();
+    service.setMember(uid, id, req.username(), req.role());
+  }
+
+  @org.springframework.web.bind.annotation.DeleteMapping("/{id}/members/{userId}")
+  public void removeMember(@PathVariable long id, @PathVariable long userId) {
+    long uid = currentUser.require().getId();
+    service.removeMember(uid, id, userId);
+  }
 }
