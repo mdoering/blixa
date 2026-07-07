@@ -73,7 +73,13 @@ checklistbank UI (React/Ant Design) for team familiarity.
   cross-project lookups and simple operations. The large tables (`name`,
   `name_usage`) can be **partitioned by `project_id`** later if a single project
   grows very large; the schema is designed so this is a non-breaking change.
-- **REST/JSON API** served by Spring Boot; the React SPA is the only client.
+- **REST/JSON API** served by Spring Boot; the React SPA is the only client,
+  consuming it via TanStack Query. The read API is deliberately shaped as a
+  handful of **view-oriented endpoints** (e.g. `tree-children`, `usage-detail`,
+  `search`) rather than generic per-table CRUD, so each screen fetches close to
+  exactly what it needs and the hot tree path stays hand-tuned. GraphQL was
+  considered and **deferred** (see §10); Spring makes it additive on the read
+  side later if over/under-fetching becomes painful.
 - **ORCID OAuth2** for login; a signed session/JWT authorises API calls.
 - **Server-side tree traversal.** Children are fetched lazily per node and
   paginated, so a 200k-node classification is never materialised at once in the
@@ -312,6 +318,7 @@ supporting-entity editing UX. (The validation *engine* is in; the rule
 - `accordingTo` dropped from usages; scrutinizer derived from the audit log, not managed separately.
 - Async, non-blocking validation: rules run out-of-band and attach advisory `issue` findings; bad data is allowed and only softly flagged. Engine + starter rules land in phase 1.
 - Name parsing/formatting binds to GBIF **name-parser 4.2.0-SNAPSHOT**, whose API differs substantially from older releases (see Appendix A). Only name-level combination/basionym authorship is used; per-epithet `genericAuthorship`/`specificAuthorship` are ignored.
+- **REST/JSON, not GraphQL**, for phase 1. GraphQL's flexible nested reads suit the relational data, but its costs (N+1/DataLoader complexity on the 200k-node tree, loss of HTTP/Varnish caching, divergence from the REST CLB/portal ecosystem) outweigh the gain for a single first-party client. The API is shaped as view-oriented read endpoints; GraphQL can be layered onto reads later if needed. Middle path if end-to-end typing is wanted: OpenAPI + TS codegen.
 
 ## Appendix A — name-parser 4.2.0-SNAPSHOT integration
 
