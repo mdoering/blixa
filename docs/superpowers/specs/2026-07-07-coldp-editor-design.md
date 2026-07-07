@@ -254,7 +254,9 @@ taxonomic usage; this table **is the classification**. (CLB keeps `Name` and
   - optional author-link overlay (§5.0): `combination_authorship_id[]`,
     `basionym_authorship_id[]` → `author` records, used only when normalizing
   - `nom_status` (nomenclatural status), `published_in_reference_id`,
-    `published_in_year`, `published_in_page`, `gender`, `etymology`
+    `published_in_year`, `published_in_page`, `published_in_page_link` (URL to
+    the exact page where the protologue starts, e.g. a BHL page — ColDP
+    `publishedInPageLink`), `gender`, `etymology`
   - **No `code` column** — derived from `project.nom_code`.
 - Taxonomic (usage) fields:
   - `status` ∈ {accepted, provisionally accepted, synonym, ambiguous synonym,
@@ -282,6 +284,13 @@ taxonomic usage; this table **is the classification**. (CLB keeps `Name` and
   exact contract we bind to is in
   [Appendix A](#appendix-a--name-parser-420-snapshot-integration). Display
   strings come from GBIF **`NameFormatter`** using the project code.
+- **Protologue page link (`published_in_page_link`) + BHL tooling.** The field
+  holds a deep link to the exact page where the name's protologue starts. A bit
+  of **BHL integration** helps populate and use it: paste/resolve a
+  [Biodiversity Heritage Library](https://www.biodiversitylibrary.org) page URL
+  (normalising to a stable `page/{id}` deep link), and later preview the page
+  image inline. Minimal paste/validate lands with the field; richer BHL
+  search/preview is phase 5 (§8).
 - **Subtree operations** (move subtree, descendant counts, subtree locking):
   `name_usage` carries a **Postgres `ltree` materialized path** (or a closure
   table) maintained on insert/move, so subtree queries and locks are cheap and
@@ -322,9 +331,10 @@ purely for the accepted classification tree:
 
 Schema present from the start; **editing UX phased in later** (phase 5):
 `name_relation`, `type_material`, `distribution`, `vernacular_name`,
-`taxon_property`, `species_estimate`, `species_interaction`,
-`taxon_concept_relation`, `media`. All project-scoped with `modified` /
-`modified_by`. Since name and usage are collapsed, ColDP's `nameID` and
+`taxon_property`, `species_estimate`, `species_interaction`, `media`. All
+project-scoped with `modified` /
+`modified_by`. (ColDP's `TaxonConceptRelation` is **not** modelled — dropped from
+the schema.) Since name and usage are collapsed, ColDP's `nameID` and
 `taxonID` foreign keys both resolve to a single `name_usage` id here (e.g.
 `type_material` and `name_relation` reference name usages directly).
 
@@ -456,8 +466,10 @@ supporting-entity editing UX. (The validation *engine* is in; the rule
     This is the opt-in on-ramp from string authorship to the normalized overlay
     (§5.0, §5.3).
 - **Phase 5 — Supporting-entity editing UX** (type material, distributions,
-  vernacular names, relations, etc.) + reference enrichment (DOI/CrossRef
-  lookup, BibTeX/CSL-JSON import).
+  vernacular names, relations, etc.) + reference/nomenclature enrichment:
+  DOI/CrossRef lookup, BibTeX/CSL-JSON import, and **BHL integration** (search
+  the Biodiversity Heritage Library, resolve/normalise protologue page deep
+  links for `published_in_page_link`, and preview the page image inline).
 
 ## 9. Key risks and mitigations
 
