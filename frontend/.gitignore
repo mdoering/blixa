@@ -5,10 +5,9 @@ dist-ssr
 
 # tsc -b build info + emitted output for the node-only project
 # (tsconfig.node.json must be composite/emit-capable to be a valid
-# project reference; its output has no runtime use and isn't checked in)
+# project reference; its output is emitted into node_modules/.tsc-out
+# via outDir, has no runtime use and isn't checked in)
 *.tsbuildinfo
-/vite.config.js
-/vite.config.d.ts
 
 # Editor directories and files
 .vscode/*
