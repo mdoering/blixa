@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Breadcrumb from './Breadcrumb';
 import ClassificationTree from './ClassificationTree';
+import TaxonDetail from './TaxonDetail';
 
 export default function TreePage() {
   const { projectId } = useParams();
@@ -20,11 +21,9 @@ export default function TreePage() {
         ) : (
           <Box>
             <Breadcrumb pid={pid} selectedId={selectedId} />
-            {/* Placeholder detail pane -- Task 3 replaces this with the real taxon detail
-                panel (view/edit fields, synonyms, validation issues). */}
-            <Text mt="md" c="dimmed">
-              Selected usage #{selectedId}
-            </Text>
+            <Box mt="md">
+              <TaxonDetail pid={pid} usageId={selectedId} />
+            </Box>
           </Box>
         )}
       </Grid.Col>
