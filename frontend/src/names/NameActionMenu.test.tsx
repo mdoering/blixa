@@ -5,7 +5,8 @@ import { renderWithProviders } from '../test/utils';
 import { server, http, HttpResponse } from '../test/server';
 import NameActionMenu from './NameActionMenu';
 
-const usage = { id: 10, scientificName: 'Panthera leo' };
+const usage = { id: 10, scientificName: 'Panthera leo', status: 'ACCEPTED' };
+const synonymUsage = { id: 11, scientificName: 'Felis leo', status: 'SYNONYM' };
 
 test('a non-editor sees no action menu at all', () => {
   renderWithProviders(
@@ -26,6 +27,19 @@ test('an editor sees add-child/add-synonym/change-status/delete actions', async 
   expect(screen.getByText('Synonym')).toBeInTheDocument();
   expect(screen.getByText('Misapplied')).toBeInTheDocument();
   expect(screen.getByText('Unassessed')).toBeInTheDocument();
+  expect(screen.getByText('Delete')).toBeInTheDocument();
+});
+
+test('add-child/add-synonym are hidden for a non-accepted usage (backend 400s both)', async () => {
+  renderWithProviders(
+    <NameActionMenu pid={3} usage={synonymUsage} canEdit onSelect={() => {}} />,
+  );
+
+  await userEvent.click(screen.getByLabelText('Actions'));
+
+  await screen.findByText('Change status'); // menu is open
+  expect(screen.queryByText('Add child')).not.toBeInTheDocument();
+  expect(screen.queryByText('Add synonym')).not.toBeInTheDocument();
   expect(screen.getByText('Delete')).toBeInTheDocument();
 });
 
@@ -60,4 +74,22 @@ test('"Delete" asks for confirmation before calling DELETE', async () => {
 
   await waitFor(() => expect(deleteCalled).toBe(true));
   expect(onSelect).not.toHaveBeenCalled();
+});
+
+test('a confirmed delete calls onAfterDelete with the deleted usage id', async () => {
+  server.use(
+    http.delete('/api/projects/3/usages/10', () => new HttpResponse(null, { status: 204 })),
+  );
+  const onAfterDelete = vi.fn();
+  renderWithProviders(
+    <NameActionMenu pid={3} usage={usage} canEdit onSelect={() => {}} onAfterDelete={onAfterDelete} />,
+  );
+
+  await userEvent.click(screen.getByLabelText('Actions'));
+  await userEvent.click(await screen.findByText('Delete'));
+
+  const dialog = await screen.findByRole('dialog');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+  await waitFor(() => expect(onAfterDelete).toHaveBeenCalledWith(10));
 });

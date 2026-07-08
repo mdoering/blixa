@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
@@ -164,6 +164,80 @@ test('clicking a row shows the taxon detail on the right', async () => {
 
   await screen.findByLabelText('Scientific name');
   expect(screen.getByLabelText('Scientific name')).toHaveValue('Abies alba');
+});
+
+test('deleting the currently-selected row clears the detail pane', async () => {
+  server.use(
+    http.get('/api/projects/9', () => HttpResponse.json(project)),
+    http.get('/api/projects/9/usages', () =>
+      HttpResponse.json({ items: [abiesAlba, abiesNigra], total: 2 }),
+    ),
+    http.get('/api/projects/9/usages/1', () =>
+      HttpResponse.json({
+        id: 1,
+        parentId: null,
+        status: 'ACCEPTED',
+        namePhrase: null,
+        extinct: null,
+        environment: null,
+        temporalRangeStart: null,
+        temporalRangeEnd: null,
+        scientificName: 'Abies alba',
+        authorship: 'Mill.',
+        rank: 'species',
+        uninomial: null,
+        genus: 'Abies',
+        infragenericEpithet: null,
+        specificEpithet: 'alba',
+        infraspecificEpithet: null,
+        cultivarEpithet: null,
+        notho: null,
+        combinationAuthorship: null,
+        combinationExAuthorship: null,
+        combinationAuthorshipYear: null,
+        basionymAuthorship: null,
+        basionymExAuthorship: null,
+        basionymAuthorshipYear: null,
+        sanctioningAuthor: null,
+        nomStatus: null,
+        publishedInReferenceId: null,
+        publishedInYear: null,
+        publishedInPage: null,
+        publishedInPageLink: null,
+        gender: null,
+        etymology: null,
+        nameType: 'SCIENTIFIC',
+        parseState: 'COMPLETE',
+        link: null,
+        remarks: null,
+        formattedName: 'Abies alba Mill.',
+        acceptedParentIds: [],
+        synonymIds: [],
+        version: 0,
+      }),
+    ),
+    http.get('/api/projects/9/usages/1/synonyms', () => HttpResponse.json([])),
+    http.get('/api/projects/9/issues', () => HttpResponse.json([])),
+    http.delete('/api/projects/9/usages/1', () => new HttpResponse(null, { status: 204 })),
+  );
+  renderPage();
+
+  // Select the row -- the detail pane shows it.
+  await userEvent.click(await screen.findByText('Abies alba'));
+  await screen.findByLabelText('Scientific name');
+
+  // Delete that same (selected) row via its action menu.
+  const actionButtons = await screen.findAllByLabelText('Actions');
+  await userEvent.click(actionButtons[0]);
+  await userEvent.click(await screen.findByText('Delete'));
+  const dialog = await screen.findByRole('dialog');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+  // The selection is cleared -- the detail pane falls back to the placeholder instead of
+  // continuing to render the now-deleted usage.
+  await waitFor(() =>
+    expect(screen.getByText('Select a name to see its details.')).toBeInTheDocument(),
+  );
 });
 
 test('the row action menu opens', async () => {

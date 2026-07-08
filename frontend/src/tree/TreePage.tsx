@@ -56,6 +56,9 @@ export default function TreePage() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             canEdit={canEdit}
+            onAfterDelete={(id) => {
+              if (id === selectedId) setSelectedId(null);
+            }}
           />
         </Grid.Col>
         <Grid.Col span={7}>

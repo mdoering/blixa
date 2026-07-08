@@ -15,6 +15,9 @@ export interface TreeNodeRowProps {
   selectedId: number | null;
   onSelect: (id: number) => void;
   canEdit?: boolean;
+  // Called after this row's (or any descendant row's) delete succeeds, with the deleted usage's
+  // id -- lets the page clear its selection if the deleted row was the one selected.
+  onAfterDelete?: (deletedId: number) => void;
 }
 
 export default function TreeNodeRow({
@@ -24,6 +27,7 @@ export default function TreeNodeRow({
   selectedId,
   onSelect,
   canEdit = false,
+  onAfterDelete,
 }: TreeNodeRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -101,6 +105,7 @@ export default function TreeNodeRow({
             onSelect={onSelect}
             opened={menuOpened}
             onChange={setMenuOpened}
+            onAfterDelete={onAfterDelete}
           />
         </Box>
       </Group>
@@ -123,6 +128,7 @@ export default function TreeNodeRow({
               selectedId={selectedId}
               onSelect={onSelect}
               canEdit={canEdit}
+              onAfterDelete={onAfterDelete}
             />
           ))}
         </Stack>

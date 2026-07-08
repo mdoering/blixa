@@ -11,6 +11,9 @@ export interface ClassificationTreeProps {
   // row's action menu, which hides itself entirely when this is false. Defaults to false so
   // existing callers that don't pass it (read-only usage) don't show write actions.
   canEdit?: boolean;
+  // Threaded down to every row's action menu; called after a delete succeeds with the deleted
+  // usage's id so the caller can clear its selection if that row was selected.
+  onAfterDelete?: (deletedId: number) => void;
 }
 
 // Lazy classification tree: only the root level is fetched eagerly; every other level is
@@ -21,6 +24,7 @@ export default function ClassificationTree({
   selectedId,
   onSelect,
   canEdit = false,
+  onAfterDelete,
 }: ClassificationTreeProps) {
   const {
     data: roots,
@@ -46,6 +50,7 @@ export default function ClassificationTree({
           selectedId={selectedId}
           onSelect={onSelect}
           canEdit={canEdit}
+          onAfterDelete={onAfterDelete}
         />
       ))}
     </Stack>

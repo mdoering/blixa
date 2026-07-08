@@ -1,7 +1,7 @@
 import { Button, Group, Modal, Select, Stack, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { messageFor } from '../api/client';
 import { createUsage, linkSynonym } from '../api/usages';
@@ -84,6 +84,13 @@ export default function CreateNameModal({
 }: CreateNameModalProps) {
   const queryClient = useQueryClient();
 
+  // Tracks the id of a usage that a previous submit already created (synonym mode only): if the
+  // create succeeds but the follow-up synonym-of link fails, the usage still exists server-side,
+  // so a retry must skip createUsage and only re-attempt linkSynonym -- otherwise a retry would
+  // POST a second, now-duplicate, orphaned usage. A ref (not state) so the value is available
+  // synchronously inside the mutationFn/onError without waiting on a re-render.
+  const createdIdRef = useRef<number | null>(null);
+
   const form = useForm<FormValues>({
     initialValues: EMPTY_VALUES,
     validate: {
@@ -92,40 +99,60 @@ export default function CreateNameModal({
     },
   });
 
-  // Reset the form fields each time the modal is (re-)opened, e.g. opening it again for a
-  // different anchor/mode shouldn't carry over the previous attempt's input.
+  // Reset the form fields (and any half-finished create) each time the modal is (re-)opened,
+  // e.g. opening it again for a different anchor/mode -- or fresh, for the same one -- shouldn't
+  // carry over the previous attempt's input or in-flight created-id.
   useEffect(() => {
     if (opened) {
       form.setValues(EMPTY_VALUES);
       form.resetDirty(EMPTY_VALUES);
+      createdIdRef.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened, mode, anchor?.id]);
 
   const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
-      const payload: CreateUsagePayload = {
-        scientificName: values.scientificName,
-        authorship: values.authorship || undefined,
-        rank: values.rank,
-        status: mode === 'synonym' ? 'SYNONYM' : 'ACCEPTED',
-        parentId: mode === 'child' && anchor ? anchor.id : undefined,
-      };
-      const created = await createUsage(pid, payload);
-      if (mode === 'synonym' && anchor) {
-        await linkSynonym(pid, created.id, anchor.id);
+    mutationFn: async (values: FormValues): Promise<number> => {
+      let id = createdIdRef.current;
+      if (id == null) {
+        const payload: CreateUsagePayload = {
+          scientificName: values.scientificName,
+          authorship: values.authorship || undefined,
+          rank: values.rank,
+          status: mode === 'synonym' ? 'SYNONYM' : 'ACCEPTED',
+          parentId: mode === 'child' && anchor ? anchor.id : undefined,
+        };
+        const created = await createUsage(pid, payload);
+        id = created.id;
+        // Recorded immediately after the create succeeds (before the link is attempted), so a
+        // link failure below still leaves the id in place for a retry to pick up.
+        createdIdRef.current = id;
       }
-      return created;
+      if (mode === 'synonym' && anchor) {
+        await linkSynonym(pid, id, anchor.id);
+      }
+      return id;
     },
-    onSuccess: async (created) => {
+    onSuccess: async (id) => {
+      createdIdRef.current = null;
       await queryClient.invalidateQueries({ queryKey: ['treeRoots', pid] });
       await queryClient.invalidateQueries({ queryKey: ['treeChildren', pid] });
       await queryClient.invalidateQueries({ queryKey: ['usageSearch', pid] });
       notifications.show({ message: 'Name created' });
-      onCreated(created.id);
+      onCreated(id);
       onClose();
     },
     onError: (e) => {
+      // A createdIdRef at this point (in synonym mode) means createUsage already succeeded and
+      // it was the synonym-of link that failed -- say so explicitly, since "could not create"
+      // would wrongly suggest nothing happened, and the modal is left open for a link-only retry.
+      if (mode === 'synonym' && createdIdRef.current != null) {
+        notifications.show({
+          color: 'red',
+          message: 'Name created but could not be linked as a synonym — click Create to retry linking.',
+        });
+        return;
+      }
       notifications.show({ color: 'red', message: messageFor(e, 'Could not create the name') });
     },
   });

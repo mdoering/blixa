@@ -15,6 +15,7 @@ const STATUS_OPTIONS = [
 export interface NameActionMenuUsage {
   id: number;
   scientificName: string | null;
+  status: string | null;
 }
 
 export interface NameActionMenuProps {
@@ -27,6 +28,10 @@ export interface NameActionMenuProps {
   // Lets the row control the menu (e.g. open it on right-click) in addition to its own ⋮ target.
   opened?: boolean;
   onChange?: (opened: boolean) => void;
+  // Called after a confirmed delete succeeds, with the deleted usage's id -- so the caller can
+  // clear its selection if the deleted row was the one selected (otherwise the detail pane would
+  // keep rendering the now-gone record).
+  onAfterDelete?: (deletedId: number) => void;
 }
 
 // Shared ⋮ (+ right-click, via the caller's `opened`/`onChange`) action menu for a single name
@@ -40,10 +45,15 @@ export default function NameActionMenu({
   onSelect,
   opened,
   onChange,
+  onAfterDelete,
 }: NameActionMenuProps) {
   const actions = useNameActions(pid);
 
   if (!canEdit) return null;
+
+  // Synonyms/misapplied/unassessed usages can neither be a parent nor have synonyms of their
+  // own -- the backend 400s both attempts -- so only offer these for accepted usages.
+  const canHaveChildrenOrSynonyms = usage.status === 'ACCEPTED';
 
   const confirmDelete = () => {
     modals.openConfirmModal({
@@ -51,7 +61,7 @@ export default function NameActionMenu({
       children: `This permanently deletes "${usage.scientificName ?? 'this name'}".`,
       labels: { confirm: 'Delete', cancel: 'Cancel' },
       confirmProps: { color: 'red' },
-      onConfirm: () => actions.remove(usage),
+      onConfirm: () => actions.remove(usage, { onSuccess: () => onAfterDelete?.(usage.id) }),
     });
   };
 
@@ -70,15 +80,22 @@ export default function NameActionMenu({
           </ActionIcon>
         </Menu.Target>
         <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
-          <Menu.Item leftSection={<IconPlus size={14} />} onClick={() => actions.createChild(usage)}>
-            Add child
-          </Menu.Item>
-          <Menu.Item
-            leftSection={<IconPlus size={14} />}
-            onClick={() => actions.createSynonymOf(usage)}
-          >
-            Add synonym
-          </Menu.Item>
+          {canHaveChildrenOrSynonyms && (
+            <>
+              <Menu.Item
+                leftSection={<IconPlus size={14} />}
+                onClick={() => actions.createChild(usage)}
+              >
+                Add child
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<IconPlus size={14} />}
+                onClick={() => actions.createSynonymOf(usage)}
+              >
+                Add synonym
+              </Menu.Item>
+            </>
+          )}
           <Menu.Label>Change status</Menu.Label>
           {STATUS_OPTIONS.map((s) => (
             <Menu.Item key={s.value} onClick={() => actions.changeStatus(usage, s.value)}>

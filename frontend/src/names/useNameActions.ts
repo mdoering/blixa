@@ -52,10 +52,15 @@ export function useNameActions(pid: number) {
   const queryClient = useQueryClient();
   const [modalState, setModalState] = useState<CreateModalState | null>(null);
 
-  const invalidate = async () => {
+  // `id` is the affected usage: also invalidate its own detail query and path so a currently-open
+  // TaxonDetail (reads ['usage', pid, id]) and Breadcrumb (reads ['treePath', pid, id]) refresh
+  // instead of continuing to show stale/deleted data -- mirrors TaxonDetail's own save.
+  const invalidate = async (id: number) => {
     await queryClient.invalidateQueries({ queryKey: ['treeRoots', pid] });
     await queryClient.invalidateQueries({ queryKey: ['treeChildren', pid] });
     await queryClient.invalidateQueries({ queryKey: ['usageSearch', pid] });
+    await queryClient.invalidateQueries({ queryKey: ['usage', pid, id] });
+    await queryClient.invalidateQueries({ queryKey: ['treePath', pid] });
   };
 
   const changeStatusMutation = useMutation({
@@ -63,17 +68,17 @@ export function useNameActions(pid: number) {
       const full = await getUsage(pid, usage.id);
       return updateUsage(pid, usage.id, toUpdatePayload(full, status));
     },
-    onSuccess: async () => {
-      await invalidate();
+    onSuccess: async (_data, { usage }) => {
+      await invalidate(usage.id);
       notifications.show({ message: 'Status updated' });
     },
-    onError: async (e) => {
+    onError: async (e, { usage }) => {
       if (e instanceof ApiError && e.status === 409) {
         notifications.show({
           color: 'orange',
           message: 'Changed by someone else — refreshing',
         });
-        await invalidate();
+        await invalidate(usage.id);
         return;
       }
       notifications.show({ color: 'red', message: messageFor(e, 'Could not update status') });
@@ -82,8 +87,8 @@ export function useNameActions(pid: number) {
 
   const removeMutation = useMutation({
     mutationFn: (usage: ActionableUsage) => deleteUsage(pid, usage.id),
-    onSuccess: async () => {
-      await invalidate();
+    onSuccess: async (_data, usage) => {
+      await invalidate(usage.id);
       notifications.show({ message: 'Deleted' });
     },
     onError: (e) => {
@@ -100,6 +105,10 @@ export function useNameActions(pid: number) {
     createRoot: () => setModalState({ mode: 'root', anchor: null }),
     changeStatus: (usage: ActionableUsage, status: string) =>
       changeStatusMutation.mutate({ usage, status }),
-    remove: (usage: ActionableUsage) => removeMutation.mutate(usage),
+    // `onSuccess` here (rather than baked into removeMutation above) lets callers react to a
+    // specific delete -- e.g. NameActionMenu's onAfterDelete clearing the selection if the
+    // deleted usage was the one selected -- without every caller needing its own mutation.
+    remove: (usage: ActionableUsage, options?: { onSuccess?: () => void }) =>
+      removeMutation.mutate(usage, options),
   };
 }

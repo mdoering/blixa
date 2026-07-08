@@ -85,6 +85,55 @@ test('synonym mode POSTs a SYNONYM usage (no parent) then links it to the anchor
   await waitFor(() => expect(onCreated).toHaveBeenCalledWith(99));
 });
 
+test('synonym mode: if the synonym-of link fails, retrying does not re-POST the usage', async () => {
+  let postCount = 0;
+  let linkCount = 0;
+  server.use(
+    http.post('/api/projects/3/usages', async () => {
+      postCount += 1;
+      return HttpResponse.json({ id: 99, scientificName: 'Pinaster abies', version: 0 }, { status: 201 });
+    }),
+    http.put('/api/projects/3/usages/99/synonym-of/5', () => {
+      linkCount += 1;
+      // The link fails only on the first attempt.
+      if (linkCount === 1) {
+        return HttpResponse.json({ error: 'boom' }, { status: 500 });
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  const onCreated = vi.fn();
+  renderWithProviders(
+    <CreateNameModal
+      pid={3}
+      mode="synonym"
+      anchor={abies}
+      opened
+      onClose={() => {}}
+      onCreated={onCreated}
+    />,
+  );
+
+  await userEvent.type(screen.getByLabelText('Scientific name'), 'Pinaster abies');
+  await pickRank('species');
+  await userEvent.click(screen.getByRole('button', { name: /create/i }));
+
+  // The usage was created, but linking it failed -- the error must say so (not imply nothing
+  // happened), and only one POST should have fired.
+  expect(await screen.findByText(/could not be linked as a synonym/i)).toBeInTheDocument();
+  expect(postCount).toBe(1);
+  expect(linkCount).toBe(1);
+  expect(onCreated).not.toHaveBeenCalled();
+
+  // Retrying (form values are still populated) must only re-attempt the link, not re-create --
+  // otherwise this would leave a duplicate orphaned usage.
+  await userEvent.click(screen.getByRole('button', { name: /create/i }));
+
+  await waitFor(() => expect(onCreated).toHaveBeenCalledWith(99));
+  expect(postCount).toBe(1);
+  expect(linkCount).toBe(2);
+});
+
 test('root mode POSTs an ACCEPTED usage with no parent', async () => {
   let postBody: Record<string, unknown> | undefined;
   server.use(

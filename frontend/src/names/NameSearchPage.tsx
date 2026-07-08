@@ -137,6 +137,9 @@ export default function NameSearchPage() {
         onSelect={setSelectedId}
         opened={menuOpenId === row.original.id}
         onChange={(opened) => setMenuOpenId(opened ? row.original.id : null)}
+        onAfterDelete={(id) => {
+          if (id === selectedId) setSelectedId(null);
+        }}
       />
     ),
     mantineTableBodyRowProps: ({ row }) => ({
