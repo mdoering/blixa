@@ -3,7 +3,7 @@ package org.catalogueoflife.editor.support;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.ActiveProfiles;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 // Singleton-container pattern: one postgres:17 container is started once (static
 // initializer) and shared by every IT for the JVM's lifetime (Testcontainers' Ryuk
@@ -20,7 +20,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 public abstract class AbstractPostgresIT {
 
   @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
+  static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17");
 
   static {
     POSTGRES.start();

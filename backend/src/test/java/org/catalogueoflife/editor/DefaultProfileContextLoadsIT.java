@@ -3,7 +3,7 @@ package org.catalogueoflife.editor;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 // Loads the full application context under the DEFAULT profile (NOT "test"), so the
 // main application.yml's ORCID registration is exercised with ORCID_CLIENT_ID unset.
@@ -14,7 +14,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 class DefaultProfileContextLoadsIT {
 
   @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
+  static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17");
 
   static {
     POSTGRES.start();
