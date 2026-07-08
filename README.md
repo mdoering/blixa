@@ -60,9 +60,19 @@ The Vite dev server runs at **http://localhost:5173** and proxies `/api`, `/oaut
 
 ### 4. Log in
 
-Open **http://localhost:5173** and sign in with **`admin` / `admin`**. Create a project, then start editing references, name usages, and the classification tree.
+Open **http://localhost:5173** and sign in with **`admin` / `admin`** (the local-login form on the sign-in page). Create a project, then start editing references, name usages, and the classification tree.
 
-> ORCID login is optional — set `ORCID_CLIENT_ID` / `ORCID_CLIENT_SECRET` (see below) to enable the "Sign in with ORCID" button.
+> **Use local login for local dev.** The "Sign in with ORCID" button will fail with *"Invalid parameter: client_id"* unless ORCID is configured — see [ORCID login](#orcid-login-optional) below. For local development, `admin` / `admin` is all you need.
+
+### ORCID login (optional)
+
+ORCID is primarily for the deployed environments (frontend + backend served same-origin, with real credentials). To enable it locally:
+
+1. Register an ORCID API client — at [orcid.org](https://orcid.org) (Developer tools) or the [ORCID Sandbox](https://sandbox.orcid.org) — to obtain a **Client ID** and **Client Secret**.
+2. In that ORCID app registration, add the redirect URI **`http://localhost:8080/login/oauth2/code/orcid`**.
+3. Run the backend with `ORCID_CLIENT_ID` and `ORCID_CLIENT_SECRET` set (e.g. `ORCID_CLIENT_ID=APP-… ORCID_CLIENT_SECRET=… mvn spring-boot:run -Dspring-boot.run.profiles=dev`).
+
+Note: in the split dev setup the ORCID callback goes directly to the backend on `:8080` (not through the Vite proxy on `:5173`), so the post-login landing is rougher than in a deployed same-origin build — another reason `admin`/`admin` is the smoother local path. The app is preconfigured for **production** ORCID endpoints (`orcid.org`); using the Sandbox additionally requires overriding the provider URIs in `application.yml`.
 
 ---
 
