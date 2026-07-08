@@ -170,7 +170,6 @@ for lossless round-trip; export maps the internal ids back to ColDP string IDs.
 >   misapplied, unassessed}** (drops ColDP's *provisionally accepted* /
 >   *ambiguous synonym*; `unassessed` replaces "bare name"; export maps
 >   unassessed→bare name). `publishedInYear` → `int`. Typed enums:
->   `temporalRangeStart/end`→`GeoTime` (from `org.catalogueoflife:api`),
 >   `nomStatus`→`NomStatus`, `gender`→`Gender`, `nameType`→`NameType`,
 >   `notho`→`NamePart`, `environment`→`List<Environment>`.
 > - **Releases (deferred):** a project's ColDP release date + version live on a
@@ -292,7 +291,8 @@ taxonomic usage; this table **is the classification**. (CLB keeps `Name` and
   - `name_phrase` (free-text qualifier, e.g. `auct. non …`, `sensu lato`)
   - `reference_id[]` (taxonomic references supporting the usage)
   - `extinct`, `environment[]` (`List<Environment>`), `temporal_range_start/end`
-    (`GeoTime`)
+    (**`String`** for now — to be validated against the GeoTime vocab on entry via
+    the CLB vocab API later; the `org.catalogueoflife:api` dep was dropped)
   - **No `according_to_reference_id` / `accordingToPage`** (dropped per decision).
   - **No scrutinizer fields** — the scrutinizer is derived from the audit log
     (last editor + `modified` timestamp) whenever it needs to be shown or
