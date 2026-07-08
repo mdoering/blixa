@@ -17,6 +17,8 @@ import org.catalogueoflife.editor.project.ProjectMapper;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
 import org.catalogueoflife.editor.tree.TreeMapper;
+import org.catalogueoflife.editor.validation.ValidationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,10 +40,11 @@ public class NameUsageService {
   private final TreeMapper tree;
   private final AuditService audit;
   private final ObjectMapper objectMapper;
+  private final ApplicationEventPublisher events;
 
   public NameUsageService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted, IdSeqMapper idSeq,
       ProjectService projects, ProjectMapper projectMapper, NameParserService parser, TreeMapper tree,
-      AuditService audit, ObjectMapper objectMapper) {
+      AuditService audit, ObjectMapper objectMapper, ApplicationEventPublisher events) {
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
     this.idSeq = idSeq;
@@ -51,6 +54,7 @@ public class NameUsageService {
     this.tree = tree;
     this.audit = audit;
     this.objectMapper = objectMapper;
+    this.events = events;
   }
 
   public List<NameUsageResponse> list(int userId, int projectId, int limit, int offset) {
@@ -114,6 +118,9 @@ public class NameUsageService {
     // in the in-memory POJO returned to the caller without a redundant round-trip.
     u.setVersion(0);
     audit.record(projectId, userId, ENTITY, u.getId(), Operation.CREATE, null, u);
+    // Published INSIDE this @Transactional method so ValidationTrigger's AFTER_COMMIT listener
+    // only ever fires once this create has actually committed (see validation/ValidationTrigger).
+    events.publishEvent(ValidationEvent.forUsage(projectId, u.getId()));
     return toResponse(u, project);
   }
 
@@ -167,6 +174,7 @@ public class NameUsageService {
     }
     NameUsage after = requireInProject(projectId, id);
     audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
+    events.publishEvent(ValidationEvent.forUsage(projectId, id));
     return toResponse(after, project);
   }
 
@@ -178,17 +186,23 @@ public class NameUsageService {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "name usage not found");
     }
     audit.record(projectId, userId, ENTITY, id, Operation.DELETE, before, null);
+    // The usage itself is gone by the time this fires (AFTER_COMMIT), so
+    // ValidationService.revalidateUsage will find nothing and no-op -- published anyway per the
+    // plan's create/update/delete symmetry; a later plan may extend this to re-check usages that
+    // referenced the deleted one (e.g. former synonym links), which is out of scope here.
+    events.publishEvent(ValidationEvent.forUsage(projectId, id));
   }
 
   @Transactional
   public void linkSynonym(int userId, int projectId, int synonymId, int acceptedId) {
     requireEditor(userId, projectId);
     requireBothInProject(projectId, synonymId, acceptedId);
-    // ON CONFLICT DO NOTHING (see SynonymAcceptedMapper.link): only audit an actual new link,
-    // not a no-op re-link of an already-existing pair.
+    // ON CONFLICT DO NOTHING (see SynonymAcceptedMapper.link): only audit/revalidate an actual new
+    // link, not a no-op re-link of an already-existing pair.
     if (synonymAccepted.link(projectId, synonymId, acceptedId, null) > 0) {
       audit.record(projectId, userId, SYNONYM_LINK_ENTITY, synonymId, Operation.CREATE, null,
           Map.of("acceptedId", acceptedId));
+      events.publishEvent(ValidationEvent.forUsage(projectId, synonymId));
     }
   }
 
@@ -199,6 +213,7 @@ public class NameUsageService {
     if (synonymAccepted.unlink(projectId, synonymId, acceptedId) > 0) {
       audit.record(projectId, userId, SYNONYM_LINK_ENTITY, synonymId, Operation.DELETE,
           Map.of("acceptedId", acceptedId), null);
+      events.publishEvent(ValidationEvent.forUsage(projectId, synonymId));
     }
   }
 

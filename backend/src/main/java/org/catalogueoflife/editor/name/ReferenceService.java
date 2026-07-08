@@ -8,6 +8,8 @@ import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.catalogueoflife.editor.name.dto.UpdateReferenceRequest;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
+import org.catalogueoflife.editor.validation.ValidationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,14 +26,18 @@ public class ReferenceService {
   private final ProjectService projects;
   private final AuditService audit;
   private final ObjectMapper objectMapper;
+  private final NameUsageMapper usages;
+  private final ApplicationEventPublisher events;
 
   public ReferenceService(ReferenceMapper references, IdSeqMapper idSeq, ProjectService projects,
-      AuditService audit, ObjectMapper objectMapper) {
+      AuditService audit, ObjectMapper objectMapper, NameUsageMapper usages, ApplicationEventPublisher events) {
     this.references = references;
     this.idSeq = idSeq;
     this.projects = projects;
     this.audit = audit;
     this.objectMapper = objectMapper;
+    this.usages = usages;
+    this.events = events;
   }
 
   public List<Reference> list(int userId, int projectId, int limit, int offset) {
@@ -117,6 +123,13 @@ public class ReferenceService {
     }
     Reference after = requireInProject(projectId, id);
     audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
+    // A reference edit (e.g. its year) can change what YearVsReferenceRule finds for every usage
+    // that cites it as published_in -- one event per citing usage id, all published inside this
+    // same transaction so ValidationTrigger's AFTER_COMMIT listener only fires if this update
+    // actually commits (see validation/ValidationTrigger, NameUsageMapper.findIdsByPublishedInReference).
+    for (int usageId : usages.findIdsByPublishedInReference(projectId, id)) {
+      events.publishEvent(ValidationEvent.forUsage(projectId, usageId));
+    }
     return after;
   }
 

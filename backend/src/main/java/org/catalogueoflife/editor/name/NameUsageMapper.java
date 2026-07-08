@@ -104,6 +104,13 @@ public interface NameUsageMapper {
   int countDuplicates(@Param("projectId") int projectId, @Param("scientificName") String scientificName,
       @Param("authorship") String authorship, @Param("excludeId") int excludeId);
 
+  // Every usage in the project citing a given reference as its published_in -- when the reference
+  // changes, these are the usages whose year_vs_reference finding may now read differently
+  // (validation/ValidationTrigger fires one ValidationEvent per id this returns; see
+  // ReferenceService.update).
+  @Select("SELECT id FROM name_usage WHERE project_id = #{projectId} AND published_in_reference_id = #{refId}")
+  List<Integer> findIdsByPublishedInReference(@Param("projectId") int projectId, @Param("refId") int refId);
+
   @Update("""
       UPDATE name_usage
       SET coldp_id = #{coldpId},

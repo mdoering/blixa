@@ -48,6 +48,11 @@ public class ValidationService {
   // by ON DELETE CASCADE on name_usage's own FKs elsewhere, not here.
   @Transactional
   public void revalidateUsage(int projectId, int usageId) {
+    // Must be the first statement: see IssueMapper.lockUsage. Serializes this call against any
+    // other concurrent revalidateUsage for the same (project, usage) -- e.g. Task 3's async
+    // auto-revalidate trigger firing for a usage while an on-demand/manual revalidate for that same
+    // usage is also in flight -- so the reconcile below never races itself into a duplicate INSERT.
+    issues.lockUsage(projectId, usageId);
     NameUsage usage = nameUsages.findByIdInProject(projectId, usageId);
     if (usage == null) {
       return;

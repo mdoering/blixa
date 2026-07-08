@@ -12,6 +12,8 @@ import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
 import org.catalogueoflife.editor.tree.dto.MoveRequest;
 import org.catalogueoflife.editor.tree.dto.PathNode;
+import org.catalogueoflife.editor.validation.ValidationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,14 +28,16 @@ public class TreeService {
   private final ProjectService projects;
   private final AuditService audit;
   private final ObjectMapper objectMapper;
+  private final ApplicationEventPublisher events;
 
   public TreeService(TreeMapper tree, NameUsageMapper usages, ProjectService projects, AuditService audit,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper, ApplicationEventPublisher events) {
     this.tree = tree;
     this.usages = usages;
     this.projects = projects;
     this.audit = audit;
     this.objectMapper = objectMapper;
+    this.events = events;
   }
 
   public List<TreeNode> listRoots(int actorId, int projectId, int limit, int offset) {
@@ -99,6 +103,7 @@ public class TreeService {
     }
     NameUsage after = usages.findByIdInProject(projectId, id);
     audit.record(projectId, actorId, "name_usage", id, Operation.UPDATE, before, after);
+    events.publishEvent(ValidationEvent.forUsage(projectId, id));
   }
 
   private void requireEditor(int actorId, int projectId) {

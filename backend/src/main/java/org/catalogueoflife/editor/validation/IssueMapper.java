@@ -18,6 +18,17 @@ import org.catalogueoflife.editor.validation.dto.IssueResponse;
 @Mapper
 public interface IssueMapper {
 
+  // Serializes concurrent ValidationService.revalidateUsage runs for the SAME (project, usage) --
+  // now that Task 3 wires an async auto-revalidate trigger off every write, an on-demand/manual
+  // revalidate for a usage can otherwise race the auto-trigger firing for that same usage: both see
+  // "no existing issue for this rule" and both try to INSERT, tripping the (project_id, entity_type,
+  // entity_id, rule) UNIQUE constraint (see V7__issue.sql / ValidationReconcileIT). The lock is
+  // scoped to the current transaction (pg_advisory_xact_lock auto-releases at commit/rollback), same
+  // pattern as TreeMapper.lockProject; the second caller blocks until the first commits, then simply
+  // sees the already-reconciled rows and updates instead of inserting.
+  @Select("SELECT pg_advisory_xact_lock(#{projectId}, #{usageId}) IS NOT NULL")
+  boolean lockUsage(@Param("projectId") int projectId, @Param("usageId") int usageId);
+
   @Insert("""
       INSERT INTO issue (project_id, entity_type, entity_id, rule, severity, message, context)
       VALUES (#{projectId}, #{entityType}, #{entityId}, #{rule}, #{severity}, #{message}, #{context}::jsonb)
