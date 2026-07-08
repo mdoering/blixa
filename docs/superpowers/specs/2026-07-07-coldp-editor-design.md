@@ -55,7 +55,7 @@ duplication (see §5.5).
 
 | Layer | Choice |
 |---|---|
-| Backend | **Java 21, Spring Boot** |
+| Backend | **Java 25 (LTS), Spring Boot 4.1** (migrated from Java 21 / Boot 3.5 after 3.5 went EOL; build requires JDK 25 — `backend/.sdkmanrc` pins Liberica 25, use `sdk env`) |
 | Persistence | **MyBatis** (`mybatis-spring-boot-starter`) — hand-written SQL |
 | Database | **PostgreSQL 17** (single DB, shared schema) |
 | Migrations | **Flyway** |
