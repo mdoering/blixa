@@ -6,6 +6,7 @@ import ProjectListPage from './projects/ProjectListPage';
 import ProjectLayout from './projects/ProjectLayout';
 import ProjectMetadataPage from './projects/ProjectMetadataPage';
 import MembersPage from './projects/MembersPage';
+import TreePage from './tree/TreePage';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route index element={<ProjectListPage />} />
           <Route path="projects/:projectId" element={<ProjectLayout />}>
             <Route index element={<Navigate to="metadata" replace />} />
+            <Route path="tree" element={<TreePage />} />
             <Route path="metadata" element={<ProjectMetadataPage />} />
             <Route path="members" element={<MembersPage />} />
           </Route>

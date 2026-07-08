@@ -1,0 +1,98 @@
+import { ActionIcon, Badge, Group, Loader, Stack, Text } from '@mantine/core';
+import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { getChildren } from '../api/tree';
+import type { TreeNode } from '../api/types';
+
+const INDENT_PX = 20;
+
+export interface TreeNodeRowProps {
+  pid: number;
+  node: TreeNode;
+  depth: number;
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+}
+
+export default function TreeNodeRow({ pid, node, depth, selectedId, onSelect }: TreeNodeRowProps) {
+  const [expanded, setExpanded] = useState(false);
+  const hasChildren = node.childCount > 0;
+  const selected = selectedId === node.id;
+
+  // Lazy: children are only fetched once this node is expanded, and stay cached by
+  // TanStack Query afterwards (collapsing/re-expanding doesn't refetch).
+  const { data: children, isLoading } = useQuery({
+    queryKey: ['treeChildren', pid, node.id],
+    queryFn: () => getChildren(pid, node.id),
+    enabled: expanded && hasChildren,
+  });
+
+  return (
+    <Stack gap={0}>
+      <Group gap={4} wrap="nowrap" pl={depth * INDENT_PX} py={2}>
+        {hasChildren ? (
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="sm"
+            aria-label={expanded ? 'Collapse' : 'Expand'}
+            onClick={() => setExpanded((e) => !e)}
+          >
+            {expanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+          </ActionIcon>
+        ) : (
+          <div style={{ width: 28, flexShrink: 0 }} />
+        )}
+        <Group
+          gap={6}
+          wrap="nowrap"
+          onClick={() => onSelect(node.id)}
+          style={{
+            cursor: 'pointer',
+            flex: 1,
+            borderRadius: 4,
+            paddingInline: 4,
+            backgroundColor: selected ? 'var(--mantine-color-blue-light)' : undefined,
+          }}
+        >
+          {node.rank && (
+            <Badge size="xs" variant="light" color="gray" style={{ flexShrink: 0 }}>
+              {node.rank}
+            </Badge>
+          )}
+          <Text size="sm" fw={selected ? 700 : 400} truncate>
+            {node.scientificName}
+          </Text>
+          {node.authorship && (
+            <Text c="dimmed" size="xs" truncate>
+              {node.authorship}
+            </Text>
+          )}
+        </Group>
+      </Group>
+      {expanded && (
+        <Stack gap={0}>
+          {isLoading && (
+            <Text size="xs" c="dimmed" pl={(depth + 1) * INDENT_PX + 28}>
+              <Loader size="xs" mr={4} style={{ verticalAlign: 'middle' }} />
+              Loading…
+            </Text>
+          )}
+          {/* No virtualization yet: a page of children (server default limit) renders in full.
+              Follow-up: paginate/virtualize very large sibling lists. */}
+          {(children ?? []).map((child) => (
+            <TreeNodeRow
+              key={child.id}
+              pid={pid}
+              node={child}
+              depth={depth + 1}
+              selectedId={selectedId}
+              onSelect={onSelect}
+            />
+          ))}
+        </Stack>
+      )}
+    </Stack>
+  );
+}

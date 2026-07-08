@@ -30,6 +30,22 @@ export interface CreateProjectPayload {
   nomCode?: string;
 }
 
+export interface TreeNode {
+  id: number;
+  scientificName: string | null;
+  authorship: string | null;
+  rank: string | null;
+  status: string | null;
+  ordinal: number | null;
+  childCount: number;
+}
+
+export interface PathNode {
+  id: number;
+  scientificName: string | null;
+  rank: string | null;
+}
+
 export interface UpdateMetadataPayload {
   title: string;
   alias?: string;
