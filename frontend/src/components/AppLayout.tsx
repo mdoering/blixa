@@ -1,4 +1,4 @@
-import { Dropdown, Layout, Typography } from 'antd';
+import { AppShell, Anchor, Group, Menu, UnstyledButton } from '@mantine/core';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMe } from '../auth/useMe';
@@ -20,27 +20,28 @@ export default function AppLayout() {
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Layout.Header style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-        <Link to="/">
-          <Typography.Text strong style={{ color: '#fff' }}>
+    <AppShell header={{ height: 60 }} padding="md">
+      <AppShell.Header>
+        <Group h="100%" px="md" gap="lg">
+          <Anchor component={Link} to="/" fw={700} c="white" underline="never">
             ColDP Editor
-          </Typography.Text>
-        </Link>
-        <ProjectSwitcher />
-        <div style={{ marginLeft: 'auto' }}>
-          <Dropdown
-            menu={{ items: [{ key: 'logout', label: 'Logout', onClick: onLogout }] }}
-          >
-            <Typography.Text style={{ color: '#fff', cursor: 'pointer' }}>
-              {me?.displayName || me?.username}
-            </Typography.Text>
-          </Dropdown>
-        </div>
-      </Layout.Header>
-      <Layout.Content style={{ padding: 24 }}>
+          </Anchor>
+          <ProjectSwitcher />
+          <Menu position="bottom-end" withinPortal>
+            <Menu.Target>
+              <UnstyledButton style={{ marginLeft: 'auto', color: 'white' }}>
+                {me?.displayName || me?.username}
+              </UnstyledButton>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item onClick={onLogout}>Logout</Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+      </AppShell.Header>
+      <AppShell.Main>
         <Outlet />
-      </Layout.Content>
-    </Layout>
+      </AppShell.Main>
+    </AppShell>
   );
 }

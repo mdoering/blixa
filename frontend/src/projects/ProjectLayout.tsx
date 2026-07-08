@@ -1,4 +1,4 @@
-import { Alert, Spin, Tabs, Typography } from 'antd';
+import { Alert, Center, Loader, Tabs, Title } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { Outlet, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { getProject } from '../api/projects';
@@ -14,21 +14,24 @@ export default function ProjectLayout() {
     enabled: Number.isFinite(id),
   });
 
-  if (isLoading) return <Spin style={{ margin: 48 }} />;
-  if (isError || !data) return <Alert type="error" showIcon message="Project not found" />;
+  if (isLoading)
+    return (
+      <Center style={{ margin: 48 }}>
+        <Loader />
+      </Center>
+    );
+  if (isError || !data) return <Alert color="red">Project not found</Alert>;
 
   const active = location.pathname.endsWith('/members') ? 'members' : 'metadata';
   return (
     <div>
-      <Typography.Title level={3}>{data.title}</Typography.Title>
-      <Tabs
-        activeKey={active}
-        onChange={(k) => navigate(`/projects/${id}/${k}`)}
-        items={[
-          { key: 'metadata', label: 'Metadata' },
-          { key: 'members', label: 'Members' },
-        ]}
-      />
+      <Title order={3}>{data.title}</Title>
+      <Tabs value={active} onChange={(v) => v && navigate(`/projects/${id}/${v}`)}>
+        <Tabs.List>
+          <Tabs.Tab value="metadata">Metadata</Tabs.Tab>
+          <Tabs.Tab value="members">Members</Tabs.Tab>
+        </Tabs.List>
+      </Tabs>
       <Outlet />
     </div>
   );

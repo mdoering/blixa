@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { server } from './server';
 
-// Ant Design (and other libs) call matchMedia; jsdom doesn't implement it.
+// Mantine (and other libs) call matchMedia; jsdom doesn't implement it.
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: (query: string) => ({
@@ -18,7 +18,14 @@ Object.defineProperty(window, 'matchMedia', {
   }),
 });
 
-// jsdom lacks getComputedStyle scrollbar measuring used by some AntD components.
+// jsdom lacks ResizeObserver, used by Mantine / Mantine React Table / TanStack Virtual.
+window.ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
+// jsdom lacks getComputedStyle scrollbar measuring used by some Mantine components.
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 afterEach(() => cleanup());

@@ -20,6 +20,8 @@ test('authenticated user sees the project list inside the app layout', async () 
     ),
   );
   renderWithProviders(<App />, { route: '/' });
-  expect(await screen.findByText('Lepidoptera')).toBeInTheDocument();
+  // The project title also appears as a (hidden, unopened) option inside the
+  // ProjectSwitcher combobox, so target the visible project-list link specifically.
+  expect(await screen.findByRole('link', { name: 'Lepidoptera' })).toBeInTheDocument();
   await waitFor(() => expect(screen.getByText('Alice')).toBeInTheDocument());
 });

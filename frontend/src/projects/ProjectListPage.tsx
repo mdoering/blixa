@@ -1,4 +1,4 @@
-import { Button, List, Tag, Typography } from 'antd';
+import { Anchor, Badge, Button, Group, Loader, Paper, Stack, Text, Title } from '@mantine/core';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -11,25 +11,30 @@ export default function ProjectListPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography.Title level={3} style={{ margin: 0 }}>
+      <Group justify="space-between" mb="md">
+        <Title order={3} m={0}>
           My projects
-        </Typography.Title>
-        <Button type="primary" onClick={() => setCreating(true)}>
-          New project
-        </Button>
-      </div>
-      <List
-        loading={isLoading}
-        bordered
-        dataSource={data ?? []}
-        locale={{ emptyText: 'No projects yet' }}
-        renderItem={(p) => (
-          <List.Item actions={[<Tag key="role">{p.role}</Tag>]}>
-            <Link to={`/projects/${p.id}/metadata`}>{p.title}</Link>
-          </List.Item>
-        )}
-      />
+        </Title>
+        <Button onClick={() => setCreating(true)}>New project</Button>
+      </Group>
+      {isLoading ? (
+        <Loader />
+      ) : (data ?? []).length === 0 ? (
+        <Text c="dimmed">No projects yet</Text>
+      ) : (
+        <Stack gap="xs">
+          {(data ?? []).map((p) => (
+            <Paper key={p.id} withBorder p="sm">
+              <Group justify="space-between">
+                <Anchor component={Link} to={`/projects/${p.id}/metadata`}>
+                  {p.title}
+                </Anchor>
+                <Badge>{p.role}</Badge>
+              </Group>
+            </Paper>
+          ))}
+        </Stack>
+      )}
       <CreateProjectModal open={creating} onClose={() => setCreating(false)} />
     </div>
   );
