@@ -80,18 +80,43 @@ class NameUsageApiIT extends AbstractPostgresIT {
     AppUser viewer = users.requireByUsernameOrNull("usageViewer");
     members.upsert(new ProjectMember((int) pid, viewer.getId(), Role.VIEWER.dbValue()));
 
-    // create an accepted usage: parse-on-write atomizes genus/specificEpithet + formattedName
+    // create an accepted usage: parse-on-write atomizes genus/specificEpithet + formattedName.
+    // "status" is a tolerant lower-case string on the wire, parsed into the Status enum
+    // server-side and round-tripped back out as the enum's name().
     String createBody = mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"scientificName\":\"Abies alba\",\"authorship\":\"Mill.\","
-                + "\"rank\":\"species\",\"status\":\"accepted\"}"))
+                + "\"rank\":\"species\",\"status\":\"accepted\",\"gender\":\"feminine\","
+                + "\"environment\":[\"terrestrial\"],\"temporalRangeStart\":\"Holocene\"}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.version").value(0))
         .andExpect(jsonPath("$.genus").value("Abies"))
         .andExpect(jsonPath("$.specificEpithet").value("alba"))
         .andExpect(jsonPath("$.formattedName").value(containsString("Abies alba")))
+        .andExpect(jsonPath("$.status").value("ACCEPTED"))
+        .andExpect(jsonPath("$.gender").value("FEMININE"))
+        .andExpect(jsonPath("$.environment[0]").value("TERRESTRIAL"))
+        .andExpect(jsonPath("$.temporalRangeStart").value("Holocene"))
         .andReturn().getResponse().getContentAsString();
     long accId = json.readTree(createBody).get("id").asLong();
+
+    // an unrecognized status value is a 400, not a 500 or a silently-accepted garbage value
+    mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Bogus status\",\"rank\":\"species\",\"status\":\"bogus\"}"))
+        .andExpect(status().isBadRequest());
+
+    // ... same for an unrecognized nomenclatural/geological vocabulary value
+    mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Bogus nomStatus\",\"rank\":\"species\",\"status\":\"accepted\","
+                + "\"nomStatus\":\"bogus\"}"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Bogus geotime\",\"rank\":\"species\",\"status\":\"accepted\","
+                + "\"temporalRangeEnd\":\"bogus\"}"))
+        .andExpect(status().isBadRequest());
 
     // fuzzy search
     mvc.perform(get("/api/projects/" + pid + "/usages").param("q", "Abies"))
@@ -100,6 +125,16 @@ class NameUsageApiIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + pid + "/usages").param("q", "zzzzz"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));
+
+    // the two remaining Status values also round-trip through the enum
+    long misappliedId = createUsage(pid, "Abies misapplied", "", "species", "misapplied");
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + misappliedId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("MISAPPLIED"));
+    long unassessedId = createUsage(pid, "Abies unassessed", "", "species", "unassessed");
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + unassessedId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("UNASSESSED"));
 
     // create a synonym
     long synId = createUsage(pid, "Picea abies", "(L.) H.Karst.", "species", "synonym");
@@ -177,13 +212,16 @@ class NameUsageApiIT extends AbstractPostgresIT {
         .andExpect(status().isOk());
 
     // cross-project guard: linking to/from a usage that belongs to a DIFFERENT project is rejected.
-    // Ids are now per-project sequences (chunk 2), so bump otherPid's sequence past pid's own
-    // usage count (1..3 so far) first -- otherwise otherPid's first usage would happen to reuse
-    // pid's own id 1, and the "cross-project" checks below would silently resolve to pid's OWN
-    // usage instead of 404/400-ing.
+    // Ids are per-project sequences (chunk 2), so bump otherPid's sequence past pid's own usage
+    // count (1..5 so far: accId, misappliedId, unassessedId, synId, accId2) first -- otherwise
+    // otherPid's usage would happen to reuse one of pid's own ids (e.g. synId's), and the
+    // "cross-project" checks below would silently resolve to pid's OWN usage instead of
+    // 404/400-ing.
     createUsage(otherPid, "Filler one", "", "species", "accepted");
     createUsage(otherPid, "Filler two", "", "species", "accepted");
     createUsage(otherPid, "Filler three", "", "species", "accepted");
+    createUsage(otherPid, "Filler four", "", "species", "accepted");
+    createUsage(otherPid, "Filler five", "", "species", "accepted");
     long otherUsageId = createUsage(otherPid, "Alien name", "Auth.", "species", "accepted");
     mvc.perform(put("/api/projects/" + pid + "/usages/" + synId + "/synonym-of/" + otherUsageId).with(csrf()))
         .andExpect(status().isNotFound());

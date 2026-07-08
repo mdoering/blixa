@@ -2,6 +2,9 @@ package org.catalogueoflife.editor.name;
 
 import java.util.List;
 import java.util.Objects;
+import life.catalogue.api.vocab.Environment;
+import life.catalogue.api.vocab.Gender;
+import life.catalogue.api.vocab.NomStatus;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
@@ -67,15 +70,19 @@ public class NameUsageService {
     u.setScientificName(req.scientificName());
     u.setAuthorship(req.authorship());
     u.setRank(req.rank());
-    u.setStatus(req.status());
+    u.setStatus(VocabParsing.requireParse(Status.class, req.status(), "status"));
     u.setParentId(req.parentId());
     u.setNamePhrase(req.namePhrase());
-    u.setNomStatus(req.nomStatus());
+    u.setNomStatus(VocabParsing.parse(NomStatus.class, req.nomStatus(), "nomStatus"));
     u.setPublishedInReferenceId(req.publishedInReferenceId());
     u.setPublishedInYear(req.publishedInYear());
     u.setPublishedInPage(req.publishedInPage());
     u.setPublishedInPageLink(req.publishedInPageLink());
+    u.setGender(VocabParsing.parse(Gender.class, req.gender(), "gender"));
     u.setExtinct(req.extinct());
+    u.setEnvironment(parseEnvironments(req.environment()));
+    u.setTemporalRangeStart(VocabParsing.parseGeoTime(req.temporalRangeStart(), "temporalRangeStart"));
+    u.setTemporalRangeEnd(VocabParsing.parseGeoTime(req.temporalRangeEnd(), "temporalRangeEnd"));
     u.setLink(req.link());
     u.setRemarks(req.remarks());
     u.setModifiedBy(userId);
@@ -103,15 +110,19 @@ public class NameUsageService {
     u.setScientificName(req.scientificName());
     u.setAuthorship(req.authorship());
     u.setRank(req.rank());
-    u.setStatus(req.status());
+    u.setStatus(VocabParsing.requireParse(Status.class, req.status(), "status"));
     u.setParentId(req.parentId());
     u.setNamePhrase(req.namePhrase());
-    u.setNomStatus(req.nomStatus());
+    u.setNomStatus(VocabParsing.parse(NomStatus.class, req.nomStatus(), "nomStatus"));
     u.setPublishedInReferenceId(req.publishedInReferenceId());
     u.setPublishedInYear(req.publishedInYear());
     u.setPublishedInPage(req.publishedInPage());
     u.setPublishedInPageLink(req.publishedInPageLink());
+    u.setGender(VocabParsing.parse(Gender.class, req.gender(), "gender"));
     u.setExtinct(req.extinct());
+    u.setEnvironment(parseEnvironments(req.environment()));
+    u.setTemporalRangeStart(VocabParsing.parseGeoTime(req.temporalRangeStart(), "temporalRangeStart"));
+    u.setTemporalRangeEnd(VocabParsing.parseGeoTime(req.temporalRangeEnd(), "temporalRangeEnd"));
     u.setLink(req.link());
     u.setRemarks(req.remarks());
     u.setModifiedBy(userId);
@@ -161,7 +172,7 @@ public class NameUsageService {
   private NameUsageResponse toResponse(NameUsage u, Project project) {
     String formattedName = parser.formatName(u, project.getNomCode(), false);
     List<Integer> acceptedParentIds = synonymAccepted.findAcceptedFor(u.getProjectId(), u.getId());
-    List<Integer> synonymIds = "accepted".equals(u.getStatus())
+    List<Integer> synonymIds = Status.ACCEPTED == u.getStatus()
         ? synonymAccepted.findSynonymsOf(u.getProjectId(), u.getId())
         : List.of();
     return NameUsageResponse.of(u, formattedName, acceptedParentIds, synonymIds);
@@ -210,5 +221,14 @@ public class NameUsageService {
 
   private static boolean changed(String oldValue, String newValue) {
     return !Objects.equals(oldValue, newValue);
+  }
+
+  private static List<Environment> parseEnvironments(List<String> raw) {
+    if (raw == null) {
+      return null;
+    }
+    return raw.stream()
+        .map(s -> VocabParsing.requireParse(Environment.class, s, "environment"))
+        .toList();
   }
 }

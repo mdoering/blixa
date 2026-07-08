@@ -2,6 +2,12 @@ package org.catalogueoflife.editor.name;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import life.catalogue.api.vocab.Environment;
+import life.catalogue.api.vocab.Gender;
+import life.catalogue.api.vocab.GeoTime;
+import life.catalogue.api.vocab.NomStatus;
+import org.gbif.nameparser.api.NamePart;
+import org.gbif.nameparser.api.NameType;
 
 // The collapsed COL editor model: name facts (nomenclatural) and taxonomic usage
 // (accepted/synonym placement) live in a single row. `parentId` is the accepted
@@ -20,13 +26,13 @@ public class NameUsage {
   private Integer basionymId;
   private Integer ordinal;
   // taxonomic
-  private String status;
+  private Status status;
   private String namePhrase;
   private List<Integer> referenceId;
   private Boolean extinct;
-  private List<String> environment;
-  private String temporalRangeStart;
-  private String temporalRangeEnd;
+  private List<Environment> environment;
+  private GeoTime temporalRangeStart;
+  private GeoTime temporalRangeEnd;
   // nomenclatural (name)
   private String scientificName;
   private String authorship;
@@ -37,7 +43,7 @@ public class NameUsage {
   private String specificEpithet;
   private String infraspecificEpithet;
   private String cultivarEpithet;
-  private String notho;
+  private NamePart notho;
   private String combinationAuthorship;
   private String combinationExAuthorship;
   private String combinationAuthorshipYear;
@@ -45,14 +51,14 @@ public class NameUsage {
   private String basionymExAuthorship;
   private String basionymAuthorshipYear;
   private String sanctioningAuthor;
-  private String nomStatus;
+  private NomStatus nomStatus;
   private Integer publishedInReferenceId;
-  private String publishedInYear;
+  private Integer publishedInYear;
   private String publishedInPage;
   private String publishedInPageLink;
-  private String gender;
+  private Gender gender;
   private String etymology;
-  private String nameType;
+  private NameType nameType;
   private String parseState;
   private String link;
   private String remarks;
@@ -74,20 +80,20 @@ public class NameUsage {
   public void setBasionymId(Integer basionymId) { this.basionymId = basionymId; }
   public Integer getOrdinal() { return ordinal; }
   public void setOrdinal(Integer ordinal) { this.ordinal = ordinal; }
-  public String getStatus() { return status; }
-  public void setStatus(String status) { this.status = status; }
+  public Status getStatus() { return status; }
+  public void setStatus(Status status) { this.status = status; }
   public String getNamePhrase() { return namePhrase; }
   public void setNamePhrase(String namePhrase) { this.namePhrase = namePhrase; }
   public List<Integer> getReferenceId() { return referenceId; }
   public void setReferenceId(List<Integer> referenceId) { this.referenceId = referenceId; }
   public Boolean getExtinct() { return extinct; }
   public void setExtinct(Boolean extinct) { this.extinct = extinct; }
-  public List<String> getEnvironment() { return environment; }
-  public void setEnvironment(List<String> environment) { this.environment = environment; }
-  public String getTemporalRangeStart() { return temporalRangeStart; }
-  public void setTemporalRangeStart(String temporalRangeStart) { this.temporalRangeStart = temporalRangeStart; }
-  public String getTemporalRangeEnd() { return temporalRangeEnd; }
-  public void setTemporalRangeEnd(String temporalRangeEnd) { this.temporalRangeEnd = temporalRangeEnd; }
+  public List<Environment> getEnvironment() { return environment; }
+  public void setEnvironment(List<Environment> environment) { this.environment = environment; }
+  public GeoTime getTemporalRangeStart() { return temporalRangeStart; }
+  public void setTemporalRangeStart(GeoTime temporalRangeStart) { this.temporalRangeStart = temporalRangeStart; }
+  public GeoTime getTemporalRangeEnd() { return temporalRangeEnd; }
+  public void setTemporalRangeEnd(GeoTime temporalRangeEnd) { this.temporalRangeEnd = temporalRangeEnd; }
   public String getScientificName() { return scientificName; }
   public void setScientificName(String scientificName) { this.scientificName = scientificName; }
   public String getAuthorship() { return authorship; }
@@ -106,8 +112,8 @@ public class NameUsage {
   public void setInfraspecificEpithet(String infraspecificEpithet) { this.infraspecificEpithet = infraspecificEpithet; }
   public String getCultivarEpithet() { return cultivarEpithet; }
   public void setCultivarEpithet(String cultivarEpithet) { this.cultivarEpithet = cultivarEpithet; }
-  public String getNotho() { return notho; }
-  public void setNotho(String notho) { this.notho = notho; }
+  public NamePart getNotho() { return notho; }
+  public void setNotho(NamePart notho) { this.notho = notho; }
   public String getCombinationAuthorship() { return combinationAuthorship; }
   public void setCombinationAuthorship(String combinationAuthorship) { this.combinationAuthorship = combinationAuthorship; }
   public String getCombinationExAuthorship() { return combinationExAuthorship; }
@@ -122,22 +128,22 @@ public class NameUsage {
   public void setBasionymAuthorshipYear(String basionymAuthorshipYear) { this.basionymAuthorshipYear = basionymAuthorshipYear; }
   public String getSanctioningAuthor() { return sanctioningAuthor; }
   public void setSanctioningAuthor(String sanctioningAuthor) { this.sanctioningAuthor = sanctioningAuthor; }
-  public String getNomStatus() { return nomStatus; }
-  public void setNomStatus(String nomStatus) { this.nomStatus = nomStatus; }
+  public NomStatus getNomStatus() { return nomStatus; }
+  public void setNomStatus(NomStatus nomStatus) { this.nomStatus = nomStatus; }
   public Integer getPublishedInReferenceId() { return publishedInReferenceId; }
   public void setPublishedInReferenceId(Integer publishedInReferenceId) { this.publishedInReferenceId = publishedInReferenceId; }
-  public String getPublishedInYear() { return publishedInYear; }
-  public void setPublishedInYear(String publishedInYear) { this.publishedInYear = publishedInYear; }
+  public Integer getPublishedInYear() { return publishedInYear; }
+  public void setPublishedInYear(Integer publishedInYear) { this.publishedInYear = publishedInYear; }
   public String getPublishedInPage() { return publishedInPage; }
   public void setPublishedInPage(String publishedInPage) { this.publishedInPage = publishedInPage; }
   public String getPublishedInPageLink() { return publishedInPageLink; }
   public void setPublishedInPageLink(String publishedInPageLink) { this.publishedInPageLink = publishedInPageLink; }
-  public String getGender() { return gender; }
-  public void setGender(String gender) { this.gender = gender; }
+  public Gender getGender() { return gender; }
+  public void setGender(Gender gender) { this.gender = gender; }
   public String getEtymology() { return etymology; }
   public void setEtymology(String etymology) { this.etymology = etymology; }
-  public String getNameType() { return nameType; }
-  public void setNameType(String nameType) { this.nameType = nameType; }
+  public NameType getNameType() { return nameType; }
+  public void setNameType(NameType nameType) { this.nameType = nameType; }
   public String getParseState() { return parseState; }
   public void setParseState(String parseState) { this.parseState = parseState; }
   public String getLink() { return link; }

@@ -3,7 +3,6 @@ package org.catalogueoflife.editor.parse;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.gbif.nameparser.api.Authorship;
 import org.gbif.nameparser.api.NamePart;
@@ -30,12 +29,12 @@ public final class ParsedNameMapping {
     u.setSpecificEpithet(pn.getSpecificEpithet());
     u.setInfraspecificEpithet(pn.getInfraspecificEpithet());
     u.setCultivarEpithet(pn.getCultivarEpithet());
-    u.setNotho(joinNotho(pn.getNotho()));
+    u.setNotho(firstNotho(pn.getNotho()));
 
     if (pn.getRank() != null) {
       u.setRank(pn.getRank().name().toLowerCase(Locale.ROOT));
     }
-    u.setNameType(pn.getType() == null ? null : pn.getType().name());
+    u.setNameType(pn.getType());
     u.setParseState(pn.getState() == null ? null : pn.getState().name());
 
     Authorship combination = pn.getCombinationAuthorship();
@@ -63,11 +62,11 @@ public final class ParsedNameMapping {
     return String.join("|", authors);
   }
 
-  /** Space-joins the notho name parts (in their natural GENERIC..INFRASPECIFIC order) into the single notho column. */
-  private static String joinNotho(Set<NamePart> notho) {
-    if (notho == null || notho.isEmpty()) {
-      return null;
-    }
-    return notho.stream().map(NamePart::name).collect(Collectors.joining(" "));
+  // The parser models notho as a Set<NamePart> (a name can in principle carry a hybrid marker at
+  // more than one part), but name_usage.notho is a single scalar NamePart column -- take the
+  // highest-level one (the set iterates in its natural GENERIC..INFRASPECIFIC order) as the
+  // representative value, or null if the name isn't a hybrid at all.
+  private static NamePart firstNotho(Set<NamePart> notho) {
+    return (notho == null || notho.isEmpty()) ? null : notho.iterator().next();
   }
 }

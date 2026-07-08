@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.catalogueoflife.editor.name.NameUsage;
+import org.gbif.nameparser.api.NameType;
 import org.gbif.nameparser.api.NomCode;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +33,7 @@ class NameParserServiceTest {
     assertNull(u.getCombinationAuthorshipYear());
     assertNull(u.getBasionymAuthorship());
     assertEquals("species", u.getRank());
-    assertEquals("SCIENTIFIC", u.getNameType());
+    assertEquals(NameType.SCIENTIFIC, u.getNameType());
     assertEquals("COMPLETE", u.getParseState());
   }
 
@@ -65,7 +66,7 @@ class NameParserServiceTest {
     service.parseInto(u, null);
 
     assertEquals("UNPARSABLE", u.getParseState());
-    assertEquals("OTHER", u.getNameType());
+    assertEquals(NameType.OTHER, u.getNameType());
   }
 
   @Test

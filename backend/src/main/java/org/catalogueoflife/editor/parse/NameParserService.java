@@ -48,7 +48,7 @@ public class NameParserService {
       ParsedNameMapping.applyTo(pn, u);
     } catch (UnparsableNameException e) {
       u.setParseState("UNPARSABLE");
-      u.setNameType(e.getType() == null ? null : e.getType().name());
+      u.setNameType(e.getType());
     }
   }
 

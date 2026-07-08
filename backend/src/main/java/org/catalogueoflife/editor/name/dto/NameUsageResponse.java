@@ -1,17 +1,25 @@
 package org.catalogueoflife.editor.name.dto;
 
 import java.util.List;
+import life.catalogue.api.vocab.Environment;
+import life.catalogue.api.vocab.GeoTime;
 import org.catalogueoflife.editor.name.NameUsage;
 
 // Mirrors ReferenceResponse's shape: the API-writable fields plus the parser-derived
 // atomized name parts / nameType / parseState, the computed formattedName, and the
-// synonym_accepted link ids (which are not columns on name_usage itself).
+// synonym_accepted link ids (which are not columns on name_usage itself). The now-enum-typed
+// model fields (status, nomStatus, gender, notho, nameType, environment, temporalRangeStart/End)
+// are exposed as plain strings here (enum .name() / GeoTime.getName()) to keep the existing
+// wire shape; publishedInYear mirrors the model's Integer.
 public record NameUsageResponse(
     Integer id,
     Integer parentId,
     String status,
     String namePhrase,
     Boolean extinct,
+    List<String> environment,
+    String temporalRangeStart,
+    String temporalRangeEnd,
     String scientificName,
     String authorship,
     String rank,
@@ -31,7 +39,7 @@ public record NameUsageResponse(
     String sanctioningAuthor,
     String nomStatus,
     Integer publishedInReferenceId,
-    String publishedInYear,
+    Integer publishedInYear,
     String publishedInPage,
     String publishedInPageLink,
     String gender,
@@ -47,14 +55,27 @@ public record NameUsageResponse(
 
   public static NameUsageResponse of(NameUsage u, String formattedName, List<Integer> acceptedParentIds,
       List<Integer> synonymIds) {
-    return new NameUsageResponse(u.getId(), u.getParentId(), u.getStatus(), u.getNamePhrase(),
-        u.getExtinct(), u.getScientificName(), u.getAuthorship(), u.getRank(), u.getUninomial(),
+    return new NameUsageResponse(u.getId(), u.getParentId(), name(u.getStatus()), u.getNamePhrase(),
+        u.getExtinct(), names(u.getEnvironment()), name(u.getTemporalRangeStart()), name(u.getTemporalRangeEnd()),
+        u.getScientificName(), u.getAuthorship(), u.getRank(), u.getUninomial(),
         u.getGenus(), u.getInfragenericEpithet(), u.getSpecificEpithet(), u.getInfraspecificEpithet(),
-        u.getCultivarEpithet(), u.getNotho(), u.getCombinationAuthorship(), u.getCombinationExAuthorship(),
+        u.getCultivarEpithet(), name(u.getNotho()), u.getCombinationAuthorship(), u.getCombinationExAuthorship(),
         u.getCombinationAuthorshipYear(), u.getBasionymAuthorship(), u.getBasionymExAuthorship(),
-        u.getBasionymAuthorshipYear(), u.getSanctioningAuthor(), u.getNomStatus(),
+        u.getBasionymAuthorshipYear(), u.getSanctioningAuthor(), name(u.getNomStatus()),
         u.getPublishedInReferenceId(), u.getPublishedInYear(), u.getPublishedInPage(),
-        u.getPublishedInPageLink(), u.getGender(), u.getEtymology(), u.getNameType(), u.getParseState(),
+        u.getPublishedInPageLink(), name(u.getGender()), u.getEtymology(), name(u.getNameType()), u.getParseState(),
         u.getLink(), u.getRemarks(), formattedName, acceptedParentIds, synonymIds, u.getVersion());
+  }
+
+  private static String name(Enum<?> e) {
+    return e == null ? null : e.name();
+  }
+
+  private static String name(GeoTime g) {
+    return g == null ? null : g.getName();
+  }
+
+  private static List<String> names(List<Environment> envs) {
+    return envs == null ? null : envs.stream().map(Environment::name).toList();
   }
 }

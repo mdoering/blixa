@@ -71,13 +71,13 @@ CREATE TABLE name_usage (
   basionym_id    INTEGER,                        -- self, same project
   ordinal        INTEGER,
   -- taxonomic
-  status         TEXT NOT NULL,             -- TaxonomicStatus enum name
+  status         TEXT NOT NULL,             -- Status enum name (org.catalogueoflife.editor.name.Status)
   name_phrase    TEXT,
   reference_id   INTEGER[],                 -- taxonomic references (same project; no array FK in Postgres)
   extinct        BOOLEAN,
-  environment    TEXT[],
-  temporal_range_start TEXT,
-  temporal_range_end   TEXT,
+  environment    TEXT[],                    -- life.catalogue.api.vocab.Environment enum names
+  temporal_range_start TEXT,                -- life.catalogue.api.vocab.GeoTime name, e.g. 'Jurassic'
+  temporal_range_end   TEXT,                -- life.catalogue.api.vocab.GeoTime name
   -- nomenclatural (name)
   scientific_name TEXT NOT NULL,
   authorship     TEXT,
@@ -88,7 +88,7 @@ CREATE TABLE name_usage (
   specific_epithet     TEXT,
   infraspecific_epithet TEXT,
   cultivar_epithet TEXT,
-  notho          TEXT,
+  notho          TEXT,                      -- org.gbif.nameparser.api.NamePart enum name
   combination_authorship TEXT,
   combination_ex_authorship TEXT,
   combination_authorship_year TEXT,
@@ -96,12 +96,12 @@ CREATE TABLE name_usage (
   basionym_ex_authorship TEXT,
   basionym_authorship_year TEXT,
   sanctioning_author TEXT,
-  nom_status     TEXT,                      -- NomStatus enum name
+  nom_status     TEXT,                      -- life.catalogue.api.vocab.NomStatus enum name
   published_in_reference_id INTEGER,        -- reference, same project
-  published_in_year TEXT,
+  published_in_year INTEGER,
   published_in_page TEXT,
   published_in_page_link TEXT,
-  gender         TEXT,
+  gender         TEXT,                      -- life.catalogue.api.vocab.Gender enum name
   etymology      TEXT,
   name_type      TEXT,                      -- NameType from the parser (e.g. SCIENTIFIC, VIRUS, PLACEHOLDER)
   parse_state    TEXT,                      -- ParsedName.State (COMPLETE/PARTIAL/...) or 'UNPARSABLE'

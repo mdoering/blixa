@@ -113,6 +113,15 @@
       <artifactId>vocab</artifactId>
       <version>1.2.3-SNAPSHOT</version>
     </dependency>
+    <!-- life.catalogue.api.vocab.GeoTime lives here, NOT in the vocab artifact (confirmed via
+         `jar tf`/`javap`: vocab only has GeoTimeType, the rank/category enum). GeoTime itself is
+         a data-driven lookup class (Map<String,GeoTime> TIMES read from a bundled geotime.csv),
+         not a plain enum, so it needs a custom MyBatis TypeHandler (see GeoTimeTypeHandler). -->
+    <dependency>
+      <groupId>org.catalogueoflife</groupId>
+      <artifactId>api</artifactId>
+      <version>1.2.3-SNAPSHOT</version>
+    </dependency>
   </dependencies>
 
   <repositories>
