@@ -5,6 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.catalogueoflife.editor.task.CurrentTask;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,10 +25,12 @@ public class AuditService {
 
   private final ChangeMapper changes;
   private final ObjectMapper objectMapper;
+  private final CurrentTask currentTask;
 
-  public AuditService(ChangeMapper changes, ObjectMapper objectMapper) {
+  public AuditService(ChangeMapper changes, ObjectMapper objectMapper, CurrentTask currentTask) {
     this.changes = changes;
     this.objectMapper = objectMapper;
+    this.currentTask = currentTask;
   }
 
   @Transactional(propagation = Propagation.MANDATORY)
@@ -38,6 +41,11 @@ public class AuditService {
       case DELETE -> Map.of("before", toMap(before));
       case UPDATE -> diffFields(toMap(before), toMap(after));
     };
+    // Resolves (and validates) the X-Task-Id header of the current request -- see CurrentTask.
+    // Thrown here (400, unknown/closed task), this propagates out of the caller's own
+    // @Transactional write method and rolls the whole write back: an edit attributed to a bogus
+    // task must not persist.
+    Integer taskId = currentTask.resolve(projectId);
     Change c = new Change();
     c.setProjectId(projectId);
     c.setUserId(userId);
@@ -45,6 +53,7 @@ public class AuditService {
     c.setEntityId(entityId);
     c.setOperation(op.name());
     c.setDiff(objectMapper.writeValueAsString(diffPayload));
+    c.setTaskId(taskId);
     changes.insert(c);
   }
 

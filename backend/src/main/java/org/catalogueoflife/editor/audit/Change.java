@@ -21,6 +21,7 @@ public class Change {
   private Integer entityId;
   private String operation;
   private String diff;
+  private Integer taskId;
 
   public Integer getId() { return id; }
   public void setId(Integer id) { this.id = id; }
@@ -40,4 +41,6 @@ public class Change {
   public void setOperation(String operation) { this.operation = operation; }
   public String getDiff() { return diff; }
   public void setDiff(String diff) { this.diff = diff; }
+  public Integer getTaskId() { return taskId; }
+  public void setTaskId(Integer taskId) { this.taskId = taskId; }
 }

@@ -30,12 +30,18 @@ public class ChangeController {
   public List<Change> list(@PathVariable int pid,
       @RequestParam(required = false) String entityType,
       @RequestParam(required = false) Integer entityId,
+      @RequestParam(required = false) Integer taskId,
       @RequestParam(defaultValue = "50") int limit,
       @RequestParam(defaultValue = "0") int offset) {
     int uid = currentUser.require().getId();
     projects.requireRole(uid, pid); // any member may read -- 404 if not a member
     int clampedLimit = Pagination.clampLimit(limit);
     int clampedOffset = Pagination.clampOffset(offset);
+    if (taskId != null) {
+      // taskId takes precedence over the entity filters -- a grouped-by-task view of the
+      // changelog (Task 2's headline use case) has no reason to also narrow by entity.
+      return changes.findByTask(pid, taskId, clampedLimit, clampedOffset);
+    }
     if (entityId != null) {
       if (entityType == null || entityType.isBlank()) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,

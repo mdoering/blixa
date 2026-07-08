@@ -15,15 +15,15 @@ import org.apache.ibatis.annotations.Select;
 public interface ChangeMapper {
 
   @Insert("""
-      INSERT INTO change (project_id, user_id, entity_type, entity_id, operation, diff)
-      VALUES (#{projectId}, #{userId}, #{entityType}, #{entityId}, #{operation}, #{diff}::jsonb)
+      INSERT INTO change (project_id, user_id, entity_type, entity_id, operation, diff, task_id)
+      VALUES (#{projectId}, #{userId}, #{entityType}, #{entityId}, #{operation}, #{diff}::jsonb, #{taskId})
       """)
   @Options(useGeneratedKeys = true, keyProperty = "id")
   void insert(Change c);
 
   @Select("""
       SELECT c.id, c.project_id, c.user_id, u.username, c.at, c.entity_type, c.entity_id,
-             c.operation, c.diff
+             c.operation, c.diff, c.task_id
       FROM change c
       LEFT JOIN app_user u ON u.id = c.user_id
       WHERE c.project_id = #{projectId}
@@ -35,7 +35,7 @@ public interface ChangeMapper {
 
   @Select("""
       SELECT c.id, c.project_id, c.user_id, u.username, c.at, c.entity_type, c.entity_id,
-             c.operation, c.diff
+             c.operation, c.diff, c.task_id
       FROM change c
       LEFT JOIN app_user u ON u.id = c.user_id
       WHERE c.project_id = #{projectId} AND c.entity_type = #{entityType} AND c.entity_id = #{entityId}
@@ -47,7 +47,7 @@ public interface ChangeMapper {
 
   @Select("""
       SELECT c.id, c.project_id, c.user_id, u.username, c.at, c.entity_type, c.entity_id,
-             c.operation, c.diff
+             c.operation, c.diff, c.task_id
       FROM change c
       LEFT JOIN app_user u ON u.id = c.user_id
       WHERE c.project_id = #{projectId} AND c.entity_type = #{entityType}
@@ -55,5 +55,17 @@ public interface ChangeMapper {
       LIMIT #{limit} OFFSET #{offset}
       """)
   List<Change> findByType(@Param("projectId") int projectId, @Param("entityType") String entityType,
+      @Param("limit") int limit, @Param("offset") int offset);
+
+  @Select("""
+      SELECT c.id, c.project_id, c.user_id, u.username, c.at, c.entity_type, c.entity_id,
+             c.operation, c.diff, c.task_id
+      FROM change c
+      LEFT JOIN app_user u ON u.id = c.user_id
+      WHERE c.project_id = #{projectId} AND c.task_id = #{taskId}
+      ORDER BY c.at DESC, c.id DESC
+      LIMIT #{limit} OFFSET #{offset}
+      """)
+  List<Change> findByTask(@Param("projectId") int projectId, @Param("taskId") int taskId,
       @Param("limit") int limit, @Param("offset") int offset);
 }

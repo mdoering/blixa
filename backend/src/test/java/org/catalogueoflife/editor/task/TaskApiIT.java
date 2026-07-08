@@ -164,4 +164,94 @@ class TaskApiIT extends AbstractPostgresIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("closed"));
   }
+
+  @Test
+  @WithMockUser(username = "taskGroupingOwner")
+  void attributesChangesToTaskViaHeaderAndFiltersChangelog() throws Exception {
+    ensureUser("taskGroupingOwner");
+    long pid = createProject("taskgroupingproj");
+
+    // an open task T -- edits sent with X-Task-Id: T should be stamped and grouped under it.
+    JsonNode task = createTask(pid, "Revise Rosaceae");
+    long taskId = task.get("id").asLong();
+
+    // 1) two edits under the task: create a reference, then update it.
+    String createBody = mvc.perform(post("/api/projects/" + pid + "/references").with(csrf())
+            .header("X-Task-Id", taskId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"Miller 1768, Gardeners Dictionary\",\"title\":\"Original title\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    long refId = json.readTree(createBody).get("id").asLong();
+    mvc.perform(put("/api/projects/" + pid + "/references/" + refId).with(csrf())
+            .header("X-Task-Id", taskId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"Miller 1768, Gardeners Dictionary\",\"title\":\"Revised title\","
+                + "\"version\":0}"))
+        .andExpect(status().isOk());
+
+    // 2) one edit WITHOUT the header -- ungrouped.
+    mvc.perform(post("/api/projects/" + pid + "/references").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"Untasked ref\",\"title\":\"Untasked\"}"))
+        .andExpect(status().isCreated());
+
+    // 3) GET /changes?taskId=T returns exactly the two task-attributed edits.
+    String changesBody = mvc.perform(get("/api/projects/" + pid + "/changes").param("taskId", String.valueOf(taskId)))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    JsonNode taskChanges = json.readTree(changesBody);
+    assertThat(taskChanges.size()).isEqualTo(2);
+    for (JsonNode n : taskChanges) {
+      assertThat(n.get("taskId").asLong()).isEqualTo(taskId);
+    }
+
+    // 4) GET /tasks/{T} shows changeCount:2.
+    mvc.perform(get("/api/projects/" + pid + "/tasks/" + taskId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.changeCount").value(2));
+
+    // 5) the un-headered change has taskId:null.
+    String allChangesBody = mvc.perform(get("/api/projects/" + pid + "/changes"))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    JsonNode allChanges = json.readTree(allChangesBody);
+    assertThat(allChanges.size()).isEqualTo(3);
+    boolean sawUngrouped = false;
+    for (JsonNode n : allChanges) {
+      if (n.get("taskId").isNull()) {
+        sawUngrouped = true;
+      }
+    }
+    assertThat(sawUngrouped).isTrue();
+
+    // 6) a write sent under a CLOSED task -> 400, and the entity is NOT persisted (rolled back).
+    mvc.perform(patch("/api/projects/" + pid + "/tasks/" + taskId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"status\":\"closed\"}"))
+        .andExpect(status().isOk());
+    mvc.perform(post("/api/projects/" + pid + "/references").with(csrf())
+            .header("X-Task-Id", taskId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"Should not persist\",\"title\":\"Nope\"}"))
+        .andExpect(status().isBadRequest());
+    // confirm the rollback: still exactly 3 changes total, and the changelog for the (now closed)
+    // task is still exactly the original 2 -- nothing snuck in under the bogus write.
+    mvc.perform(get("/api/projects/" + pid + "/changes"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(3));
+    mvc.perform(get("/api/projects/" + pid + "/changes").param("taskId", String.valueOf(taskId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(2));
+
+    // 7) X-Task-Id = a nonexistent/foreign id -> 400.
+    mvc.perform(post("/api/projects/" + pid + "/references").with(csrf())
+            .header("X-Task-Id", "999999")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"Foreign task ref\",\"title\":\"Nope\"}"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/projects/" + pid + "/changes"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(3));
+  }
 }
