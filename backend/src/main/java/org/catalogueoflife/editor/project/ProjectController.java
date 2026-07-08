@@ -33,50 +33,50 @@ public class ProjectController {
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public ProjectResponse create(@Valid @RequestBody CreateProjectRequest req) {
-    long uid = currentUser.require().getId();
+    int uid = currentUser.require().getId();
     Project p = service.create(uid, req);
     return ProjectResponse.of(p, Role.OWNER.dbValue());
   }
 
   @GetMapping
   public List<ProjectResponse> listMine() {
-    long uid = currentUser.require().getId();
+    int uid = currentUser.require().getId();
     return service.listForUser(uid).stream()
         .map(p -> ProjectResponse.of(p, members.findRole(p.getId(), uid)))
         .toList();
   }
 
   @GetMapping("/{id}")
-  public ProjectResponse get(@PathVariable long id) {
-    long uid = currentUser.require().getId();
+  public ProjectResponse get(@PathVariable int id) {
+    int uid = currentUser.require().getId();
     Project p = service.requireVisible(uid, id);
     return ProjectResponse.of(p, members.findRole(id, uid));
   }
 
   @PutMapping("/{id}/metadata")
-  public ProjectResponse updateMetadata(@PathVariable long id,
+  public ProjectResponse updateMetadata(@PathVariable int id,
                                         @Valid @RequestBody UpdateProjectMetadataRequest req) {
-    long uid = currentUser.require().getId();
+    int uid = currentUser.require().getId();
     Project p = service.updateMetadata(uid, id, req);
     return ProjectResponse.of(p, members.findRole(id, uid));
   }
 
   @GetMapping("/{id}/members")
-  public java.util.List<org.catalogueoflife.editor.project.dto.MemberResponse> members(@PathVariable long id) {
-    long uid = currentUser.require().getId();
+  public java.util.List<org.catalogueoflife.editor.project.dto.MemberResponse> members(@PathVariable int id) {
+    int uid = currentUser.require().getId();
     return service.listMembers(uid, id);
   }
 
   @PutMapping("/{id}/members")
-  public void setMember(@PathVariable long id,
+  public void setMember(@PathVariable int id,
                         @jakarta.validation.Valid @RequestBody org.catalogueoflife.editor.project.dto.MemberRequest req) {
-    long uid = currentUser.require().getId();
+    int uid = currentUser.require().getId();
     service.setMember(uid, id, req.username(), req.role());
   }
 
   @org.springframework.web.bind.annotation.DeleteMapping("/{id}/members/{userId}")
-  public void removeMember(@PathVariable long id, @PathVariable long userId) {
-    long uid = currentUser.require().getId();
+  public void removeMember(@PathVariable int id, @PathVariable int userId) {
+    int uid = currentUser.require().getId();
     service.removeMember(uid, id, userId);
   }
 }

@@ -41,14 +41,15 @@ class ProjectApiIT extends AbstractPostgresIT {
 
     mvc.perform(post("/api/projects").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"slug\":\"aves\",\"title\":\"Birds\",\"nomCode\":\"zoological\"}"))
+            .content("{\"title\":\"Birds\",\"nomCode\":\"zoological\"}"))
        .andExpect(status().isCreated())
-       .andExpect(jsonPath("$.slug").value("aves"))
+       .andExpect(jsonPath("$.title").value("Birds"))
+       .andExpect(jsonPath("$.nomCode").value("ZOOLOGICAL"))
        .andExpect(jsonPath("$.role").value("owner"));
 
     mvc.perform(get("/api/projects"))
        .andExpect(status().isOk())
-       .andExpect(jsonPath("$[0].slug").value("aves"));
+       .andExpect(jsonPath("$[0].title").value("Birds"));
   }
 
   @Test
@@ -67,7 +68,7 @@ class ProjectApiIT extends AbstractPostgresIT {
 
     String body = mvc.perform(post("/api/projects").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"slug\":\"mammalia\",\"title\":\"Mammals\",\"nomCode\":\"zoological\"}"))
+            .content("{\"title\":\"Mammals\",\"nomCode\":\"zoological\"}"))
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     long projectId = json.readTree(body).get("id").asLong();
@@ -75,17 +76,37 @@ class ProjectApiIT extends AbstractPostgresIT {
     mvc.perform(put("/api/projects/" + projectId + "/metadata").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"title\":\"Mammals Updated\",\"alias\":\"Mamm\","
-                + "\"description\":\"Updated description\",\"nomCode\":\"zoological\"}"))
+                + "\"description\":\"Updated description\",\"nomCode\":\"zoological\","
+                + "\"license\":\"cc-by\"}"))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.title").value("Mammals Updated"))
        .andExpect(jsonPath("$.alias").value("Mamm"))
-       .andExpect(jsonPath("$.description").value("Updated description"));
+       .andExpect(jsonPath("$.description").value("Updated description"))
+       .andExpect(jsonPath("$.license").value("CC_BY"));
 
     mvc.perform(get("/api/projects/" + projectId))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.title").value("Mammals Updated"))
        .andExpect(jsonPath("$.alias").value("Mamm"))
        .andExpect(jsonPath("$.description").value("Updated description"));
+  }
+
+  @Test
+  @WithMockUser(username = "metaOwner3")
+  void updateMetadataRejectsDisallowedLicense() throws Exception {
+    ensureUser("metaOwner3");
+
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Insects\",\"nomCode\":\"zoological\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    long projectId = json.readTree(body).get("id").asLong();
+
+    mvc.perform(put("/api/projects/" + projectId + "/metadata").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Insects\",\"license\":\"MIT\"}"))
+       .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -96,10 +117,10 @@ class ProjectApiIT extends AbstractPostgresIT {
 
     String body = mvc.perform(post("/api/projects").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"slug\":\"reptilia\",\"title\":\"Reptiles\",\"nomCode\":\"zoological\"}"))
+            .content("{\"title\":\"Reptiles\",\"nomCode\":\"zoological\"}"))
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
-    long projectId = json.readTree(body).get("id").asLong();
+    int projectId = json.readTree(body).get("id").asInt();
 
     AppUser viewer = users.requireByUsernameOrNull("metaViewer");
     members.upsert(new ProjectMember(projectId, viewer.getId(), Role.VIEWER.dbValue()));

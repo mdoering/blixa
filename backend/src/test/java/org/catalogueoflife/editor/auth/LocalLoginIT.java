@@ -72,7 +72,7 @@ class LocalLoginIT extends AbstractPostgresIT {
     // authenticated (mocked) user, proving CSRF protection is actually enforced.
     mvc.perform(post("/api/projects")
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"slug\":\"csrf-demo\",\"title\":\"Csrf Demo\"}"))
+            .content("{\"title\":\"Csrf Demo\"}"))
        .andExpect(status().isForbidden());
 
     // (b) A real GET response must carry the XSRF-TOKEN cookie (written by
@@ -86,7 +86,7 @@ class LocalLoginIT extends AbstractPostgresIT {
             .contentType(MediaType.APPLICATION_JSON)
             .cookie(xsrfCookie)
             .header("X-XSRF-TOKEN", xsrfCookie.getValue())
-            .content("{\"slug\":\"csrf-demo\",\"title\":\"Csrf Demo\"}"))
+            .content("{\"title\":\"Csrf Demo\"}"))
        .andExpect(status().isCreated());
   }
 }

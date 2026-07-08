@@ -1,9 +1,14 @@
 package org.catalogueoflife.editor.project;
 
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import life.catalogue.api.vocab.License;
 import org.catalogueoflife.editor.project.dto.CreateProjectRequest;
 import org.catalogueoflife.editor.project.dto.UpdateProjectMetadataRequest;
 import org.catalogueoflife.editor.user.AppUserMapper;
+import org.gbif.nameparser.api.NomCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +16,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ProjectService {
+
+  // COL only permits these two Creative Commons licenses (CC0-1.0 and CC-BY-4.0); the wider
+  // life.catalogue.api.vocab.License enum also has CC_BY_NC/UNSPECIFIED/OTHER which are rejected.
+  private static final Set<License> ALLOWED_LICENSES = EnumSet.of(License.CC0, License.CC_BY);
 
   private final ProjectMapper projects;
   private final ProjectMemberMapper members;
@@ -23,24 +32,20 @@ public class ProjectService {
   }
 
   @Transactional
-  public Project create(long userId, CreateProjectRequest req) {
-    if (projects.findBySlug(req.slug()) != null) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "slug already used");
-    }
+  public Project create(int userId, CreateProjectRequest req) {
     Project p = new Project();
-    p.setSlug(req.slug());
     p.setTitle(req.title());
-    p.setNomCode(req.nomCode());
+    p.setNomCode(parseNomCode(req.nomCode()));
     projects.insert(p);
     members.upsert(new ProjectMember(p.getId(), userId, Role.OWNER.dbValue()));
     return p;
   }
 
-  public List<Project> listForUser(long userId) {
+  public List<Project> listForUser(int userId) {
     return projects.findByMember(userId);
   }
 
-  public String requireRole(long userId, long projectId) {
+  public String requireRole(int userId, int projectId) {
     String role = members.findRole(projectId, userId);
     if (role == null) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "project not found");
@@ -48,33 +53,33 @@ public class ProjectService {
     return role;
   }
 
-  public Project requireVisible(long userId, long projectId) {
+  public Project requireVisible(int userId, int projectId) {
     requireRole(userId, projectId);
     return projects.findById(projectId);
   }
 
   @Transactional
-  public Project updateMetadata(long userId, long projectId, UpdateProjectMetadataRequest req) {
+  public Project updateMetadata(int userId, int projectId, UpdateProjectMetadataRequest req) {
     String role = requireRole(userId, projectId);
     if (!role.equals(Role.OWNER.dbValue()) && !role.equals(Role.EDITOR.dbValue())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner or editor required");
     }
+    NomCode nomCode = parseNomCode(req.nomCode());
+    License license = parseLicense(req.license());
+    requireValidLicense(license);
     Project p = projects.findById(projectId);
     p.setTitle(req.title());
     p.setAlias(req.alias());
     p.setDescription(req.description());
-    p.setNomCode(req.nomCode());
-    p.setLicense(req.license());
-    p.setVersion(req.version());
-    p.setIssued(req.issued());
+    p.setNomCode(nomCode);
+    p.setLicense(license);
     p.setGeographicScope(req.geographicScope());
     p.setTaxonomicScope(req.taxonomicScope());
-    p.setDoi(req.doi());
     projects.updateMetadata(p);
     return p;
   }
 
-  public java.util.List<org.catalogueoflife.editor.project.dto.MemberResponse> listMembers(long actorId, long projectId) {
+  public java.util.List<org.catalogueoflife.editor.project.dto.MemberResponse> listMembers(int actorId, int projectId) {
     requireRole(actorId, projectId); // any member may read
     return members.findByProject(projectId).stream()
         .map(m -> {
@@ -86,7 +91,7 @@ public class ProjectService {
   }
 
   @Transactional
-  public void setMember(long actorId, long projectId, String username, String roleValue) {
+  public void setMember(int actorId, int projectId, String username, String roleValue) {
     requireOwner(actorId, projectId);
     Role role = Role.fromDb(roleValue); // throws IllegalArgumentException -> 400 via handler below
     var target = users.findByUsername(username);
@@ -102,7 +107,7 @@ public class ProjectService {
   }
 
   @Transactional
-  public void removeMember(long actorId, long projectId, long targetUserId) {
+  public void removeMember(int actorId, int projectId, int targetUserId) {
     requireOwner(actorId, projectId);
     String targetRole = members.findRole(projectId, targetUserId);
     if (Role.OWNER.dbValue().equals(targetRole) && countOwners(projectId) <= 1) {
@@ -111,14 +116,47 @@ public class ProjectService {
     members.delete(projectId, targetUserId);
   }
 
-  private long countOwners(long projectId) {
+  private long countOwners(int projectId) {
     return members.findByProject(projectId).stream()
         .filter(m -> m.getRole().equals(Role.OWNER.dbValue())).count();
   }
 
-  private void requireOwner(long actorId, long projectId) {
+  private void requireOwner(int actorId, int projectId) {
     if (!Role.OWNER.dbValue().equals(requireRole(actorId, projectId))) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner required");
+    }
+  }
+
+  private static void requireValidLicense(License license) {
+    if (license != null && !ALLOWED_LICENSES.contains(license)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "license must be one of " + ALLOWED_LICENSES);
+    }
+  }
+
+  // Frontend sends lowercase strings (e.g. "zoological"); tolerantly upper-case before matching
+  // the enum constant name, rejecting anything unrecognized with a 400 rather than an ISE.
+  private static NomCode parseNomCode(String nomCode) {
+    if (nomCode == null || nomCode.isBlank()) {
+      return null;
+    }
+    try {
+      return NomCode.valueOf(nomCode.trim().toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid nomCode: " + nomCode);
+    }
+  }
+
+  // Same tolerant parsing for license (e.g. "cc-by" / "cc0"); requireValidLicense then narrows
+  // the full life.catalogue.api.vocab.License enum down to the two COL-permitted licenses.
+  private static License parseLicense(String license) {
+    if (license == null || license.isBlank()) {
+      return null;
+    }
+    try {
+      return License.valueOf(license.trim().toUpperCase(Locale.ROOT).replace('-', '_'));
+    } catch (IllegalArgumentException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid license: " + license);
     }
   }
 }

@@ -6,6 +6,7 @@ import java.util.List;
 import org.catalogueoflife.editor.support.AbstractPostgresIT;
 import org.catalogueoflife.editor.user.AppUser;
 import org.catalogueoflife.editor.user.AppUserMapper;
+import org.gbif.nameparser.api.NomCode;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -22,9 +23,8 @@ class ProjectMapperIT extends AbstractPostgresIT {
     users.insert(u);
 
     Project p = new Project();
-    p.setSlug("lepidoptera");
     p.setTitle("Lepidoptera");
-    p.setNomCode("zoological");
+    p.setNomCode(NomCode.ZOOLOGICAL);
     projects.insert(p);
     assertThat(p.getId()).isNotNull();
 
@@ -32,6 +32,6 @@ class ProjectMapperIT extends AbstractPostgresIT {
 
     assertThat(members.findRole(p.getId(), u.getId())).isEqualTo("owner");
     List<Project> mine = projects.findByMember(u.getId());
-    assertThat(mine).extracting(Project::getSlug).containsExactly("lepidoptera");
+    assertThat(mine).extracting(Project::getTitle).containsExactly("Lepidoptera");
   }
 }

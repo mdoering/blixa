@@ -11,19 +11,14 @@ import org.apache.ibatis.annotations.Update;
 public interface ProjectMapper {
 
   @Insert("""
-      INSERT INTO project (slug, title, alias, description, nom_code, license, version,
-                           issued, geographic_scope, taxonomic_scope, doi, metadata)
-      VALUES (#{slug}, #{title}, #{alias}, #{description}, #{nomCode}, #{license}, #{version},
-              #{issued}, #{geographicScope}, #{taxonomicScope}, #{doi}, #{metadata}::jsonb)
+      INSERT INTO project (title, alias, description, nom_code, license, geographic_scope, taxonomic_scope, metadata)
+      VALUES (#{title}, #{alias}, #{description}, #{nomCode}, #{license}, #{geographicScope}, #{taxonomicScope}, #{metadata}::jsonb)
       """)
   @Options(useGeneratedKeys = true, keyProperty = "id")
   void insert(Project p);
 
   @Select("SELECT * FROM project WHERE id = #{id}")
-  Project findById(long id);
-
-  @Select("SELECT * FROM project WHERE slug = #{slug}")
-  Project findBySlug(String slug);
+  Project findById(int id);
 
   @Select("""
       SELECT p.* FROM project p
@@ -31,14 +26,13 @@ public interface ProjectMapper {
       WHERE m.user_id = #{userId}
       ORDER BY p.title
       """)
-  List<Project> findByMember(long userId);
+  List<Project> findByMember(int userId);
 
   @Update("""
       UPDATE project
       SET title = #{title}, alias = #{alias}, description = #{description},
-          nom_code = #{nomCode}, license = #{license}, version = #{version},
-          issued = #{issued}, geographic_scope = #{geographicScope},
-          taxonomic_scope = #{taxonomicScope}, doi = #{doi},
+          nom_code = #{nomCode}, license = #{license},
+          geographic_scope = #{geographicScope}, taxonomic_scope = #{taxonomicScope},
           metadata = #{metadata}::jsonb, updated_at = now()
       WHERE id = #{id}
       """)

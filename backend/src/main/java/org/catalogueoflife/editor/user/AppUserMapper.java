@@ -17,7 +17,7 @@ public interface AppUserMapper {
   void insert(AppUser u);
 
   @Select("SELECT * FROM app_user WHERE id = #{id}")
-  AppUser findById(long id);
+  AppUser findById(int id);
 
   @Select("SELECT * FROM app_user WHERE username = #{username}")
   AppUser findByUsername(String username);

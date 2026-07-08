@@ -22,17 +22,17 @@ public class ReferenceService {
   }
 
   public List<Reference> list(long userId, long projectId, int limit, int offset) {
-    projects.requireRole(userId, projectId);
+    projects.requireRole((int) userId, (int) projectId);
     return references.findByProject(projectId, Pagination.clampLimit(limit), Pagination.clampOffset(offset));
   }
 
   public List<Reference> search(long userId, long projectId, String q, int limit, int offset) {
-    projects.requireRole(userId, projectId);
+    projects.requireRole((int) userId, (int) projectId);
     return references.search(projectId, q, Pagination.clampLimit(limit), Pagination.clampOffset(offset));
   }
 
   public Reference get(long userId, long projectId, long id) {
-    projects.requireRole(userId, projectId);
+    projects.requireRole((int) userId, (int) projectId);
     return requireInProject(projectId, id);
   }
 
@@ -111,7 +111,7 @@ public class ReferenceService {
   }
 
   private void requireEditor(long userId, long projectId) {
-    String role = projects.requireRole(userId, projectId);
+    String role = projects.requireRole((int) userId, (int) projectId);
     if (!role.equals(Role.OWNER.dbValue()) && !role.equals(Role.EDITOR.dbValue())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner or editor required");
     }

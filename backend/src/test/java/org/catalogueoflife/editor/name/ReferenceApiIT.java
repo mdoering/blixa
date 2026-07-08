@@ -39,10 +39,10 @@ class ReferenceApiIT extends AbstractPostgresIT {
     if (existing == null) users.createLocal(username, "pw", username);
   }
 
-  private long createProject(String slug) throws Exception {
+  private long createProject(String title) throws Exception {
     String body = mvc.perform(post("/api/projects").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"slug\":\"" + slug + "\",\"title\":\"" + slug + "\",\"nomCode\":\"zoological\"}"))
+            .content("{\"title\":\"" + title + "\",\"nomCode\":\"zoological\"}"))
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     return json.readTree(body).get("id").asLong();
@@ -56,7 +56,7 @@ class ReferenceApiIT extends AbstractPostgresIT {
     long pid = createProject("refproj");
 
     AppUser viewer = users.requireByUsernameOrNull("refViewer");
-    members.upsert(new ProjectMember(pid, viewer.getId(), Role.VIEWER.dbValue()));
+    members.upsert(new ProjectMember((int) pid, viewer.getId(), Role.VIEWER.dbValue()));
 
     // create
     String createBody = mvc.perform(post("/api/projects/" + pid + "/references").with(csrf())

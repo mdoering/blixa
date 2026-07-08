@@ -1,16 +1,12 @@
 CREATE TABLE project (
   id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  slug              TEXT UNIQUE NOT NULL,
   title             TEXT NOT NULL,
   alias             TEXT,
   description       TEXT,
   nom_code          TEXT,
   license           TEXT,
-  version           TEXT,
-  issued            DATE,
   geographic_scope  TEXT,
   taxonomic_scope   TEXT,
-  doi               TEXT,
   metadata          JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()

@@ -18,11 +18,11 @@ public interface ProjectMemberMapper {
   void upsert(ProjectMember m);
 
   @Select("SELECT role FROM project_member WHERE project_id = #{projectId} AND user_id = #{userId}")
-  String findRole(@Param("projectId") long projectId, @Param("userId") long userId);
+  String findRole(@Param("projectId") int projectId, @Param("userId") int userId);
 
   @Select("SELECT * FROM project_member WHERE project_id = #{projectId}")
-  List<ProjectMember> findByProject(long projectId);
+  List<ProjectMember> findByProject(int projectId);
 
   @Delete("DELETE FROM project_member WHERE project_id = #{projectId} AND user_id = #{userId}")
-  void delete(@Param("projectId") long projectId, @Param("userId") long userId);
+  void delete(@Param("projectId") int projectId, @Param("userId") int userId);
 }

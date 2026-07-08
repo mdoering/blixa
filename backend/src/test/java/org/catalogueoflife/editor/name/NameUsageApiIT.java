@@ -43,10 +43,10 @@ class NameUsageApiIT extends AbstractPostgresIT {
     if (existing == null) users.createLocal(username, "pw", username);
   }
 
-  private long createProject(String slug) throws Exception {
+  private long createProject(String title) throws Exception {
     String body = mvc.perform(post("/api/projects").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"slug\":\"" + slug + "\",\"title\":\"" + slug + "\",\"nomCode\":\"botanical\"}"))
+            .content("{\"title\":\"" + title + "\",\"nomCode\":\"botanical\"}"))
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     return json.readTree(body).get("id").asLong();
@@ -78,7 +78,7 @@ class NameUsageApiIT extends AbstractPostgresIT {
     long otherPid = createProject("otherusageproj");
 
     AppUser viewer = users.requireByUsernameOrNull("usageViewer");
-    members.upsert(new ProjectMember(pid, viewer.getId(), Role.VIEWER.dbValue()));
+    members.upsert(new ProjectMember((int) pid, viewer.getId(), Role.VIEWER.dbValue()));
 
     // create an accepted usage: parse-on-write atomizes genus/specificEpithet + formattedName
     String createBody = mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())

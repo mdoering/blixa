@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.catalogueoflife.editor.name.NameUsage;
+import org.gbif.nameparser.api.NomCode;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -22,7 +23,7 @@ class NameParserServiceTest {
     u.setAuthorship("Mill.");
     u.setRank("species");
 
-    service.parseInto(u, "botanical");
+    service.parseInto(u, NomCode.BOTANICAL);
 
     assertEquals("Abies", u.getGenus());
     assertEquals("alba", u.getSpecificEpithet());
@@ -44,7 +45,7 @@ class NameParserServiceTest {
     u.setAuthorship("(Linnaeus, 1771)");
     u.setRank("species");
 
-    service.parseInto(u, "zoological");
+    service.parseInto(u, NomCode.ZOOLOGICAL);
 
     assertEquals("Puma", u.getGenus());
     assertEquals("concolor", u.getSpecificEpithet());
@@ -76,14 +77,14 @@ class NameParserServiceTest {
     u.setScientificName("Abies alba");
     u.setAuthorship("Mill.");
     u.setRank("species");
-    service.parseInto(u, "botanical");
+    service.parseInto(u, NomCode.BOTANICAL);
     assertEquals("Abies", u.getGenus());
     assertEquals("alba", u.getSpecificEpithet());
     assertEquals("Mill.", u.getCombinationAuthorship());
 
     u.setScientificName("BOLD:AAA0001");
     u.setAuthorship(null);
-    service.parseInto(u, "botanical");
+    service.parseInto(u, NomCode.BOTANICAL);
 
     assertEquals("UNPARSABLE", u.getParseState());
     assertNull(u.getGenus());
@@ -98,7 +99,7 @@ class NameParserServiceTest {
     u.setAuthorship("Mill.");
     u.setRank("species");
 
-    String canonical = service.formatName(u, "botanical", false);
+    String canonical = service.formatName(u, NomCode.BOTANICAL, false);
 
     assertTrue(canonical != null && !canonical.isBlank());
     assertTrue(canonical.contains("Abies alba"), "expected canonical name to contain 'Abies alba' but was: " + canonical);
@@ -112,7 +113,7 @@ class NameParserServiceTest {
     u.setAuthorship("Mill.");
     u.setRank("species");
 
-    String html = service.formatName(u, "botanical", true);
+    String html = service.formatName(u, NomCode.BOTANICAL, true);
 
     assertEquals("<i>Abies</i> <i>alba</i> Mill.", html);
   }

@@ -34,18 +34,17 @@ public class NameParserService {
    * to the exception's {@link org.gbif.nameparser.api.NameType}; the caller always gets back a
    * usable, if unparsed, {@link NameUsage}.
    *
-   * @param nomCode the project's nomenclatural code (e.g. "botanical", "zoological"), tolerantly parsed
+   * @param nomCode the project's nomenclatural code, or {@code null} if unknown
    */
-  public void parseInto(NameUsage u, @Nullable String nomCode) {
+  public void parseInto(NameUsage u, @Nullable NomCode nomCode) {
     // Always clear the previously-atomized fields first: on the success path
     // ParsedNameMapping.applyTo re-populates whatever the new parse yields (so a name that no
     // longer has, say, a basionym authorship doesn't keep a stale one from a prior parse), and on
     // the failure path below they must reflect the now-unparsable name, i.e. all null.
     clearParsedFields(u);
     Rank rank = parseRank(u.getRank());
-    NomCode code = parseNomCode(nomCode);
     try {
-      ParsedName pn = parser.parse(u.getScientificName(), u.getAuthorship(), rank, code);
+      ParsedName pn = parser.parse(u.getScientificName(), u.getAuthorship(), rank, nomCode);
       ParsedNameMapping.applyTo(pn, u);
     } catch (UnparsableNameException e) {
       u.setParseState("UNPARSABLE");
@@ -80,11 +79,10 @@ public class NameParserService {
    * canonicalComplete}/{@code canonicalCompleteHtml}. Falls back to the raw {@code
    * scientificName} (plus authorship, if present) when the name cannot be parsed.
    */
-  public String formatName(NameUsage u, @Nullable String nomCode, boolean html) {
+  public String formatName(NameUsage u, @Nullable NomCode nomCode, boolean html) {
     Rank rank = parseRank(u.getRank());
-    NomCode code = parseNomCode(nomCode);
     try {
-      ParsedName pn = parser.parse(u.getScientificName(), u.getAuthorship(), rank, code);
+      ParsedName pn = parser.parse(u.getScientificName(), u.getAuthorship(), rank, nomCode);
       return html ? NameFormatter.canonicalCompleteHtml(pn) : NameFormatter.canonicalComplete(pn);
     } catch (UnparsableNameException e) {
       String name = u.getScientificName();
@@ -104,18 +102,6 @@ public class NameParserService {
       return Rank.valueOf(normalize(rank));
     } catch (IllegalArgumentException e) {
       return Rank.UNRANKED;
-    }
-  }
-
-  /** Tolerant string -> NomCode, falling back to {@code null} (unknown code) rather than throwing. */
-  private static NomCode parseNomCode(@Nullable String code) {
-    if (code == null || code.isBlank()) {
-      return null;
-    }
-    try {
-      return NomCode.valueOf(normalize(code));
-    } catch (IllegalArgumentException e) {
-      return null;
     }
   }
 

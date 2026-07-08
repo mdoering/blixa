@@ -43,7 +43,7 @@ class MemberApiIT extends AbstractPostgresIT {
 
     String body = mvc.perform(post("/api/projects").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"slug\":\"mollusca\",\"title\":\"Molluscs\"}"))
+            .content("{\"title\":\"Molluscs\"}"))
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     long pid = json.readTree(body).get("id").asLong();
@@ -80,13 +80,13 @@ class MemberApiIT extends AbstractPostgresIT {
 
     String body = mvc.perform(post("/api/projects").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"slug\":\"aranea\",\"title\":\"Spiders\"}"))
+            .content("{\"title\":\"Spiders\"}"))
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     long pid = json.readTree(body).get("id").asLong();
 
     AppUser editorTwo = users.requireByUsernameOrNull("editorTwo");
-    members.upsert(new ProjectMember(pid, editorTwo.getId(), Role.EDITOR.dbValue()));
+    members.upsert(new ProjectMember((int) pid, editorTwo.getId(), Role.EDITOR.dbValue()));
 
     // editorTwo is a member but not an owner: setting members must be forbidden.
     mvc.perform(put("/api/projects/" + pid + "/members").with(csrf()).with(user("editorTwo"))
@@ -103,13 +103,13 @@ class MemberApiIT extends AbstractPostgresIT {
 
     String body = mvc.perform(post("/api/projects").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"slug\":\"insecta\",\"title\":\"Insects\"}"))
+            .content("{\"title\":\"Insects\"}"))
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     long pid = json.readTree(body).get("id").asLong();
 
     AppUser helperThree = users.requireByUsernameOrNull("helperThree");
-    members.upsert(new ProjectMember(pid, helperThree.getId(), Role.EDITOR.dbValue()));
+    members.upsert(new ProjectMember((int) pid, helperThree.getId(), Role.EDITOR.dbValue()));
 
     mvc.perform(delete("/api/projects/" + pid + "/members/" + helperThree.getId()).with(csrf()))
        .andExpect(status().is2xxSuccessful());
@@ -126,7 +126,7 @@ class MemberApiIT extends AbstractPostgresIT {
 
     String body = mvc.perform(post("/api/projects").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"slug\":\"aves2\",\"title\":\"Birds Two\"}"))
+            .content("{\"title\":\"Birds Two\"}"))
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     long pid = json.readTree(body).get("id").asLong();
@@ -144,7 +144,7 @@ class MemberApiIT extends AbstractPostgresIT {
 
     String body = mvc.perform(post("/api/projects").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"slug\":\"aves3\",\"title\":\"Birds Three\"}"))
+            .content("{\"title\":\"Birds Three\"}"))
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     long pid = json.readTree(body).get("id").asLong();
@@ -164,7 +164,7 @@ class MemberApiIT extends AbstractPostgresIT {
 
     String body = mvc.perform(post("/api/projects").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"slug\":\"reptilia2\",\"title\":\"Reptiles Two\"}"))
+            .content("{\"title\":\"Reptiles Two\"}"))
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     long pid = json.readTree(body).get("id").asLong();

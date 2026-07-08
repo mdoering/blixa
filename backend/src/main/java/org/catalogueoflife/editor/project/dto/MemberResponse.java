@@ -1,3 +1,3 @@
 package org.catalogueoflife.editor.project.dto;
 
-public record MemberResponse(Long userId, String username, String role) {}
+public record MemberResponse(Integer userId, String username, String role) {}

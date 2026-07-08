@@ -1,7 +1,7 @@
 package org.catalogueoflife.editor.user;
 
 public class AppUser {
-  private Long id;
+  private Integer id;
   private String orcid;
   private String username;
   private String email;
@@ -10,8 +10,8 @@ public class AppUser {
   private String family;
   private String passwordHash;
 
-  public Long getId() { return id; }
-  public void setId(Long id) { this.id = id; }
+  public Integer getId() { return id; }
+  public void setId(Integer id) { this.id = id; }
   public String getOrcid() { return orcid; }
   public void setOrcid(String orcid) { this.orcid = orcid; }
   public String getUsername() { return username; }

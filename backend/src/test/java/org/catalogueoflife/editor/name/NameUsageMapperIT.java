@@ -26,13 +26,12 @@ class NameUsageMapperIT extends AbstractPostgresIT {
     assertThat(u.getId()).isNotNull();
 
     Project p = new Project();
-    p.setSlug("brassicaceae");
     p.setTitle("Brassicaceae");
     projects.insert(p);
     assertThat(p.getId()).isNotNull();
 
     NameUsage accepted = new NameUsage();
-    accepted.setProjectId(p.getId());
+    accepted.setProjectId(p.getId().longValue());
     accepted.setColdpId("acc-1");
     accepted.setAlternativeId(List.of("alt-1", "alt-2"));
     accepted.setReferenceId(List.of(100L, 200L));
@@ -40,17 +39,17 @@ class NameUsageMapperIT extends AbstractPostgresIT {
     accepted.setScientificName("Abies alba");
     accepted.setAuthorship("Mill.");
     accepted.setRank("species");
-    accepted.setModifiedBy(u.getId());
+    accepted.setModifiedBy(u.getId().longValue());
     nameUsages.insert(accepted);
     assertThat(accepted.getId()).isNotNull();
 
     NameUsage synonym = new NameUsage();
-    synonym.setProjectId(p.getId());
+    synonym.setProjectId(p.getId().longValue());
     synonym.setColdpId("syn-1");
     synonym.setStatus("synonym");
     synonym.setScientificName("Pinus picea");
     synonym.setRank("species");
-    synonym.setModifiedBy(u.getId());
+    synonym.setModifiedBy(u.getId().longValue());
     nameUsages.insert(synonym);
     assertThat(synonym.getId()).isNotNull();
 
@@ -79,18 +78,17 @@ class NameUsageMapperIT extends AbstractPostgresIT {
     assertThat(u.getId()).isNotNull();
 
     Project p = new Project();
-    p.setSlug("cas-project");
     p.setTitle("CAS Project");
     projects.insert(p);
     assertThat(p.getId()).isNotNull();
 
     NameUsage nu = new NameUsage();
-    nu.setProjectId(p.getId());
+    nu.setProjectId(p.getId().longValue());
     nu.setColdpId("cas-1");
     nu.setStatus("accepted");
     nu.setScientificName("Abies alba");
     nu.setRank("species");
-    nu.setModifiedBy(u.getId());
+    nu.setModifiedBy(u.getId().longValue());
     nameUsages.insert(nu);
     assertThat(nu.getId()).isNotNull();
 
