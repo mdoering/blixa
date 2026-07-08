@@ -2,6 +2,7 @@ package org.catalogueoflife.editor.name;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import life.catalogue.api.vocab.Environment;
@@ -12,7 +13,9 @@ import org.catalogueoflife.editor.audit.Operation;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
+import org.catalogueoflife.editor.name.dto.UsagePage;
 import org.catalogueoflife.editor.parse.NameParserService;
+import org.gbif.nameparser.api.Rank;
 import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectMapper;
 import org.catalogueoflife.editor.project.ProjectService;
@@ -61,18 +64,40 @@ public class NameUsageService {
     this.issues = issues;
   }
 
-  public List<NameUsageResponse> list(int userId, int projectId, int limit, int offset) {
+  // Unified list/search backing GET /usages: q/rank/status are each optional and ANDed together
+  // (blank/null -> unfiltered). rank/status are validated tolerantly like every other vocab field
+  // (VocabParsing; unrecognized -> 400) and then normalized to their STORED string form so the
+  // mapper's exact-match filters line up with what's actually in the column -- rank is stored
+  // lower-case (see parse/ParsedNameMapping.applyTo), status upper-case (Status.name()), so a
+  // caller-supplied "SPECIES" and a stored "species" must be reconciled here, not left to SQL.
+  // `total` counts ALL matches for the same filters, ignoring limit/offset.
+  public UsagePage searchPage(int userId, int projectId, String q, String rank, String status,
+      int limit, int offset) {
     projects.requireRole(userId, projectId);
-    return usages.findByProject(projectId, Pagination.clampLimit(limit), Pagination.clampOffset(offset)).stream()
+    String qFilter = (q == null || q.isBlank()) ? null : q;
+    String rankFilter = normalizeRankFilter(rank);
+    String statusFilter = normalizeStatusFilter(status);
+    int clampedLimit = Pagination.clampLimit(limit);
+    int clampedOffset = Pagination.clampOffset(offset);
+    List<NameUsageResponse> items = usages
+        .searchItems(projectId, qFilter, rankFilter, statusFilter, clampedLimit, clampedOffset).stream()
         .map(this::toListResponse)
         .toList();
+    long total = usages.countMatches(projectId, qFilter, rankFilter, statusFilter);
+    return new UsagePage(items, total);
   }
 
-  public List<NameUsageResponse> search(int userId, int projectId, String q, int limit, int offset) {
-    projects.requireRole(userId, projectId);
-    return usages.search(projectId, q, Pagination.clampLimit(limit), Pagination.clampOffset(offset)).stream()
-        .map(this::toListResponse)
-        .toList();
+  // Blank/null -> no filter; otherwise the name-parser Rank matching the (case/space/hyphen
+  // tolerant) input, re-rendered lower-case to match how rank is actually stored on name_usage.
+  private static String normalizeRankFilter(String raw) {
+    Rank r = VocabParsing.parse(Rank.class, raw, "rank");
+    return r == null ? null : r.name().toLowerCase(Locale.ROOT);
+  }
+
+  // Blank/null -> no filter; otherwise the Status enum name (upper-case), matching the stored form.
+  private static String normalizeStatusFilter(String raw) {
+    Status s = VocabParsing.parse(Status.class, raw, "status");
+    return s == null ? null : s.name();
   }
 
   public NameUsageResponse get(int userId, int projectId, int id) {

@@ -6,6 +6,7 @@ import org.catalogueoflife.editor.auth.CurrentUser;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
+import org.catalogueoflife.editor.name.dto.UsagePage;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,14 +32,14 @@ public class NameUsageController {
   }
 
   @GetMapping
-  public List<NameUsageResponse> list(@PathVariable int pid,
+  public UsagePage list(@PathVariable int pid,
       @RequestParam(required = false) String q,
+      @RequestParam(required = false) String rank,
+      @RequestParam(required = false) String status,
       @RequestParam(defaultValue = "50") int limit,
       @RequestParam(defaultValue = "0") int offset) {
     int uid = currentUser.require().getId();
-    return (q == null || q.isBlank())
-        ? service.list(uid, pid, limit, offset)
-        : service.search(uid, pid, q, limit, offset);
+    return service.searchPage(uid, pid, q, rank, status, limit, offset);
   }
 
   @PostMapping

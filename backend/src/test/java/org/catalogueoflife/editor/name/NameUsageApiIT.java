@@ -122,13 +122,14 @@ class NameUsageApiIT extends AbstractPostgresIT {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.temporalRangeEnd").value("bogus"));
 
-    // fuzzy search
+    // fuzzy search -- GET /usages now returns {items, total}, not a bare array.
     mvc.perform(get("/api/projects/" + pid + "/usages").param("q", "Abies"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].id").value(accId));
+        .andExpect(jsonPath("$.items[0].id").value(accId));
     mvc.perform(get("/api/projects/" + pid + "/usages").param("q", "zzzzz"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(0));
+        .andExpect(jsonPath("$.items.length()").value(0))
+        .andExpect(jsonPath("$.total").value(0));
 
     // the two remaining Status values also round-trip through the enum
     long misappliedId = createUsage(pid, "Abies misapplied", "", "species", "misapplied");
@@ -251,6 +252,80 @@ class NameUsageApiIT extends AbstractPostgresIT {
         .andExpect(status().isNoContent());
     mvc.perform(get("/api/projects/" + pid + "/usages/" + accId2))
         .andExpect(status().isNotFound());
+  }
+
+  // GET /usages's rank/status filters + total count (Task 1 of the create/search/actions plan).
+  // rank is stored lower-case on name_usage (see parse/ParsedNameMapping.applyTo) while the wire
+  // filter is the upper-case enum name like every other vocab field here -- this exercises that
+  // NameUsageService normalizes the filter into the stored form before the exact-match SQL, not
+  // just that the value is accepted.
+  @Test
+  @WithMockUser(username = "usageSearchOwner")
+  void searchFiltersByRankAndStatusWithTotal() throws Exception {
+    ensureUser("usageSearchOwner");
+    long pid = createProject("usagesearchproj");
+
+    long albaId = createUsage(pid, "Abies alba", "Mill.", "species", "accepted");
+    createUsage(pid, "Abies alpina", "Vill.", "species", "accepted");
+    createUsage(pid, "Abies", "Mill.", "genus", "accepted");
+    createUsage(pid, "Piceabies alba", "(L.) H.Karst.", "species", "synonym");
+    createUsage(pid, "Abies misapplicata", "", "species", "misapplied");
+    // 5 usages total: 4 at rank species (2 accepted, 1 synonym, 1 misapplied), 1 at rank genus.
+
+    // no filters: all 5, ordered by scientificName (default order when q is absent).
+    mvc.perform(get("/api/projects/" + pid + "/usages"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(5))
+        .andExpect(jsonPath("$.total").value(5));
+
+    // rank filter is upper-case on the wire but the column stores the lower-cased form --
+    // this only passes if the filter value is normalized before the exact match.
+    mvc.perform(get("/api/projects/" + pid + "/usages").param("rank", "SPECIES"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(4))
+        .andExpect(jsonPath("$.total").value(4));
+
+    // status filter, independently.
+    mvc.perform(get("/api/projects/" + pid + "/usages").param("status", "SYNONYM"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.total").value(1))
+        .andExpect(jsonPath("$.items[0].scientificName").value("Piceabies alba"));
+
+    // q fuzzy filter still works standalone: an exact-text query sorts its own exact match first
+    // by similarity (avoids hard-coding an exact total, which depends on pg_trgm's similarity
+    // threshold/other near-matches in the seed data).
+    mvc.perform(get("/api/projects/" + pid + "/usages").param("q", "Abies"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].scientificName").value("Abies"));
+
+    // q + rank + status combined with AND: rank=species/status=accepted alone are exact filters
+    // that already narrow to exactly {Abies alba, Abies alpina} regardless of q, so adding
+    // q="Abies" (which both fuzzy-match comfortably) must still total exactly 2 -- proving the
+    // three filters are ANDed, not OR'd or applied independently.
+    mvc.perform(get("/api/projects/" + pid + "/usages")
+            .param("q", "Abies").param("rank", "species").param("status", "accepted"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(2))
+        .andExpect(jsonPath("$.total").value(2));
+
+    // total reflects ALL matches while limit caps the returned items.
+    mvc.perform(get("/api/projects/" + pid + "/usages").param("rank", "species").param("limit", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.total").value(4));
+
+    // an unknown rank/status filter value is a 400, not a 500 or a silently-empty result.
+    mvc.perform(get("/api/projects/" + pid + "/usages").param("rank", "bogus"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/projects/" + pid + "/usages").param("status", "bogus"))
+        .andExpect(status().isBadRequest());
+
+    // sanity: the accepted-species usage is actually reachable via a plain get, unaffected by the
+    // filter normalization above.
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + albaId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.rank").value("species"));
   }
 
   // Guards against a synonym leaking a parentId-driven bypass of TreeService.move's

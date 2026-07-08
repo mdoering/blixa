@@ -63,25 +63,45 @@ public interface NameUsageMapper {
   })
   NameUsage findByIdInProject(@Param("projectId") int projectId, @Param("id") int id);
 
+  // Unified list/search: q/rank/status are each optional (null -> unfiltered), ANDed together.
+  // q is the existing pg_trgm fuzzy filter (scientific_name % q); rank/status are exact matches
+  // against their STORED string form (rank: the name-parser Rank's lower-cased name(); status:
+  // the Status enum's name()) -- NameUsageService normalizes caller-supplied filter values into
+  // that form before calling this. Order is by similarity when q is present (best match first),
+  // else alphabetical by scientificName -- matches countMatches' filter set exactly so `total`
+  // (ignoring limit/offset) is always consistent with `items`.
   @Select("""
+      <script>
       SELECT * FROM name_usage
       WHERE project_id = #{projectId}
-      ORDER BY id
+      <if test="q != null">AND scientific_name % #{q}</if>
+      <if test="rank != null">AND rank = #{rank}</if>
+      <if test="status != null">AND status = #{status}</if>
+      <choose>
+        <when test="q != null">ORDER BY similarity(scientific_name, #{q}) DESC</when>
+        <otherwise>ORDER BY scientific_name</otherwise>
+      </choose>
       LIMIT #{limit} OFFSET #{offset}
+      </script>
       """)
   @ResultMap("nameUsageResult")
-  List<NameUsage> findByProject(@Param("projectId") int projectId, @Param("limit") int limit,
-      @Param("offset") int offset);
-
-  @Select("""
-      SELECT * FROM name_usage
-      WHERE project_id = #{projectId} AND scientific_name % #{q}
-      ORDER BY similarity(scientific_name, #{q}) DESC
-      LIMIT #{limit} OFFSET #{offset}
-      """)
-  @ResultMap("nameUsageResult")
-  List<NameUsage> search(@Param("projectId") int projectId, @Param("q") String q,
+  List<NameUsage> searchItems(@Param("projectId") int projectId, @Param("q") String q,
+      @Param("rank") String rank, @Param("status") String status,
       @Param("limit") int limit, @Param("offset") int offset);
+
+  // Same filter set as searchItems (q/rank/status), no limit/offset/order -- the total that drives
+  // UsagePage.total independent of the page being fetched.
+  @Select("""
+      <script>
+      SELECT COUNT(*) FROM name_usage
+      WHERE project_id = #{projectId}
+      <if test="q != null">AND scientific_name % #{q}</if>
+      <if test="rank != null">AND rank = #{rank}</if>
+      <if test="status != null">AND status = #{status}</if>
+      </script>
+      """)
+  long countMatches(@Param("projectId") int projectId, @Param("q") String q,
+      @Param("rank") String rank, @Param("status") String status);
 
   @Delete("DELETE FROM name_usage WHERE project_id = #{projectId} AND id = #{id}")
   int delete(@Param("projectId") int projectId, @Param("id") int id);
