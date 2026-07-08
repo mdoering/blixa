@@ -86,6 +86,24 @@ public interface NameUsageMapper {
   @Delete("DELETE FROM name_usage WHERE project_id = #{projectId} AND id = #{id}")
   int delete(@Param("projectId") int projectId, @Param("id") int id);
 
+  // All usage ids in a project, in id order -- ValidationService.revalidateProject drives its
+  // per-usage revalidateUsage loop off this (see validation/ValidationService.java).
+  @Select("SELECT id FROM name_usage WHERE project_id = #{projectId} ORDER BY id")
+  List<Integer> findIdsByProject(@Param("projectId") int projectId);
+
+  // Count of OTHER usages in the project sharing the same scientificName + authorship --
+  // validation/rules/DuplicateNameRule.java's data source. `IS NOT DISTINCT FROM` is Postgres's
+  // NULL-safe equality (plain `=` is never true when either side is NULL, which would wrongly
+  // treat two authorless duplicates as non-duplicates).
+  @Select("""
+      SELECT COUNT(*) FROM name_usage
+      WHERE project_id = #{projectId} AND scientific_name = #{scientificName}
+        AND authorship IS NOT DISTINCT FROM #{authorship}
+        AND id != #{excludeId}
+      """)
+  int countDuplicates(@Param("projectId") int projectId, @Param("scientificName") String scientificName,
+      @Param("authorship") String authorship, @Param("excludeId") int excludeId);
+
   @Update("""
       UPDATE name_usage
       SET coldp_id = #{coldpId},

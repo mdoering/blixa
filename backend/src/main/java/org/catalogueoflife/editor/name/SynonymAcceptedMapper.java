@@ -43,4 +43,12 @@ public interface SynonymAcceptedMapper {
       ORDER BY ordinal
       """)
   List<Integer> findSynonymsOf(@Param("projectId") int projectId, @Param("acceptedId") int acceptedId);
+
+  // How many accepted usages a synonym is linked to -- validation/rules/SynonymWithoutAcceptedRule
+  // fires when this is 0 for a SYNONYM/MISAPPLIED usage (see RuleContext.synonymAcceptedCount()).
+  @Select("""
+      SELECT COUNT(*) FROM synonym_accepted
+      WHERE project_id = #{projectId} AND synonym_id = #{synonymId}
+      """)
+  int countBySynonym(@Param("projectId") int projectId, @Param("synonymId") int synonymId);
 }
