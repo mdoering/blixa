@@ -149,4 +149,26 @@ class ValidationReconcileIT extends AbstractPostgresIT {
     assertThat(reopened.getStatus()).isEqualTo(IssueStatus.OPEN.name());
     assertThat(reopened.getReviewerId()).isNull();
   }
+
+  // Fix 1: issue.entity_id is polymorphic (no cascade FK to name_usage), so deleting a usage must
+  // explicitly clean up its own issue rows (see name/NameUsageService.delete calling
+  // IssueMapper.deleteByEntity) or GET /issues would show a stale row referencing a nonexistent
+  // entity forever.
+  @Test
+  @WithMockUser(username = "deleteCleansIssuesOwner")
+  void deletingAUsageRemovesItsIssues() throws Exception {
+    ensureUser("deleteCleansIssuesOwner");
+    long pid = createProject("deletecleansissuesproj");
+
+    // a synonym with no accepted link trips synonym_without_accepted (ERROR).
+    long synId = createUsage(pid, "Deletus alpha", "L.", "species", "synonym");
+    validationService.revalidateUsage((int) pid, (int) synId);
+    assertThat(findIssue((int) pid, (int) synId)).isNotNull();
+    assertThat(issueMapper.findByEntity((int) pid, "name_usage", (int) synId)).isNotEmpty();
+
+    mvc.perform(delete("/api/projects/" + pid + "/usages/" + synId).with(csrf()))
+        .andExpect(status().isNoContent());
+
+    assertThat(issueMapper.findByEntity((int) pid, "name_usage", (int) synId)).isEmpty();
+  }
 }

@@ -17,6 +17,7 @@ import org.catalogueoflife.editor.project.ProjectMapper;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
 import org.catalogueoflife.editor.tree.TreeMapper;
+import org.catalogueoflife.editor.validation.IssueMapper;
 import org.catalogueoflife.editor.validation.ValidationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -41,10 +42,11 @@ public class NameUsageService {
   private final AuditService audit;
   private final ObjectMapper objectMapper;
   private final ApplicationEventPublisher events;
+  private final IssueMapper issues;
 
   public NameUsageService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted, IdSeqMapper idSeq,
       ProjectService projects, ProjectMapper projectMapper, NameParserService parser, TreeMapper tree,
-      AuditService audit, ObjectMapper objectMapper, ApplicationEventPublisher events) {
+      AuditService audit, ObjectMapper objectMapper, ApplicationEventPublisher events, IssueMapper issues) {
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
     this.idSeq = idSeq;
@@ -55,6 +57,7 @@ public class NameUsageService {
     this.audit = audit;
     this.objectMapper = objectMapper;
     this.events = events;
+    this.issues = issues;
   }
 
   public List<NameUsageResponse> list(int userId, int projectId, int limit, int offset) {
@@ -185,6 +188,9 @@ public class NameUsageService {
     if (usages.delete(projectId, id) == 0) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "name usage not found");
     }
+    // entity_id is polymorphic (no cascade FK to name_usage): clean up this usage's own issue rows
+    // now, or they'd reference a nonexistent entity forever (see validation/IssueMapper.deleteByEntity).
+    issues.deleteByEntity(projectId, ENTITY, id);
     audit.record(projectId, userId, ENTITY, id, Operation.DELETE, before, null);
     // The usage itself is gone by the time this fires (AFTER_COMMIT), so
     // ValidationService.revalidateUsage will find nothing and no-op -- published anyway per the

@@ -76,12 +76,33 @@ public interface IssueMapper {
   @Delete("DELETE FROM issue WHERE id = #{id}")
   int deleteById(@Param("id") int id);
 
+  // issue.entity_id is polymorphic (no cascade FK to name_usage/reference), so nothing at the DB
+  // level cleans up an entity's issues when it's deleted -- without this, GET /issues would show
+  // stale rows referencing a nonexistent entity forever. Called explicitly by the deleting service
+  // (name/NameUsageService.delete, name/ReferenceService.delete) inside the same transaction as the
+  // delete itself.
+  @Delete("""
+      DELETE FROM issue WHERE project_id = #{projectId} AND entity_type = #{entityType}
+        AND entity_id = #{entityId}
+      """)
+  int deleteByEntity(@Param("projectId") int projectId, @Param("entityType") String entityType,
+      @Param("entityId") int entityId);
+
   // Reviewer lifecycle transition (accept/reject/reopen, action -> status mapping owned by Task 2's
   // IssueService). Already needed here so ValidationReconcileIT can simulate "a reviewer accepted
-  // this issue" directly, ahead of Task 2's review endpoint existing.
+  // this issue" directly, ahead of Task 2's review endpoint existing. reopen passes reviewerId=null
+  // (IssueService.review's convention), so tying reviewed_at to reviewerId being null keeps the two
+  // columns consistent: reopen clears BOTH reviewer_id and reviewed_at, same as the reconcile-driven
+  // reopen in `reopen` above; accept/reject (non-null reviewerId) stamp reviewed_at = now().
+  // jdbcType=INTEGER on the standalone `IS NULL` check is required: unlike `reviewer_id = ?` (whose
+  // type Postgres infers from the target column), a bare `? IS NULL` gives Postgres no column
+  // context to infer the parameter's type from, and it fails to prepare with "could not determine
+  // data type of parameter" without an explicit type.
   @Update("""
       UPDATE issue
-      SET status = #{status}, reviewer_id = #{reviewerId}, reviewed_at = now(), updated_at = now()
+      SET status = #{status}, reviewer_id = #{reviewerId},
+          reviewed_at = CASE WHEN #{reviewerId,jdbcType=INTEGER} IS NULL THEN NULL ELSE now() END,
+          updated_at = now()
       WHERE id = #{id}
       """)
   int review(@Param("id") int id, @Param("status") String status, @Param("reviewerId") Integer reviewerId);

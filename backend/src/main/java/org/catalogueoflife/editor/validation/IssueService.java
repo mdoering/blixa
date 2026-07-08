@@ -69,7 +69,10 @@ public class IssueService {
   // Owner/editor triggers a full project recompute (ValidationService.revalidateProject, Task 1)
   // and gets back the resulting problems-view summary -- the same shape GET /issues/summary
   // returns, so a caller can show "N errors, M warnings" right after a manual revalidate.
-  @Transactional
+  // Deliberately NOT @Transactional: ValidationService.revalidateProject calls revalidateUsage
+  // through the Spring proxy per usage so each gets its OWN transaction (see that method's
+  // javadoc) -- wrapping this method in a transaction would defeat that by making it all one
+  // outer transaction again, holding every usage's advisory lock until the very end.
   public IssueSummaryResponse revalidateProject(int actorId, int projectId) {
     requireOwnerOrEditor(projects.requireRole(actorId, projectId));
     validationService.revalidateProject(projectId);

@@ -152,6 +152,10 @@ class IssueApiIT extends AbstractPostgresIT {
     JsonNode reopened = json.readTree(reopenBody);
     assertThat(reopened.get("status").asString()).isEqualTo("open");
     assertThat(reopened.get("reviewerId").isNull()).isTrue();
+    // Fix 4: reopen must clear BOTH reviewer_id and reviewed_at -- previously reviewed_at stayed
+    // stamped from the earlier reject, leaving an inconsistent reviewer_id=NULL, reviewed_at=<ts>
+    // row (unlike the reconcile-driven reopen in IssueMapper.reopen, which nulls both).
+    assertThat(reopened.get("reviewedAt").isNull()).isTrue();
 
     // 8) a viewer may read but not review -- 403, not a leaked write.
     mvc.perform(post("/api/projects/" + pid + "/issues/" + errorIssueId + "/review")

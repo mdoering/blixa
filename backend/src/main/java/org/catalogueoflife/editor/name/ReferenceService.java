@@ -8,6 +8,7 @@ import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.catalogueoflife.editor.name.dto.UpdateReferenceRequest;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
+import org.catalogueoflife.editor.validation.IssueMapper;
 import org.catalogueoflife.editor.validation.ValidationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -28,9 +29,11 @@ public class ReferenceService {
   private final ObjectMapper objectMapper;
   private final NameUsageMapper usages;
   private final ApplicationEventPublisher events;
+  private final IssueMapper issues;
 
   public ReferenceService(ReferenceMapper references, IdSeqMapper idSeq, ProjectService projects,
-      AuditService audit, ObjectMapper objectMapper, NameUsageMapper usages, ApplicationEventPublisher events) {
+      AuditService audit, ObjectMapper objectMapper, NameUsageMapper usages, ApplicationEventPublisher events,
+      IssueMapper issues) {
     this.references = references;
     this.idSeq = idSeq;
     this.projects = projects;
@@ -38,6 +41,7 @@ public class ReferenceService {
     this.objectMapper = objectMapper;
     this.usages = usages;
     this.events = events;
+    this.issues = issues;
   }
 
   public List<Reference> list(int userId, int projectId, int limit, int offset) {
@@ -137,10 +141,25 @@ public class ReferenceService {
   public void delete(int userId, int projectId, int id) {
     requireEditor(userId, projectId);
     Reference before = requireInProject(projectId, id);
+    // Capture BEFORE the delete: ON DELETE SET NULL (see V3__name_core.sql) means every citing
+    // usage's published_in_reference_id becomes NULL the instant the reference row is gone, so
+    // querying by refId afterwards would find nothing -- same call update() uses to find its
+    // ValidationEvent targets.
+    List<Integer> citingUsageIds = usages.findIdsByPublishedInReference(projectId, id);
     if (references.delete(projectId, id) == 0) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "reference not found");
     }
+    // entity_id is polymorphic (no cascade FK to reference): clean up this reference's own issue
+    // rows now, or they'd reference a nonexistent entity forever (see validation/IssueMapper.deleteByEntity).
+    issues.deleteByEntity(projectId, ENTITY, id);
     audit.record(projectId, userId, ENTITY, id, Operation.DELETE, before, null);
+    // The SET NULL can clear year_vs_reference and trip missing_published_in for each citing usage
+    // -- mirrors update()'s per-citing-usage ValidationEvent, published from inside this same
+    // @Transactional method so ValidationTrigger's AFTER_COMMIT listener only fires once this
+    // delete actually commits.
+    for (int usageId : citingUsageIds) {
+      events.publishEvent(ValidationEvent.forUsage(projectId, usageId));
+    }
   }
 
   private Reference requireInProject(int projectId, int id) {

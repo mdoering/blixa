@@ -2,6 +2,7 @@ package org.catalogueoflife.editor.validation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -74,6 +75,27 @@ class AutoRevalidateIT extends AbstractPostgresIT {
     return json.readTree(body);
   }
 
+  private long createReference(long pid, String citation, String issued) throws Exception {
+    String body = mvc.perform(post("/api/projects/" + pid + "/references").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"" + citation + "\",\"issued\":\"" + issued + "\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    return json.readTree(body).get("id").asLong();
+  }
+
+  private long createUsageCitingReference(long pid, String name, String authorship, String rank,
+      String statusValue, long refId, int year) throws Exception {
+    String body = mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"" + name + "\",\"authorship\":\"" + authorship
+                + "\",\"rank\":\"" + rank + "\",\"status\":\"" + statusValue
+                + "\",\"publishedInReferenceId\":" + refId + ",\"publishedInYear\":" + year + "}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    return json.readTree(body).get("id").asLong();
+  }
+
   private static boolean hasIssue(JsonNode issues, long entityId, String rule, String severity) {
     for (JsonNode issue : issues) {
       if (issue.get("entityId").asLong() == entityId
@@ -122,5 +144,44 @@ class AutoRevalidateIT extends AbstractPostgresIT {
         .andExpect(status().isNoContent());
     JsonNode cleared = pollUntil(pid, issues -> !hasIssue(issues, synId, "synonym_without_accepted", "error"));
     assertThat(hasIssue(cleared, synId, "synonym_without_accepted", "error")).isFalse();
+  }
+
+  // Fix 3: deleting a reference nulls every citing usage's published_in_reference_id via
+  // ON DELETE SET NULL (see ReferenceService.delete / V3__name_core.sql) -- which should clear
+  // year_vs_reference and trip missing_published_in -- but ONLY update() published a ValidationEvent
+  // before this fix, so a deleted reference's citing usages were never re-checked. No manual
+  // revalidate call anywhere here: everything must flow from the real create/delete API calls plus
+  // the async auto-revalidate listener, same discipline as autoRevalidatesAfterEachWriteWithoutAManualTrigger.
+  @Test
+  @WithMockUser(username = "autoRevalidateRefDeleteOwner")
+  void deletingAReferenceRevalidatesItsFormerlyCitingUsages() throws Exception {
+    ensureUser("autoRevalidateRefDeleteOwner");
+    long pid = createProject("autorevalidaterefdeleteproj");
+
+    // reference "issued" year (1700) differs from the usage's publishedInYear (2000) by way more
+    // than YearVsReferenceRule's MAX_DIFF of 2 -- so citing this reference trips year_vs_reference.
+    long refId = createReference(pid, "Old 1700, Some Work", "1700");
+    long usageId = createUsageCitingReference(pid, "Autorevaliddeletus alpha", "L.", "species",
+        "accepted", refId, 2000);
+
+    // 1) the create's ValidationEvent should, asynchronously, produce the year_vs_reference WARNING
+    // (and, since publishedInReferenceId IS set, no missing_published_in INFO yet).
+    JsonNode withWarning = pollUntil(pid, issues -> hasIssue(issues, usageId, "year_vs_reference", "warning"));
+    assertThat(hasIssue(withWarning, usageId, "year_vs_reference", "warning")).isTrue();
+    assertThat(hasIssue(withWarning, usageId, "missing_published_in", "info")).isFalse();
+
+    // 2) delete the reference via the real API -- ON DELETE SET NULL clears the usage's
+    // published_in_reference_id, and ReferenceService.delete must publish a ValidationEvent for the
+    // usage (captured BEFORE the delete, since querying by refId afterwards finds nothing).
+    mvc.perform(delete("/api/projects/" + pid + "/references/" + refId).with(csrf()))
+        .andExpect(status().isNoContent());
+
+    // 3) poll until the async re-revalidate reflects the change: year_vs_reference gone (no
+    // reference left to compare against) and missing_published_in now fires (publishedInReferenceId
+    // is null).
+    JsonNode after = pollUntil(pid, issues -> !hasIssue(issues, usageId, "year_vs_reference", "warning")
+        && hasIssue(issues, usageId, "missing_published_in", "info"));
+    assertThat(hasIssue(after, usageId, "year_vs_reference", "warning")).isFalse();
+    assertThat(hasIssue(after, usageId, "missing_published_in", "info")).isTrue();
   }
 }

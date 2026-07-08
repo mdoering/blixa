@@ -9,6 +9,8 @@ import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.Reference;
 import org.catalogueoflife.editor.name.ReferenceMapper;
 import org.catalogueoflife.editor.name.SynonymAcceptedMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -31,6 +33,16 @@ public class ValidationService {
   private final SynonymAcceptedMapper synonymAccepted;
   private final ObjectMapper objectMapper;
 
+  // Self-reference through the Spring proxy so revalidateProject's per-usage calls below actually
+  // go through @Transactional (see revalidateProject) -- a plain `this.revalidateUsage(...)` call
+  // bypasses the proxy entirely, so the whole recompute would run as ONE transaction holding every
+  // per-usage pg_advisory_xact_lock until the very end (see IssueMapper.lockUsage), starving the
+  // async auto-revalidate pool for the whole project's worth of usages. @Lazy avoids a circular
+  // bean-creation error (this bean depending on itself while still being constructed).
+  @Autowired
+  @Lazy
+  private ValidationService self;
+
   public ValidationService(List<ValidationRule> rules, IssueMapper issues, NameUsageMapper nameUsages,
       ReferenceMapper references, SynonymAcceptedMapper synonymAccepted, ObjectMapper objectMapper) {
     this.rules = rules;
@@ -45,7 +57,9 @@ public class ValidationService {
   // for it. Idempotent: calling this twice in a row with unchanged underlying data leaves the
   // stored issue set byte-identical (see ValidationReconcileIT). A usage that no longer exists
   // (already deleted) is a no-op -- there is nothing left to validate; its issues are cleaned up
-  // by ON DELETE CASCADE on name_usage's own FKs elsewhere, not here.
+  // explicitly by the deleting service (name/NameUsageService.delete calling
+  // IssueMapper.deleteByEntity inside the same transaction as the delete), not by any DB-level
+  // cascade -- issue.entity_id is polymorphic and has no FK to name_usage at all.
   @Transactional
   public void revalidateUsage(int projectId, int usageId) {
     // Must be the first statement: see IssueMapper.lockUsage. Serializes this call against any
@@ -96,10 +110,15 @@ public class ValidationService {
 
   // Iterates every usage in the project and revalidates each in turn. Note: this is O(N) queries
   // (buildContext runs a handful of selects per usage) -- acceptable for an on-demand recompute; a
-  // set-based fast path is a later optimization (see plan Self-Review Notes).
+  // set-based fast path is a later optimization (see plan Self-Review Notes). Calls through `self`
+  // (the Spring proxy), not `this`, so each iteration is its OWN transaction: revalidateUsage's
+  // @Transactional actually applies per usage, acquiring and releasing IssueMapper.lockUsage's
+  // advisory lock promptly instead of holding every usage's lock for the whole recompute (see the
+  // `self` field's javadoc). IssueService.revalidateProject (the caller) must NOT be @Transactional
+  // itself, or this would wrap right back into one outer transaction.
   public void revalidateProject(int projectId) {
     for (int usageId : nameUsages.findIdsByProject(projectId)) {
-      revalidateUsage(projectId, usageId);
+      self.revalidateUsage(projectId, usageId);
     }
   }
 
