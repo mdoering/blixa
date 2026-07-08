@@ -148,11 +148,36 @@ internal one**:
 - *Exclude entirely:* DSID keys, `VerbatimRecord`, sector/source/decision/matching,
   and the CLB `dao`/`webservice` layers.
 
-**Identifiers.** Each entity gets a **surrogate, project-scoped primary key we
-mint** (the editor creates data from scratch and imports it). The original ColDP
-`ID` and `alternativeID[]` are preserved as attributes for lossless round-trip.
-Internal foreign keys use the surrogate key; export maps them back to ColDP
-string IDs.
+**Identifiers.** *(revised per the 2026-07-08 model review — see the "Model
+refinements" box below.)* Project-scoped entities (`reference`, `author`,
+`name_usage`, `synonym_accepted`) use a **compound `(project_id, id)` primary
+key** where `id` is a plain **`Integer`** allocated as a **per-project sequence
+starting at 1** (via an `id_seq` counter table, atomic `INSERT … ON CONFLICT …
+RETURNING`). All scalar foreign keys are therefore **compound** (`(project_id,
+parent_id)` → `name_usage(project_id, id)`, etc.), so the **database enforces
+same-project referential integrity** (the app-layer cross-project guard becomes
+belt-and-suspenders). `project` and `app_user` keep a global `Integer` identity
+PK. The original ColDP `ID` and `alternativeID[]` are preserved as attributes
+for lossless round-trip; export maps the internal ids back to ColDP string IDs.
+
+> **Model refinements (2026-07-08 review) — applied and green (`mvn verify`).**
+> - **Identifiers:** `Long`→`Integer` everywhere; per-project `(project_id, id)`
+>   compound keys + `id_seq` allocation (above).
+> - **Project:** removed `slug`, `doi`, `issued`, `version` (kept `created_at` as
+>   the project start). `nom_code` → `NomCode` enum; `license` → an enum
+>   restricted to the two COL licenses only (`CC0-1.0`, `CC-BY-4.0`), else 400.
+> - **NameUsage:** `status` → a custom `Status` enum **{accepted, synonym,
+>   misapplied, unassessed}** (drops ColDP's *provisionally accepted* /
+>   *ambiguous synonym*; `unassessed` replaces "bare name"; export maps
+>   unassessed→bare name). `publishedInYear` → `int`. Typed enums:
+>   `temporalRangeStart/end`→`GeoTime` (from `org.catalogueoflife:api`),
+>   `nomStatus`→`NomStatus`, `gender`→`Gender`, `nameType`→`NameType`,
+>   `notho`→`NamePart`, `environment`→`List<Environment>`.
+> - **Releases (deferred):** a project's ColDP release date + version live on a
+>   future **Release** entity (per-project: version, issued date, changelog,
+>   released_by, + a link to the exported archive — *not* a DB data-snapshot;
+>   the snapshot is the exported ColDP file), built alongside ColDP **export**
+>   (phase 3). The working project is the editable head.
 
 **Normalization stance: strings authoritative, relational normalization
 optional.** For both authorship and names, the **denormalized string is the
@@ -184,11 +209,13 @@ and reviewed **before** any service or UI work.
 
 ### 5.1 Project, users, membership
 
-- **`project`** — `id`, `key/slug`, ColDP metadata (title, alias, description,
-  license, version, issued, geographic/taxonomic scope, DOI, etc. as structured
-  columns plus a JSONB blob for the long tail of extensible YAML fields),
-  **`nom_code`** (the single nomenclatural code applied to *all* names in the
-  project), timestamps.
+- **`project`** — global `Integer` `id`, ColDP metadata (`title`, `alias`,
+  `description`, `license` [enum: CC0-1.0/CC-BY-4.0], geographic/taxonomic scope,
+  plus a JSONB blob for the long tail of extensible YAML fields), **`nom_code`**
+  (`NomCode` enum — the single nomenclatural code applied to *all* names in the
+  project), and `created_at`/`updated_at`. *(Per the 2026-07-08 review: `slug`,
+  `doi`, `issued`, `version` were removed — `issued`/`version` move to the future
+  Release entity; projects are identified by `id`.)*
 - **`app_user`** — `id`, `orcid` (nullable for local accounts),
   `username/email`, display name, `family`/`given` (for authorship),
   password hash (local accounts only), timestamps.
@@ -259,11 +286,13 @@ taxonomic usage; this table **is the classification**. (CLB keeps `Name` and
     `publishedInPageLink`), `gender`, `etymology`
   - **No `code` column** — derived from `project.nom_code`.
 - Taxonomic (usage) fields:
-  - `status` ∈ {accepted, provisionally accepted, synonym, ambiguous synonym,
-    misapplied, bare name}
+  - `status` — the custom **`Status`** enum ∈ {**accepted, synonym, misapplied,
+    unassessed**} *(2026-07-08 review; unassessed replaces "bare name";
+    provisional/ambiguous dropped)*
   - `name_phrase` (free-text qualifier, e.g. `auct. non …`, `sensu lato`)
   - `reference_id[]` (taxonomic references supporting the usage)
-  - `extinct`, `environment[]`, `temporal_range_start/end`
+  - `extinct`, `environment[]` (`List<Environment>`), `temporal_range_start/end`
+    (`GeoTime`)
   - **No `according_to_reference_id` / `accordingToPage`** (dropped per decision).
   - **No scrutinizer fields** — the scrutinizer is derived from the audit log
     (last editor + `modified` timestamp) whenever it needs to be shown or
