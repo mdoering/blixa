@@ -4,7 +4,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import life.catalogue.api.vocab.Environment;
 import life.catalogue.api.vocab.Gender;
-import life.catalogue.api.vocab.GeoTime;
 import life.catalogue.api.vocab.NomStatus;
 import org.gbif.nameparser.api.NamePart;
 import org.gbif.nameparser.api.NameType;
@@ -31,8 +30,8 @@ public class NameUsage {
   private List<Integer> referenceId;
   private Boolean extinct;
   private List<Environment> environment;
-  private GeoTime temporalRangeStart;
-  private GeoTime temporalRangeEnd;
+  private String temporalRangeStart;
+  private String temporalRangeEnd;
   // nomenclatural (name)
   private String scientificName;
   private String authorship;
@@ -90,10 +89,10 @@ public class NameUsage {
   public void setExtinct(Boolean extinct) { this.extinct = extinct; }
   public List<Environment> getEnvironment() { return environment; }
   public void setEnvironment(List<Environment> environment) { this.environment = environment; }
-  public GeoTime getTemporalRangeStart() { return temporalRangeStart; }
-  public void setTemporalRangeStart(GeoTime temporalRangeStart) { this.temporalRangeStart = temporalRangeStart; }
-  public GeoTime getTemporalRangeEnd() { return temporalRangeEnd; }
-  public void setTemporalRangeEnd(GeoTime temporalRangeEnd) { this.temporalRangeEnd = temporalRangeEnd; }
+  public String getTemporalRangeStart() { return temporalRangeStart; }
+  public void setTemporalRangeStart(String temporalRangeStart) { this.temporalRangeStart = temporalRangeStart; }
+  public String getTemporalRangeEnd() { return temporalRangeEnd; }
+  public void setTemporalRangeEnd(String temporalRangeEnd) { this.temporalRangeEnd = temporalRangeEnd; }
   public String getScientificName() { return scientificName; }
   public void setScientificName(String scientificName) { this.scientificName = scientificName; }
   public String getAuthorship() { return authorship; }

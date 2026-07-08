@@ -81,8 +81,8 @@ public class NameUsageService {
     u.setGender(VocabParsing.parse(Gender.class, req.gender(), "gender"));
     u.setExtinct(req.extinct());
     u.setEnvironment(parseEnvironments(req.environment()));
-    u.setTemporalRangeStart(VocabParsing.parseGeoTime(req.temporalRangeStart(), "temporalRangeStart"));
-    u.setTemporalRangeEnd(VocabParsing.parseGeoTime(req.temporalRangeEnd(), "temporalRangeEnd"));
+    u.setTemporalRangeStart(req.temporalRangeStart());
+    u.setTemporalRangeEnd(req.temporalRangeEnd());
     u.setLink(req.link());
     u.setRemarks(req.remarks());
     u.setModifiedBy(userId);
@@ -121,8 +121,8 @@ public class NameUsageService {
     u.setGender(VocabParsing.parse(Gender.class, req.gender(), "gender"));
     u.setExtinct(req.extinct());
     u.setEnvironment(parseEnvironments(req.environment()));
-    u.setTemporalRangeStart(VocabParsing.parseGeoTime(req.temporalRangeStart(), "temporalRangeStart"));
-    u.setTemporalRangeEnd(VocabParsing.parseGeoTime(req.temporalRangeEnd(), "temporalRangeEnd"));
+    u.setTemporalRangeStart(req.temporalRangeStart());
+    u.setTemporalRangeEnd(req.temporalRangeEnd());
     u.setLink(req.link());
     u.setRemarks(req.remarks());
     u.setModifiedBy(userId);

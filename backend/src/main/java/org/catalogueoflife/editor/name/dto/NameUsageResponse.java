@@ -2,15 +2,15 @@ package org.catalogueoflife.editor.name.dto;
 
 import java.util.List;
 import life.catalogue.api.vocab.Environment;
-import life.catalogue.api.vocab.GeoTime;
 import org.catalogueoflife.editor.name.NameUsage;
 
 // Mirrors ReferenceResponse's shape: the API-writable fields plus the parser-derived
 // atomized name parts / nameType / parseState, the computed formattedName, and the
 // synonym_accepted link ids (which are not columns on name_usage itself). The now-enum-typed
-// model fields (status, nomStatus, gender, notho, nameType, environment, temporalRangeStart/End)
-// are exposed as plain strings here (enum .name() / GeoTime.getName()) to keep the existing
-// wire shape; publishedInYear mirrors the model's Integer.
+// model fields (status, nomStatus, gender, notho, nameType, environment) are exposed as plain
+// strings here (enum .name()) to keep the existing wire shape; temporalRangeStart/End are plain
+// Strings on the model already (free-text for now; vocab-backed validation is a future concern);
+// publishedInYear mirrors the model's Integer.
 public record NameUsageResponse(
     Integer id,
     Integer parentId,
@@ -56,7 +56,7 @@ public record NameUsageResponse(
   public static NameUsageResponse of(NameUsage u, String formattedName, List<Integer> acceptedParentIds,
       List<Integer> synonymIds) {
     return new NameUsageResponse(u.getId(), u.getParentId(), name(u.getStatus()), u.getNamePhrase(),
-        u.getExtinct(), names(u.getEnvironment()), name(u.getTemporalRangeStart()), name(u.getTemporalRangeEnd()),
+        u.getExtinct(), names(u.getEnvironment()), u.getTemporalRangeStart(), u.getTemporalRangeEnd(),
         u.getScientificName(), u.getAuthorship(), u.getRank(), u.getUninomial(),
         u.getGenus(), u.getInfragenericEpithet(), u.getSpecificEpithet(), u.getInfraspecificEpithet(),
         u.getCultivarEpithet(), name(u.getNotho()), u.getCombinationAuthorship(), u.getCombinationExAuthorship(),
@@ -69,10 +69,6 @@ public record NameUsageResponse(
 
   private static String name(Enum<?> e) {
     return e == null ? null : e.name();
-  }
-
-  private static String name(GeoTime g) {
-    return g == null ? null : g.getName();
   }
 
   private static List<String> names(List<Environment> envs) {

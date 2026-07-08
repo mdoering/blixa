@@ -76,8 +76,8 @@ CREATE TABLE name_usage (
   reference_id   INTEGER[],                 -- taxonomic references (same project; no array FK in Postgres)
   extinct        BOOLEAN,
   environment    TEXT[],                    -- life.catalogue.api.vocab.Environment enum names
-  temporal_range_start TEXT,                -- life.catalogue.api.vocab.GeoTime name, e.g. 'Jurassic'
-  temporal_range_end   TEXT,                -- life.catalogue.api.vocab.GeoTime name
+  temporal_range_start TEXT,                -- free string for now, e.g. 'Jurassic'; to be validated against the CLB vocab API later
+  temporal_range_end   TEXT,                -- free string for now; to be validated against the CLB vocab API later
   -- nomenclatural (name)
   scientific_name TEXT NOT NULL,
   authorship     TEXT,

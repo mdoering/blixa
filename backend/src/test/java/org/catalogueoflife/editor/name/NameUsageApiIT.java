@@ -106,17 +106,21 @@ class NameUsageApiIT extends AbstractPostgresIT {
             .content("{\"scientificName\":\"Bogus status\",\"rank\":\"species\",\"status\":\"bogus\"}"))
         .andExpect(status().isBadRequest());
 
-    // ... same for an unrecognized nomenclatural/geological vocabulary value
+    // ... same for an unrecognized nomenclatural vocabulary value
     mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"scientificName\":\"Bogus nomStatus\",\"rank\":\"species\",\"status\":\"accepted\","
                 + "\"nomStatus\":\"bogus\"}"))
         .andExpect(status().isBadRequest());
+
+    // temporalRange is a free string for now (no vocab validation yet), so an arbitrary value
+    // is accepted and stored/returned as-is rather than being rejected as an unrecognized term.
     mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"scientificName\":\"Bogus geotime\",\"rank\":\"species\",\"status\":\"accepted\","
+            .content("{\"scientificName\":\"Free text geotime\",\"rank\":\"species\",\"status\":\"accepted\","
                 + "\"temporalRangeEnd\":\"bogus\"}"))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.temporalRangeEnd").value("bogus"));
 
     // fuzzy search
     mvc.perform(get("/api/projects/" + pid + "/usages").param("q", "Abies"))
@@ -213,15 +217,16 @@ class NameUsageApiIT extends AbstractPostgresIT {
 
     // cross-project guard: linking to/from a usage that belongs to a DIFFERENT project is rejected.
     // Ids are per-project sequences (chunk 2), so bump otherPid's sequence past pid's own usage
-    // count (1..5 so far: accId, misappliedId, unassessedId, synId, accId2) first -- otherwise
-    // otherPid's usage would happen to reuse one of pid's own ids (e.g. synId's), and the
-    // "cross-project" checks below would silently resolve to pid's OWN usage instead of
-    // 404/400-ing.
+    // count (1..6 so far: the "Free text geotime" temporalRange passthrough usage, accId,
+    // misappliedId, unassessedId, synId, accId2) first -- otherwise otherPid's usage would happen
+    // to reuse one of pid's own ids (e.g. synId's), and the "cross-project" checks below would
+    // silently resolve to pid's OWN usage instead of 404/400-ing.
     createUsage(otherPid, "Filler one", "", "species", "accepted");
     createUsage(otherPid, "Filler two", "", "species", "accepted");
     createUsage(otherPid, "Filler three", "", "species", "accepted");
     createUsage(otherPid, "Filler four", "", "species", "accepted");
     createUsage(otherPid, "Filler five", "", "species", "accepted");
+    createUsage(otherPid, "Filler six", "", "species", "accepted");
     long otherUsageId = createUsage(otherPid, "Alien name", "Auth.", "species", "accepted");
     mvc.perform(put("/api/projects/" + pid + "/usages/" + synId + "/synonym-of/" + otherUsageId).with(csrf()))
         .andExpect(status().isNotFound());

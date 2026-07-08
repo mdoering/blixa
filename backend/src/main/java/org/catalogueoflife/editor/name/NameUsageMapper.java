@@ -39,8 +39,7 @@ public interface NameUsageMapper {
           #{referenceId,typeHandler=org.catalogueoflife.editor.name.IntegerArrayTypeHandler},
           #{extinct},
           #{environment,typeHandler=org.catalogueoflife.editor.name.EnvironmentArrayTypeHandler},
-          #{temporalRangeStart,typeHandler=org.catalogueoflife.editor.name.GeoTimeTypeHandler},
-          #{temporalRangeEnd,typeHandler=org.catalogueoflife.editor.name.GeoTimeTypeHandler},
+          #{temporalRangeStart}, #{temporalRangeEnd},
           #{scientificName}, #{authorship}, #{rank}, #{uninomial}, #{genus}, #{infragenericEpithet},
           #{specificEpithet}, #{infraspecificEpithet}, #{cultivarEpithet}, #{notho},
           #{combinationAuthorship}, #{combinationExAuthorship}, #{combinationAuthorshipYear},
@@ -60,11 +59,7 @@ public interface NameUsageMapper {
       @Result(property = "referenceId", column = "reference_id",
           typeHandler = IntegerArrayTypeHandler.class),
       @Result(property = "environment", column = "environment",
-          typeHandler = EnvironmentArrayTypeHandler.class),
-      @Result(property = "temporalRangeStart", column = "temporal_range_start",
-          typeHandler = GeoTimeTypeHandler.class),
-      @Result(property = "temporalRangeEnd", column = "temporal_range_end",
-          typeHandler = GeoTimeTypeHandler.class)
+          typeHandler = EnvironmentArrayTypeHandler.class)
   })
   NameUsage findByIdInProject(@Param("projectId") int projectId, @Param("id") int id);
 
@@ -100,8 +95,7 @@ public interface NameUsageMapper {
           reference_id = #{referenceId,typeHandler=org.catalogueoflife.editor.name.IntegerArrayTypeHandler},
           extinct = #{extinct},
           environment = #{environment,typeHandler=org.catalogueoflife.editor.name.EnvironmentArrayTypeHandler},
-          temporal_range_start = #{temporalRangeStart,typeHandler=org.catalogueoflife.editor.name.GeoTimeTypeHandler},
-          temporal_range_end = #{temporalRangeEnd,typeHandler=org.catalogueoflife.editor.name.GeoTimeTypeHandler},
+          temporal_range_start = #{temporalRangeStart}, temporal_range_end = #{temporalRangeEnd},
           scientific_name = #{scientificName}, authorship = #{authorship}, rank = #{rank},
           uninomial = #{uninomial}, genus = #{genus}, infrageneric_epithet = #{infragenericEpithet},
           specific_epithet = #{specificEpithet}, infraspecific_epithet = #{infraspecificEpithet},
