@@ -1,6 +1,7 @@
 package org.catalogueoflife.editor.tree;
 
 import java.util.List;
+import java.util.Map;
 import org.catalogueoflife.editor.audit.AuditService;
 import org.catalogueoflife.editor.audit.Operation;
 import org.catalogueoflife.editor.name.NameUsage;
@@ -15,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class TreeService {
@@ -23,12 +25,15 @@ public class TreeService {
   private final NameUsageMapper usages;
   private final ProjectService projects;
   private final AuditService audit;
+  private final ObjectMapper objectMapper;
 
-  public TreeService(TreeMapper tree, NameUsageMapper usages, ProjectService projects, AuditService audit) {
+  public TreeService(TreeMapper tree, NameUsageMapper usages, ProjectService projects, AuditService audit,
+      ObjectMapper objectMapper) {
     this.tree = tree;
     this.usages = usages;
     this.projects = projects;
     this.audit = audit;
+    this.objectMapper = objectMapper;
   }
 
   public List<TreeNode> listRoots(int actorId, int projectId, int limit, int offset) {
@@ -81,15 +86,19 @@ public class TreeService {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "would create a cycle");
       }
     }
+    // Snapshot BEFORE the reparent UPDATE below: reparent() mutates the row directly in SQL
+    // (never touching `moved` in memory), so `moved` itself would still look like a valid
+    // pre-move snapshot -- but relying on that is fragile since it only stays correct as long as
+    // no code path re-fetches/mutates `moved` in place first. Converting to a Map here makes the
+    // audit snapshot explicit and independent, mirroring ReferenceService.update/NameUsageService.update.
+    @SuppressWarnings("unchecked")
+    Map<String, Object> before = objectMapper.convertValue(moved, Map.class);
     int updated = tree.reparent(projectId, id, parentId, req.version());
     if (updated == 0) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
     }
-    // `moved` was fetched before any mutation above and is never mutated locally (the reparent
-    // itself happens directly in SQL via tree.reparent), so it's still a valid pre-move snapshot;
-    // re-fetching for `after` picks up the new parentId/version/modified stamped by reparent.
     NameUsage after = usages.findByIdInProject(projectId, id);
-    audit.record(projectId, actorId, "name_usage", id, Operation.UPDATE, moved, after);
+    audit.record(projectId, actorId, "name_usage", id, Operation.UPDATE, before, after);
   }
 
   private void requireEditor(int actorId, int projectId) {

@@ -112,57 +112,65 @@ class ChangeApiIT extends AbstractPostgresIT {
     assertThat(all.size()).isEqualTo(8);
     for (JsonNode n : all) {
       assertThat(n.get("userId").asInt()).isEqualTo(owner.getId());
-      assertThat(n.get("username").asText()).isEqualTo("changeOwner");
+      assertThat(n.get("username").asString()).isEqualTo("changeOwner");
     }
-    assertThat(all.get(0).get("entityType").asText()).isEqualTo("synonym_link");
-    assertThat(all.get(0).get("operation").asText()).isEqualTo("DELETE");
+    assertThat(all.get(0).get("entityType").asString()).isEqualTo("synonym_link");
+    assertThat(all.get(0).get("operation").asString()).isEqualTo("DELETE");
     assertThat(all.get(0).get("entityId").asLong()).isEqualTo(synId);
-    assertThat(all.get(1).get("entityType").asText()).isEqualTo("synonym_link");
-    assertThat(all.get(1).get("operation").asText()).isEqualTo("CREATE");
+    assertThat(all.get(1).get("entityType").asString()).isEqualTo("synonym_link");
+    assertThat(all.get(1).get("operation").asString()).isEqualTo("CREATE");
     assertThat(all.get(1).get("entityId").asLong()).isEqualTo(synId);
-    assertThat(all.get(2).get("entityType").asText()).isEqualTo("name_usage");
-    assertThat(all.get(2).get("operation").asText()).isEqualTo("CREATE");
+    assertThat(all.get(2).get("entityType").asString()).isEqualTo("name_usage");
+    assertThat(all.get(2).get("operation").asString()).isEqualTo("CREATE");
     assertThat(all.get(2).get("entityId").asLong()).isEqualTo(synId);
-    assertThat(all.get(3).get("entityType").asText()).isEqualTo("name_usage");
-    assertThat(all.get(3).get("operation").asText()).isEqualTo("UPDATE");
+    assertThat(all.get(3).get("entityType").asString()).isEqualTo("name_usage");
+    assertThat(all.get(3).get("operation").asString()).isEqualTo("UPDATE");
     assertThat(all.get(3).get("entityId").asLong()).isEqualTo(movedId);
-    assertThat(all.get(4).get("entityType").asText()).isEqualTo("name_usage");
-    assertThat(all.get(4).get("operation").asText()).isEqualTo("CREATE");
+    assertThat(all.get(4).get("entityType").asString()).isEqualTo("name_usage");
+    assertThat(all.get(4).get("operation").asString()).isEqualTo("CREATE");
     assertThat(all.get(4).get("entityId").asLong()).isEqualTo(movedId);
-    assertThat(all.get(5).get("entityType").asText()).isEqualTo("name_usage");
-    assertThat(all.get(5).get("operation").asText()).isEqualTo("CREATE");
+    assertThat(all.get(5).get("entityType").asString()).isEqualTo("name_usage");
+    assertThat(all.get(5).get("operation").asString()).isEqualTo("CREATE");
     assertThat(all.get(5).get("entityId").asLong()).isEqualTo(parentId);
-    assertThat(all.get(6).get("entityType").asText()).isEqualTo("reference");
-    assertThat(all.get(6).get("operation").asText()).isEqualTo("UPDATE");
+    assertThat(all.get(6).get("entityType").asString()).isEqualTo("reference");
+    assertThat(all.get(6).get("operation").asString()).isEqualTo("UPDATE");
     assertThat(all.get(6).get("entityId").asLong()).isEqualTo(refId);
-    assertThat(all.get(7).get("entityType").asText()).isEqualTo("reference");
-    assertThat(all.get(7).get("operation").asText()).isEqualTo("CREATE");
+    assertThat(all.get(7).get("entityType").asString()).isEqualTo("reference");
+    assertThat(all.get(7).get("operation").asString()).isEqualTo("CREATE");
     assertThat(all.get(7).get("entityId").asLong()).isEqualTo(refId);
 
     // the reference-update entry's diff carries the title from/to, and nothing else (diff is
     // stored/returned as raw JSON text -- parse it as a second JSON document).
-    JsonNode refUpdateDiff = json.readTree(all.get(6).get("diff").asText());
-    assertThat(refUpdateDiff.get("title").get("from").asText()).isEqualTo("Original title");
-    assertThat(refUpdateDiff.get("title").get("to").asText()).isEqualTo("Revised title");
+    JsonNode refUpdateDiff = json.readTree(all.get(6).get("diff").asString());
+    assertThat(refUpdateDiff.get("title").get("from").asString()).isEqualTo("Original title");
+    assertThat(refUpdateDiff.get("title").get("to").asString()).isEqualTo("Revised title");
     // citation was resent unchanged -- must NOT show up as a spurious diff entry.
     assertThat(refUpdateDiff.has("citation")).isFalse();
     assertThat(refUpdateDiff.size()).isEqualTo(1);
 
     // the move's diff isolates just the parentId change (version/modified churn is excluded).
-    JsonNode moveDiff = json.readTree(all.get(3).get("diff").asText());
+    JsonNode moveDiff = json.readTree(all.get(3).get("diff").asString());
     assertThat(moveDiff.get("parentId").get("from").isNull()).isTrue();
     assertThat(moveDiff.get("parentId").get("to").asLong()).isEqualTo(parentId);
     assertThat(moveDiff.size()).isEqualTo(1);
 
     // the synonym-link create diff carries the accepted id.
-    JsonNode linkDiff = json.readTree(all.get(1).get("diff").asText());
+    JsonNode linkDiff = json.readTree(all.get(1).get("diff").asString());
     assertThat(linkDiff.get("after").get("acceptedId").asLong()).isEqualTo(movedId);
 
     // per-entity filter: only the moved usage's own two entries (create + move update).
     JsonNode filtered = getChanges(pid, "?entityType=name_usage&entityId=" + movedId);
     assertThat(filtered.size()).isEqualTo(2);
-    assertThat(filtered.get(0).get("operation").asText()).isEqualTo("UPDATE");
-    assertThat(filtered.get(1).get("operation").asText()).isEqualTo("CREATE");
+    assertThat(filtered.get(0).get("operation").asString()).isEqualTo("UPDATE");
+    assertThat(filtered.get(1).get("operation").asString()).isEqualTo("CREATE");
+
+    // entityType alone (no entityId) filters by type across all entities of that type: the two
+    // reference entries (create + update), and nothing from name_usage or synonym_link.
+    JsonNode byType = getChanges(pid, "?entityType=reference");
+    assertThat(byType.size()).isEqualTo(2);
+    for (JsonNode n : byType) {
+      assertThat(n.get("entityType").asString()).isEqualTo("reference");
+    }
 
     // entityId without entityType is a 400, not a silent full-project dump.
     mvc.perform(get("/api/projects/" + pid + "/changes").param("entityId", String.valueOf(movedId)))

@@ -44,4 +44,16 @@ public interface ChangeMapper {
       """)
   List<Change> findByEntity(@Param("projectId") int projectId, @Param("entityType") String entityType,
       @Param("entityId") int entityId, @Param("limit") int limit, @Param("offset") int offset);
+
+  @Select("""
+      SELECT c.id, c.project_id, c.user_id, u.username, c.at, c.entity_type, c.entity_id,
+             c.operation, c.diff
+      FROM change c
+      LEFT JOIN app_user u ON u.id = c.user_id
+      WHERE c.project_id = #{projectId} AND c.entity_type = #{entityType}
+      ORDER BY c.at DESC, c.id DESC
+      LIMIT #{limit} OFFSET #{offset}
+      """)
+  List<Change> findByType(@Param("projectId") int projectId, @Param("entityType") String entityType,
+      @Param("limit") int limit, @Param("offset") int offset);
 }

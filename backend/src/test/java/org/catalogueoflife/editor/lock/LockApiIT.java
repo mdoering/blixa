@@ -72,7 +72,7 @@ class LockApiIT extends AbstractPostgresIT {
         .andReturn().getResponse().getContentAsString();
     JsonNode acquired = json.readTree(acquireBody);
     long lockId = acquired.get("id").asLong();
-    OffsetDateTime firstExpiry = OffsetDateTime.parse(acquired.get("expiresAt").asText());
+    OffsetDateTime firstExpiry = OffsetDateTime.parse(acquired.get("expiresAt").asString());
     assertThat(firstExpiry).isAfter(OffsetDateTime.now());
 
     // 2) the second member tries the SAME entity -> 409, body describes the actual holder (owner),
@@ -99,7 +99,7 @@ class LockApiIT extends AbstractPostgresIT {
     String refreshBody = mvc.perform(post("/api/projects/" + pid + "/locks/" + lockId + "/refresh").with(csrf()))
         .andExpect(status().isOk())
         .andReturn().getResponse().getContentAsString();
-    OffsetDateTime refreshedExpiry = OffsetDateTime.parse(json.readTree(refreshBody).get("expiresAt").asText());
+    OffsetDateTime refreshedExpiry = OffsetDateTime.parse(json.readTree(refreshBody).get("expiresAt").asString());
     assertThat(refreshedExpiry).isAfterOrEqualTo(firstExpiry);
 
     mvc.perform(post("/api/projects/" + pid + "/locks/" + lockId + "/refresh").with(csrf()).with(user("lockHelper")))

@@ -43,6 +43,9 @@ public class ChangeController {
       }
       return changes.findByEntity(pid, entityType, entityId, clampedLimit, clampedOffset);
     }
+    if (entityType != null && !entityType.isBlank()) {
+      return changes.findByType(pid, entityType, clampedLimit, clampedOffset);
+    }
     return changes.findByProject(pid, clampedLimit, clampedOffset);
   }
 }
