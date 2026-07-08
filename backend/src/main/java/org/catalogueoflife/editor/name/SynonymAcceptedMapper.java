@@ -13,12 +13,15 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface SynonymAcceptedMapper {
 
+  // Returns the affected row count (0 if the pair was already linked, thanks to ON CONFLICT DO
+  // NOTHING) so callers -- see NameUsageService.linkSynonym -- can tell a real new link apart
+  // from a no-op re-link, e.g. to avoid auditing a change that didn't actually happen.
   @Insert("""
       INSERT INTO synonym_accepted (project_id, synonym_id, accepted_id, ordinal)
       VALUES (#{projectId}, #{s}, #{a}, #{o})
       ON CONFLICT DO NOTHING
       """)
-  void link(@Param("projectId") int projectId, @Param("s") int synonymId, @Param("a") int acceptedId,
+  int link(@Param("projectId") int projectId, @Param("s") int synonymId, @Param("a") int acceptedId,
       @Param("o") Integer ordinal);
 
   @Delete("""

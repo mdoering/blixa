@@ -1,6 +1,8 @@
 package org.catalogueoflife.editor.tree;
 
 import java.util.List;
+import org.catalogueoflife.editor.audit.AuditService;
+import org.catalogueoflife.editor.audit.Operation;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.Pagination;
@@ -20,11 +22,13 @@ public class TreeService {
   private final TreeMapper tree;
   private final NameUsageMapper usages;
   private final ProjectService projects;
+  private final AuditService audit;
 
-  public TreeService(TreeMapper tree, NameUsageMapper usages, ProjectService projects) {
+  public TreeService(TreeMapper tree, NameUsageMapper usages, ProjectService projects, AuditService audit) {
     this.tree = tree;
     this.usages = usages;
     this.projects = projects;
+    this.audit = audit;
   }
 
   public List<TreeNode> listRoots(int actorId, int projectId, int limit, int offset) {
@@ -81,6 +85,11 @@ public class TreeService {
     if (updated == 0) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
     }
+    // `moved` was fetched before any mutation above and is never mutated locally (the reparent
+    // itself happens directly in SQL via tree.reparent), so it's still a valid pre-move snapshot;
+    // re-fetching for `after` picks up the new parentId/version/modified stamped by reparent.
+    NameUsage after = usages.findByIdInProject(projectId, id);
+    audit.record(projectId, actorId, "name_usage", id, Operation.UPDATE, moved, after);
   }
 
   private void requireEditor(int actorId, int projectId) {

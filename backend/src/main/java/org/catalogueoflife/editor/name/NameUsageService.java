@@ -1,10 +1,13 @@
 package org.catalogueoflife.editor.name;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import life.catalogue.api.vocab.Environment;
 import life.catalogue.api.vocab.Gender;
 import life.catalogue.api.vocab.NomStatus;
+import org.catalogueoflife.editor.audit.AuditService;
+import org.catalogueoflife.editor.audit.Operation;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
@@ -18,11 +21,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class NameUsageService {
 
   private static final String ENTITY = "name_usage";
+  private static final String SYNONYM_LINK_ENTITY = "synonym_link";
 
   private final NameUsageMapper usages;
   private final SynonymAcceptedMapper synonymAccepted;
@@ -31,9 +36,12 @@ public class NameUsageService {
   private final ProjectMapper projectMapper;
   private final NameParserService parser;
   private final TreeMapper tree;
+  private final AuditService audit;
+  private final ObjectMapper objectMapper;
 
   public NameUsageService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted, IdSeqMapper idSeq,
-      ProjectService projects, ProjectMapper projectMapper, NameParserService parser, TreeMapper tree) {
+      ProjectService projects, ProjectMapper projectMapper, NameParserService parser, TreeMapper tree,
+      AuditService audit, ObjectMapper objectMapper) {
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
     this.idSeq = idSeq;
@@ -41,6 +49,8 @@ public class NameUsageService {
     this.projectMapper = projectMapper;
     this.parser = parser;
     this.tree = tree;
+    this.audit = audit;
+    this.objectMapper = objectMapper;
   }
 
   public List<NameUsageResponse> list(int userId, int projectId, int limit, int offset) {
@@ -103,6 +113,7 @@ public class NameUsageService {
     // the version column defaults to 0 in the DB (see V3__name_core.sql); reflect that
     // in the in-memory POJO returned to the caller without a redundant round-trip.
     u.setVersion(0);
+    audit.record(projectId, userId, ENTITY, u.getId(), Operation.CREATE, null, u);
     return toResponse(u, project);
   }
 
@@ -117,6 +128,13 @@ public class NameUsageService {
       requireValidParent(projectId, id, req.parentId());
     }
     NameUsage u = requireInProject(projectId, id);
+    // Snapshot BEFORE mutating u's fields in place below: MyBatis's session-scoped local cache
+    // would hand back this SAME cached instance from a second identical findByIdInProject call
+    // (no intervening write to invalidate it yet), so re-fetching would alias rather than give an
+    // independent "before" object. Converting to a Map here decouples the audit snapshot from u's
+    // subsequent mutation.
+    @SuppressWarnings("unchecked")
+    Map<String, Object> before = objectMapper.convertValue(u, Map.class);
     boolean reparse = changed(u.getScientificName(), req.scientificName())
         || changed(u.getAuthorship(), req.authorship())
         || changed(u.getRank(), req.rank());
@@ -147,29 +165,41 @@ public class NameUsageService {
     if (updated == 0) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
     }
-    return toResponse(requireInProject(projectId, id), project);
+    NameUsage after = requireInProject(projectId, id);
+    audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
+    return toResponse(after, project);
   }
 
   @Transactional
   public void delete(int userId, int projectId, int id) {
     requireEditor(userId, projectId);
+    NameUsage before = requireInProject(projectId, id);
     if (usages.delete(projectId, id) == 0) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "name usage not found");
     }
+    audit.record(projectId, userId, ENTITY, id, Operation.DELETE, before, null);
   }
 
   @Transactional
   public void linkSynonym(int userId, int projectId, int synonymId, int acceptedId) {
     requireEditor(userId, projectId);
     requireBothInProject(projectId, synonymId, acceptedId);
-    synonymAccepted.link(projectId, synonymId, acceptedId, null);
+    // ON CONFLICT DO NOTHING (see SynonymAcceptedMapper.link): only audit an actual new link,
+    // not a no-op re-link of an already-existing pair.
+    if (synonymAccepted.link(projectId, synonymId, acceptedId, null) > 0) {
+      audit.record(projectId, userId, SYNONYM_LINK_ENTITY, synonymId, Operation.CREATE, null,
+          Map.of("acceptedId", acceptedId));
+    }
   }
 
   @Transactional
   public void unlinkSynonym(int userId, int projectId, int synonymId, int acceptedId) {
     requireEditor(userId, projectId);
     requireBothInProject(projectId, synonymId, acceptedId);
-    synonymAccepted.unlink(projectId, synonymId, acceptedId);
+    if (synonymAccepted.unlink(projectId, synonymId, acceptedId) > 0) {
+      audit.record(projectId, userId, SYNONYM_LINK_ENTITY, synonymId, Operation.DELETE,
+          Map.of("acceptedId", acceptedId), null);
+    }
   }
 
   // App-layer cross-project integrity guard, kept as a nice 404/400 in front of the DB-level
