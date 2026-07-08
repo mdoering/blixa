@@ -44,7 +44,7 @@ class ProjectApiIT extends AbstractPostgresIT {
             .content("{\"title\":\"Birds\",\"nomCode\":\"zoological\"}"))
        .andExpect(status().isCreated())
        .andExpect(jsonPath("$.title").value("Birds"))
-       .andExpect(jsonPath("$.nomCode").value("ZOOLOGICAL"))
+       .andExpect(jsonPath("$.nomCode").value("zoological"))
        .andExpect(jsonPath("$.role").value("owner"));
 
     mvc.perform(get("/api/projects"))
@@ -73,22 +73,31 @@ class ProjectApiIT extends AbstractPostgresIT {
         .andReturn().getResponse().getContentAsString();
     long projectId = json.readTree(body).get("id").asLong();
 
+    // Save the exact wire values the frontend Selects send (SPDX license id + lowercase nomCode);
+    // they must round-trip unchanged (regression for "invalid license: CC0-1.0").
     mvc.perform(put("/api/projects/" + projectId + "/metadata").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"title\":\"Mammals Updated\",\"alias\":\"Mamm\","
                 + "\"description\":\"Updated description\",\"nomCode\":\"zoological\","
-                + "\"license\":\"cc-by\"}"))
+                + "\"license\":\"CC0-1.0\"}"))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.title").value("Mammals Updated"))
        .andExpect(jsonPath("$.alias").value("Mamm"))
        .andExpect(jsonPath("$.description").value("Updated description"))
-       .andExpect(jsonPath("$.license").value("CC_BY"));
+       .andExpect(jsonPath("$.nomCode").value("zoological"))
+       .andExpect(jsonPath("$.license").value("CC0-1.0"));
+
+    // The other permitted license also round-trips as its SPDX id.
+    mvc.perform(put("/api/projects/" + projectId + "/metadata").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Mammals Updated\",\"license\":\"CC-BY-4.0\"}"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.license").value("CC-BY-4.0"));
 
     mvc.perform(get("/api/projects/" + projectId))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.title").value("Mammals Updated"))
-       .andExpect(jsonPath("$.alias").value("Mamm"))
-       .andExpect(jsonPath("$.description").value("Updated description"));
+       .andExpect(jsonPath("$.license").value("CC-BY-4.0"));
   }
 
   @Test

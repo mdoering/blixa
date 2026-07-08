@@ -1,9 +1,7 @@
 package org.catalogueoflife.editor.project;
 
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import life.catalogue.api.vocab.License;
 import org.catalogueoflife.editor.project.dto.CreateProjectRequest;
 import org.catalogueoflife.editor.project.dto.UpdateProjectMetadataRequest;
@@ -16,10 +14,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ProjectService {
-
-  // COL only permits these two Creative Commons licenses (CC0-1.0 and CC-BY-4.0); the wider
-  // life.catalogue.api.vocab.License enum also has CC_BY_NC/UNSPECIFIED/OTHER which are rejected.
-  private static final Set<License> ALLOWED_LICENSES = EnumSet.of(License.CC0, License.CC_BY);
 
   private final ProjectMapper projects;
   private final ProjectMemberMapper members;
@@ -65,8 +59,7 @@ public class ProjectService {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner or editor required");
     }
     NomCode nomCode = parseNomCode(req.nomCode());
-    License license = parseLicense(req.license());
-    requireValidLicense(license);
+    License license = Licenses.parse(req.license());
     Project p = projects.findById(projectId);
     p.setTitle(req.title());
     p.setAlias(req.alias());
@@ -127,13 +120,6 @@ public class ProjectService {
     }
   }
 
-  private static void requireValidLicense(License license) {
-    if (license != null && !ALLOWED_LICENSES.contains(license)) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-          "license must be one of " + ALLOWED_LICENSES);
-    }
-  }
-
   // Frontend sends lowercase strings (e.g. "zoological"); tolerantly upper-case before matching
   // the enum constant name, rejecting anything unrecognized with a 400 rather than an ISE.
   private static NomCode parseNomCode(String nomCode) {
@@ -144,19 +130,6 @@ public class ProjectService {
       return NomCode.valueOf(nomCode.trim().toUpperCase(Locale.ROOT));
     } catch (IllegalArgumentException e) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid nomCode: " + nomCode);
-    }
-  }
-
-  // Same tolerant parsing for license (e.g. "cc-by" / "cc0"); requireValidLicense then narrows
-  // the full life.catalogue.api.vocab.License enum down to the two COL-permitted licenses.
-  private static License parseLicense(String license) {
-    if (license == null || license.isBlank()) {
-      return null;
-    }
-    try {
-      return License.valueOf(license.trim().toUpperCase(Locale.ROOT).replace('-', '_'));
-    } catch (IllegalArgumentException e) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid license: " + license);
     }
   }
 }
