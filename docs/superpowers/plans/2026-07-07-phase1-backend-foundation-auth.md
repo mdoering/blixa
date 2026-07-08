@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot 3.5.x, Spring Security (oauth2-client + form login), MyBatis (`mybatis-spring-boot-starter` 3.0.x), PostgreSQL 17, Flyway, JUnit 5, Testcontainers, Maven.
 
+> **Stack update (2026-07-08, post-execution):** the backend was subsequently upgraded to **Spring Boot 4.1.0 / Java 25** (LTS) after Boot 3.5 reached end-of-life, with `mybatis-spring-boot-starter` 4.0.1 and Testcontainers 2.0. The version pins, the `3.5.4` pom snippet, and the `env 'api.version=1.41'` OrbStack workaround in the steps below are the **original as-executed values** and are kept for historical accuracy; the current authoritative stack is in the design spec §3. The build now requires **JDK 25** (`backend/.sdkmanrc` → `25.0.1-librca`; `sdk env`), and the OrbStack Testcontainers workaround is no longer needed.
+
 ## Global Constraints
 
 - Java **21**; Spring Boot **3.5.x**; PostgreSQL **17**.

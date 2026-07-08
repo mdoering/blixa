@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis, Postgres 17 + `pg_trgm`, Flyway, `org.gbif:name-parser:4.2.0` (+ `name-parser-api`), `org.catalogueoflife:vocab:1.2.3-SNAPSHOT` (+ transitive `coldp`), Testcontainers.
 
+> **Stack update (2026-07-08, post-execution):** the backend now runs on **Spring Boot 4.1.0 / Java 25** (upgraded after Boot 3.5 EOL). The `env 'api.version=1.41'` OrbStack Testcontainers workaround referenced throughout this plan's steps is **no longer needed** (Testcontainers 2.0 negotiates the Docker API correctly); run `mvn`/`mvn verify` under **JDK 25** (`backend/.sdkmanrc` → `25.0.1-librca`, `sdk env`). Authoritative current stack: design spec §3.
+
 ## Global Constraints
 
 - Extends the existing backend under `backend/`, base package `org.catalogueoflife.editor`. Commit to `main`; no branches.
