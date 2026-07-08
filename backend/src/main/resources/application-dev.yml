@@ -1,0 +1,10 @@
+# Active only under the 'dev' profile:  mvn spring-boot:run -Dspring-boot.run.profiles=dev
+# Points at the docker compose database, which is published on host port 5433 to avoid clashing with
+# a PostgreSQL commonly already running on 5432 (e.g. the main ChecklistBank dev database).
+# Still overridable via DB_URL / DB_USER / DB_PASSWORD. The 'dev' profile also seeds a local login
+# user (admin/admin) via DevBootstrap.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/coldp_editor}
+    username: ${DB_USER:coldp_editor}
+    password: ${DB_PASSWORD:coldp_editor}

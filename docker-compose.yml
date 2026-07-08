@@ -1,0 +1,29 @@
+# Local development database for the ColDP editor backend.
+# Published on host port 5433 (not 5432) to avoid clashing with a PostgreSQL that is commonly
+# already running on 5432 (e.g. the main ChecklistBank dev database). The backend's `dev` profile
+# is preconfigured for this (see backend/src/main/resources/application-dev.yml); override with
+# DB_URL / DB_USER / DB_PASSWORD otherwise. Flyway runs the migrations automatically on startup.
+#
+#   docker compose up -d      # start
+#   docker compose down       # stop (keeps data)
+#   docker compose down -v     # stop and wipe the database (Flyway re-migrates on next backend start)
+services:
+  db:
+    image: postgres:17
+    container_name: coldp-editor-db
+    environment:
+      POSTGRES_DB: coldp_editor
+      POSTGRES_USER: coldp_editor
+      POSTGRES_PASSWORD: coldp_editor
+    ports:
+      - "5433:5432"
+    volumes:
+      - coldp_editor_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coldp_editor -d coldp_editor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  coldp_editor_pgdata:
