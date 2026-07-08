@@ -13,6 +13,7 @@ import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectMapper;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
+import org.catalogueoflife.editor.tree.TreeMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,15 +30,17 @@ public class NameUsageService {
   private final ProjectService projects;
   private final ProjectMapper projectMapper;
   private final NameParserService parser;
+  private final TreeMapper tree;
 
   public NameUsageService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted, IdSeqMapper idSeq,
-      ProjectService projects, ProjectMapper projectMapper, NameParserService parser) {
+      ProjectService projects, ProjectMapper projectMapper, NameParserService parser, TreeMapper tree) {
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
     this.idSeq = idSeq;
     this.projects = projects;
     this.projectMapper = projectMapper;
     this.parser = parser;
+    this.tree = tree;
   }
 
   public List<NameUsageResponse> list(int userId, int projectId, int limit, int offset) {
@@ -64,7 +67,12 @@ public class NameUsageService {
   public NameUsageResponse create(int userId, int projectId, CreateNameUsageRequest req) {
     requireEditor(userId, projectId);
     Project project = requireProject(projectId);
-    requireParentInProject(projectId, req.parentId());
+    if (req.parentId() != null) {
+      // See TreeMapper.lockProject: serializes against concurrent moves/creates/updates that
+      // touch this project's tree while we validate+use req.parentId() below.
+      tree.lockProject(projectId);
+      requireValidParent(projectId, null, req.parentId());
+    }
     NameUsage u = new NameUsage();
     u.setProjectId(projectId);
     u.setScientificName(req.scientificName());
@@ -102,7 +110,12 @@ public class NameUsageService {
   public NameUsageResponse update(int userId, int projectId, int id, UpdateNameUsageRequest req) {
     requireEditor(userId, projectId);
     Project project = requireProject(projectId);
-    requireParentInProject(projectId, req.parentId());
+    if (req.parentId() != null) {
+      // See TreeMapper.lockProject: serializes against concurrent moves/creates/updates that
+      // touch this project's tree while we validate+use req.parentId() below.
+      tree.lockProject(projectId);
+      requireValidParent(projectId, id, req.parentId());
+    }
     NameUsage u = requireInProject(projectId, id);
     boolean reparse = changed(u.getScientificName(), req.scientificName())
         || changed(u.getAuthorship(), req.authorship())
@@ -190,9 +203,26 @@ public class NameUsageService {
     return NameUsageResponse.of(u, formattedName, List.of(), List.of());
   }
 
-  private void requireParentInProject(int projectId, Integer parentId) {
-    if (parentId != null && usages.findByIdInProject(projectId, parentId) == null) {
+  // Centralizes the cycle/accepted-parent guards that the generic usage create/update endpoints
+  // must apply -- previously only TreeService.move enforced these, so an editor could create a
+  // cycle or parent a usage under a synonym by going through PUT/POST /usages instead of the
+  // dedicated tree/move endpoint. Callers only invoke this when parentId != null and must hold
+  // TreeMapper.lockProject(projectId) first so the isDescendant check below is atomic with the
+  // eventual write. `id` is null on create (the new row has no id yet, so no self-parent/cycle is
+  // possible -- only the accepted-parent check applies); non-null on update.
+  private void requireValidParent(int projectId, Integer id, int parentId) {
+    if (id != null && parentId == id) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "a usage cannot be its own parent");
+    }
+    NameUsage parent = usages.findByIdInProject(projectId, parentId);
+    if (parent == null) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "parent not in project");
+    }
+    if (parent.getStatus() != Status.ACCEPTED) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "parent must be an accepted usage");
+    }
+    if (id != null && tree.isDescendant(projectId, id, parentId)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "would create a cycle");
     }
   }
 

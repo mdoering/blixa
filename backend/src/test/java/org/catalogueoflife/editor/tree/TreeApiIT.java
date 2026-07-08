@@ -123,6 +123,12 @@ class TreeApiIT extends AbstractPostgresIT {
         .andExpect(status().isNotFound());
     mvc.perform(get("/api/projects/" + pid + "/tree/path/" + mammaliaId).with(user("treeOutsider")))
         .andExpect(status().isNotFound());
+
+    // a synonym is never a tree node, so its "path" must not leak out as a 200 -- the recursive
+    // CTE's base case is filtered to status = 'ACCEPTED', producing an empty path that
+    // TreeService.path turns into 404 (see findPath's Javadoc).
+    mvc.perform(get("/api/projects/" + pid + "/tree/path/" + synId))
+        .andExpect(status().isNotFound());
   }
 
   private org.springframework.test.web.servlet.ResultActions move(long pid, long id, Long parentId,

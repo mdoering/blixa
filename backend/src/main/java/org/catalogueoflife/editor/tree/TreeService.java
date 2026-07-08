@@ -56,6 +56,10 @@ public class TreeService {
   @Transactional
   public void move(int actorId, int projectId, int id, MoveRequest req) {
     requireEditor(actorId, projectId);
+    // Serializes reparents within this project for the rest of the transaction (see
+    // TreeMapper.lockProject) so the isDescendant check below and the reparent write are atomic
+    // with respect to any other concurrent move/create/update touching this project's tree.
+    tree.lockProject(projectId);
     NameUsage moved = usages.findByIdInProject(projectId, id);
     if (moved == null || moved.getStatus() != Status.ACCEPTED) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "name usage not found");

@@ -252,4 +252,60 @@ class NameUsageApiIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + pid + "/usages/" + accId2))
         .andExpect(status().isNotFound());
   }
+
+  // Guards against a synonym leaking a parentId-driven bypass of TreeService.move's
+  // cycle/accepted-parent checks: the generic create/update endpoints let parentId be set
+  // directly, so they must apply the same guards themselves (see NameUsageService.requireValidParent).
+  @Test
+  @WithMockUser(username = "parentGuardOwner")
+  void parentIdCycleAndAcceptedGuards() throws Exception {
+    ensureUser("parentGuardOwner");
+    long pid = createProject("parentguardproj");
+
+    // A (accepted, root) -> B (accepted, child of A); S is a synonym, never a valid parent.
+    long aId = createUsage(pid, "Guardus alpha", "", "species", "accepted");
+    String bBody = mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Guardus beta\",\"rank\":\"species\",\"status\":\"accepted\","
+                + "\"parentId\":" + aId + "}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    long bId = json.readTree(bBody).get("id").asLong();
+    long sId = createUsage(pid, "Guardus synonym", "", "species", "synonym");
+
+    // create with parentId = a synonym is rejected: a synonym was never a tree node.
+    mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Guardus gamma\",\"rank\":\"species\",\"status\":\"accepted\","
+                + "\"parentId\":" + sId + "}"))
+        .andExpect(status().isBadRequest());
+
+    // update setting parentId to itself is rejected.
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + aId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Guardus alpha\",\"rank\":\"species\",\"status\":\"accepted\","
+                + "\"parentId\":" + aId + ",\"version\":0}"))
+        .andExpect(status().isBadRequest());
+
+    // update setting parentId to one of its own descendants would create a cycle: A -> B is the
+    // current tree, so making A a child of its own child B loops the tree back on itself.
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + aId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Guardus alpha\",\"rank\":\"species\",\"status\":\"accepted\","
+                + "\"parentId\":" + bId + ",\"version\":0}"))
+        .andExpect(status().isBadRequest());
+
+    // update with parentId = a synonym is rejected too, not just on create.
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + bId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Guardus beta\",\"rank\":\"species\",\"status\":\"accepted\","
+                + "\"parentId\":" + sId + ",\"version\":0}"))
+        .andExpect(status().isBadRequest());
+
+    // sanity: none of the rejected attempts above disturbed the tree -- A is still B's parent.
+    mvc.perform(get("/api/projects/" + pid + "/tree/children/" + aId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].id").value(bId));
+  }
 }
