@@ -7,12 +7,21 @@ export interface ClassificationTreeProps {
   pid: number;
   selectedId: number | null;
   onSelect: (id: number) => void;
+  // Whether the current user may create/edit/delete names (owner|editor); threaded down to each
+  // row's action menu, which hides itself entirely when this is false. Defaults to false so
+  // existing callers that don't pass it (read-only usage) don't show write actions.
+  canEdit?: boolean;
 }
 
 // Lazy classification tree: only the root level is fetched eagerly; every other level is
 // fetched on demand when its parent row is expanded (see TreeNodeRow). No virtualization
 // yet -- a follow-up should add it (or server paging controls) for very large sibling lists.
-export default function ClassificationTree({ pid, selectedId, onSelect }: ClassificationTreeProps) {
+export default function ClassificationTree({
+  pid,
+  selectedId,
+  onSelect,
+  canEdit = false,
+}: ClassificationTreeProps) {
   const {
     data: roots,
     isLoading,
@@ -36,6 +45,7 @@ export default function ClassificationTree({ pid, selectedId, onSelect }: Classi
           depth={0}
           selectedId={selectedId}
           onSelect={onSelect}
+          canEdit={canEdit}
         />
       ))}
     </Stack>

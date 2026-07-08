@@ -1,9 +1,10 @@
-import { ActionIcon, Badge, Group, Loader, Stack, Text } from '@mantine/core';
+import { ActionIcon, Badge, Box, Group, Loader, Stack, Text } from '@mantine/core';
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getChildren } from '../api/tree';
 import type { TreeNode } from '../api/types';
+import NameActionMenu from '../names/NameActionMenu';
 
 const INDENT_PX = 20;
 
@@ -13,10 +14,20 @@ export interface TreeNodeRowProps {
   depth: number;
   selectedId: number | null;
   onSelect: (id: number) => void;
+  canEdit?: boolean;
 }
 
-export default function TreeNodeRow({ pid, node, depth, selectedId, onSelect }: TreeNodeRowProps) {
+export default function TreeNodeRow({
+  pid,
+  node,
+  depth,
+  selectedId,
+  onSelect,
+  canEdit = false,
+}: TreeNodeRowProps) {
   const [expanded, setExpanded] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [menuOpened, setMenuOpened] = useState(false);
   const hasChildren = node.childCount > 0;
   const selected = selectedId === node.id;
 
@@ -30,7 +41,19 @@ export default function TreeNodeRow({ pid, node, depth, selectedId, onSelect }: 
 
   return (
     <Stack gap={0}>
-      <Group gap={4} wrap="nowrap" pl={depth * INDENT_PX} py={2}>
+      <Group
+        gap={4}
+        wrap="nowrap"
+        pl={depth * INDENT_PX}
+        py={2}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onContextMenu={(e) => {
+          if (!canEdit) return;
+          e.preventDefault();
+          setMenuOpened(true);
+        }}
+      >
         {hasChildren ? (
           <ActionIcon
             variant="subtle"
@@ -70,6 +93,16 @@ export default function TreeNodeRow({ pid, node, depth, selectedId, onSelect }: 
             </Text>
           )}
         </Group>
+        <Box style={{ opacity: hovered || selected || menuOpened ? 1 : 0, flexShrink: 0 }}>
+          <NameActionMenu
+            pid={pid}
+            usage={node}
+            canEdit={canEdit}
+            onSelect={onSelect}
+            opened={menuOpened}
+            onChange={setMenuOpened}
+          />
+        </Box>
       </Group>
       {expanded && (
         <Stack gap={0}>
@@ -89,6 +122,7 @@ export default function TreeNodeRow({ pid, node, depth, selectedId, onSelect }: 
               depth={depth + 1}
               selectedId={selectedId}
               onSelect={onSelect}
+              canEdit={canEdit}
             />
           ))}
         </Stack>

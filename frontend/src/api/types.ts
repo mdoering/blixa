@@ -130,6 +130,18 @@ export interface UpdateUsagePayload {
   version: number;
 }
 
+// Mirrors backend CreateNameUsageRequest's writable subset used by the create flow (root/child/
+// synonym). rank/status use the same wire form as elsewhere: rank is free-form but the backend's
+// name parser re-renders it lower-case once parsed (see NameUsageService/ParsedNameMapping);
+// status is the upper-case enum name (see UpdateUsagePayload / TaxonDetail's STATUS_OPTIONS).
+export interface CreateUsagePayload {
+  scientificName: string;
+  authorship?: string;
+  rank?: string;
+  status: string;
+  parentId?: number;
+}
+
 export interface Issue {
   id: number;
   entityType: string;
