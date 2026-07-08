@@ -35,10 +35,11 @@ public class IssueController {
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String severity,
       @RequestParam(required = false) String entityType,
+      @RequestParam(required = false) Integer entityId,
       @RequestParam(defaultValue = "50") int limit,
       @RequestParam(defaultValue = "0") int offset) {
     int uid = currentUser.require().getId();
-    return service.list(uid, pid, status, severity, entityType, limit, offset);
+    return service.list(uid, pid, status, severity, entityType, entityId, limit, offset);
   }
 
   @GetMapping("/issues/summary")

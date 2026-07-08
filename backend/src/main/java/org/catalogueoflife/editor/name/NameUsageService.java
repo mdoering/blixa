@@ -189,6 +189,7 @@ public class NameUsageService {
     u.setEnvironment(parseEnvironments(req.environment()));
     u.setTemporalRangeStart(req.temporalRangeStart());
     u.setTemporalRangeEnd(req.temporalRangeEnd());
+    u.setEtymology(req.etymology());
     u.setLink(req.link());
     u.setRemarks(req.remarks());
     u.setModifiedBy(userId);

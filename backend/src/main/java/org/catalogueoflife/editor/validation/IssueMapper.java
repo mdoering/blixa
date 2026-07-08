@@ -111,10 +111,13 @@ public interface IssueMapper {
   // revalidate). All below LOWER() severity/status: the API speaks lowercase (Role.dbValue()/
   // TaskStatus.apiValue()'s convention), the column stores the enum's upper-case name().
 
-  // Every issue for a project, optionally narrowed by status/severity/entityType (each null ->
-  // unfiltered, per IssueService's normalize-or-null filter parsing); joins app_user for the
-  // reviewer's username (null until reviewed). Ordered by severity criticality (ERROR first) then
-  // newest-first -- a reviewer's queue surfaces the worst problems first.
+  // Every issue for a project, optionally narrowed by status/severity/entityType/entityId (each
+  // null -> unfiltered, per IssueService's normalize-or-null filter parsing); joins app_user for
+  // the reviewer's username (null until reviewed). Ordered by severity criticality (ERROR first)
+  // then newest-first -- a reviewer's queue surfaces the worst problems first. entityId is only
+  // meaningful alongside entityType (ids are only unique per entity type) but is applied as its
+  // own independent filter, matching how the frontend's getEntityIssues (entityType + entityId)
+  // scopes a single entity's issues.
   @Select("""
       <script>
       SELECT i.id AS id, i.entity_type AS entityType, i.entity_id AS entityId, i.rule AS rule,
@@ -127,6 +130,7 @@ public interface IssueMapper {
       <if test="status != null">AND i.status = #{status}</if>
       <if test="severity != null">AND i.severity = #{severity}</if>
       <if test="entityType != null">AND i.entity_type = #{entityType}</if>
+      <if test="entityId != null">AND i.entity_id = #{entityId}</if>
       ORDER BY CASE i.severity WHEN 'ERROR' THEN 0 WHEN 'WARNING' THEN 1 WHEN 'INFO' THEN 2 ELSE 3 END,
                i.created_at DESC
       LIMIT #{limit} OFFSET #{offset}
@@ -134,7 +138,7 @@ public interface IssueMapper {
       """)
   List<IssueResponse> findByProject(@Param("projectId") int projectId, @Param("status") String status,
       @Param("severity") String severity, @Param("entityType") String entityType,
-      @Param("limit") int limit, @Param("offset") int offset);
+      @Param("entityId") Integer entityId, @Param("limit") int limit, @Param("offset") int offset);
 
   // Single-issue read scoped to the project -- returns null both when the id doesn't exist and
   // when it belongs to a different project, so IssueService can turn either case into a 404

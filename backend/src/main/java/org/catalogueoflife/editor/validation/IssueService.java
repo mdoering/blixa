@@ -35,14 +35,14 @@ public class IssueService {
   }
 
   public List<IssueResponse> list(int actorId, int projectId, String status, String severity,
-      String entityType, int limit, int offset) {
+      String entityType, Integer entityId, int limit, int offset) {
     projects.requireRole(actorId, projectId); // any member may read -- 404 if not a member
     String statusFilter = normalizeStatusFilter(status);
     String severityFilter = normalizeSeverityFilter(severity);
     String entityTypeFilter = normalizeEntityTypeFilter(entityType);
     int clampedLimit = Pagination.clampLimit(limit);
     int clampedOffset = Pagination.clampOffset(offset);
-    return issues.findByProject(projectId, statusFilter, severityFilter, entityTypeFilter,
+    return issues.findByProject(projectId, statusFilter, severityFilter, entityTypeFilter, entityId,
         clampedLimit, clampedOffset);
   }
 
