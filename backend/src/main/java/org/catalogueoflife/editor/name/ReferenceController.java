@@ -31,11 +31,11 @@ public class ReferenceController {
   }
 
   @GetMapping
-  public List<ReferenceResponse> list(@PathVariable long pid,
+  public List<ReferenceResponse> list(@PathVariable int pid,
       @RequestParam(required = false) String q,
       @RequestParam(defaultValue = "50") int limit,
       @RequestParam(defaultValue = "0") int offset) {
-    long uid = currentUser.require().getId();
+    int uid = currentUser.require().getId();
     List<Reference> result = (q == null || q.isBlank())
         ? service.list(uid, pid, limit, offset)
         : service.search(uid, pid, q, limit, offset);
@@ -44,29 +44,29 @@ public class ReferenceController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public ReferenceResponse create(@PathVariable long pid, @Valid @RequestBody CreateReferenceRequest req) {
-    long uid = currentUser.require().getId();
+  public ReferenceResponse create(@PathVariable int pid, @Valid @RequestBody CreateReferenceRequest req) {
+    int uid = currentUser.require().getId();
     Reference r = service.create(uid, pid, req);
     return ReferenceResponse.of(r);
   }
 
   @GetMapping("/{id}")
-  public ReferenceResponse get(@PathVariable long pid, @PathVariable long id) {
-    long uid = currentUser.require().getId();
+  public ReferenceResponse get(@PathVariable int pid, @PathVariable int id) {
+    int uid = currentUser.require().getId();
     return ReferenceResponse.of(service.get(uid, pid, id));
   }
 
   @PutMapping("/{id}")
-  public ReferenceResponse update(@PathVariable long pid, @PathVariable long id,
+  public ReferenceResponse update(@PathVariable int pid, @PathVariable int id,
       @Valid @RequestBody UpdateReferenceRequest req) {
-    long uid = currentUser.require().getId();
+    int uid = currentUser.require().getId();
     return ReferenceResponse.of(service.update(uid, pid, id, req));
   }
 
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void delete(@PathVariable long pid, @PathVariable long id) {
-    long uid = currentUser.require().getId();
+  public void delete(@PathVariable int pid, @PathVariable int id) {
+    int uid = currentUser.require().getId();
     service.delete(uid, pid, id);
   }
 }

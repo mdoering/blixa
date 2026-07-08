@@ -13,31 +13,35 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class ReferenceService {
 
+  private static final String ENTITY = "reference";
+
   private final ReferenceMapper references;
+  private final IdSeqMapper idSeq;
   private final ProjectService projects;
 
-  public ReferenceService(ReferenceMapper references, ProjectService projects) {
+  public ReferenceService(ReferenceMapper references, IdSeqMapper idSeq, ProjectService projects) {
     this.references = references;
+    this.idSeq = idSeq;
     this.projects = projects;
   }
 
-  public List<Reference> list(long userId, long projectId, int limit, int offset) {
-    projects.requireRole((int) userId, (int) projectId);
+  public List<Reference> list(int userId, int projectId, int limit, int offset) {
+    projects.requireRole(userId, projectId);
     return references.findByProject(projectId, Pagination.clampLimit(limit), Pagination.clampOffset(offset));
   }
 
-  public List<Reference> search(long userId, long projectId, String q, int limit, int offset) {
-    projects.requireRole((int) userId, (int) projectId);
+  public List<Reference> search(int userId, int projectId, String q, int limit, int offset) {
+    projects.requireRole(userId, projectId);
     return references.search(projectId, q, Pagination.clampLimit(limit), Pagination.clampOffset(offset));
   }
 
-  public Reference get(long userId, long projectId, long id) {
-    projects.requireRole((int) userId, (int) projectId);
+  public Reference get(int userId, int projectId, int id) {
+    projects.requireRole(userId, projectId);
     return requireInProject(projectId, id);
   }
 
   @Transactional
-  public Reference create(long userId, long projectId, CreateReferenceRequest req) {
+  public Reference create(int userId, int projectId, CreateReferenceRequest req) {
     requireEditor(userId, projectId);
     Reference r = new Reference();
     r.setProjectId(projectId);
@@ -58,6 +62,9 @@ public class ReferenceService {
     r.setLink(req.link());
     r.setRemarks(req.remarks());
     r.setModifiedBy(userId);
+    // allocate the next per-project id BEFORE inserting: reference has no DB identity column
+    // any more (see V3__name_core.sql), so the app owns id generation via id_seq.
+    r.setId(idSeq.allocate(projectId, ENTITY));
     references.insert(r);
     // the version column defaults to 0 in the DB (see V3__name_core.sql); reflect that
     // in the in-memory POJO returned to the caller without a redundant round-trip.
@@ -66,7 +73,7 @@ public class ReferenceService {
   }
 
   @Transactional
-  public Reference update(long userId, long projectId, long id, UpdateReferenceRequest req) {
+  public Reference update(int userId, int projectId, int id, UpdateReferenceRequest req) {
     requireEditor(userId, projectId);
     Reference r = requireInProject(projectId, id);
     r.setCitation(req.citation());
@@ -95,23 +102,23 @@ public class ReferenceService {
   }
 
   @Transactional
-  public void delete(long userId, long projectId, long id) {
+  public void delete(int userId, int projectId, int id) {
     requireEditor(userId, projectId);
-    if (references.delete(id, projectId) == 0) {
+    if (references.delete(projectId, id) == 0) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "reference not found");
     }
   }
 
-  private Reference requireInProject(long projectId, long id) {
-    Reference r = references.findByIdInProject(id, projectId);
+  private Reference requireInProject(int projectId, int id) {
+    Reference r = references.findByIdInProject(projectId, id);
     if (r == null) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "reference not found");
     }
     return r;
   }
 
-  private void requireEditor(long userId, long projectId) {
-    String role = projects.requireRole((int) userId, (int) projectId);
+  private void requireEditor(int userId, int projectId) {
+    String role = projects.requireRole(userId, projectId);
     if (!role.equals(Role.OWNER.dbValue()) && !role.equals(Role.EDITOR.dbValue())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner or editor required");
     }

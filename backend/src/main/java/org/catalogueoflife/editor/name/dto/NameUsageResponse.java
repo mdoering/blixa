@@ -7,8 +7,8 @@ import org.catalogueoflife.editor.name.NameUsage;
 // atomized name parts / nameType / parseState, the computed formattedName, and the
 // synonym_accepted link ids (which are not columns on name_usage itself).
 public record NameUsageResponse(
-    Long id,
-    Long parentId,
+    Integer id,
+    Integer parentId,
     String status,
     String namePhrase,
     Boolean extinct,
@@ -30,7 +30,7 @@ public record NameUsageResponse(
     String basionymAuthorshipYear,
     String sanctioningAuthor,
     String nomStatus,
-    Long publishedInReferenceId,
+    Integer publishedInReferenceId,
     String publishedInYear,
     String publishedInPage,
     String publishedInPageLink,
@@ -41,12 +41,12 @@ public record NameUsageResponse(
     String link,
     String remarks,
     String formattedName,
-    List<Long> acceptedParentIds,
-    List<Long> synonymIds,
+    List<Integer> acceptedParentIds,
+    List<Integer> synonymIds,
     Integer version) {
 
-  public static NameUsageResponse of(NameUsage u, String formattedName, List<Long> acceptedParentIds,
-      List<Long> synonymIds) {
+  public static NameUsageResponse of(NameUsage u, String formattedName, List<Integer> acceptedParentIds,
+      List<Integer> synonymIds) {
     return new NameUsageResponse(u.getId(), u.getParentId(), u.getStatus(), u.getNamePhrase(),
         u.getExtinct(), u.getScientificName(), u.getAuthorship(), u.getRank(), u.getUninomial(),
         u.getGenus(), u.getInfragenericEpithet(), u.getSpecificEpithet(), u.getInfraspecificEpithet(),

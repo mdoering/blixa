@@ -4,7 +4,6 @@ import java.util.List;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
 import org.apache.ibatis.annotations.ResultMap;
@@ -15,12 +14,14 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface NameUsageMapper {
 
+  // id is app-allocated (see IdSeqMapper) and set on `u` before calling insert -- the compound
+  // (project_id, id) primary key means there is no DB identity/generated key to read back.
   // version and modified are left out of the insert column list so the DB defaults
   // (0 / now()) apply -- setting them explicitly to a null POJO value would insert
   // an explicit NULL and violate the NOT NULL constraint instead of using the default.
   @Insert("""
       INSERT INTO name_usage (
-          project_id, coldp_id, alternative_id, parent_id, basionym_id, ordinal,
+          project_id, id, coldp_id, alternative_id, parent_id, basionym_id, ordinal,
           status, name_phrase, reference_id, extinct, environment,
           temporal_range_start, temporal_range_end,
           scientific_name, authorship, rank, uninomial, genus, infrageneric_epithet,
@@ -31,11 +32,11 @@ public interface NameUsageMapper {
           published_in_page, published_in_page_link, gender, etymology, name_type,
           parse_state, link, remarks, modified_by)
       VALUES (
-          #{projectId}, #{coldpId},
+          #{projectId}, #{id}, #{coldpId},
           #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
           #{parentId}, #{basionymId}, #{ordinal},
           #{status}, #{namePhrase},
-          #{referenceId,typeHandler=org.catalogueoflife.editor.name.LongArrayTypeHandler},
+          #{referenceId,typeHandler=org.catalogueoflife.editor.name.IntegerArrayTypeHandler},
           #{extinct},
           #{environment,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
           #{temporalRangeStart}, #{temporalRangeEnd},
@@ -47,20 +48,20 @@ public interface NameUsageMapper {
           #{publishedInPage}, #{publishedInPageLink}, #{gender}, #{etymology}, #{nameType},
           #{parseState}, #{link}, #{remarks}, #{modifiedBy})
       """)
-  @Options(useGeneratedKeys = true, keyProperty = "id")
   void insert(NameUsage u);
 
-  @Select("SELECT * FROM name_usage WHERE id = #{id}")
+  @Select("SELECT * FROM name_usage WHERE project_id = #{projectId} AND id = #{id}")
   @Results(id = "nameUsageResult", value = {
       @Result(property = "id", column = "id", id = true),
+      @Result(property = "projectId", column = "project_id", id = true),
       @Result(property = "alternativeId", column = "alternative_id",
           typeHandler = StringArrayTypeHandler.class),
       @Result(property = "referenceId", column = "reference_id",
-          typeHandler = LongArrayTypeHandler.class),
+          typeHandler = IntegerArrayTypeHandler.class),
       @Result(property = "environment", column = "environment",
           typeHandler = StringArrayTypeHandler.class)
   })
-  NameUsage findById(long id);
+  NameUsage findByIdInProject(@Param("projectId") int projectId, @Param("id") int id);
 
   @Select("""
       SELECT * FROM name_usage
@@ -69,7 +70,7 @@ public interface NameUsageMapper {
       LIMIT #{limit} OFFSET #{offset}
       """)
   @ResultMap("nameUsageResult")
-  List<NameUsage> findByProject(@Param("projectId") long projectId, @Param("limit") int limit,
+  List<NameUsage> findByProject(@Param("projectId") int projectId, @Param("limit") int limit,
       @Param("offset") int offset);
 
   @Select("""
@@ -79,15 +80,11 @@ public interface NameUsageMapper {
       LIMIT #{limit} OFFSET #{offset}
       """)
   @ResultMap("nameUsageResult")
-  List<NameUsage> search(@Param("projectId") long projectId, @Param("q") String q,
+  List<NameUsage> search(@Param("projectId") int projectId, @Param("q") String q,
       @Param("limit") int limit, @Param("offset") int offset);
 
-  @Select("SELECT * FROM name_usage WHERE id = #{id} AND project_id = #{projectId}")
-  @ResultMap("nameUsageResult")
-  NameUsage findByIdInProject(@Param("id") long id, @Param("projectId") long projectId);
-
-  @Delete("DELETE FROM name_usage WHERE id = #{id} AND project_id = #{projectId}")
-  int delete(@Param("id") long id, @Param("projectId") long projectId);
+  @Delete("DELETE FROM name_usage WHERE project_id = #{projectId} AND id = #{id}")
+  int delete(@Param("projectId") int projectId, @Param("id") int id);
 
   @Update("""
       UPDATE name_usage
@@ -95,7 +92,7 @@ public interface NameUsageMapper {
           alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
           parent_id = #{parentId}, basionym_id = #{basionymId}, ordinal = #{ordinal},
           status = #{status}, name_phrase = #{namePhrase},
-          reference_id = #{referenceId,typeHandler=org.catalogueoflife.editor.name.LongArrayTypeHandler},
+          reference_id = #{referenceId,typeHandler=org.catalogueoflife.editor.name.IntegerArrayTypeHandler},
           extinct = #{extinct},
           environment = #{environment,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
           temporal_range_start = #{temporalRangeStart}, temporal_range_end = #{temporalRangeEnd},
@@ -115,7 +112,7 @@ public interface NameUsageMapper {
           gender = #{gender}, etymology = #{etymology}, name_type = #{nameType},
           parse_state = #{parseState}, link = #{link}, remarks = #{remarks},
           modified = now(), modified_by = #{modifiedBy}, version = version + 1
-      WHERE id = #{id} AND version = #{version}
+      WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}
       """)
   int update(NameUsage u);
 }

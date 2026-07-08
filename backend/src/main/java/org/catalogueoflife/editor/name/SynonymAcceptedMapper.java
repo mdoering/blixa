@@ -7,33 +7,37 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+// synonym_accepted links two name_usage rows WITHIN the same project (see the compound
+// (project_id, synonym_id/accepted_id) foreign keys in V3__name_core.sql); every method takes
+// projectId alongside the usage ids so a link/lookup can never cross project boundaries.
 @Mapper
 public interface SynonymAcceptedMapper {
 
   @Insert("""
-      INSERT INTO synonym_accepted (synonym_usage_id, accepted_usage_id, ordinal)
-      VALUES (#{s}, #{a}, #{o})
+      INSERT INTO synonym_accepted (project_id, synonym_id, accepted_id, ordinal)
+      VALUES (#{projectId}, #{s}, #{a}, #{o})
       ON CONFLICT DO NOTHING
       """)
-  void link(@Param("s") long synonymUsageId, @Param("a") long acceptedUsageId, @Param("o") Integer ordinal);
+  void link(@Param("projectId") int projectId, @Param("s") int synonymId, @Param("a") int acceptedId,
+      @Param("o") Integer ordinal);
 
   @Delete("""
       DELETE FROM synonym_accepted
-      WHERE synonym_usage_id = #{s} AND accepted_usage_id = #{a}
+      WHERE project_id = #{projectId} AND synonym_id = #{s} AND accepted_id = #{a}
       """)
-  int unlink(@Param("s") long synonymUsageId, @Param("a") long acceptedUsageId);
+  int unlink(@Param("projectId") int projectId, @Param("s") int synonymId, @Param("a") int acceptedId);
 
   @Select("""
-      SELECT accepted_usage_id FROM synonym_accepted
-      WHERE synonym_usage_id = #{synonymUsageId}
+      SELECT accepted_id FROM synonym_accepted
+      WHERE project_id = #{projectId} AND synonym_id = #{synonymId}
       ORDER BY ordinal
       """)
-  List<Long> findAcceptedFor(long synonymUsageId);
+  List<Integer> findAcceptedFor(@Param("projectId") int projectId, @Param("synonymId") int synonymId);
 
   @Select("""
-      SELECT synonym_usage_id FROM synonym_accepted
-      WHERE accepted_usage_id = #{acceptedUsageId}
+      SELECT synonym_id FROM synonym_accepted
+      WHERE project_id = #{projectId} AND accepted_id = #{acceptedId}
       ORDER BY ordinal
       """)
-  List<Long> findSynonymsOf(long acceptedUsageId);
+  List<Integer> findSynonymsOf(@Param("projectId") int projectId, @Param("acceptedId") int acceptedId);
 }

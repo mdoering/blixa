@@ -176,7 +176,14 @@ class NameUsageApiIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + pid + "/usages/" + accId).with(user("usageViewer")))
         .andExpect(status().isOk());
 
-    // cross-project guard: linking to/from a usage that belongs to a DIFFERENT project is rejected
+    // cross-project guard: linking to/from a usage that belongs to a DIFFERENT project is rejected.
+    // Ids are now per-project sequences (chunk 2), so bump otherPid's sequence past pid's own
+    // usage count (1..3 so far) first -- otherwise otherPid's first usage would happen to reuse
+    // pid's own id 1, and the "cross-project" checks below would silently resolve to pid's OWN
+    // usage instead of 404/400-ing.
+    createUsage(otherPid, "Filler one", "", "species", "accepted");
+    createUsage(otherPid, "Filler two", "", "species", "accepted");
+    createUsage(otherPid, "Filler three", "", "species", "accepted");
     long otherUsageId = createUsage(otherPid, "Alien name", "Auth.", "species", "accepted");
     mvc.perform(put("/api/projects/" + pid + "/usages/" + synId + "/synonym-of/" + otherUsageId).with(csrf()))
         .andExpect(status().isNotFound());

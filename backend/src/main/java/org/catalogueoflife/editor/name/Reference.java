@@ -3,9 +3,11 @@ package org.catalogueoflife.editor.name;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+// reference uses a per-project compound (project_id, id) primary key (see V3__name_core.sql):
+// id alone is only meaningful together with projectId.
 public class Reference {
-  private Long id;
-  private Long projectId;
+  private Integer id;
+  private Integer projectId;
   private String coldpId;
   private List<String> alternativeId;
   private String citation;
@@ -25,13 +27,13 @@ public class Reference {
   private String link;
   private String remarks;
   private OffsetDateTime modified;
-  private Long modifiedBy;
+  private Integer modifiedBy;
   private Integer version;
 
-  public Long getId() { return id; }
-  public void setId(Long id) { this.id = id; }
-  public Long getProjectId() { return projectId; }
-  public void setProjectId(Long projectId) { this.projectId = projectId; }
+  public Integer getId() { return id; }
+  public void setId(Integer id) { this.id = id; }
+  public Integer getProjectId() { return projectId; }
+  public void setProjectId(Integer projectId) { this.projectId = projectId; }
   public String getColdpId() { return coldpId; }
   public void setColdpId(String coldpId) { this.coldpId = coldpId; }
   public List<String> getAlternativeId() { return alternativeId; }
@@ -70,8 +72,8 @@ public class Reference {
   public void setRemarks(String remarks) { this.remarks = remarks; }
   public OffsetDateTime getModified() { return modified; }
   public void setModified(OffsetDateTime modified) { this.modified = modified; }
-  public Long getModifiedBy() { return modifiedBy; }
-  public void setModifiedBy(Long modifiedBy) { this.modifiedBy = modifiedBy; }
+  public Integer getModifiedBy() { return modifiedBy; }
+  public void setModifiedBy(Integer modifiedBy) { this.modifiedBy = modifiedBy; }
   public Integer getVersion() { return version; }
   public void setVersion(Integer version) { this.version = version; }
 }

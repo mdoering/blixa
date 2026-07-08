@@ -7,18 +7,22 @@ import java.util.List;
 // (accepted/synonym placement) live in a single row. `parentId` is the accepted
 // classification tree link (self-referencing); synonyms link to their accepted
 // usage via the separate synonym_accepted table, NOT via parentId.
+//
+// id/parentId/basionymId/publishedInReferenceId/referenceId are all scoped to `projectId`:
+// name_usage uses a per-project compound (project_id, id) primary key (see V3__name_core.sql),
+// so an id alone is only meaningful together with the project it belongs to.
 public class NameUsage {
-  private Long id;
-  private Long projectId;
+  private Integer id;
+  private Integer projectId;
   private String coldpId;
   private List<String> alternativeId;
-  private Long parentId;
-  private Long basionymId;
+  private Integer parentId;
+  private Integer basionymId;
   private Integer ordinal;
   // taxonomic
   private String status;
   private String namePhrase;
-  private List<Long> referenceId;
+  private List<Integer> referenceId;
   private Boolean extinct;
   private List<String> environment;
   private String temporalRangeStart;
@@ -42,7 +46,7 @@ public class NameUsage {
   private String basionymAuthorshipYear;
   private String sanctioningAuthor;
   private String nomStatus;
-  private Long publishedInReferenceId;
+  private Integer publishedInReferenceId;
   private String publishedInYear;
   private String publishedInPage;
   private String publishedInPageLink;
@@ -53,29 +57,29 @@ public class NameUsage {
   private String link;
   private String remarks;
   private OffsetDateTime modified;
-  private Long modifiedBy;
+  private Integer modifiedBy;
   private Integer version;
 
-  public Long getId() { return id; }
-  public void setId(Long id) { this.id = id; }
-  public Long getProjectId() { return projectId; }
-  public void setProjectId(Long projectId) { this.projectId = projectId; }
+  public Integer getId() { return id; }
+  public void setId(Integer id) { this.id = id; }
+  public Integer getProjectId() { return projectId; }
+  public void setProjectId(Integer projectId) { this.projectId = projectId; }
   public String getColdpId() { return coldpId; }
   public void setColdpId(String coldpId) { this.coldpId = coldpId; }
   public List<String> getAlternativeId() { return alternativeId; }
   public void setAlternativeId(List<String> alternativeId) { this.alternativeId = alternativeId; }
-  public Long getParentId() { return parentId; }
-  public void setParentId(Long parentId) { this.parentId = parentId; }
-  public Long getBasionymId() { return basionymId; }
-  public void setBasionymId(Long basionymId) { this.basionymId = basionymId; }
+  public Integer getParentId() { return parentId; }
+  public void setParentId(Integer parentId) { this.parentId = parentId; }
+  public Integer getBasionymId() { return basionymId; }
+  public void setBasionymId(Integer basionymId) { this.basionymId = basionymId; }
   public Integer getOrdinal() { return ordinal; }
   public void setOrdinal(Integer ordinal) { this.ordinal = ordinal; }
   public String getStatus() { return status; }
   public void setStatus(String status) { this.status = status; }
   public String getNamePhrase() { return namePhrase; }
   public void setNamePhrase(String namePhrase) { this.namePhrase = namePhrase; }
-  public List<Long> getReferenceId() { return referenceId; }
-  public void setReferenceId(List<Long> referenceId) { this.referenceId = referenceId; }
+  public List<Integer> getReferenceId() { return referenceId; }
+  public void setReferenceId(List<Integer> referenceId) { this.referenceId = referenceId; }
   public Boolean getExtinct() { return extinct; }
   public void setExtinct(Boolean extinct) { this.extinct = extinct; }
   public List<String> getEnvironment() { return environment; }
@@ -120,8 +124,8 @@ public class NameUsage {
   public void setSanctioningAuthor(String sanctioningAuthor) { this.sanctioningAuthor = sanctioningAuthor; }
   public String getNomStatus() { return nomStatus; }
   public void setNomStatus(String nomStatus) { this.nomStatus = nomStatus; }
-  public Long getPublishedInReferenceId() { return publishedInReferenceId; }
-  public void setPublishedInReferenceId(Long publishedInReferenceId) { this.publishedInReferenceId = publishedInReferenceId; }
+  public Integer getPublishedInReferenceId() { return publishedInReferenceId; }
+  public void setPublishedInReferenceId(Integer publishedInReferenceId) { this.publishedInReferenceId = publishedInReferenceId; }
   public String getPublishedInYear() { return publishedInYear; }
   public void setPublishedInYear(String publishedInYear) { this.publishedInYear = publishedInYear; }
   public String getPublishedInPage() { return publishedInPage; }
@@ -142,8 +146,8 @@ public class NameUsage {
   public void setRemarks(String remarks) { this.remarks = remarks; }
   public OffsetDateTime getModified() { return modified; }
   public void setModified(OffsetDateTime modified) { this.modified = modified; }
-  public Long getModifiedBy() { return modifiedBy; }
-  public void setModifiedBy(Long modifiedBy) { this.modifiedBy = modifiedBy; }
+  public Integer getModifiedBy() { return modifiedBy; }
+  public void setModifiedBy(Integer modifiedBy) { this.modifiedBy = modifiedBy; }
   public Integer getVersion() { return version; }
   public void setVersion(Integer version) { this.version = version; }
 }

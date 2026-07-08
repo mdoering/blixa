@@ -18,43 +18,47 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class NameUsageService {
 
+  private static final String ENTITY = "name_usage";
+
   private final NameUsageMapper usages;
   private final SynonymAcceptedMapper synonymAccepted;
+  private final IdSeqMapper idSeq;
   private final ProjectService projects;
   private final ProjectMapper projectMapper;
   private final NameParserService parser;
 
-  public NameUsageService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted,
+  public NameUsageService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted, IdSeqMapper idSeq,
       ProjectService projects, ProjectMapper projectMapper, NameParserService parser) {
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
+    this.idSeq = idSeq;
     this.projects = projects;
     this.projectMapper = projectMapper;
     this.parser = parser;
   }
 
-  public List<NameUsageResponse> list(long userId, long projectId, int limit, int offset) {
-    projects.requireRole((int) userId, (int) projectId);
+  public List<NameUsageResponse> list(int userId, int projectId, int limit, int offset) {
+    projects.requireRole(userId, projectId);
     return usages.findByProject(projectId, Pagination.clampLimit(limit), Pagination.clampOffset(offset)).stream()
         .map(this::toListResponse)
         .toList();
   }
 
-  public List<NameUsageResponse> search(long userId, long projectId, String q, int limit, int offset) {
-    projects.requireRole((int) userId, (int) projectId);
+  public List<NameUsageResponse> search(int userId, int projectId, String q, int limit, int offset) {
+    projects.requireRole(userId, projectId);
     return usages.search(projectId, q, Pagination.clampLimit(limit), Pagination.clampOffset(offset)).stream()
         .map(this::toListResponse)
         .toList();
   }
 
-  public NameUsageResponse get(long userId, long projectId, long id) {
-    projects.requireRole((int) userId, (int) projectId);
+  public NameUsageResponse get(int userId, int projectId, int id) {
+    projects.requireRole(userId, projectId);
     Project project = requireProject(projectId);
     return toResponse(requireInProject(projectId, id), project);
   }
 
   @Transactional
-  public NameUsageResponse create(long userId, long projectId, CreateNameUsageRequest req) {
+  public NameUsageResponse create(int userId, int projectId, CreateNameUsageRequest req) {
     requireEditor(userId, projectId);
     Project project = requireProject(projectId);
     requireParentInProject(projectId, req.parentId());
@@ -77,6 +81,9 @@ public class NameUsageService {
     u.setModifiedBy(userId);
     // parse BEFORE insert so the atomized fields + nameType/parseState are populated on the row.
     parser.parseInto(u, project.getNomCode());
+    // allocate the next per-project id BEFORE inserting: name_usage has no DB identity column
+    // any more (see V3__name_core.sql), so the app owns id generation via id_seq.
+    u.setId(idSeq.allocate(projectId, ENTITY));
     usages.insert(u);
     // the version column defaults to 0 in the DB (see V3__name_core.sql); reflect that
     // in the in-memory POJO returned to the caller without a redundant round-trip.
@@ -85,7 +92,7 @@ public class NameUsageService {
   }
 
   @Transactional
-  public NameUsageResponse update(long userId, long projectId, long id, UpdateNameUsageRequest req) {
+  public NameUsageResponse update(int userId, int projectId, int id, UpdateNameUsageRequest req) {
     requireEditor(userId, projectId);
     Project project = requireProject(projectId);
     requireParentInProject(projectId, req.parentId());
@@ -120,31 +127,31 @@ public class NameUsageService {
   }
 
   @Transactional
-  public void delete(long userId, long projectId, long id) {
+  public void delete(int userId, int projectId, int id) {
     requireEditor(userId, projectId);
-    if (usages.delete(id, projectId) == 0) {
+    if (usages.delete(projectId, id) == 0) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "name usage not found");
     }
   }
 
   @Transactional
-  public void linkSynonym(long userId, long projectId, long synonymId, long acceptedId) {
+  public void linkSynonym(int userId, int projectId, int synonymId, int acceptedId) {
     requireEditor(userId, projectId);
     requireBothInProject(projectId, synonymId, acceptedId);
-    synonymAccepted.link(synonymId, acceptedId, null);
+    synonymAccepted.link(projectId, synonymId, acceptedId, null);
   }
 
   @Transactional
-  public void unlinkSynonym(long userId, long projectId, long synonymId, long acceptedId) {
+  public void unlinkSynonym(int userId, int projectId, int synonymId, int acceptedId) {
     requireEditor(userId, projectId);
     requireBothInProject(projectId, synonymId, acceptedId);
-    synonymAccepted.unlink(synonymId, acceptedId);
+    synonymAccepted.unlink(projectId, synonymId, acceptedId);
   }
 
-  // App-layer cross-project integrity guard: synonym_accepted has no project_id column and no
-  // DB-level check that both sides belong to the same project (design decision from Task 1), so
-  // the service must verify both usages resolve within THIS project before (un)linking.
-  private void requireBothInProject(long projectId, long synonymId, long acceptedId) {
+  // App-layer cross-project integrity guard, kept as a nice 404/400 in front of the DB-level
+  // compound FKs (synonym_accepted's FKs to name_usage(project_id, id), see V3__name_core.sql):
+  // verify both usages resolve within THIS project before (un)linking.
+  private void requireBothInProject(int projectId, int synonymId, int acceptedId) {
     requireInProject(projectId, synonymId);
     requireInProject(projectId, acceptedId);
   }
@@ -153,9 +160,9 @@ public class NameUsageService {
   // formatted display name plus the per-row synonym-link lookups.
   private NameUsageResponse toResponse(NameUsage u, Project project) {
     String formattedName = parser.formatName(u, project.getNomCode(), false);
-    List<Long> acceptedParentIds = synonymAccepted.findAcceptedFor(u.getId());
-    List<Long> synonymIds = "accepted".equals(u.getStatus())
-        ? synonymAccepted.findSynonymsOf(u.getId())
+    List<Integer> acceptedParentIds = synonymAccepted.findAcceptedFor(u.getProjectId(), u.getId());
+    List<Integer> synonymIds = "accepted".equals(u.getStatus())
+        ? synonymAccepted.findSynonymsOf(u.getProjectId(), u.getId())
         : List.of();
     return NameUsageResponse.of(u, formattedName, acceptedParentIds, synonymIds);
   }
@@ -172,30 +179,30 @@ public class NameUsageService {
     return NameUsageResponse.of(u, formattedName, List.of(), List.of());
   }
 
-  private void requireParentInProject(long projectId, Long parentId) {
-    if (parentId != null && usages.findByIdInProject(parentId, projectId) == null) {
+  private void requireParentInProject(int projectId, Integer parentId) {
+    if (parentId != null && usages.findByIdInProject(projectId, parentId) == null) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "parent not in project");
     }
   }
 
-  private NameUsage requireInProject(long projectId, long id) {
-    NameUsage u = usages.findByIdInProject(id, projectId);
+  private NameUsage requireInProject(int projectId, int id) {
+    NameUsage u = usages.findByIdInProject(projectId, id);
     if (u == null) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "name usage not found");
     }
     return u;
   }
 
-  private Project requireProject(long projectId) {
-    Project p = projectMapper.findById((int) projectId);
+  private Project requireProject(int projectId) {
+    Project p = projectMapper.findById(projectId);
     if (p == null) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "project not found");
     }
     return p;
   }
 
-  private void requireEditor(long userId, long projectId) {
-    String role = projects.requireRole((int) userId, (int) projectId);
+  private void requireEditor(int userId, int projectId) {
+    String role = projects.requireRole(userId, projectId);
     if (!role.equals(Role.OWNER.dbValue()) && !role.equals(Role.EDITOR.dbValue())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner or editor required");
     }

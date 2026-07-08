@@ -3,7 +3,7 @@ package org.catalogueoflife.editor.name.dto;
 import org.catalogueoflife.editor.name.Reference;
 
 public record ReferenceResponse(
-    Long id,
+    Integer id,
     String citation,
     String type,
     String author,
