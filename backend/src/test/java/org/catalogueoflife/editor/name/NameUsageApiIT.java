@@ -308,4 +308,71 @@ class NameUsageApiIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].id").value(bId));
   }
+
+  @Test
+  @WithMockUser(username = "synRelOwner")
+  void synonymAndAcceptedListingEndpoints() throws Exception {
+    ensureUser("synRelOwner");
+    ensureUser("synRelViewer");
+    long pid = createProject("synrelproj");
+    // "synRelViewer" is deliberately NOT added as a member of pid -- used below for the 404 authz check.
+
+    long accId = createUsage(pid, "Zebra accepted", "", "species", "accepted");
+    long s1Id = createUsage(pid, "Alpha synonym", "", "species", "synonym");
+    long s2Id = createUsage(pid, "Beta synonym", "", "species", "synonym");
+
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + s1Id + "/synonym-of/" + accId).with(csrf()))
+        .andExpect(status().isNoContent());
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + s2Id + "/synonym-of/" + accId).with(csrf()))
+        .andExpect(status().isNoContent());
+
+    // GET /{accepted}/synonyms returns both synonyms, ordered by scientificName (Alpha, Beta).
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + accId + "/synonyms"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(2))
+        .andExpect(jsonPath("$[0].id").value(s1Id))
+        .andExpect(jsonPath("$[0].scientificName").value("Alpha synonym"))
+        .andExpect(jsonPath("$[1].id").value(s2Id))
+        .andExpect(jsonPath("$[1].scientificName").value("Beta synonym"));
+
+    // GET /{synonym}/accepted returns the accepted usage it points to.
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + s1Id + "/accepted"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].id").value(accId));
+
+    // a plain accepted usage with no synonyms has an empty list, not a 404.
+    long lonelyAccId = createUsage(pid, "Lonely accepted", "", "species", "accepted");
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + lonelyAccId + "/synonyms"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+
+    // pro parte: s1 also links to a second accepted usage, so it must appear under BOTH accepteds'
+    // synonym lists, and s1's own accepted-list must contain both.
+    long accId2 = createUsage(pid, "Yankee accepted", "", "species", "accepted");
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + s1Id + "/synonym-of/" + accId2).with(csrf()))
+        .andExpect(status().isNoContent());
+
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + accId2 + "/synonyms"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].id").value(s1Id));
+
+    String s1Accepted = mvc.perform(get("/api/projects/" + pid + "/usages/" + s1Id + "/accepted"))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    List<Long> s1AcceptedIds = new ArrayList<>();
+    json.readTree(s1Accepted).forEach(n -> s1AcceptedIds.add(n.get("id").asLong()));
+    assertThat(s1AcceptedIds).containsExactlyInAnyOrder(accId, accId2);
+
+    // a user who isn't a member of the project gets 404, matching GET /usages/{id}'s own authz.
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + accId + "/synonyms").with(user("synRelViewer")))
+        .andExpect(status().isNotFound());
+
+    // anchor id that doesn't exist in the project -> 404, not an empty list.
+    mvc.perform(get("/api/projects/" + pid + "/usages/999999/synonyms"))
+        .andExpect(status().isNotFound());
+    mvc.perform(get("/api/projects/" + pid + "/usages/999999/accepted"))
+        .andExpect(status().isNotFound());
+  }
 }

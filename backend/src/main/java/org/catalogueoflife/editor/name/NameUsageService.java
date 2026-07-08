@@ -1,5 +1,6 @@
 package org.catalogueoflife.editor.name;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -78,6 +79,30 @@ public class NameUsageService {
     projects.requireRole(userId, projectId);
     Project project = requireProject(projectId);
     return toResponse(requireInProject(projectId, id), project);
+  }
+
+  // The usages linked to `id` as synonyms (synonym_accepted.accepted_usage_id = id), ordered by
+  // scientificName. Any project member may read; 404 if `id` itself isn't in the project.
+  public List<NameUsageResponse> listSynonyms(int userId, int projectId, int id) {
+    projects.requireRole(userId, projectId);
+    Project project = requireProject(projectId);
+    requireInProject(projectId, id);
+    return synonymAccepted.findSynonymsOf(projectId, id).stream()
+        .map(sid -> toResponse(requireInProject(projectId, sid), project))
+        .sorted(Comparator.comparing(NameUsageResponse::scientificName, Comparator.nullsLast(String::compareTo)))
+        .toList();
+  }
+
+  // The accepted usages that `id` points to (synonym_accepted.synonym_id = id), ordered by
+  // scientificName. Any project member may read; 404 if `id` itself isn't in the project.
+  public List<NameUsageResponse> listAccepted(int userId, int projectId, int id) {
+    projects.requireRole(userId, projectId);
+    Project project = requireProject(projectId);
+    requireInProject(projectId, id);
+    return synonymAccepted.findAcceptedFor(projectId, id).stream()
+        .map(aid -> toResponse(requireInProject(projectId, aid), project))
+        .sorted(Comparator.comparing(NameUsageResponse::scientificName, Comparator.nullsLast(String::compareTo)))
+        .toList();
   }
 
   @Transactional

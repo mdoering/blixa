@@ -61,6 +61,18 @@ public class NameUsageController {
     return service.update(uid, pid, id, req);
   }
 
+  @GetMapping("/{id}/synonyms")
+  public List<NameUsageResponse> listSynonyms(@PathVariable int pid, @PathVariable int id) {
+    int uid = currentUser.require().getId();
+    return service.listSynonyms(uid, pid, id);
+  }
+
+  @GetMapping("/{id}/accepted")
+  public List<NameUsageResponse> listAccepted(@PathVariable int pid, @PathVariable int id) {
+    int uid = currentUser.require().getId();
+    return service.listAccepted(uid, pid, id);
+  }
+
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable int pid, @PathVariable int id) {
