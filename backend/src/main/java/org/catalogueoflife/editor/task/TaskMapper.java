@@ -40,7 +40,7 @@ public interface TaskMapper {
       SELECT t.id AS id, t.title AS title, t.description AS description,
              LOWER(t.status) AS status, t.user_id AS userId, u.username AS username,
              t.created_at AS createdAt, t.closed_at AS closedAt,
-             (SELECT COUNT(*) FROM change c WHERE c.task_id = t.id) AS changeCount
+             (SELECT COUNT(*) FROM change c WHERE c.task_id = t.id AND c.project_id = t.project_id) AS changeCount
       FROM task t
       LEFT JOIN app_user u ON u.id = t.user_id
       WHERE t.project_id = #{projectId} AND t.id = #{id}
@@ -54,7 +54,7 @@ public interface TaskMapper {
       SELECT t.id AS id, t.title AS title, t.description AS description,
              LOWER(t.status) AS status, t.user_id AS userId, u.username AS username,
              t.created_at AS createdAt, t.closed_at AS closedAt,
-             (SELECT COUNT(*) FROM change c WHERE c.task_id = t.id) AS changeCount
+             (SELECT COUNT(*) FROM change c WHERE c.task_id = t.id AND c.project_id = t.project_id) AS changeCount
       FROM task t
       LEFT JOIN app_user u ON u.id = t.user_id
       WHERE t.project_id = #{projectId}

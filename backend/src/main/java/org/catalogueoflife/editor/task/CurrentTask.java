@@ -28,7 +28,10 @@ public class CurrentTask {
   private final HttpServletRequest request;
   private final TaskMapper tasks;
 
-  private boolean resolved;
+  // Memoized per project: a request normally drives writes for a single project, but keying the
+  // cache on projectId keeps resolve() correct if a future request ever spans projects (rather than
+  // returning the first project's resolution for a second one).
+  private Integer resolvedProjectId;
   private Integer taskId;
 
   public CurrentTask(HttpServletRequest request, TaskMapper tasks) {
@@ -37,10 +40,10 @@ public class CurrentTask {
   }
 
   public Integer resolve(int projectId) {
-    if (resolved) {
+    if (resolvedProjectId != null && resolvedProjectId == projectId) {
       return taskId;
     }
-    resolved = true;
+    resolvedProjectId = projectId;
     taskId = resolveHeader(projectId);
     return taskId;
   }
