@@ -17,21 +17,28 @@ public interface LockMapper {
   // re-acquire) or expired (the previous holder's claim has lapsed); otherwise the WHERE clause
   // makes the ON CONFLICT branch a no-op and the still-active other user's row is left untouched.
   // Callers read the row back afterwards (findByEntity) to learn who ended up holding it.
+  // taskId is nullable (Integer, not int) -- an absent declared intent inserts/overwrites task_id
+  // as NULL, same as every other advisory, optional field here.
   @Insert("""
-      INSERT INTO lock (project_id, entity_type, entity_id, user_id, acquired_at, expires_at)
-      VALUES (#{projectId}, #{entityType}, #{entityId}, #{userId}, now(), now() + make_interval(secs => #{ttl}))
+      INSERT INTO lock (project_id, entity_type, entity_id, user_id, task_id, acquired_at, expires_at)
+      VALUES (#{projectId}, #{entityType}, #{entityId}, #{userId}, #{taskId}, now(), now() + make_interval(secs => #{ttl}))
       ON CONFLICT (project_id, entity_type, entity_id) DO UPDATE
-        SET user_id = EXCLUDED.user_id, acquired_at = now(), expires_at = EXCLUDED.expires_at
+        SET user_id = EXCLUDED.user_id, task_id = EXCLUDED.task_id, acquired_at = now(), expires_at = EXCLUDED.expires_at
         WHERE lock.user_id = EXCLUDED.user_id OR lock.expires_at <= now()
       """)
   void upsertTakeover(@Param("projectId") int projectId, @Param("entityType") String entityType,
-      @Param("entityId") int entityId, @Param("userId") int userId, @Param("ttl") int ttl);
+      @Param("entityId") int entityId, @Param("userId") int userId, @Param("taskId") Integer taskId,
+      @Param("ttl") int ttl);
 
+  // LEFT JOIN task so an absent/foreign task_id (never possible once validated by LockService, but
+  // also true of a lock predating this feature) still returns the lock row with a null taskTitle
+  // rather than dropping it.
   @Select("""
       SELECT l.id, l.project_id, l.entity_type, l.entity_id, l.user_id, u.username,
-             l.acquired_at, l.expires_at
+             l.acquired_at, l.expires_at, l.task_id, t.title AS task_title
       FROM lock l
       LEFT JOIN app_user u ON u.id = l.user_id
+      LEFT JOIN task t ON t.id = l.task_id
       WHERE l.project_id = #{projectId} AND l.entity_type = #{entityType} AND l.entity_id = #{entityId}
       """)
   Lock findByEntity(@Param("projectId") int projectId, @Param("entityType") String entityType,
@@ -41,9 +48,10 @@ public interface LockMapper {
   // just at acquire time.
   @Select("""
       SELECT l.id, l.project_id, l.entity_type, l.entity_id, l.user_id, u.username,
-             l.acquired_at, l.expires_at
+             l.acquired_at, l.expires_at, l.task_id, t.title AS task_title
       FROM lock l
       LEFT JOIN app_user u ON u.id = l.user_id
+      LEFT JOIN task t ON t.id = l.task_id
       WHERE l.project_id = #{projectId} AND l.expires_at > now()
       ORDER BY l.acquired_at DESC
       """)
@@ -51,9 +59,10 @@ public interface LockMapper {
 
   @Select("""
       SELECT l.id, l.project_id, l.entity_type, l.entity_id, l.user_id, u.username,
-             l.acquired_at, l.expires_at
+             l.acquired_at, l.expires_at, l.task_id, t.title AS task_title
       FROM lock l
       LEFT JOIN app_user u ON u.id = l.user_id
+      LEFT JOIN task t ON t.id = l.task_id
       WHERE l.project_id = #{projectId} AND l.id = #{id}
       """)
   Lock findById(@Param("projectId") int projectId, @Param("id") int id);

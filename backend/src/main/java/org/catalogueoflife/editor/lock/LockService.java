@@ -4,6 +4,9 @@ import java.util.List;
 import org.catalogueoflife.editor.lock.dto.AcquireLockRequest;
 import org.catalogueoflife.editor.lock.dto.LockResponse;
 import org.catalogueoflife.editor.project.ProjectService;
+import org.catalogueoflife.editor.task.Task;
+import org.catalogueoflife.editor.task.TaskMapper;
+import org.catalogueoflife.editor.task.TaskStatus;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,22 +26,40 @@ public class LockService {
 
   private final LockMapper locks;
   private final ProjectService projects;
+  private final TaskMapper tasks;
 
-  public LockService(LockMapper locks, ProjectService projects) {
+  public LockService(LockMapper locks, ProjectService projects, TaskMapper tasks) {
     this.locks = locks;
     this.projects = projects;
+    this.tasks = tasks;
   }
 
   @Transactional
   public LockResponse acquire(int actorId, int projectId, AcquireLockRequest req) {
     projects.requireRole(actorId, projectId);
     int ttl = clampTtl(req.ttlSeconds());
-    locks.upsertTakeover(projectId, req.entityType(), req.entityId(), actorId, ttl);
+    Integer taskId = validateTask(projectId, req.taskId());
+    locks.upsertTakeover(projectId, req.entityType(), req.entityId(), actorId, taskId, ttl);
     // Read back the row rather than trusting the UPSERT's own affected-row count: this is the
     // single source of truth for who ended up holding it, whether that's us (fresh
     // acquire/takeover) or the still-active other user the UPSERT's WHERE clause left untouched.
     Lock current = locks.findByEntity(projectId, req.entityType(), req.entityId());
     return toResponse(current, actorId);
+  }
+
+  // Tasks are optional intent: null passes through untouched (an ungrouped/plain lock). A
+  // present-but-invalid reference (not in this project, or CLOSED) is a client error -> 400,
+  // mirroring CurrentTask's X-Task-Id validation for changelog attribution -- surfacing the bug
+  // rather than silently dropping the declared intent.
+  private Integer validateTask(int projectId, Integer taskId) {
+    if (taskId == null) {
+      return null;
+    }
+    Task t = tasks.findById(projectId, taskId);
+    if (t == null || !TaskStatus.OPEN.name().equals(t.getStatus())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown or closed task: " + taskId);
+    }
+    return taskId;
   }
 
   @Transactional
@@ -75,7 +96,8 @@ public class LockService {
 
   private static LockResponse toResponse(Lock l, int actorId) {
     return new LockResponse(l.getId(), l.getEntityType(), l.getEntityId(), l.getUserId(),
-        l.getUsername(), l.getAcquiredAt(), l.getExpiresAt(), l.getUserId() == actorId);
+        l.getUsername(), l.getAcquiredAt(), l.getExpiresAt(), l.getUserId() == actorId,
+        l.getTaskId(), l.getTaskTitle());
   }
 
   private static int clampTtl(Integer ttlSeconds) {

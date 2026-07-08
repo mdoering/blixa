@@ -5,6 +5,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -47,6 +48,15 @@ class LockApiIT extends AbstractPostgresIT {
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     return json.readTree(body).get("id").asLong();
+  }
+
+  private JsonNode createTask(long pid, String title) throws Exception {
+    String body = mvc.perform(post("/api/projects/" + pid + "/tasks").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"" + title + "\"}"))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    return json.readTree(body);
   }
 
   @Test
@@ -138,5 +148,61 @@ class LockApiIT extends AbstractPostgresIT {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"entityType\":\"name_usage\",\"entityId\":1}"))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @WithMockUser(username = "lockTaskOwner")
+  void acquireCarriesOptionalTaskIntent() throws Exception {
+    ensureUser("lockTaskOwner");
+    long pid = createProject("lockTaskProj");
+
+    // an open task T -- its title is the "intent" the lock list should surface.
+    JsonNode task = createTask(pid, "Revise genus Abies");
+    long taskId = task.get("id").asLong();
+
+    // 1) acquiring WITH taskId -> 200, taskId + taskTitle populated from the task.
+    String acquireBody = mvc.perform(post("/api/projects/" + pid + "/locks").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"entityType\":\"name_usage\",\"entityId\":1,\"taskId\":" + taskId + "}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.heldByMe").value(true))
+        .andExpect(jsonPath("$.taskId").value(taskId))
+        .andExpect(jsonPath("$.taskTitle").value("Revise genus Abies"))
+        .andReturn().getResponse().getContentAsString();
+    long lockId = json.readTree(acquireBody).get("id").asLong();
+
+    // 2) GET /locks shows the same intent (title), not just the id.
+    mvc.perform(get("/api/projects/" + pid + "/locks"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].id").value(lockId))
+        .andExpect(jsonPath("$[0].taskId").value(taskId))
+        .andExpect(jsonPath("$[0].taskTitle").value("Revise genus Abies"));
+
+    // 3) acquiring on a DIFFERENT entity with NO taskId still works -- null taskId/taskTitle.
+    String untaskedBody = mvc.perform(post("/api/projects/" + pid + "/locks").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"entityType\":\"name_usage\",\"entityId\":2}"))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    JsonNode untasked = json.readTree(untaskedBody);
+    assertThat(untasked.get("taskId").isNull()).isTrue();
+    assertThat(untasked.get("taskTitle").isNull()).isTrue();
+
+    // 4) a nonexistent taskId -> 400.
+    mvc.perform(post("/api/projects/" + pid + "/locks").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"entityType\":\"name_usage\",\"entityId\":3,\"taskId\":999999}"))
+        .andExpect(status().isBadRequest());
+
+    // 5) close the task, then acquiring with its (now closed) id -> 400.
+    mvc.perform(patch("/api/projects/" + pid + "/tasks/" + taskId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"status\":\"closed\"}"))
+        .andExpect(status().isOk());
+    mvc.perform(post("/api/projects/" + pid + "/locks").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"entityType\":\"name_usage\",\"entityId\":4,\"taskId\":" + taskId + "}"))
+        .andExpect(status().isBadRequest());
   }
 }
