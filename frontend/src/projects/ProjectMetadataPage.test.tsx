@@ -7,8 +7,8 @@ import { server, http, HttpResponse } from '../test/server';
 import ProjectMetadataPage from './ProjectMetadataPage';
 
 const project = {
-  id: 3, slug: 'mam', title: 'Mammals', alias: null, description: null, nomCode: 'zoological',
-  license: null, version: null, issued: null, geographicScope: null, taxonomicScope: null, doi: null, role: 'owner',
+  id: 3, title: 'Mammals', alias: null, description: null, nomCode: 'zoological',
+  license: null, geographicScope: null, taxonomicScope: null, role: 'owner',
 };
 
 function renderPage() {

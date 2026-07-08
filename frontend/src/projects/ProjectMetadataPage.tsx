@@ -9,6 +9,8 @@ import { messageFor } from '../api/client';
 import type { UpdateMetadataPayload } from '../api/types';
 import { NOM_CODES } from './CreateProjectModal';
 
+const LICENSES = ['CC0-1.0', 'CC-BY-4.0'];
+
 export default function ProjectMetadataPage() {
   const { projectId } = useParams();
   const id = Number(projectId);
@@ -21,15 +23,11 @@ export default function ProjectMetadataPage() {
       description: undefined,
       nomCode: undefined,
       license: undefined,
-      version: undefined,
-      issued: undefined,
       geographicScope: undefined,
       taxonomicScope: undefined,
-      doi: undefined,
     },
     validate: {
       title: (v) => (v ? null : 'Required'),
-      issued: (v) => (!v || /^\d{4}-\d{2}-\d{2}$/.test(v) ? null : 'Use YYYY-MM-DD'),
     },
   });
 
@@ -72,16 +70,18 @@ export default function ProjectMetadataPage() {
             />
           </SimpleGrid>
           <Textarea label="Description" rows={3} {...form.getInputProps('description')} />
-          <SimpleGrid cols={3}>
-            <TextInput label="License" {...form.getInputProps('license')} />
-            <TextInput label="Version" {...form.getInputProps('version')} />
-            <TextInput label="Issued" placeholder="YYYY-MM-DD" {...form.getInputProps('issued')} />
+          <SimpleGrid cols={2}>
+            <Select
+              label="License"
+              clearable
+              data={LICENSES.map((l) => ({ value: l, label: l }))}
+              {...form.getInputProps('license')}
+            />
           </SimpleGrid>
           <SimpleGrid cols={2}>
             <TextInput label="Geographic scope" {...form.getInputProps('geographicScope')} />
             <TextInput label="Taxonomic scope" {...form.getInputProps('taxonomicScope')} />
           </SimpleGrid>
-          <TextInput label="DOI" {...form.getInputProps('doi')} />
           <Button type="submit" loading={mutation.isPending} disabled={!canEdit}>
             Save
           </Button>

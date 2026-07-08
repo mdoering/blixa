@@ -7,7 +7,7 @@ import ProjectListPage from './ProjectListPage';
 test('lists the user projects with their role', async () => {
   server.use(
     http.get('/api/projects', () =>
-      HttpResponse.json([{ id: 1, slug: 'aves', title: 'Birds', role: 'owner' }]),
+      HttpResponse.json([{ id: 1, title: 'Birds', role: 'owner' }]),
     ),
   );
   renderWithProviders(<ProjectListPage />);

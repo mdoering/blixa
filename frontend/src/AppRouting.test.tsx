@@ -16,7 +16,7 @@ test('authenticated user sees the project list inside the app layout', async () 
       HttpResponse.json({ id: 1, username: 'alice', orcid: '', displayName: 'Alice' }),
     ),
     http.get('/api/projects', () =>
-      HttpResponse.json([{ id: 7, slug: 'lep', title: 'Lepidoptera', role: 'editor' }]),
+      HttpResponse.json([{ id: 7, title: 'Lepidoptera', role: 'editor' }]),
     ),
   );
   renderWithProviders(<App />, { route: '/' });

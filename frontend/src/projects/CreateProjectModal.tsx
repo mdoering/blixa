@@ -11,9 +11,8 @@ export const NOM_CODES = ['zoological', 'botanical', 'virus', 'bacterial', 'cult
 
 export default function CreateProjectModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const form = useForm<CreateProjectPayload>({
-    initialValues: { slug: '', title: '', nomCode: undefined },
+    initialValues: { title: '', nomCode: undefined },
     validate: {
-      slug: (v) => (v ? null : 'Required'),
       title: (v) => (v ? null : 'Required'),
     },
   });
@@ -35,7 +34,6 @@ export default function CreateProjectModal({ open, onClose }: { open: boolean; o
     <Modal opened={open} onClose={onClose} title="New project">
       <form onSubmit={form.onSubmit((v) => mutation.mutate(v))}>
         <Stack gap="md">
-          <TextInput label="Slug" placeholder="lepidoptera" {...form.getInputProps('slug')} />
           <TextInput
             label="Title"
             placeholder="Lepidoptera of the World"

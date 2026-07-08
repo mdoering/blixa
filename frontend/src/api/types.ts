@@ -9,17 +9,13 @@ export interface Me {
 
 export interface Project {
   id: number;
-  slug: string;
   title: string;
   alias: string | null;
   description: string | null;
   nomCode: string | null;
   license: string | null;
-  version: string | null;
-  issued: string | null;
   geographicScope: string | null;
   taxonomicScope: string | null;
-  doi: string | null;
   role: Role;
 }
 
@@ -30,7 +26,6 @@ export interface Member {
 }
 
 export interface CreateProjectPayload {
-  slug: string;
   title: string;
   nomCode?: string;
 }
@@ -41,9 +36,6 @@ export interface UpdateMetadataPayload {
   description?: string;
   nomCode?: string;
   license?: string;
-  version?: string;
-  issued?: string;
   geographicScope?: string;
   taxonomicScope?: string;
-  doi?: string;
 }
