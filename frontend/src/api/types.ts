@@ -142,6 +142,14 @@ export interface CreateUsagePayload {
   parentId?: number;
 }
 
+// Mirrors backend UsagePage: a page of name-usage search results. `total` counts ALL matches for
+// the same q/rank/status filters, ignoring limit/offset -- lets the Names search table's
+// mantine-react-table drive server-side pagination off a stable row count.
+export interface UsagePage {
+  items: NameUsage[];
+  total: number;
+}
+
 export interface Issue {
   id: number;
   entityType: string;

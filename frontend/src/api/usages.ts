@@ -1,5 +1,27 @@
 import { api } from './client';
-import type { CreateUsagePayload, NameUsage, UpdateUsagePayload } from './types';
+import type { CreateUsagePayload, NameUsage, UpdateUsagePayload, UsagePage } from './types';
+
+export interface SearchUsagesParams {
+  q?: string;
+  rank?: string;
+  status?: string;
+  limit: number;
+  offset: number;
+}
+
+// GET /usages?q=&rank=&status=&limit=&offset= -- q is pg_trgm fuzzy, rank/status are optional
+// exact filters (enum-name wire form, see UsagePage/CreateUsagePayload), ANDed server-side.
+// `total` counts ALL matches for the same filters (ignoring limit/offset), driving the search
+// table's server-side pagination (mantine-react-table's `rowCount`).
+export function searchUsages(pid: number, params: SearchUsagesParams): Promise<UsagePage> {
+  const search = new URLSearchParams();
+  if (params.q) search.set('q', params.q);
+  if (params.rank) search.set('rank', params.rank);
+  if (params.status) search.set('status', params.status);
+  search.set('limit', String(params.limit));
+  search.set('offset', String(params.offset));
+  return api<UsagePage>(`/api/projects/${pid}/usages?${search.toString()}`);
+}
 
 export function getUsage(pid: number, id: number): Promise<NameUsage> {
   return api<NameUsage>(`/api/projects/${pid}/usages/${id}`);

@@ -24,15 +24,18 @@ export default function ProjectLayout() {
 
   const active = location.pathname.endsWith('/members')
     ? 'members'
-    : location.pathname.endsWith('/tree')
-      ? 'tree'
-      : 'metadata';
+    : location.pathname.endsWith('/names')
+      ? 'names'
+      : location.pathname.endsWith('/tree')
+        ? 'tree'
+        : 'metadata';
   return (
     <div>
       <Title order={3}>{data.title}</Title>
       <Tabs value={active} onChange={(v) => v && navigate(`/projects/${id}/${v}`)}>
         <Tabs.List>
           <Tabs.Tab value="tree">Tree</Tabs.Tab>
+          <Tabs.Tab value="names">Names</Tabs.Tab>
           <Tabs.Tab value="metadata">Metadata</Tabs.Tab>
           <Tabs.Tab value="members">Members</Tabs.Tab>
         </Tabs.List>
