@@ -22,6 +22,13 @@ import { getUsage, updateUsage } from '../api/usages';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import NameRelationsTab from '../child/NameRelationsTab';
 import TypeMaterialTab from '../child/TypeMaterialTab';
+import {
+  DistributionTab,
+  EstimateTab,
+  MediaTab,
+  PropertyTab,
+  VernacularTab,
+} from '../child/taxonTabs';
 import IssueList from './IssueList';
 import SynonymList from './SynonymList';
 
@@ -175,6 +182,10 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
   if (usageQuery.isLoading) return <Text c="dimmed">Loading…</Text>;
   if (usageQuery.isError || !usage) return <Text c="red">Could not load this taxon</Text>;
 
+  // The taxon-level entities only apply to accepted taxa (the backend guards create + drops them on
+  // demote), so their tabs only show when accepted.
+  const isAccepted = usage.status === 'ACCEPTED';
+
   return (
     <Box>
       <Tabs defaultValue="details" keepMounted={false}>
@@ -182,6 +193,11 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
           <Tabs.Tab value="details">Details</Tabs.Tab>
           <Tabs.Tab value="names">Names</Tabs.Tab>
           <Tabs.Tab value="types">Types</Tabs.Tab>
+          {isAccepted && <Tabs.Tab value="vernaculars">Vernaculars</Tabs.Tab>}
+          {isAccepted && <Tabs.Tab value="distribution">Distribution</Tabs.Tab>}
+          {isAccepted && <Tabs.Tab value="media">Media</Tabs.Tab>}
+          {isAccepted && <Tabs.Tab value="estimates">Estimates</Tabs.Tab>}
+          {isAccepted && <Tabs.Tab value="properties">Properties</Tabs.Tab>}
           <Tabs.Tab value="synonyms">Synonyms</Tabs.Tab>
           <Tabs.Tab value="issues">Issues</Tabs.Tab>
         </Tabs.List>
@@ -238,6 +254,32 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
         <Tabs.Panel value="types" pt="md">
           <TypeMaterialTab pid={pid} usageId={usageId} canEdit={canEdit} />
         </Tabs.Panel>
+
+        {isAccepted && (
+          <Tabs.Panel value="vernaculars" pt="md">
+            <VernacularTab pid={pid} usageId={usageId} canEdit={canEdit} />
+          </Tabs.Panel>
+        )}
+        {isAccepted && (
+          <Tabs.Panel value="distribution" pt="md">
+            <DistributionTab pid={pid} usageId={usageId} canEdit={canEdit} />
+          </Tabs.Panel>
+        )}
+        {isAccepted && (
+          <Tabs.Panel value="media" pt="md">
+            <MediaTab pid={pid} usageId={usageId} canEdit={canEdit} />
+          </Tabs.Panel>
+        )}
+        {isAccepted && (
+          <Tabs.Panel value="estimates" pt="md">
+            <EstimateTab pid={pid} usageId={usageId} canEdit={canEdit} />
+          </Tabs.Panel>
+        )}
+        {isAccepted && (
+          <Tabs.Panel value="properties" pt="md">
+            <PropertyTab pid={pid} usageId={usageId} canEdit={canEdit} />
+          </Tabs.Panel>
+        )}
 
         <Tabs.Panel value="synonyms" pt="md">
           <SynonymList pid={pid} usageId={usageId} status={usage.status} canEdit={canEdit} />

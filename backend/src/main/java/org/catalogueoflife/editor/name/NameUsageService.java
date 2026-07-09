@@ -50,11 +50,12 @@ public class NameUsageService {
   private final ApplicationEventPublisher events;
   private final IssueMapper issues;
   private final TaxonInfoMapper taxonInfo;
+  private final org.catalogueoflife.editor.child.TaxonChildMapper taxonChildren;
 
   public NameUsageService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted, IdSeqMapper idSeq,
       ProjectService projects, ProjectMapper projectMapper, NameParserService parser, TreeMapper tree,
       AuditService audit, ObjectMapper objectMapper, ApplicationEventPublisher events, IssueMapper issues,
-      TaxonInfoMapper taxonInfo) {
+      TaxonInfoMapper taxonInfo, org.catalogueoflife.editor.child.TaxonChildMapper taxonChildren) {
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
     this.idSeq = idSeq;
@@ -67,6 +68,7 @@ public class NameUsageService {
     this.events = events;
     this.issues = issues;
     this.taxonInfo = taxonInfo;
+    this.taxonChildren = taxonChildren;
   }
 
   // Unified list/search backing GET /usages: q/rank/status are each optional and ANDed together
@@ -568,6 +570,12 @@ public class NameUsageService {
           u.getTemporalRangeStart(), u.getTemporalRangeEnd());
     } else {
       taxonInfo.delete(u.getProjectId(), u.getId());
+    }
+    // Taxon-level child entities (vernacular/distribution/media/estimate/property) belong only to
+    // accepted usages; drop them whenever the usage is not accepted. This covers both a direct
+    // status edit (update) and demote, which both funnel through here.
+    if (u.getStatus() != Status.ACCEPTED) {
+      taxonChildren.dropAll(u.getProjectId(), u.getId());
     }
   }
 }

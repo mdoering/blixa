@@ -64,6 +64,11 @@ function mockCommon(usage = baseUsage(), role = 'owner') {
     http.get('/api/projects/4/usages/10/accepted', () => HttpResponse.json([])),
     http.get('/api/projects/4/usages/10/relations', () => HttpResponse.json([])),
     http.get('/api/projects/4/usages/10/type-material', () => HttpResponse.json([])),
+    http.get('/api/projects/4/usages/10/vernaculars', () => HttpResponse.json([])),
+    http.get('/api/projects/4/usages/10/distributions', () => HttpResponse.json([])),
+    http.get('/api/projects/4/usages/10/media', () => HttpResponse.json([])),
+    http.get('/api/projects/4/usages/10/estimates', () => HttpResponse.json([])),
+    http.get('/api/projects/4/usages/10/properties', () => HttpResponse.json([])),
     http.get('/api/projects/4/issues', () => HttpResponse.json([])),
   );
 }
@@ -219,6 +224,47 @@ test('the Types tab lists a holotype with its institution and occurrenceID', asy
   // Citation column + Institution column ("BMNH 1901.1.1") both render this text.
   expect(screen.getAllByText('BMNH 1901.1.1').length).toBeGreaterThanOrEqual(1);
   expect(screen.getByText('GB')).toBeInTheDocument();
+});
+
+test('the Vernaculars tab (accepted only) lists a vernacular name', async () => {
+  mockCommon();
+  server.use(
+    http.get('/api/projects/4/usages/10/vernaculars', () =>
+      HttpResponse.json([
+        {
+          id: 3,
+          usageId: 10,
+          name: 'Lion',
+          language: 'eng',
+          country: null,
+          sex: null,
+          preferred: true,
+          referenceId: null,
+          remarks: null,
+          version: 0,
+        },
+      ]),
+    ),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await screen.findByLabelText('Scientific name');
+  await userEvent.click(screen.getByRole('tab', { name: /vernaculars/i }));
+  await screen.findByText('Lion');
+  expect(screen.getByText('eng')).toBeInTheDocument();
+});
+
+test('a synonym usage hides the taxon-level tabs', async () => {
+  mockCommon(baseUsage({ status: 'SYNONYM' }));
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await screen.findByLabelText('Scientific name');
+  expect(screen.queryByRole('tab', { name: /vernaculars/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: /distribution/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: /estimates/i })).not.toBeInTheDocument();
+  // Names + Types still apply to any usage.
+  expect(screen.getByRole('tab', { name: /names/i })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: /types/i })).toBeInTheDocument();
 });
 
 test('a warning issue shows its badge and message', async () => {
