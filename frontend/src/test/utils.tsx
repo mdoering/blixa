@@ -5,13 +5,14 @@ import { MemoryRouter } from 'react-router-dom';
 import { MantineProvider } from '@mantine/core';
 import { ModalsProvider } from '@mantine/modals';
 import { Notifications } from '@mantine/notifications';
+import { theme } from '../theme';
 
 export function renderWithProviders(ui: ReactElement, opts: { route?: string } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <MantineProvider>
+    <MantineProvider theme={theme}>
       <ModalsProvider>
         <Notifications />
         <QueryClientProvider client={queryClient}>

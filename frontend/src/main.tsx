@@ -10,6 +10,7 @@ import { ModalsProvider } from '@mantine/modals';
 import { Notifications } from '@mantine/notifications';
 import App from './App';
 import { ApiError } from './api/client';
+import { theme } from './theme';
 
 function markUnauthenticatedOn401(error: unknown) {
   if (error instanceof ApiError && error.status === 401) {
@@ -30,7 +31,7 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <MantineProvider>
+    <MantineProvider theme={theme} defaultColorScheme="light">
       <ModalsProvider>
         <Notifications />
         <QueryClientProvider client={queryClient}>
