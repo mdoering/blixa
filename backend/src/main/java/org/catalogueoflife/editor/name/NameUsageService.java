@@ -47,10 +47,12 @@ public class NameUsageService {
   private final ObjectMapper objectMapper;
   private final ApplicationEventPublisher events;
   private final IssueMapper issues;
+  private final TaxonInfoMapper taxonInfo;
 
   public NameUsageService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted, IdSeqMapper idSeq,
       ProjectService projects, ProjectMapper projectMapper, NameParserService parser, TreeMapper tree,
-      AuditService audit, ObjectMapper objectMapper, ApplicationEventPublisher events, IssueMapper issues) {
+      AuditService audit, ObjectMapper objectMapper, ApplicationEventPublisher events, IssueMapper issues,
+      TaxonInfoMapper taxonInfo) {
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
     this.idSeq = idSeq;
@@ -62,6 +64,7 @@ public class NameUsageService {
     this.objectMapper = objectMapper;
     this.events = events;
     this.issues = issues;
+    this.taxonInfo = taxonInfo;
   }
 
   // Unified list/search backing GET /usages: q/rank/status are each optional and ANDed together
@@ -167,6 +170,7 @@ public class NameUsageService {
     // any more (see V3__name_core.sql), so the app owns id generation via id_seq.
     u.setId(idSeq.allocate(projectId, ENTITY));
     usages.insert(u);
+    writeTaxonInfo(u);
     // the version column defaults to 0 in the DB (see V3__name_core.sql); reflect that
     // in the in-memory POJO returned to the caller without a redundant round-trip.
     u.setVersion(0);
@@ -226,6 +230,7 @@ public class NameUsageService {
     if (updated == 0) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
     }
+    writeTaxonInfo(u);
     NameUsage after = requireInProject(projectId, id);
     audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
     events.publishEvent(ValidationEvent.forUsage(projectId, id));
@@ -362,5 +367,20 @@ public class NameUsageService {
     return raw.stream()
         .map(s -> VocabParsing.requireParse(Environment.class, s, "environment"))
         .toList();
+  }
+
+  // Taxon-level attributes (extinct/environment/temporal range) live in taxon_info and belong only
+  // to accepted usages. Upsert them when the usage is accepted and carries a value; otherwise
+  // (non-accepted, or accepted with nothing set) ensure no row lingers. Runs inside the caller's
+  // write transaction. Spec: docs/superpowers/specs/2026-07-09-taxon-info-refactor-design.md
+  private void writeTaxonInfo(NameUsage u) {
+    boolean hasData = u.getExtinct() != null || u.getEnvironment() != null
+        || u.getTemporalRangeStart() != null || u.getTemporalRangeEnd() != null;
+    if (u.getStatus() == Status.ACCEPTED && hasData) {
+      taxonInfo.upsert(u.getProjectId(), u.getId(), u.getExtinct(), u.getEnvironment(),
+          u.getTemporalRangeStart(), u.getTemporalRangeEnd());
+    } else {
+      taxonInfo.delete(u.getProjectId(), u.getId());
+    }
   }
 }

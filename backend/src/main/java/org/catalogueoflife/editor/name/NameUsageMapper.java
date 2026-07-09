@@ -22,8 +22,7 @@ public interface NameUsageMapper {
   @Insert("""
       INSERT INTO name_usage (
           project_id, id, coldp_id, alternative_id, parent_id, basionym_id, ordinal,
-          status, name_phrase, reference_id, extinct, environment,
-          temporal_range_start, temporal_range_end,
+          status, name_phrase, reference_id,
           scientific_name, authorship, rank, uninomial, genus, infrageneric_epithet,
           specific_epithet, infraspecific_epithet, cultivar_epithet, notho,
           combination_authorship, combination_ex_authorship, combination_authorship_year,
@@ -37,9 +36,6 @@ public interface NameUsageMapper {
           #{parentId}, #{basionymId}, #{ordinal},
           #{status}, #{namePhrase},
           #{referenceId,typeHandler=org.catalogueoflife.editor.name.IntegerArrayTypeHandler},
-          #{extinct},
-          #{environment,typeHandler=org.catalogueoflife.editor.name.EnvironmentArrayTypeHandler},
-          #{temporalRangeStart}, #{temporalRangeEnd},
           #{scientificName}, #{authorship}, #{rank}, #{uninomial}, #{genus}, #{infragenericEpithet},
           #{specificEpithet}, #{infraspecificEpithet}, #{cultivarEpithet}, #{notho},
           #{combinationAuthorship}, #{combinationExAuthorship}, #{combinationAuthorshipYear},
@@ -50,7 +46,13 @@ public interface NameUsageMapper {
       """)
   void insert(NameUsage u);
 
-  @Select("SELECT * FROM name_usage WHERE project_id = #{projectId} AND id = #{id}")
+  @Select("""
+      SELECT nu.*, ti.extinct, ti.environment,
+             ti.temporal_range_start, ti.temporal_range_end
+      FROM name_usage nu
+      LEFT JOIN taxon_info ti ON ti.project_id = nu.project_id AND ti.usage_id = nu.id
+      WHERE nu.project_id = #{projectId} AND nu.id = #{id}
+      """)
   @Results(id = "nameUsageResult", value = {
       @Result(property = "id", column = "id", id = true),
       @Result(property = "projectId", column = "project_id", id = true),
@@ -72,14 +74,17 @@ public interface NameUsageMapper {
   // (ignoring limit/offset) is always consistent with `items`.
   @Select("""
       <script>
-      SELECT * FROM name_usage
-      WHERE project_id = #{projectId}
-      <if test="q != null">AND scientific_name % #{q}</if>
-      <if test="rank != null">AND rank = #{rank}</if>
-      <if test="status != null">AND status = #{status}</if>
+      SELECT nu.*, ti.extinct, ti.environment,
+             ti.temporal_range_start, ti.temporal_range_end
+      FROM name_usage nu
+      LEFT JOIN taxon_info ti ON ti.project_id = nu.project_id AND ti.usage_id = nu.id
+      WHERE nu.project_id = #{projectId}
+      <if test="q != null">AND nu.scientific_name % #{q}</if>
+      <if test="rank != null">AND nu.rank = #{rank}</if>
+      <if test="status != null">AND nu.status = #{status}</if>
       <choose>
-        <when test="q != null">ORDER BY similarity(scientific_name, #{q}) DESC</when>
-        <otherwise>ORDER BY scientific_name</otherwise>
+        <when test="q != null">ORDER BY similarity(nu.scientific_name, #{q}) DESC</when>
+        <otherwise>ORDER BY nu.scientific_name</otherwise>
       </choose>
       LIMIT #{limit} OFFSET #{offset}
       </script>
@@ -138,9 +143,6 @@ public interface NameUsageMapper {
           parent_id = #{parentId}, basionym_id = #{basionymId}, ordinal = #{ordinal},
           status = #{status}, name_phrase = #{namePhrase},
           reference_id = #{referenceId,typeHandler=org.catalogueoflife.editor.name.IntegerArrayTypeHandler},
-          extinct = #{extinct},
-          environment = #{environment,typeHandler=org.catalogueoflife.editor.name.EnvironmentArrayTypeHandler},
-          temporal_range_start = #{temporalRangeStart}, temporal_range_end = #{temporalRangeEnd},
           scientific_name = #{scientificName}, authorship = #{authorship}, rank = #{rank},
           uninomial = #{uninomial}, genus = #{genus}, infrageneric_epithet = #{infragenericEpithet},
           specific_epithet = #{specificEpithet}, infraspecific_epithet = #{infraspecificEpithet},

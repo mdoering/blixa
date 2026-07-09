@@ -150,7 +150,10 @@ class NameUsageApiIT extends AbstractPostgresIT {
 
     mvc.perform(get("/api/projects/" + pid + "/usages/" + accId))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.synonymIds[0]").value(synId));
+        .andExpect(jsonPath("$.synonymIds[0]").value(synId))
+        // taxon info (created above) round-trips back via the taxon_info LEFT JOIN
+        .andExpect(jsonPath("$.environment[0]").value("TERRESTRIAL"))
+        .andExpect(jsonPath("$.temporalRangeStart").value("Holocene"));
 
     mvc.perform(get("/api/projects/" + pid + "/usages/" + synId))
         .andExpect(status().isOk())
@@ -252,6 +255,52 @@ class NameUsageApiIT extends AbstractPostgresIT {
         .andExpect(status().isNoContent());
     mvc.perform(get("/api/projects/" + pid + "/usages/" + accId2))
         .andExpect(status().isNotFound());
+  }
+
+  // Taxon info (extinct/environment/temporal) lives in taxon_info and only for accepted usages:
+  // a synonym never carries it, and demoting an accepted usage sheds it.
+  @Test
+  @WithMockUser(username = "tiUser")
+  void taxonInfoIsAcceptedOnlyAndClearedOnStatusChange() throws Exception {
+    ensureUser("tiUser");
+    long pid = createProject("taxoninfoproj");
+
+    // A SYNONYM created with environment keeps no taxon info (accepted-only).
+    String synBody = mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Syn env\",\"rank\":\"species\",\"status\":\"synonym\","
+                + "\"environment\":[\"marine\"]}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    long synId = json.readTree(synBody).get("id").asLong();
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + synId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.environment[0]").doesNotExist());
+
+    // An ACCEPTED usage with environment round-trips (via the taxon_info join)...
+    String accBody = mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Acc env\",\"rank\":\"species\",\"status\":\"accepted\","
+                + "\"environment\":[\"marine\"]}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.environment[0]").value("MARINE"))
+        .andReturn().getResponse().getContentAsString();
+    long accId = json.readTree(accBody).get("id").asLong();
+    int version = json.readTree(accBody).get("version").asInt();
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + accId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.environment[0]").value("MARINE"));
+
+    // ...but demoting it to SYNONYM (full-replace update carrying environment, as the UI does)
+    // sheds the taxon info.
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + accId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Acc env\",\"rank\":\"species\",\"status\":\"synonym\","
+                + "\"environment\":[\"marine\"],\"version\":" + version + "}"))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + accId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.environment[0]").doesNotExist());
   }
 
   // GET /usages's rank/status filters + total count (Task 1 of the create/search/actions plan).
