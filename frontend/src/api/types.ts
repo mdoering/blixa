@@ -151,6 +151,53 @@ export interface UsagePage {
 }
 
 // Mirrors backend IssueResponse. severity/status are lowercase API strings.
+// Mirrors backend ReferenceResponse (writable fields + id/version). All strings are nullable.
+export interface Reference {
+  id: number;
+  citation: string | null;
+  type: string | null;
+  author: string | null;
+  editor: string | null;
+  title: string | null;
+  containerTitle: string | null;
+  issued: string | null;
+  volume: string | null;
+  issue: string | null;
+  page: string | null;
+  publisher: string | null;
+  doi: string | null;
+  isbn: string | null;
+  issn: string | null;
+  link: string | null;
+  remarks: string | null;
+  version: number;
+}
+
+// Mirrors backend CreateReferenceRequest (also the shape returned by resolve-doi as a preview).
+export interface CreateRefPayload {
+  citation?: string;
+  type?: string;
+  author?: string;
+  editor?: string;
+  title?: string;
+  containerTitle?: string;
+  issued?: string;
+  volume?: string;
+  issue?: string;
+  page?: string;
+  publisher?: string;
+  doi?: string;
+  isbn?: string;
+  issn?: string;
+  link?: string;
+  remarks?: string;
+}
+
+// Mirrors backend UpdateReferenceRequest (create fields + optimistic-lock version).
+export interface UpdateRefPayload extends CreateRefPayload {
+  version: number;
+}
+
 export interface Issue {
   id: number;
   entityType: string;

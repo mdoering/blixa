@@ -2,6 +2,7 @@ import { Stack, Text } from '@mantine/core';
 import {
   IconAlertTriangle,
   IconBinaryTree2,
+  IconBooks,
   IconFolders,
   IconHistory,
   IconList,
@@ -35,6 +36,7 @@ export default function AppSidebar({ projectId, collapsed, onNavigate }: AppSide
       ? [
           { key: 'tree', label: 'Tree', icon: <IconBinaryTree2 size={ICON} />, to: `/projects/${projectId}/tree` },
           { key: 'names', label: 'Names', icon: <IconList size={ICON} />, to: `/projects/${projectId}/names` },
+          { key: 'references', label: 'References', icon: <IconBooks size={ICON} />, to: `/projects/${projectId}/references` },
           { key: 'issues', label: 'Issues', icon: <IconAlertTriangle size={ICON} />, to: `/projects/${projectId}/issues` },
           { key: 'history', label: 'History', icon: <IconHistory size={ICON} />, to: `/projects/${projectId}/history` },
           { key: 'project', label: 'Project', icon: <IconSettings size={ICON} />, to: `/projects/${projectId}/metadata` },

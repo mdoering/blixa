@@ -10,6 +10,7 @@ import TreePage from './tree/TreePage';
 import NameSearchPage from './names/NameSearchPage';
 import IssuesPage from './issues/IssuesPage';
 import HistoryPage from './history/HistoryPage';
+import ReferencesPage from './references/ReferencesPage';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
             <Route index element={<Navigate to="metadata" replace />} />
             <Route path="tree" element={<TreePage />} />
             <Route path="names" element={<NameSearchPage />} />
+            <Route path="references" element={<ReferencesPage />} />
             <Route path="issues" element={<IssuesPage />} />
             <Route path="history" element={<HistoryPage />} />
             <Route path="metadata" element={<ProjectMetadataPage />} />
