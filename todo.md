@@ -34,16 +34,33 @@ Brainstormed into 4 sub-projects (each own spec+plan+ship). Sequencing: refactor
 ## References editor — DONE (spec `…/specs/2026-07-09-references-editor-design.md`)
 - [x] **References editor** (commits): `References` section — citation search table + create/edit/delete `ReferenceForm`; **Import DOI** (backend `POST /references/resolve-doi` → Crossref via RestClient → CSL map → unsaved preview → pre-filled form; browser-verified live with 10.1038/nature12373) and **Import BibTeX** (backend `POST /references/import-bibtex` → jbibtex parse → bulk create). `RefMapping.fromCrossref/fromBibtex`; `CrossrefClient` (built with `RestClient.builder()` static — the `RestClient.Builder` bean isn't present). jbibtex dep. backend 35u+54IT; frontend 96 tests.
 
+## Name & taxon child entities — DONE (spec `…/specs/2026-07-09-name-taxon-child-entities-design.md`)
+All 7 ColDP child entities, on one reusable pattern. Commits 8533575 (NameRelation
++ infra), af7d82e (TypeMaterial), b32eb3f (5 taxon-level entities).
+- **Shared pattern**: backend mapper/service/controller/DTO per entity, all keyed
+  `(project_id,id)` with CASCADE FK to `name_usage` (V10 migration, 7 tables);
+  frontend `EntitySelect` (async picker) + generic `ChildEntityTab` (field-driven
+  list/add/edit/delete) + `childApi()` factory. `TaxonDetail` is now Mantine **Tabs**.
+- **Any usage**: `name_relation` (→ related usage by ID, NomRelType) · `type_material`
+  (incl. GBIF `occurrenceId` for later import).
+- **Accepted-only** (`AbstractChildEntityService`, create-guarded; dropped on demote
+  via `TaxonChildMapper.dropAll` wired into `writeTaxonInfo`): `vernacular` (simplified),
+  `distribution` (free-text area OR gazetteer areaId+gazetteer), `media`, `estimate`,
+  `property` (ordinal ignored). Tabs show only when the usage is ACCEPTED.
+- backend mvn verify 35u+57IT; frontend 102 tests + build.
+
 ## Frontend remaining
 - [ ] Tree **virtualization** (lazy-per-node is fine for now; needed at Lepidoptera scale).
-- [ ] Issue **entity deep-link** (click an issue's entity → open it in the tree/detail — currently plain text).
+- [x] Issue **entity deep-link** — DONE. IssuesPage entity cell links to
+  `…/names?usage={id}`; NameSearchPage reads `?usage=` for the selected row.
 - [ ] References list **total count** (endpoint returns a bare List → prev/next paging, no total/MRT; add a count for a richer table later).
 - [ ] CSL-JSON import + DOI consolidation (find-DOI-for-existing) — same RefMapping.
+- [ ] Child entities: GBIF occurrence import into TypeMaterial (by `occurrenceId`); distribution map preview (portal-components) using gazetteer areaId.
 
 ## Features backlog (`features.md`) — bigger pieces
 - [ ] **Status business-rules + acc↔syn workflow**: only accepted names in tree/carry taxon info; synonyms → ≥1 accepted; no synonym chaining; misapplied = synonym; acc→syn demotion picks a new accepted + migrates taxon info (ask user).
 - [ ] **More validation rules**: rank-vs-parent, genus-token-vs-parent, infraspecific-part-vs-parent, genus-year ≤ species-year, synonym→non-accepted, dangling pointers.
-- [ ] **Supporting entities**: vernacular / distribution / properties / estimates / environments / geo-range (attach to accepted usages only).
+- [x] **Supporting entities**: vernacular / distribution / properties / estimates / media + name relations / type material — DONE (see "Name & taxon child entities" above). Environments/geo-range beyond distribution not yet modelled.
 - [ ] **Tools**: bulk name insert (TSV / texttree), homotypic grouping, reference import (DOI/Crossref, BibTeX, CSL-JSON) + DOI consolidation.
 - [ ] **ColDP import/export** (phase 2/3) — where the deferred **Release** entity (version + issued + changelog) gets built.
 
