@@ -14,6 +14,10 @@ export interface ClassificationTreeProps {
   // Threaded down to every row's action menu; called after a delete succeeds with the deleted
   // usage's id so the caller can clear its selection if that row was selected.
   onAfterDelete?: (deletedId: number) => void;
+  // When set (used by the Move target-picker), the row for this usage is shown non-selectable and
+  // non-expandable -- so neither the node itself nor any of its descendants (only reachable by
+  // expanding it, since the tree is single-parent) can be chosen as a new parent.
+  disabledId?: number;
 }
 
 // Lazy classification tree: only the root level is fetched eagerly; every other level is
@@ -25,6 +29,7 @@ export default function ClassificationTree({
   onSelect,
   canEdit = false,
   onAfterDelete,
+  disabledId,
 }: ClassificationTreeProps) {
   const {
     data: roots,
@@ -51,6 +56,7 @@ export default function ClassificationTree({
           onSelect={onSelect}
           canEdit={canEdit}
           onAfterDelete={onAfterDelete}
+          disabledId={disabledId}
         />
       ))}
     </Stack>

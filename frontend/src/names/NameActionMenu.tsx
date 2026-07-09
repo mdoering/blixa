@@ -1,6 +1,7 @@
 import { ActionIcon, Menu } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconArrowsMove, IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
+import MoveNameModal from '../tree/MoveNameModal';
 import CreateNameModal from './CreateNameModal';
 import { useNameActions } from './useNameActions';
 
@@ -94,6 +95,12 @@ export default function NameActionMenu({
               >
                 Add synonym
               </Menu.Item>
+              <Menu.Item
+                leftSection={<IconArrowsMove size={14} />}
+                onClick={() => actions.startMove(usage)}
+              >
+                Move…
+              </Menu.Item>
             </>
           )}
           <Menu.Label>Change status</Menu.Label>
@@ -119,6 +126,14 @@ export default function NameActionMenu({
             actions.closeModal();
             onSelect(newId);
           }}
+        />
+      )}
+      {actions.moveTarget && (
+        <MoveNameModal
+          pid={pid}
+          usage={actions.moveTarget}
+          opened
+          onClose={actions.closeMove}
         />
       )}
     </>

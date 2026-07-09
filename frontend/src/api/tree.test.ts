@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { server, http, HttpResponse } from '../test/server';
-import { getChildren, getPath, getRoots } from './tree';
+import { getChildren, getPath, getRoots, moveParent } from './tree';
 
 test('getRoots calls the project roots endpoint with paging params', async () => {
   let requestUrl = '';
@@ -51,4 +51,28 @@ test('getPath calls the path endpoint for the given id', async () => {
   );
   await getPath(3, 42);
   expect(called).toBe(true);
+});
+
+test('moveParent PUTs parentId + version to the reparent endpoint', async () => {
+  let body: unknown = null;
+  server.use(
+    http.put('/api/projects/3/tree/usages/9/parent', async ({ request }) => {
+      body = await request.json();
+      return new HttpResponse(null, { status: 200 });
+    }),
+  );
+  await moveParent(3, 9, 6, 2);
+  expect(body).toEqual({ parentId: 6, version: 2 });
+});
+
+test('moveParent sends parentId null when making a node a root', async () => {
+  let body: unknown = null;
+  server.use(
+    http.put('/api/projects/3/tree/usages/9/parent', async ({ request }) => {
+      body = await request.json();
+      return new HttpResponse(null, { status: 200 });
+    }),
+  );
+  await moveParent(3, 9, null, 4);
+  expect(body).toEqual({ parentId: null, version: 4 });
 });

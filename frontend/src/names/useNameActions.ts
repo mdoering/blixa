@@ -17,6 +17,13 @@ export interface CreateModalState {
   anchor: CreateNameAnchor | null;
 }
 
+// The node currently targeted by the Move modal (null = closed). Structurally compatible with
+// MoveNameModal's MoveTarget; kept inline so this hook doesn't depend on the tree module.
+export interface MoveModalTarget {
+  id: number;
+  scientificName: string | null;
+}
+
 // Update (there's no status-only endpoint) is a full replace, so change-status must carry over
 // every other field of the freshly-loaded usage -- mirrors TaxonDetail's save payload.
 function toUpdatePayload(usage: NameUsage, status: string): UpdateUsagePayload {
@@ -51,6 +58,7 @@ function toUpdatePayload(usage: NameUsage, status: string): UpdateUsagePayload {
 export function useNameActions(pid: number) {
   const queryClient = useQueryClient();
   const [modalState, setModalState] = useState<CreateModalState | null>(null);
+  const [moveTarget, setMoveTarget] = useState<MoveModalTarget | null>(null);
 
   // `id` is the affected usage: also invalidate its own detail query and path so a currently-open
   // TaxonDetail (reads ['usage', pid, id]) and Breadcrumb (reads ['treePath', pid, id]) refresh
@@ -103,6 +111,11 @@ export function useNameActions(pid: number) {
     createSynonymOf: (accepted: CreateNameAnchor) =>
       setModalState({ mode: 'synonym', anchor: accepted }),
     createRoot: () => setModalState({ mode: 'root', anchor: null }),
+    // Move modal open/close (the reparent flow itself lives in MoveNameModal, mirroring how the
+    // create flow lives in CreateNameModal off `modalState`).
+    moveTarget,
+    startMove: (usage: MoveModalTarget) => setMoveTarget(usage),
+    closeMove: () => setMoveTarget(null),
     changeStatus: (usage: ActionableUsage, status: string) =>
       changeStatusMutation.mutate({ usage, status }),
     // `onSuccess` here (rather than baked into removeMutation above) lets callers react to a

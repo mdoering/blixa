@@ -18,6 +18,9 @@ export interface TreeNodeRowProps {
   // Called after this row's (or any descendant row's) delete succeeds, with the deleted usage's
   // id -- lets the page clear its selection if the deleted row was the one selected.
   onAfterDelete?: (deletedId: number) => void;
+  // See ClassificationTree: when this row's node matches, it (and its subtree) is disabled as a
+  // Move target -- non-selectable and non-expandable.
+  disabledId?: number;
 }
 
 export default function TreeNodeRow({
@@ -28,11 +31,14 @@ export default function TreeNodeRow({
   onSelect,
   canEdit = false,
   onAfterDelete,
+  disabledId,
 }: TreeNodeRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [menuOpened, setMenuOpened] = useState(false);
-  const hasChildren = node.childCount > 0;
+  const disabled = disabledId === node.id;
+  // A disabled node's whole subtree is off-limits as a target, so it can't be expanded to reach it.
+  const hasChildren = node.childCount > 0 && !disabled;
   const selected = selectedId === node.id;
 
   // Lazy: children are only fetched once this node is expanded, and stay cached by
@@ -74,9 +80,10 @@ export default function TreeNodeRow({
         <Group
           gap={6}
           wrap="nowrap"
-          onClick={() => onSelect(node.id)}
+          onClick={() => !disabled && onSelect(node.id)}
           style={{
-            cursor: 'pointer',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled ? 0.45 : 1,
             flex: 1,
             borderRadius: 4,
             paddingInline: 4,
@@ -129,6 +136,7 @@ export default function TreeNodeRow({
               onSelect={onSelect}
               canEdit={canEdit}
               onAfterDelete={onAfterDelete}
+              disabledId={disabledId}
             />
           ))}
         </Stack>

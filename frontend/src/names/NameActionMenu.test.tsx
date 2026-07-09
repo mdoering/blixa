@@ -22,6 +22,7 @@ test('an editor sees add-child/add-synonym/change-status/delete actions', async 
 
   expect(await screen.findByText('Add child')).toBeInTheDocument();
   expect(screen.getByText('Add synonym')).toBeInTheDocument();
+  expect(screen.getByText(/^Move/)).toBeInTheDocument();
   expect(screen.getByText('Change status')).toBeInTheDocument();
   expect(screen.getByText('Accepted')).toBeInTheDocument();
   expect(screen.getByText('Synonym')).toBeInTheDocument();
@@ -40,6 +41,7 @@ test('add-child/add-synonym are hidden for a non-accepted usage (backend 400s bo
   await screen.findByText('Change status'); // menu is open
   expect(screen.queryByText('Add child')).not.toBeInTheDocument();
   expect(screen.queryByText('Add synonym')).not.toBeInTheDocument();
+  expect(screen.queryByText(/^Move/)).not.toBeInTheDocument();
   expect(screen.getByText('Delete')).toBeInTheDocument();
 });
 
