@@ -78,6 +78,23 @@ test('"Delete" asks for confirmation before calling DELETE', async () => {
   expect(onSelect).not.toHaveBeenCalled();
 });
 
+test('"Synonym" on an accepted usage opens the guided Demote modal', async () => {
+  server.use(
+    http.get('/api/projects/3/usages/10', () =>
+      HttpResponse.json({ id: 10, version: 1, status: 'ACCEPTED', scientificName: 'Panthera leo', synonymIds: [] }),
+    ),
+    http.get('/api/projects/3/tree/children/10', () => HttpResponse.json([])),
+    http.get('/api/projects/3/tree/roots', () => HttpResponse.json([])),
+  );
+  renderWithProviders(<NameActionMenu pid={3} usage={usage} canEdit onSelect={() => {}} />);
+
+  await userEvent.click(screen.getByLabelText('Actions'));
+  await userEvent.click(await screen.findByText('Synonym'));
+
+  // The Demote modal's title ("Demote <name> to a synonym") is unique to the opened modal.
+  expect(await screen.findByText(/to a synonym/)).toBeInTheDocument();
+});
+
 test('a confirmed delete calls onAfterDelete with the deleted usage id', async () => {
   server.use(
     http.delete('/api/projects/3/usages/10', () => new HttpResponse(null, { status: 204 })),

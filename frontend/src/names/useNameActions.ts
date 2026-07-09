@@ -55,10 +55,18 @@ function toUpdatePayload(usage: NameUsage, status: string): UpdateUsagePayload {
 // open" state -- callers (NameActionMenu, TreePage's toolbar button, later the Names search
 // table) render <CreateNameModal> themselves keyed off `modalState`, so each caller controls how
 // the resulting new-id gets used (e.g. select it).
+// The node targeted by the Demote modal, plus which non-accepted status the user picked.
+export interface DemoteModalTarget {
+  usage: MoveModalTarget;
+  status: string;
+}
+
 export function useNameActions(pid: number) {
   const queryClient = useQueryClient();
   const [modalState, setModalState] = useState<CreateModalState | null>(null);
   const [moveTarget, setMoveTarget] = useState<MoveModalTarget | null>(null);
+  const [demoteTarget, setDemoteTarget] = useState<DemoteModalTarget | null>(null);
+  const [promoteTarget, setPromoteTarget] = useState<MoveModalTarget | null>(null);
 
   // `id` is the affected usage: also invalidate its own detail query and path so a currently-open
   // TaxonDetail (reads ['usage', pid, id]) and Breadcrumb (reads ['treePath', pid, id]) refresh
@@ -116,6 +124,13 @@ export function useNameActions(pid: number) {
     moveTarget,
     startMove: (usage: MoveModalTarget) => setMoveTarget(usage),
     closeMove: () => setMoveTarget(null),
+    // Demote (acc->syn) and promote (syn->acc) modals; the flows live in Demote/PromoteModal.
+    demoteTarget,
+    startDemote: (usage: MoveModalTarget, status: string) => setDemoteTarget({ usage, status }),
+    closeDemote: () => setDemoteTarget(null),
+    promoteTarget,
+    startPromote: (usage: MoveModalTarget) => setPromoteTarget(usage),
+    closePromote: () => setPromoteTarget(null),
     changeStatus: (usage: ActionableUsage, status: string) =>
       changeStatusMutation.mutate({ usage, status }),
     // `onSuccess` here (rather than baked into removeMutation above) lets callers react to a

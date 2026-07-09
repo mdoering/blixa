@@ -2,6 +2,8 @@ import { ActionIcon, Menu } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { IconArrowsMove, IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
 import MoveNameModal from '../tree/MoveNameModal';
+import DemoteModal from '../tree/DemoteModal';
+import PromoteModal from '../tree/PromoteModal';
 import CreateNameModal from './CreateNameModal';
 import { useNameActions } from './useNameActions';
 
@@ -51,6 +53,19 @@ export default function NameActionMenu({
   const actions = useNameActions(pid);
 
   if (!canEdit) return null;
+
+  // acc -> syn/misapplied opens the guided Demote modal; syn/misapplied -> accepted opens Promote;
+  // every other transition (e.g. synonym <-> misapplied, -> unassessed) is a plain status update.
+  const onStatusClick = (target: string) => {
+    const move = { id: usage.id, scientificName: usage.scientificName };
+    if (usage.status === 'ACCEPTED' && (target === 'SYNONYM' || target === 'MISAPPLIED')) {
+      actions.startDemote(move, target);
+    } else if ((usage.status === 'SYNONYM' || usage.status === 'MISAPPLIED') && target === 'ACCEPTED') {
+      actions.startPromote(move);
+    } else {
+      actions.changeStatus(usage, target);
+    }
+  };
 
   // Synonyms/misapplied/unassessed usages can neither be a parent nor have synonyms of their
   // own -- the backend 400s both attempts -- so only offer these for accepted usages.
@@ -105,7 +120,7 @@ export default function NameActionMenu({
           )}
           <Menu.Label>Change status</Menu.Label>
           {STATUS_OPTIONS.map((s) => (
-            <Menu.Item key={s.value} onClick={() => actions.changeStatus(usage, s.value)}>
+            <Menu.Item key={s.value} onClick={() => onStatusClick(s.value)}>
               {s.label}
             </Menu.Item>
           ))}
@@ -134,6 +149,23 @@ export default function NameActionMenu({
           usage={actions.moveTarget}
           opened
           onClose={actions.closeMove}
+        />
+      )}
+      {actions.demoteTarget && (
+        <DemoteModal
+          pid={pid}
+          usage={actions.demoteTarget.usage}
+          initialStatus={actions.demoteTarget.status}
+          opened
+          onClose={actions.closeDemote}
+        />
+      )}
+      {actions.promoteTarget && (
+        <PromoteModal
+          pid={pid}
+          usage={actions.promoteTarget}
+          opened
+          onClose={actions.closePromote}
         />
       )}
     </>

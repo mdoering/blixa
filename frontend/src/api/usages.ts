@@ -43,6 +43,30 @@ export function deleteUsage(pid: number, id: number): Promise<void> {
   return api<void>(`/api/projects/${pid}/usages/${id}`, { method: 'DELETE' });
 }
 
+// acc -> syn (see backend NameUsageService.demote): turn an accepted usage into a synonym/misapplied
+// of `acceptedId`. childrenTo/synonymsTo are required by the backend only when the node has accepted
+// children / its own synonyms; version is the node's optimistic lock. Returns the updated usage.
+export interface DemotePayload {
+  acceptedId: number;
+  status: string;
+  childrenTo?: string;
+  synonymsTo?: string;
+  version: number;
+}
+export function demoteUsage(pid: number, id: number, payload: DemotePayload): Promise<NameUsage> {
+  return api<NameUsage>(`/api/projects/${pid}/usages/${id}/demote`, { method: 'POST', json: payload });
+}
+
+// syn -> acc (see backend NameUsageService.promote): promote a synonym/misapplied usage to accepted
+// at `parentId` (null = root), dropping its synonym links. Returns the updated usage.
+export interface PromotePayload {
+  parentId: number | null;
+  version: number;
+}
+export function promoteUsage(pid: number, id: number, payload: PromotePayload): Promise<NameUsage> {
+  return api<NameUsage>(`/api/projects/${pid}/usages/${id}/promote`, { method: 'POST', json: payload });
+}
+
 // Links `synonymId` (expected to already have status SYNONYM/MISAPPLIED) as a synonym of
 // `acceptedId`. No request body -- this only creates the synonym_accepted row server-side.
 export function linkSynonym(pid: number, synonymId: number, acceptedId: number): Promise<void> {
