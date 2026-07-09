@@ -45,6 +45,14 @@ test('renders the summary rollup and the issue rows', async () => {
   expect(screen.getByText(/warning 1/)).toBeInTheDocument();
 });
 
+test('the entity cell deep-links to the usage on the Names page', async () => {
+  mockProject();
+  renderPage();
+  await screen.findByText('genus_mismatch');
+  const link = screen.getByRole('link', { name: 'name_usage #9' });
+  expect(link).toHaveAttribute('href', '/projects/3/names?usage=9');
+});
+
 test('accepting an issue POSTs the review action', async () => {
   mockProject();
   let reviewed: unknown = null;

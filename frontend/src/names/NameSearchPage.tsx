@@ -4,7 +4,7 @@ import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { MantineReactTable, useMantineReactTable, type MRT_ColumnDef } from 'mantine-react-table';
 import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { getProject } from '../api/projects';
 import { searchUsages } from '../api/usages';
 import type { NameUsage } from '../api/types';
@@ -49,7 +49,16 @@ export default function NameSearchPage() {
   const { data: project } = useQuery({ queryKey: ['project', pid], queryFn: () => getProject(pid) });
   const canEdit = project ? ['owner', 'editor'].includes(project.role) : false;
 
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Deep-link support: ?usage=<id> (e.g. from the Issues dashboard) preselects that usage's detail,
+  // even if it isn't on the current filtered table page. Re-syncs when the param changes.
+  const [searchParams] = useSearchParams();
+  const usageParam = searchParams.get('usage');
+  const [selectedId, setSelectedId] = useState<number | null>(
+    usageParam ? Number(usageParam) : null,
+  );
+  useEffect(() => {
+    if (usageParam) setSelectedId(Number(usageParam));
+  }, [usageParam]);
   // Which row's ⋮ menu is open -- a single id, since only one menu can be open at a time; also
   // driven by right-click on the row (mirrors TreeNodeRow's onContextMenu handling).
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);

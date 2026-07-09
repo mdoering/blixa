@@ -26,6 +26,44 @@ const abiesNigra = {
   version: 0,
 };
 
+// Fuller detail shape TaxonDetail's own GET returns (used by the deep-link test below).
+const abiesAlbaDetail = {
+  ...abiesAlba,
+  namePhrase: null,
+  extinct: null,
+  environment: null,
+  temporalRangeStart: null,
+  temporalRangeEnd: null,
+  uninomial: null,
+  genus: 'Abies',
+  infragenericEpithet: null,
+  specificEpithet: 'alba',
+  infraspecificEpithet: null,
+  cultivarEpithet: null,
+  notho: null,
+  combinationAuthorship: null,
+  combinationExAuthorship: null,
+  combinationAuthorshipYear: null,
+  basionymAuthorship: null,
+  basionymExAuthorship: null,
+  basionymAuthorshipYear: null,
+  sanctioningAuthor: null,
+  nomStatus: null,
+  publishedInReferenceId: null,
+  publishedInYear: null,
+  publishedInPage: null,
+  publishedInPageLink: null,
+  gender: null,
+  etymology: null,
+  nameType: 'SCIENTIFIC',
+  parseState: 'COMPLETE',
+  link: null,
+  remarks: null,
+  formattedName: 'Abies alba Mill.',
+  acceptedParentIds: [],
+  synonymIds: [],
+};
+
 // Both rows satisfy the (much larger) NameUsage shape structurally-enough for the table's
 // columns (scientificName/authorship/rank/status) and for NameActionMenu's minimal usage shape;
 // TaxonDetail's own request is mocked separately below with the fuller shape it needs.
@@ -238,6 +276,27 @@ test('deleting the currently-selected row clears the detail pane', async () => {
   await waitFor(() =>
     expect(screen.getByText('Select a name to see its details.')).toBeInTheDocument(),
   );
+});
+
+test('?usage= deep-link preselects that usage in the detail pane (no click)', async () => {
+  server.use(
+    http.get('/api/projects/9', () => HttpResponse.json(project)),
+    http.get('/api/projects/9/usages', () =>
+      HttpResponse.json({ items: [abiesAlba, abiesNigra], total: 2 }),
+    ),
+    http.get('/api/projects/9/usages/1', () => HttpResponse.json(abiesAlbaDetail)),
+    http.get('/api/projects/9/usages/1/synonyms', () => HttpResponse.json([])),
+    http.get('/api/projects/9/issues', () => HttpResponse.json([])),
+  );
+  renderWithProviders(
+    <Routes>
+      <Route path="/projects/:projectId/names" element={<NameSearchPage />} />
+    </Routes>,
+    { route: '/projects/9/names?usage=1' },
+  );
+
+  // The detail form appears without any interaction, seeded from the ?usage= param.
+  expect(await screen.findByLabelText('Scientific name')).toHaveValue('Abies alba');
 });
 
 test('the row action menu opens', async () => {

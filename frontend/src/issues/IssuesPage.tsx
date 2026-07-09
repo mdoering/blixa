@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Anchor,
   Badge,
   Button,
   Group,
@@ -12,7 +13,7 @@ import {
 } from '@mantine/core';
 import { IconDots, IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
 import { messageFor } from '../api/client';
@@ -167,9 +168,19 @@ export default function IssuesPage() {
                 <Text size="sm">{i.message}</Text>
               </Table.Td>
               <Table.Td>
-                <Text size="sm" c="dimmed">
-                  {i.entityType} #{i.entityId}
-                </Text>
+                {i.entityType === 'name_usage' ? (
+                  <Anchor
+                    component={Link}
+                    to={`/projects/${pid}/names?usage=${i.entityId}`}
+                    size="sm"
+                  >
+                    {i.entityType} #{i.entityId}
+                  </Anchor>
+                ) : (
+                  <Text size="sm" c="dimmed">
+                    {i.entityType} #{i.entityId}
+                  </Text>
+                )}
               </Table.Td>
               <Table.Td>
                 <Badge size="sm" variant="outline" color={STATUS_COLOR[i.status] ?? 'gray'}>
