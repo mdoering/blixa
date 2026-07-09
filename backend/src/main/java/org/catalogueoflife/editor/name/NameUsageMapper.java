@@ -142,6 +142,22 @@ public interface NameUsageMapper {
   @Select("SELECT id FROM name_usage WHERE project_id = #{projectId} AND parent_id = #{parentId}")
   List<Integer> findChildIds(@Param("projectId") int projectId, @Param("parentId") int parentId);
 
+  // Scientific name of the nearest STRICT ancestor of rank genus (depth > 0 skips the node itself),
+  // or null if there is none -- the classification genus that GenusMismatchRule compares a usage's
+  // parsed genus token against. The depth bound is the same defensive cycle guard as TreeMapper's.
+  @Select("""
+      WITH RECURSIVE anc AS (
+        SELECT project_id, id, parent_id, rank, scientific_name, 0 AS depth
+        FROM name_usage WHERE project_id = #{projectId} AND id = #{id}
+        UNION ALL
+        SELECT n.project_id, n.id, n.parent_id, n.rank, n.scientific_name, anc.depth + 1
+        FROM name_usage n JOIN anc ON n.project_id = anc.project_id AND n.id = anc.parent_id
+        WHERE anc.depth < 10000
+      )
+      SELECT scientific_name FROM anc WHERE depth > 0 AND rank = 'genus' ORDER BY depth LIMIT 1
+      """)
+  String findAncestorGenusName(@Param("projectId") int projectId, @Param("id") int id);
+
   // Bulk reparent every direct child of oldParentId onto newParentId (which may be null = root).
   // Used by demote: a server-orchestrated move of a whole child set under the project advisory lock,
   // so unlike the single-node reparent it carries no per-child optimistic version -- it still bumps

@@ -160,6 +160,30 @@ class NameUsageMapperIT extends AbstractPostgresIT {
     assertThat(nameUsages.findByIdInProject(projectB, 1).getProjectId()).isEqualTo(projectB);
   }
 
+  @Test
+  void findsNearestAncestorGenusName() {
+    Project p = new Project();
+    p.setTitle("GenusAnc");
+    projects.insert(p);
+    int pid = p.getId();
+
+    NameUsage bus = newMinimalUsage(pid);
+    bus.setScientificName("Bus");
+    bus.setRank("genus");
+    bus.setId(idSeq.allocate(pid, ENTITY));
+    nameUsages.insert(bus);
+
+    NameUsage sp = newMinimalUsage(pid);
+    sp.setScientificName("Bus cus");
+    sp.setParentId(bus.getId());
+    sp.setId(idSeq.allocate(pid, ENTITY));
+    nameUsages.insert(sp);
+
+    // a species under genus "Bus" -> "Bus"; the genus itself has no ancestor genus -> null
+    assertThat(nameUsages.findAncestorGenusName(pid, sp.getId())).isEqualTo("Bus");
+    assertThat(nameUsages.findAncestorGenusName(pid, bus.getId())).isNull();
+  }
+
   private static NameUsage newMinimalUsage(int projectId) {
     NameUsage u = new NameUsage();
     u.setProjectId(projectId);

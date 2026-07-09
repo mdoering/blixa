@@ -128,7 +128,9 @@ public class ValidationService {
         : references.findByIdInProject(projectId, usage.getPublishedInReferenceId());
     int duplicateCount = nameUsages.countDuplicates(projectId, usage.getScientificName(),
         usage.getAuthorship(), usage.getId());
-    return new RuleContext(usage, synonymAcceptedCount, publishedInReference, duplicateCount);
+    String ancestorGenusName = nameUsages.findAncestorGenusName(projectId, usage.getId());
+    return new RuleContext(usage, synonymAcceptedCount, publishedInReference, duplicateCount,
+        ancestorGenusName);
   }
 
   private void insert(int projectId, int usageId, Finding finding, String contextJson) {

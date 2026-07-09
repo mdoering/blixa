@@ -8,6 +8,7 @@ import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.Reference;
 import org.catalogueoflife.editor.name.Status;
 import org.catalogueoflife.editor.validation.rules.DuplicateNameRule;
+import org.catalogueoflife.editor.validation.rules.GenusMismatchRule;
 import org.catalogueoflife.editor.validation.rules.MissingPublishedInRule;
 import org.catalogueoflife.editor.validation.rules.SynonymWithoutAcceptedRule;
 import org.catalogueoflife.editor.validation.rules.UnparsableNameRule;
@@ -177,5 +178,35 @@ class RuleTests {
 
     assertThat(new YearVsReferenceRule().evaluate(new RuleContext(u, 0, referenceIssued("undated"), 0)))
         .isEmpty();
+  }
+
+  // --- GenusMismatchRule ---
+
+  @Test
+  void genusMismatchFlagsWhenGenusDiffersFromClassification() {
+    NameUsage u = new NameUsage();
+    u.setStatus(Status.ACCEPTED);
+    u.setScientificName("Aus bus");
+    u.setGenus("Aus");
+
+    Optional<Finding> finding =
+        new GenusMismatchRule().evaluate(new RuleContext(u, 0, null, 0, "Bus"));
+    assertThat(finding).isPresent();
+    assertThat(finding.get().rule()).isEqualTo("genus_mismatch");
+    assertThat(finding.get().severity()).isEqualTo(Severity.WARNING);
+    assertThat(finding.get().message()).contains("Aus").contains("Bus");
+  }
+
+  @Test
+  void genusMismatchOkWhenGenusMatchesOrNoAncestorGenus() {
+    NameUsage u = new NameUsage();
+    u.setStatus(Status.ACCEPTED);
+    u.setGenus("Aus");
+
+    assertThat(new GenusMismatchRule().evaluate(new RuleContext(u, 0, null, 0, "Aus"))).isEmpty();
+    // case-insensitive
+    assertThat(new GenusMismatchRule().evaluate(new RuleContext(u, 0, null, 0, "aus"))).isEmpty();
+    // no ancestor genus in the classification -> nothing to compare against
+    assertThat(new GenusMismatchRule().evaluate(new RuleContext(u, 0, null, 0, null))).isEmpty();
   }
 }
