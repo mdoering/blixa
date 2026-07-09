@@ -9,6 +9,7 @@ import org.catalogueoflife.editor.task.CurrentTask;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
 import tools.jackson.databind.ObjectMapper;
 
 // Central, single place that turns a write into one append-only `change` row (see
@@ -45,7 +46,15 @@ public class AuditService {
     // Thrown here (400, unknown/closed task), this propagates out of the caller's own
     // @Transactional write method and rolls the whole write back: an edit attributed to a bogus
     // task must not persist.
-    Integer taskId = currentTask.resolve(projectId);
+    //
+    // CurrentTask is @RequestScope, so it only resolves inside an HTTP request. Every production
+    // write reaches here from a controller, so the guard is always true there and behaviour is
+    // unchanged. A write made outside any request -- the dev sample-data seeder (DevSampleData), or
+    // any future background job -- has no task by definition, so it records an ungrouped change
+    // rather than hitting a ScopeNotActiveException.
+    Integer taskId = RequestContextHolder.getRequestAttributes() != null
+        ? currentTask.resolve(projectId)
+        : null;
     Change c = new Change();
     c.setProjectId(projectId);
     c.setUserId(userId);

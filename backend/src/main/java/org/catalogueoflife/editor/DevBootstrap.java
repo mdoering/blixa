@@ -7,14 +7,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 // Dev-only convenience: seed a local login account so a fresh database is immediately usable through
 // the UI. There is no self-service signup, and ORCID login needs real credentials, so without this a
 // brand-new local DB has no way to authenticate. Active ONLY under the "dev" Spring profile -- it
 // never runs in production or under the "test" profile the integration tests use. Idempotent.
+// @Order(0): must run before DevSampleData (@Order(1)), which seeds a sample project owned by this
+// user and so needs the account to already exist on first boot.
 @Component
 @Profile("dev")
+@Order(0)
 public class DevBootstrap implements ApplicationRunner {
 
   private static final Logger log = LoggerFactory.getLogger(DevBootstrap.class);
