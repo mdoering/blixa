@@ -31,10 +31,14 @@ Brainstormed into 4 sub-projects (each own spec+plan+ship). Sequencing: refactor
 - [x] **Issues dashboard** (commit) — `Issues` section: summary rollup + Revalidate + status/severity-filtered paged table + Accept/Reject/Reopen. Browser-verified (4 missing_published_in INFO on the seeded ref-less taxa).
 - [x] **History (changelog) view** (commit) — `History` section: reverse-chron `GET /changes` with operation badge + entity + author + relative time + collapsible JSON diff + task filter. Browser-verified (demote/promote + seeder diffs render).
 
+## References editor — DONE (spec `…/specs/2026-07-09-references-editor-design.md`)
+- [x] **References editor** (commits): `References` section — citation search table + create/edit/delete `ReferenceForm`; **Import DOI** (backend `POST /references/resolve-doi` → Crossref via RestClient → CSL map → unsaved preview → pre-filled form; browser-verified live with 10.1038/nature12373) and **Import BibTeX** (backend `POST /references/import-bibtex` → jbibtex parse → bulk create). `RefMapping.fromCrossref/fromBibtex`; `CrossrefClient` (built with `RestClient.builder()` static — the `RestClient.Builder` bean isn't present). jbibtex dep. backend 35u+54IT; frontend 96 tests.
+
 ## Frontend remaining
-- [ ] **References editor** (MRT table like Names + a reference form).
 - [ ] Tree **virtualization** (lazy-per-node is fine for now; needed at Lepidoptera scale).
 - [ ] Issue **entity deep-link** (click an issue's entity → open it in the tree/detail — currently plain text).
+- [ ] References list **total count** (endpoint returns a bare List → prev/next paging, no total/MRT; add a count for a richer table later).
+- [ ] CSL-JSON import + DOI consolidation (find-DOI-for-existing) — same RefMapping.
 
 ## Features backlog (`features.md`) — bigger pieces
 - [ ] **Status business-rules + acc↔syn workflow**: only accepted names in tree/carry taxon info; synonyms → ≥1 accepted; no synonym chaining; misapplied = synonym; acc→syn demotion picks a new accepted + migrates taxon info (ask user).
