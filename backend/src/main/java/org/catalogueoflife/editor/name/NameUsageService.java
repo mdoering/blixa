@@ -11,7 +11,9 @@ import life.catalogue.api.vocab.NomStatus;
 import org.catalogueoflife.editor.audit.AuditService;
 import org.catalogueoflife.editor.audit.Operation;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
+import org.catalogueoflife.editor.name.dto.DemoteRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
+import org.catalogueoflife.editor.name.dto.PromoteRequest;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.UsagePage;
 import org.catalogueoflife.editor.parse.NameParserService;
@@ -277,6 +279,144 @@ public class NameUsageService {
           Map.of("acceptedId", acceptedId), null);
       events.publishEvent(ValidationEvent.forUsage(projectId, synonymId));
     }
+  }
+
+  // acc -> syn: turn an accepted usage into a synonym/misapplied name of `acceptedId`, atomically
+  // reassigning its accepted children and its own synonyms per the caller's choices (see
+  // DemoteRequest / the P2 spec). Owner/editor only. The whole reshuffle runs under the project
+  // advisory lock so it is serialized against concurrent moves/demotes.
+  @Transactional
+  public NameUsageResponse demote(int userId, int projectId, int id, DemoteRequest req) {
+    requireEditor(userId, projectId);
+    Project project = requireProject(projectId);
+    tree.lockProject(projectId);
+
+    NameUsage node = requireInProject(projectId, id);
+    if (node.getStatus() != Status.ACCEPTED) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "only accepted usages can be demoted");
+    }
+    Status newStatus = VocabParsing.requireParse(Status.class, req.status(), "status");
+    if (newStatus != Status.SYNONYM && newStatus != Status.MISAPPLIED) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "demote target status must be SYNONYM or MISAPPLIED");
+    }
+    int acceptedId = req.acceptedId();
+    if (acceptedId == id) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "a usage cannot be a synonym of itself");
+    }
+    NameUsage target = requireInProject(projectId, acceptedId);
+    if (target.getStatus() != Status.ACCEPTED) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "the new accepted name must be an accepted usage");
+    }
+    if (tree.isDescendant(projectId, id, acceptedId)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "the new accepted name cannot be a descendant of the demoted node");
+    }
+
+    Integer formerParentId = node.getParentId();
+    List<Integer> childIds = usages.findChildIds(projectId, id);
+    List<Integer> synIds = synonymAccepted.findSynonymsOf(projectId, id);
+
+    // Validate the "ask" dimensions up front (before any write) whenever they apply.
+    Integer childrenNewParent = null;
+    if (!childIds.isEmpty()) {
+      if ("new-accepted".equals(req.childrenTo())) {
+        childrenNewParent = acceptedId;
+      } else if ("former-parent".equals(req.childrenTo())) {
+        childrenNewParent = formerParentId;
+      } else {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "childrenTo must be 'new-accepted' or 'former-parent' when the node has children");
+      }
+    }
+    if (!synIds.isEmpty()
+        && !"new-accepted".equals(req.synonymsTo()) && !"unassessed".equals(req.synonymsTo())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "synonymsTo must be 'new-accepted' or 'unassessed' when the node has synonyms");
+    }
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> before = objectMapper.convertValue(node, Map.class);
+
+    // Demote the node itself (CAS on version -> 409 on a concurrent edit); writeTaxonInfo drops its
+    // taxon info since it is no longer accepted.
+    node.setStatus(newStatus);
+    node.setParentId(null);
+    node.setModifiedBy(userId);
+    node.setVersion(req.version());
+    if (usages.update(node) == 0) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
+    }
+    writeTaxonInfo(node);
+
+    // Reassign the node's (accepted) children.
+    if (!childIds.isEmpty()) {
+      usages.reparentChildren(projectId, id, childrenNewParent, userId);
+    }
+    // Handle the node's own synonyms: re-point them to the new accepted, or (for those left with no
+    // accepted at all) detach as unassessed.
+    if (!synIds.isEmpty()) {
+      boolean toAccepted = "new-accepted".equals(req.synonymsTo());
+      for (int s : synIds) {
+        if (toAccepted) {
+          synonymAccepted.link(projectId, s, acceptedId, null);
+        }
+        synonymAccepted.unlink(projectId, s, id);
+        if (!toAccepted && synonymAccepted.countBySynonym(projectId, s) == 0) {
+          usages.setStatus(projectId, s, Status.UNASSESSED.name(), userId);
+        }
+      }
+    }
+    // The demoted node becomes a synonym of the target.
+    synonymAccepted.link(projectId, id, acceptedId, null);
+
+    NameUsage after = requireInProject(projectId, id);
+    audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
+    events.publishEvent(ValidationEvent.forUsage(projectId, id));
+    events.publishEvent(ValidationEvent.forUsage(projectId, acceptedId));
+    childIds.forEach(c -> events.publishEvent(ValidationEvent.forUsage(projectId, c)));
+    synIds.forEach(s -> events.publishEvent(ValidationEvent.forUsage(projectId, s)));
+    return toResponse(after, project);
+  }
+
+  // syn -> acc: promote a synonym/misapplied usage into an accepted name placed at `parentId`
+  // (null = root), dropping all of its synonym links. Owner/editor only.
+  @Transactional
+  public NameUsageResponse promote(int userId, int projectId, int id, PromoteRequest req) {
+    requireEditor(userId, projectId);
+    Project project = requireProject(projectId);
+    tree.lockProject(projectId);
+
+    NameUsage node = requireInProject(projectId, id);
+    if (node.getStatus() != Status.SYNONYM && node.getStatus() != Status.MISAPPLIED) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "only synonyms or misapplied names can be promoted");
+    }
+    Integer parentId = req.parentId();
+    if (parentId != null) {
+      NameUsage parent = usages.findByIdInProject(projectId, parentId);
+      if (parent == null || parent.getStatus() != Status.ACCEPTED) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "parent not found or not accepted");
+      }
+    }
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> before = objectMapper.convertValue(node, Map.class);
+    node.setStatus(Status.ACCEPTED);
+    node.setParentId(parentId);
+    node.setModifiedBy(userId);
+    node.setVersion(req.version());
+    if (usages.update(node) == 0) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
+    }
+    synonymAccepted.deleteBySynonym(projectId, id);
+    writeTaxonInfo(node);
+
+    NameUsage after = requireInProject(projectId, id);
+    audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
+    events.publishEvent(ValidationEvent.forUsage(projectId, id));
+    return toResponse(after, project);
   }
 
   // App-layer cross-project integrity guard, kept as a nice 404/400 in front of the DB-level

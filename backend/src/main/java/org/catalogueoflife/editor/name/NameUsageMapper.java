@@ -136,6 +136,34 @@ public interface NameUsageMapper {
   @Select("SELECT id FROM name_usage WHERE project_id = #{projectId} AND published_in_reference_id = #{refId}")
   List<Integer> findIdsByPublishedInReference(@Param("projectId") int projectId, @Param("refId") int refId);
 
+  // Direct children of a usage (parent_id = id). The tree only ever links accepted->accepted, so
+  // these are the accepted children the demote workflow (NameUsageService.demote) must reassign
+  // when their parent is turned into a synonym.
+  @Select("SELECT id FROM name_usage WHERE project_id = #{projectId} AND parent_id = #{parentId}")
+  List<Integer> findChildIds(@Param("projectId") int projectId, @Param("parentId") int parentId);
+
+  // Bulk reparent every direct child of oldParentId onto newParentId (which may be null = root).
+  // Used by demote: a server-orchestrated move of a whole child set under the project advisory lock,
+  // so unlike the single-node reparent it carries no per-child optimistic version -- it still bumps
+  // version/modified so any client holding a stale child conflicts on its next own write.
+  @Update("""
+      UPDATE name_usage
+      SET parent_id = #{newParentId}, version = version + 1, modified = now(), modified_by = #{modifiedBy}
+      WHERE project_id = #{projectId} AND parent_id = #{oldParentId}
+      """)
+  int reparentChildren(@Param("projectId") int projectId, @Param("oldParentId") int oldParentId,
+      @Param("newParentId") Integer newParentId, @Param("modifiedBy") int modifiedBy);
+
+  // Set just the status of a usage (+ bump version/modified). Used by demote's synonymsTo=unassessed
+  // branch to detach a now-orphaned synonym; the status value is the Status enum's name().
+  @Update("""
+      UPDATE name_usage
+      SET status = #{status}, version = version + 1, modified = now(), modified_by = #{modifiedBy}
+      WHERE project_id = #{projectId} AND id = #{id}
+      """)
+  int setStatus(@Param("projectId") int projectId, @Param("id") int id,
+      @Param("status") String status, @Param("modifiedBy") int modifiedBy);
+
   @Update("""
       UPDATE name_usage
       SET coldp_id = #{coldpId},

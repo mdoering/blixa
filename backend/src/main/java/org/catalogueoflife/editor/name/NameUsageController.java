@@ -4,7 +4,9 @@ import jakarta.validation.Valid;
 import java.util.List;
 import org.catalogueoflife.editor.auth.CurrentUser;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
+import org.catalogueoflife.editor.name.dto.DemoteRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
+import org.catalogueoflife.editor.name.dto.PromoteRequest;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.UsagePage;
 import org.springframework.http.HttpStatus;
@@ -93,5 +95,21 @@ public class NameUsageController {
   public void unlinkSynonym(@PathVariable int pid, @PathVariable int id, @PathVariable int acceptedId) {
     int uid = currentUser.require().getId();
     service.unlinkSynonym(uid, pid, id, acceptedId);
+  }
+
+  // acc -> syn (see NameUsageService.demote): returns the updated (now-synonym) usage.
+  @PostMapping("/{id}/demote")
+  public NameUsageResponse demote(@PathVariable int pid, @PathVariable int id,
+      @Valid @RequestBody DemoteRequest req) {
+    int uid = currentUser.require().getId();
+    return service.demote(uid, pid, id, req);
+  }
+
+  // syn -> acc (see NameUsageService.promote): returns the updated (now-accepted) usage.
+  @PostMapping("/{id}/promote")
+  public NameUsageResponse promote(@PathVariable int pid, @PathVariable int id,
+      @RequestBody PromoteRequest req) {
+    int uid = currentUser.require().getId();
+    return service.promote(uid, pid, id, req);
   }
 }

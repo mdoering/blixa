@@ -30,6 +30,11 @@ public interface SynonymAcceptedMapper {
       """)
   int unlink(@Param("projectId") int projectId, @Param("s") int synonymId, @Param("a") int acceptedId);
 
+  // Drop every link from a synonym usage to its accepted target(s). Used when promoting that usage
+  // to accepted (NameUsageService.promote): it is no longer a synonym of anything.
+  @Delete("DELETE FROM synonym_accepted WHERE project_id = #{projectId} AND synonym_id = #{synonymId}")
+  int deleteBySynonym(@Param("projectId") int projectId, @Param("synonymId") int synonymId);
+
   @Select("""
       SELECT accepted_id FROM synonym_accepted
       WHERE project_id = #{projectId} AND synonym_id = #{synonymId}

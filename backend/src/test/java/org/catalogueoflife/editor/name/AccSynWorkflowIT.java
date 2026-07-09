@@ -1,0 +1,158 @@
+package org.catalogueoflife.editor.name;
+
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.catalogueoflife.editor.support.AbstractPostgresIT;
+import org.catalogueoflife.editor.user.AppUserService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.ObjectMapper;
+
+@AutoConfigureMockMvc
+@WithMockUser(username = "accsynOwner")
+class AccSynWorkflowIT extends AbstractPostgresIT {
+
+  @Autowired MockMvc mvc;
+  @Autowired AppUserService users;
+  @Autowired ObjectMapper json;
+
+  private void ensureUser(String username) {
+    if (users.requireByUsernameOrNull(username) == null) users.createLocal(username, "pw", username);
+  }
+
+  private long createProject(String title) throws Exception {
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"" + title + "\",\"nomCode\":\"zoological\"}"))
+        .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    return json.readTree(body).get("id").asLong();
+  }
+
+  private long createUsage(long pid, String name, String rank, String status, Long parentId) throws Exception {
+    String content = "{\"scientificName\":\"" + name + "\",\"rank\":\"" + rank + "\",\"status\":\"" + status + "\""
+        + (parentId != null ? ",\"parentId\":" + parentId : "") + "}";
+    String body = mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content(content))
+        .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    return json.readTree(body).get("id").asLong();
+  }
+
+  private void link(long pid, long synId, long acceptedId) throws Exception {
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + synId + "/synonym-of/" + acceptedId).with(csrf()))
+        .andExpect(status().isNoContent());
+  }
+
+  private int version(long pid, long id) throws Exception {
+    String body = mvc.perform(get("/api/projects/" + pid + "/usages/" + id))
+        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    return json.readTree(body).get("version").asInt();
+  }
+
+  @Test
+  void demoteMovesChildrenAndSynonymsThenPromoteBack() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("accsyn");
+
+    long aus = createUsage(pid, "Aus", "genus", "accepted", null);
+    long ausBus = createUsage(pid, "Aus bus", "species", "accepted", aus);
+    long bus = createUsage(pid, "Bus", "genus", "accepted", null);
+    long xus = createUsage(pid, "Xus", "genus", "synonym", null);
+    link(pid, xus, aus);
+
+    // Demote Aus -> synonym of Bus; its child follows to Bus; its synonym Xus re-points to Bus.
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + aus + "/demote").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"acceptedId\":" + bus + ",\"status\":\"SYNONYM\",\"childrenTo\":\"new-accepted\","
+                + "\"synonymsTo\":\"new-accepted\",\"version\":" + version(pid, aus) + "}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("SYNONYM"))
+        .andExpect(jsonPath("$.parentId").value(nullValue()))
+        .andExpect(jsonPath("$.acceptedParentIds[0]").value((int) bus));
+
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + ausBus))
+        .andExpect(jsonPath("$.parentId").value((int) bus));
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + xus))
+        .andExpect(jsonPath("$.acceptedParentIds[0]").value((int) bus));
+
+    // Promote Aus back to accepted under Bus; its synonym links are gone.
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + aus + "/promote").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"parentId\":" + bus + ",\"version\":" + version(pid, aus) + "}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("ACCEPTED"))
+        .andExpect(jsonPath("$.parentId").value((int) bus))
+        .andExpect(jsonPath("$.acceptedParentIds.length()").value(0));
+  }
+
+  @Test
+  void demoteOrphansSynonymAsUnassessed() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("accsynua");
+    long acc = createUsage(pid, "Accepteda", "genus", "accepted", null);
+    long target = createUsage(pid, "Targeta", "genus", "accepted", null);
+    long syn = createUsage(pid, "Synonyma", "genus", "synonym", null);
+    link(pid, syn, acc);
+
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + acc + "/demote").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"acceptedId\":" + target + ",\"status\":\"SYNONYM\",\"synonymsTo\":\"unassessed\","
+                + "\"version\":" + version(pid, acc) + "}"))
+        .andExpect(status().isOk());
+
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + syn))
+        .andExpect(jsonPath("$.status").value("UNASSESSED"))
+        .andExpect(jsonPath("$.acceptedParentIds.length()").value(0));
+  }
+
+  @Test
+  void demotePromoteValidation() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("accsynval");
+    long a = createUsage(pid, "Genusa", "genus", "accepted", null);
+    long child = createUsage(pid, "Genusa speciesa", "species", "accepted", a);
+    long b = createUsage(pid, "Genusb", "genus", "accepted", null);
+    long c = createUsage(pid, "Genusc", "genus", "accepted", null);
+    long syn = createUsage(pid, "Synonymb", "genus", "synonym", null);
+
+    // has children but no childrenTo -> 400
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + a + "/demote").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"acceptedId\":" + b + ",\"status\":\"SYNONYM\",\"version\":" + version(pid, a) + "}"))
+        .andExpect(status().isBadRequest());
+
+    // target is a descendant of the node -> 400
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + a + "/demote").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"acceptedId\":" + child + ",\"status\":\"SYNONYM\",\"childrenTo\":\"new-accepted\","
+                + "\"version\":" + version(pid, a) + "}"))
+        .andExpect(status().isBadRequest());
+
+    // demoting a non-accepted usage -> 400
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + syn + "/demote").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"acceptedId\":" + b + ",\"status\":\"SYNONYM\",\"version\":" + version(pid, syn) + "}"))
+        .andExpect(status().isBadRequest());
+
+    // stale version -> 409
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + b + "/demote").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"acceptedId\":" + c + ",\"status\":\"SYNONYM\",\"version\":999}"))
+        .andExpect(status().isConflict());
+
+    // promoting an accepted usage -> 400
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + b + "/promote").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"parentId\":null,\"version\":" + version(pid, b) + "}"))
+        .andExpect(status().isBadRequest());
+  }
+}
