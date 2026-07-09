@@ -77,19 +77,21 @@ pages (TaxonDetail, TreePage, etc.) that read it still dedupe.
 **Header (left→right):**
 
 - `Burger` (sidebar toggle).
-- Brand: a neutral Tabler glyph mark + "ColDP Editor" wordmark, links to `/`.
-- `ProjectSwitcher` (see below).
+- Brand: a neutral Tabler glyph mark + "ColDP Editor" wordmark, links to `/`. (Upper-left brand slot;
+  the glyph is a placeholder for a future SVG logo.)
+- **Current project name** — read-only (see below).
 - Spacer (`ml="auto"`-style).
 - **Color-scheme toggle** (sun/moon).
 - **User menu**: `me.displayName || me.username` → `Logout` (existing behavior preserved).
 
-**ProjectSwitcher (fixed):**
+**Current project name** (revised 2026-07-09, post-implementation, per user request — replaces the
+originally-planned `ProjectSwitcher`):
 
-- Reads the current project id from the route; its `value` reflects the active project (so the
-  current project is always shown), placeholder "Select a project" when on home.
-- Searchable `Select`; options are the user's projects (`['projects']` query).
-- On change, navigates to `/projects/:id/tree` (the primary editing view — changed from today's
-  `metadata`).
+- The header shows the active project's **title read-only** next to the brand, and nothing on the
+  home route. Component: `CurrentProjectName` (reads `['project', id]`, shared with `ProjectLayout`).
+- **Selecting** a project is done by clicking a row on the Projects list page — no header dropdown.
+- The original plan's `ProjectSwitcher` `Select` (current-project value + navigate-to-`/tree`) was
+  built (Task 6) and then removed; `ProjectSwitcher.tsx` + its test are deleted.
 
 ### Theme & dark mode
 
