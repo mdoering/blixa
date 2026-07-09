@@ -67,6 +67,7 @@ export function useNameActions(pid: number) {
   const [moveTarget, setMoveTarget] = useState<MoveModalTarget | null>(null);
   const [demoteTarget, setDemoteTarget] = useState<DemoteModalTarget | null>(null);
   const [promoteTarget, setPromoteTarget] = useState<MoveModalTarget | null>(null);
+  const [linkAcceptedTarget, setLinkAcceptedTarget] = useState<MoveModalTarget | null>(null);
 
   // `id` is the affected usage: also invalidate its own detail query and path so a currently-open
   // TaxonDetail (reads ['usage', pid, id]) and Breadcrumb (reads ['treePath', pid, id]) refresh
@@ -131,6 +132,10 @@ export function useNameActions(pid: number) {
     promoteTarget,
     startPromote: (usage: MoveModalTarget) => setPromoteTarget(usage),
     closePromote: () => setPromoteTarget(null),
+    // Add-accepted (pro parte) modal for a synonym/misapplied usage.
+    linkAcceptedTarget,
+    startLinkAccepted: (usage: MoveModalTarget) => setLinkAcceptedTarget(usage),
+    closeLinkAccepted: () => setLinkAcceptedTarget(null),
     changeStatus: (usage: ActionableUsage, status: string) =>
       changeStatusMutation.mutate({ usage, status }),
     // `onSuccess` here (rather than baked into removeMutation above) lets callers react to a

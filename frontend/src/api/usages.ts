@@ -61,6 +61,8 @@ export function demoteUsage(pid: number, id: number, payload: DemotePayload): Pr
 // at `parentId` (null = root), dropping its synonym links. Returns the updated usage.
 export interface PromotePayload {
   parentId: number | null;
+  // Pro parte: accepted ids (currently this synonym's targets) to keep as separate synonym copies.
+  keepAcceptedIds?: number[];
   version: number;
 }
 export function promoteUsage(pid: number, id: number, payload: PromotePayload): Promise<NameUsage> {
@@ -72,6 +74,13 @@ export function promoteUsage(pid: number, id: number, payload: PromotePayload): 
 export function linkSynonym(pid: number, synonymId: number, acceptedId: number): Promise<void> {
   return api<void>(`/api/projects/${pid}/usages/${synonymId}/synonym-of/${acceptedId}`, {
     method: 'PUT',
+  });
+}
+
+// Removes the synonym_accepted link between `synonymId` and `acceptedId` (leaves both usages).
+export function unlinkSynonym(pid: number, synonymId: number, acceptedId: number): Promise<void> {
+  return api<void>(`/api/projects/${pid}/usages/${synonymId}/synonym-of/${acceptedId}`, {
+    method: 'DELETE',
   });
 }
 

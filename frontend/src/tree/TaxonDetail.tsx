@@ -218,7 +218,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
       </SimpleGrid>
 
       <Divider my="md" label="Synonyms" labelPosition="left" />
-      <SynonymList pid={pid} usageId={usageId} status={usage.status} />
+      <SynonymList pid={pid} usageId={usageId} status={usage.status} canEdit={canEdit} />
 
       <Divider my="md" label="Issues" labelPosition="left" />
       <IssueList pid={pid} entityId={usageId} />

@@ -20,6 +20,7 @@ function mockNode() {
     http.get('/api/projects/7/usages/9', () =>
       HttpResponse.json({ id: 9, version: 3, status: 'SYNONYM', scientificName: 'Xus' }),
     ),
+    http.get('/api/projects/7/usages/9/accepted', () => HttpResponse.json([])),
     http.get('/api/projects/7/tree/roots', () => HttpResponse.json([bus])),
   );
 }
@@ -44,6 +45,35 @@ test('promotes under a picked parent', async () => {
   await userEvent.click(btn);
   await waitFor(() => expect(onClose).toHaveBeenCalled());
   expect(body).toEqual({ parentId: 6, version: 3 });
+});
+
+test('pro parte: offers to keep relations and sends keepAcceptedIds', async () => {
+  let body: unknown = null;
+  server.use(
+    http.get('/api/projects/7/usages/9', () =>
+      HttpResponse.json({ id: 9, version: 3, status: 'SYNONYM', scientificName: 'Xus' }),
+    ),
+    http.get('/api/projects/7/usages/9/accepted', () =>
+      HttpResponse.json([
+        { id: 6, scientificName: 'Bus' },
+        { id: 8, scientificName: 'Cus' },
+      ]),
+    ),
+    http.get('/api/projects/7/tree/roots', () => HttpResponse.json([bus])),
+    http.post('/api/projects/7/usages/9/promote', async ({ request }) => {
+      body = await request.json();
+      return HttpResponse.json({ id: 9 });
+    }),
+  );
+  renderWithProviders(
+    <PromoteModal pid={7} usage={{ id: 9, scientificName: 'Xus' }} opened onClose={() => {}} />,
+  );
+  // keep-selection appears because the node has >= 2 accepted links
+  const cus = await screen.findByLabelText('Cus');
+  await userEvent.click(screen.getByText('Make it a root'));
+  await userEvent.click(cus); // keep the relation to Cus (id 8)
+  await userEvent.click(screen.getByRole('button', { name: 'Promote' }));
+  await waitFor(() => expect(body).toEqual({ parentId: null, keepAcceptedIds: [8], version: 3 }));
 });
 
 test('"Make it a root" promotes to parentId null', async () => {

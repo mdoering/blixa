@@ -400,6 +400,15 @@ public class NameUsageService {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "parent not found or not accepted");
       }
     }
+    // Pro parte: relations to keep must currently be this usage's accepted targets.
+    List<Integer> keep = req.keepAcceptedIds() == null ? List.of() : req.keepAcceptedIds();
+    List<Integer> formerAccepted = synonymAccepted.findAcceptedFor(projectId, id);
+    for (int k : keep) {
+      if (!formerAccepted.contains(k)) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "keepAcceptedIds must be current accepted names of this synonym");
+      }
+    }
 
     @SuppressWarnings("unchecked")
     Map<String, Object> before = objectMapper.convertValue(node, Map.class);
@@ -413,10 +422,48 @@ public class NameUsageService {
     synonymAccepted.deleteBySynonym(projectId, id);
     writeTaxonInfo(node);
 
+    // For each kept relation, split off a NEW synonym usage (a copy of this name) linked to that
+    // accepted name -- the name stays a synonym there while this usage becomes accepted.
+    for (int k : keep) {
+      int copyId = createSynonymCopy(project, node, userId);
+      synonymAccepted.link(projectId, copyId, k, null);
+      events.publishEvent(ValidationEvent.forUsage(projectId, k));
+    }
+
     NameUsage after = requireInProject(projectId, id);
     audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
     events.publishEvent(ValidationEvent.forUsage(projectId, id));
     return toResponse(after, project);
+  }
+
+  // Creates a new SYNONYM usage that copies `source`'s name/nomenclatural fields (re-parsed for the
+  // atomized parts), for the pro-parte split on promote. Same allocate/insert/audit/validate shape
+  // as create(), minus taxon info (a synonym never carries it).
+  private int createSynonymCopy(Project project, NameUsage source, int userId) {
+    NameUsage c = new NameUsage();
+    c.setProjectId(source.getProjectId());
+    c.setScientificName(source.getScientificName());
+    c.setAuthorship(source.getAuthorship());
+    c.setRank(source.getRank());
+    c.setStatus(Status.SYNONYM);
+    c.setNamePhrase(source.getNamePhrase());
+    c.setNomStatus(source.getNomStatus());
+    c.setPublishedInReferenceId(source.getPublishedInReferenceId());
+    c.setPublishedInYear(source.getPublishedInYear());
+    c.setPublishedInPage(source.getPublishedInPage());
+    c.setPublishedInPageLink(source.getPublishedInPageLink());
+    c.setGender(source.getGender());
+    c.setEtymology(source.getEtymology());
+    c.setLink(source.getLink());
+    c.setRemarks(source.getRemarks());
+    c.setModifiedBy(userId);
+    parser.parseInto(c, project.getNomCode());
+    c.setId(idSeq.allocate(source.getProjectId(), ENTITY));
+    usages.insert(c);
+    c.setVersion(0);
+    audit.record(source.getProjectId(), userId, ENTITY, c.getId(), Operation.CREATE, null, c);
+    events.publishEvent(ValidationEvent.forUsage(source.getProjectId(), c.getId()));
+    return c.getId();
   }
 
   // App-layer cross-project integrity guard, kept as a nice 404/400 in front of the DB-level

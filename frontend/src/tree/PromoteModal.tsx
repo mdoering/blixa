@@ -1,9 +1,9 @@
-import { Box, Button, Group, Modal, SegmentedControl, Stack, Text } from '@mantine/core';
+import { Box, Button, Checkbox, Group, Modal, SegmentedControl, Stack, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
-import { getUsage, promoteUsage } from '../api/usages';
+import { getAccepted, getUsage, promoteUsage } from '../api/usages';
 import ClassificationTree from './ClassificationTree';
 import type { MoveTarget } from './MoveNameModal';
 
@@ -23,12 +23,14 @@ export default function PromoteModal({ pid, usage, opened, onClose }: PromoteMod
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<Mode>('parent');
   const [parentId, setParentId] = useState<number | null>(null);
+  const [keep, setKeep] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (opened) {
       setMode('parent');
       setParentId(null);
+      setKeep([]);
       setError(null);
     }
   }, [opened, usage.id]);
@@ -38,12 +40,20 @@ export default function PromoteModal({ pid, usage, opened, onClose }: PromoteMod
     queryFn: () => getUsage(pid, usage.id),
     enabled: opened,
   });
+  // The accepted names this synonym currently points to — offered as "keep" when it's pro parte.
+  const { data: accepteds } = useQuery({
+    queryKey: ['usageAccepted', pid, usage.id],
+    queryFn: () => getAccepted(pid, usage.id),
+    enabled: opened,
+  });
+  const proParte = (accepteds?.length ?? 0) >= 2;
 
   const mutation = useMutation({
     mutationFn: () => {
       if (!node) throw new Error('not loaded');
       return promoteUsage(pid, usage.id, {
         parentId: mode === 'root' ? null : parentId,
+        keepAcceptedIds: keep.length ? keep : undefined,
         version: node.version,
       });
     },
@@ -122,6 +132,21 @@ export default function PromoteModal({ pid, usage, opened, onClose }: PromoteMod
             It becomes a root of the classification.
           </Text>
         )}
+
+        {proParte && (
+          <Checkbox.Group
+            label="This name is a synonym of several accepted names. Keep any as separate synonyms:"
+            value={keep.map(String)}
+            onChange={(vals) => setKeep(vals.map(Number))}
+          >
+            <Stack gap={4} mt="xs">
+              {(accepteds ?? []).map((a) => (
+                <Checkbox key={a.id} value={String(a.id)} label={a.scientificName ?? `#${a.id}`} />
+              ))}
+            </Stack>
+          </Checkbox.Group>
+        )}
+
         {error && (
           <Text c="red" size="sm">
             {error}

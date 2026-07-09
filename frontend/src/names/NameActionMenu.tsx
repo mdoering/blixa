@@ -4,6 +4,7 @@ import { IconArrowsMove, IconDots, IconPlus, IconTrash } from '@tabler/icons-rea
 import MoveNameModal from '../tree/MoveNameModal';
 import DemoteModal from '../tree/DemoteModal';
 import PromoteModal from '../tree/PromoteModal';
+import LinkAcceptedModal from '../tree/LinkAcceptedModal';
 import CreateNameModal from './CreateNameModal';
 import { useNameActions } from './useNameActions';
 
@@ -118,6 +119,16 @@ export default function NameActionMenu({
               </Menu.Item>
             </>
           )}
+          {(usage.status === 'SYNONYM' || usage.status === 'MISAPPLIED') && (
+            <Menu.Item
+              leftSection={<IconPlus size={14} />}
+              onClick={() =>
+                actions.startLinkAccepted({ id: usage.id, scientificName: usage.scientificName })
+              }
+            >
+              Add accepted name…
+            </Menu.Item>
+          )}
           <Menu.Label>Change status</Menu.Label>
           {STATUS_OPTIONS.map((s) => (
             <Menu.Item key={s.value} onClick={() => onStatusClick(s.value)}>
@@ -166,6 +177,14 @@ export default function NameActionMenu({
           usage={actions.promoteTarget}
           opened
           onClose={actions.closePromote}
+        />
+      )}
+      {actions.linkAcceptedTarget && (
+        <LinkAcceptedModal
+          pid={pid}
+          usage={actions.linkAcceptedTarget}
+          opened
+          onClose={actions.closeLinkAccepted}
         />
       )}
     </>

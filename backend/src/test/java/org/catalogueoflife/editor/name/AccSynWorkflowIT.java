@@ -115,6 +115,37 @@ class AccSynWorkflowIT extends AbstractPostgresIT {
   }
 
   @Test
+  void promoteProParteKeepsSelectedRelationAsCopy() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("accsynpp");
+    long a = createUsage(pid, "Genusa", "genus", "accepted", null);
+    long b = createUsage(pid, "Genusb", "genus", "accepted", null);
+    long syn = createUsage(pid, "Genusx", "genus", "synonym", null);
+    link(pid, syn, a);
+    link(pid, syn, b); // pro parte: a synonym of both a and b
+
+    // Promote syn to a root accepted, keeping the relation to b as a separate synonym copy.
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + syn + "/promote").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"parentId\":null,\"keepAcceptedIds\":[" + b + "],\"version\":" + version(pid, syn) + "}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("ACCEPTED"))
+        .andExpect(jsonPath("$.acceptedParentIds.length()").value(0));
+
+    // a lost the synonym; b keeps a copy synonym named "Genusx".
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + a))
+        .andExpect(jsonPath("$.synonymIds.length()").value(0));
+    String bBody = mvc.perform(get("/api/projects/" + pid + "/usages/" + b))
+        .andExpect(jsonPath("$.synonymIds.length()").value(1))
+        .andReturn().getResponse().getContentAsString();
+    long copyId = json.readTree(bBody).get("synonymIds").get(0).asLong();
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + copyId))
+        .andExpect(jsonPath("$.status").value("SYNONYM"))
+        .andExpect(jsonPath("$.scientificName").value("Genusx"))
+        .andExpect(jsonPath("$.acceptedParentIds[0]").value((int) b));
+  }
+
+  @Test
   void demotePromoteValidation() throws Exception {
     ensureUser("accsynOwner");
     long pid = createProject("accsynval");
