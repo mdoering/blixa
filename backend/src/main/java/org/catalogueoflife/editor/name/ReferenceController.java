@@ -3,7 +3,9 @@ package org.catalogueoflife.editor.name;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.catalogueoflife.editor.auth.CurrentUser;
+import org.catalogueoflife.editor.name.dto.BibtexRequest;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
+import org.catalogueoflife.editor.name.dto.DoiRequest;
 import org.catalogueoflife.editor.name.dto.ReferenceResponse;
 import org.catalogueoflife.editor.name.dto.UpdateReferenceRequest;
 import org.springframework.http.HttpStatus;
@@ -23,11 +25,29 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReferenceController {
 
   private final ReferenceService service;
+  private final ReferenceImportService importService;
   private final CurrentUser currentUser;
 
-  public ReferenceController(ReferenceService service, CurrentUser currentUser) {
+  public ReferenceController(ReferenceService service, ReferenceImportService importService,
+      CurrentUser currentUser) {
     this.service = service;
+    this.importService = importService;
     this.currentUser = currentUser;
+  }
+
+  // DOI -> an UNSAVED CreateReferenceRequest preview (the UI reviews then creates it normally).
+  @PostMapping("/resolve-doi")
+  public CreateReferenceRequest resolveDoi(@PathVariable int pid, @RequestBody DoiRequest req) {
+    int uid = currentUser.require().getId();
+    return importService.resolveDoi(uid, pid, req.doi());
+  }
+
+  // Parse + create every entry in a BibTeX blob.
+  @PostMapping("/import-bibtex")
+  @ResponseStatus(HttpStatus.CREATED)
+  public List<ReferenceResponse> importBibtex(@PathVariable int pid, @RequestBody BibtexRequest req) {
+    int uid = currentUser.require().getId();
+    return importService.importBibtex(uid, pid, req.bibtex()).stream().map(ReferenceResponse::of).toList();
   }
 
   @GetMapping

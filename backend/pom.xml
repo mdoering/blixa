@@ -113,6 +113,12 @@
       <artifactId>vocab</artifactId>
       <version>1.2.3-SNAPSHOT</version>
     </dependency>
+    <!-- BibTeX parsing for reference import (see name/RefMapping.fromBibtex). -->
+    <dependency>
+      <groupId>org.jbibtex</groupId>
+      <artifactId>jbibtex</artifactId>
+      <version>1.0.20</version>
+    </dependency>
   </dependencies>
 
   <repositories>
