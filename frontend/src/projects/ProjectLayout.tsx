@@ -1,13 +1,14 @@
-import { Alert, Center, Loader, Tabs, Title } from '@mantine/core';
+import { Alert, Center, Loader } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
-import { Outlet, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Outlet, useParams } from 'react-router-dom';
 import { getProject } from '../api/projects';
 
+// Thin guard for the project routes: loads the project (shared ['project', id] key so section pages
+// dedupe), shows a loader / not-found, and otherwise renders the active section via <Outlet/>. The
+// section navigation and project title now live in the shell (sidebar + header switcher).
 export default function ProjectLayout() {
   const { projectId } = useParams();
   const id = Number(projectId);
-  const navigate = useNavigate();
-  const location = useLocation();
   const { data, isLoading, isError } = useQuery({
     queryKey: ['project', id],
     queryFn: () => getProject(id),
@@ -21,26 +22,5 @@ export default function ProjectLayout() {
       </Center>
     );
   if (isError || !data) return <Alert color="red">Project not found</Alert>;
-
-  const active = location.pathname.endsWith('/members')
-    ? 'members'
-    : location.pathname.endsWith('/names')
-      ? 'names'
-      : location.pathname.endsWith('/tree')
-        ? 'tree'
-        : 'metadata';
-  return (
-    <div>
-      <Title order={3}>{data.title}</Title>
-      <Tabs value={active} onChange={(v) => v && navigate(`/projects/${id}/${v}`)}>
-        <Tabs.List>
-          <Tabs.Tab value="tree">Tree</Tabs.Tab>
-          <Tabs.Tab value="names">Names</Tabs.Tab>
-          <Tabs.Tab value="metadata">Metadata</Tabs.Tab>
-          <Tabs.Tab value="members">Members</Tabs.Tab>
-        </Tabs.List>
-      </Tabs>
-      <Outlet />
-    </div>
-  );
+  return <Outlet />;
 }
