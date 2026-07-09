@@ -184,6 +184,69 @@ class NameUsageMapperIT extends AbstractPostgresIT {
     assertThat(nameUsages.findAncestorGenusName(pid, bus.getId())).isNull();
   }
 
+  @Test
+  void ancestorAndParentContextQueries() {
+    Project p = new Project();
+    p.setTitle("AncCtx");
+    projects.insert(p);
+    int pid = p.getId();
+
+    NameUsage genus = newMinimalUsage(pid);
+    genus.setScientificName("Bus");
+    genus.setRank("genus");
+    genus.setPublishedInYear(1800);
+    genus.setId(idSeq.allocate(pid, ENTITY));
+    nameUsages.insert(genus);
+
+    NameUsage species = newMinimalUsage(pid);
+    species.setScientificName("Bus cus");
+    species.setRank("species");
+    species.setSpecificEpithet("cus");
+    species.setPublishedInYear(1810);
+    species.setParentId(genus.getId());
+    species.setId(idSeq.allocate(pid, ENTITY));
+    nameUsages.insert(species);
+
+    NameUsage subsp = newMinimalUsage(pid);
+    subsp.setScientificName("Bus cus dus");
+    subsp.setRank("subspecies");
+    subsp.setSpecificEpithet("cus");
+    subsp.setParentId(species.getId());
+    subsp.setId(idSeq.allocate(pid, ENTITY));
+    nameUsages.insert(subsp);
+
+    assertThat(nameUsages.findParentRank(pid, subsp.getId())).isEqualTo("species");
+    assertThat(nameUsages.findParentRank(pid, genus.getId())).isNull();
+    assertThat(nameUsages.findAncestorGenusYear(pid, species.getId())).isEqualTo(1800);
+    assertThat(nameUsages.findAncestorSpeciesEpithet(pid, subsp.getId())).isEqualTo("cus");
+  }
+
+  @Test
+  void countsNonAcceptedSynonymTargets() {
+    Project p = new Project();
+    p.setTitle("NonAccTargets");
+    projects.insert(p);
+    int pid = p.getId();
+
+    NameUsage accepted = newMinimalUsage(pid);
+    accepted.setId(idSeq.allocate(pid, ENTITY));
+    nameUsages.insert(accepted);
+
+    NameUsage notAccepted = newMinimalUsage(pid);
+    notAccepted.setStatus(Status.SYNONYM);
+    notAccepted.setId(idSeq.allocate(pid, ENTITY));
+    nameUsages.insert(notAccepted);
+
+    NameUsage syn = newMinimalUsage(pid);
+    syn.setStatus(Status.SYNONYM);
+    syn.setId(idSeq.allocate(pid, ENTITY));
+    nameUsages.insert(syn);
+
+    synonymAccepted.link(pid, syn.getId(), accepted.getId(), null);
+    synonymAccepted.link(pid, syn.getId(), notAccepted.getId(), null);
+    assertThat(nameUsages.countNonAcceptedSynonymTargets(pid, syn.getId())).isEqualTo(1);
+  }
+
   private static NameUsage newMinimalUsage(int projectId) {
     NameUsage u = new NameUsage();
     u.setProjectId(projectId);

@@ -158,6 +158,50 @@ public interface NameUsageMapper {
       """)
   String findAncestorGenusName(@Param("projectId") int projectId, @Param("id") int id);
 
+  // The immediate parent's rank (RankVsParentRule), or null if the id has no parent.
+  @Select("""
+      SELECT p.rank FROM name_usage c JOIN name_usage p
+        ON p.project_id = c.project_id AND p.id = c.parent_id
+      WHERE c.project_id = #{projectId} AND c.id = #{id}
+      """)
+  String findParentRank(@Param("projectId") int projectId, @Param("id") int id);
+
+  // publishedInYear of the nearest STRICT genus ancestor (GenusYearAfterSpeciesRule), or null.
+  @Select("""
+      WITH RECURSIVE anc AS (
+        SELECT project_id, id, parent_id, rank, published_in_year, 0 AS depth
+        FROM name_usage WHERE project_id = #{projectId} AND id = #{id}
+        UNION ALL
+        SELECT n.project_id, n.id, n.parent_id, n.rank, n.published_in_year, anc.depth + 1
+        FROM name_usage n JOIN anc ON n.project_id = anc.project_id AND n.id = anc.parent_id
+        WHERE anc.depth < 10000
+      )
+      SELECT published_in_year FROM anc WHERE depth > 0 AND rank = 'genus' ORDER BY depth LIMIT 1
+      """)
+  Integer findAncestorGenusYear(@Param("projectId") int projectId, @Param("id") int id);
+
+  // specific_epithet of the nearest STRICT species ancestor (SpeciesEpithetMismatchRule), or null.
+  @Select("""
+      WITH RECURSIVE anc AS (
+        SELECT project_id, id, parent_id, rank, specific_epithet, 0 AS depth
+        FROM name_usage WHERE project_id = #{projectId} AND id = #{id}
+        UNION ALL
+        SELECT n.project_id, n.id, n.parent_id, n.rank, n.specific_epithet, anc.depth + 1
+        FROM name_usage n JOIN anc ON n.project_id = anc.project_id AND n.id = anc.parent_id
+        WHERE anc.depth < 10000
+      )
+      SELECT specific_epithet FROM anc WHERE depth > 0 AND rank = 'species' ORDER BY depth LIMIT 1
+      """)
+  String findAncestorSpeciesEpithet(@Param("projectId") int projectId, @Param("id") int id);
+
+  // How many of a synonym's accepted targets are NOT actually accepted (SynonymOfNonAcceptedRule).
+  @Select("""
+      SELECT COUNT(*) FROM synonym_accepted sa JOIN name_usage a
+        ON a.project_id = sa.project_id AND a.id = sa.accepted_id
+      WHERE sa.project_id = #{projectId} AND sa.synonym_id = #{synonymId} AND a.status <> 'ACCEPTED'
+      """)
+  int countNonAcceptedSynonymTargets(@Param("projectId") int projectId, @Param("synonymId") int synonymId);
+
   // Bulk reparent every direct child of oldParentId onto newParentId (which may be null = root).
   // Used by demote: a server-orchestrated move of a whole child set under the project advisory lock,
   // so unlike the single-node reparent it carries no per-child optimistic version -- it still bumps

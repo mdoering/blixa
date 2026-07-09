@@ -9,7 +9,11 @@ import org.catalogueoflife.editor.name.Reference;
 import org.catalogueoflife.editor.name.Status;
 import org.catalogueoflife.editor.validation.rules.DuplicateNameRule;
 import org.catalogueoflife.editor.validation.rules.GenusMismatchRule;
+import org.catalogueoflife.editor.validation.rules.GenusYearAfterSpeciesRule;
 import org.catalogueoflife.editor.validation.rules.MissingPublishedInRule;
+import org.catalogueoflife.editor.validation.rules.RankVsParentRule;
+import org.catalogueoflife.editor.validation.rules.SpeciesEpithetMismatchRule;
+import org.catalogueoflife.editor.validation.rules.SynonymOfNonAcceptedRule;
 import org.catalogueoflife.editor.validation.rules.SynonymWithoutAcceptedRule;
 import org.catalogueoflife.editor.validation.rules.UnparsableNameRule;
 import org.catalogueoflife.editor.validation.rules.YearVsReferenceRule;
@@ -208,5 +212,92 @@ class RuleTests {
     assertThat(new GenusMismatchRule().evaluate(new RuleContext(u, 0, null, 0, "aus"))).isEmpty();
     // no ancestor genus in the classification -> nothing to compare against
     assertThat(new GenusMismatchRule().evaluate(new RuleContext(u, 0, null, 0, null))).isEmpty();
+  }
+
+  // --- RankVsParentRule ---
+
+  @Test
+  void rankVsParentFlagsWhenNotBelowParent() {
+    NameUsage u = new NameUsage();
+    u.setStatus(Status.ACCEPTED);
+    u.setRank("genus"); // a genus parented under a species is wrong
+    RuleContext ctx = new RuleContext(u, 0, null, 0, null, "species", null, null, 0);
+    assertThat(new RankVsParentRule().evaluate(ctx)).isPresent();
+  }
+
+  @Test
+  void rankVsParentOkWhenBelowParentOrNoParent() {
+    NameUsage u = new NameUsage();
+    u.setRank("species");
+    assertThat(new RankVsParentRule().evaluate(new RuleContext(u, 0, null, 0, null, "genus", null, null, 0)))
+        .isEmpty();
+    // no parent -> nothing to compare
+    assertThat(new RankVsParentRule().evaluate(new RuleContext(u, 0, null, 0))).isEmpty();
+  }
+
+  // --- SpeciesEpithetMismatchRule ---
+
+  @Test
+  void speciesEpithetMismatchFlags() {
+    NameUsage u = new NameUsage();
+    u.setStatus(Status.ACCEPTED);
+    u.setSpecificEpithet("tigris");
+    RuleContext ctx = new RuleContext(u, 0, null, 0, null, null, null, "leo", 0);
+    assertThat(new SpeciesEpithetMismatchRule().evaluate(ctx)).isPresent();
+  }
+
+  @Test
+  void speciesEpithetMismatchOkWhenMatchesOrNoAncestor() {
+    NameUsage u = new NameUsage();
+    u.setStatus(Status.ACCEPTED);
+    u.setSpecificEpithet("leo");
+    assertThat(new SpeciesEpithetMismatchRule()
+        .evaluate(new RuleContext(u, 0, null, 0, null, null, null, "leo", 0))).isEmpty();
+    assertThat(new SpeciesEpithetMismatchRule()
+        .evaluate(new RuleContext(u, 0, null, 0, null, null, null, null, 0))).isEmpty();
+  }
+
+  // --- GenusYearAfterSpeciesRule ---
+
+  @Test
+  void genusYearAfterSpeciesFlagsWhenGenusYounger() {
+    NameUsage u = new NameUsage();
+    u.setStatus(Status.ACCEPTED);
+    u.setPublishedInYear(1758);
+    RuleContext ctx = new RuleContext(u, 0, null, 0, null, null, 1816, null, 0);
+    assertThat(new GenusYearAfterSpeciesRule().evaluate(ctx)).isPresent();
+  }
+
+  @Test
+  void genusYearAfterSpeciesOkWhenGenusOlderOrMissing() {
+    NameUsage u = new NameUsage();
+    u.setStatus(Status.ACCEPTED);
+    u.setPublishedInYear(1816);
+    assertThat(new GenusYearAfterSpeciesRule()
+        .evaluate(new RuleContext(u, 0, null, 0, null, null, 1758, null, 0))).isEmpty();
+    assertThat(new GenusYearAfterSpeciesRule()
+        .evaluate(new RuleContext(u, 0, null, 0, null, null, null, null, 0))).isEmpty();
+  }
+
+  // --- SynonymOfNonAcceptedRule ---
+
+  @Test
+  void synonymOfNonAcceptedFlags() {
+    NameUsage u = new NameUsage();
+    u.setStatus(Status.SYNONYM);
+    RuleContext ctx = new RuleContext(u, 1, null, 0, null, null, null, null, 1);
+    assertThat(new SynonymOfNonAcceptedRule().evaluate(ctx)).isPresent();
+  }
+
+  @Test
+  void synonymOfNonAcceptedOkWhenAllAcceptedOrNotSynonym() {
+    NameUsage syn = new NameUsage();
+    syn.setStatus(Status.SYNONYM);
+    assertThat(new SynonymOfNonAcceptedRule()
+        .evaluate(new RuleContext(syn, 1, null, 0, null, null, null, null, 0))).isEmpty();
+    NameUsage acc = new NameUsage();
+    acc.setStatus(Status.ACCEPTED);
+    assertThat(new SynonymOfNonAcceptedRule()
+        .evaluate(new RuleContext(acc, 0, null, 0, null, null, null, null, 1))).isEmpty();
   }
 }

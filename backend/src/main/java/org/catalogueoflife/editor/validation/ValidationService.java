@@ -129,8 +129,14 @@ public class ValidationService {
     int duplicateCount = nameUsages.countDuplicates(projectId, usage.getScientificName(),
         usage.getAuthorship(), usage.getId());
     String ancestorGenusName = nameUsages.findAncestorGenusName(projectId, usage.getId());
+    String parentRank = usage.getParentId() == null ? null
+        : nameUsages.findParentRank(projectId, usage.getId());
+    Integer ancestorGenusYear = nameUsages.findAncestorGenusYear(projectId, usage.getId());
+    String ancestorSpeciesEpithet = nameUsages.findAncestorSpeciesEpithet(projectId, usage.getId());
+    int synonymNonAcceptedTargetCount = nameUsages.countNonAcceptedSynonymTargets(projectId, usage.getId());
     return new RuleContext(usage, synonymAcceptedCount, publishedInReference, duplicateCount,
-        ancestorGenusName);
+        ancestorGenusName, parentRank, ancestorGenusYear, ancestorSpeciesEpithet,
+        synonymNonAcceptedTargetCount);
   }
 
   private void insert(int projectId, int usageId, Finding finding, String contextJson) {
