@@ -13,7 +13,7 @@ Local run: `docker compose up -d` (Postgres on **5433**), backend `mvn spring-bo
 
 ## Next up (suggested order)
 - [x] **Dev sample-data seeder** (`dev` profile) — DONE (commit a3a27ac). `DevSampleData` (@Order after DevBootstrap) seeds project "Felidae (sample data)": 10 accepted taxa (Animalia→…→Panthera leo/Felis catus), 2 synonyms, 1 reference. Atomic (one TransactionTemplate) + idempotent (skips on title). Needed an `AuditService` guard: `CurrentTask` is `@RequestScope`, so off-request writes (seeder/future jobs) now record an ungrouped change instead of `ScopeNotActiveException` — in-request behaviour unchanged. Verified end-to-end over HTTP + restart-skip.
-- [ ] **Tree move/reparent UI** — backend `PUT /tree/usages/{id}/parent` is done (cycle-safe); needs a "Move…" action + target-picker in the `⋮` menu.
+- [x] **Tree move/reparent UI** — DONE (commit 432f30d). "Move…" in the ⋮/right-click menu (accepted only) → `MoveNameModal`: target-picker tree (reuses `ClassificationTree` with new `disabledId` prop → moved node + subtree greyed/non-expandable so no cycle can be picked) or "Make it a root". Re-reads version before PUT (409-safe); invalidates roots/children/detail/path. frontend 50 tests. **Live browser verification still pending** (fold into the shell-redesign session).
 - [ ] **Link / unlink existing synonyms from the UI** (backend `PUT|DELETE /usages/{id}/synonym-of/{acceptedId}` exists; `SynonymList` is read-only today).
 
 ## Frontend remaining
