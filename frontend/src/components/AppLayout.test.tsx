@@ -11,8 +11,8 @@ function renderShell(route: string) {
     http.get('/api/me', () =>
       HttpResponse.json({ id: 1, username: 'alice', orcid: '', displayName: 'Alice' }),
     ),
-    http.get('/api/projects', () =>
-      HttpResponse.json([{ id: 3, title: 'Felidae', role: 'owner' }]),
+    http.get('/api/projects/3', () =>
+      HttpResponse.json({ id: 3, title: 'Felidae', role: 'owner' }),
     ),
   );
   return renderWithProviders(
@@ -25,9 +25,10 @@ function renderShell(route: string) {
   );
 }
 
-test('renders brand, footer, user name, and the project section nav', async () => {
+test('renders brand, current project name, footer, and the project section nav', async () => {
   renderShell('/projects/3/tree');
   expect(await screen.findByText('ColDP Editor')).toBeInTheDocument();
+  expect(await screen.findByText('Felidae')).toBeInTheDocument(); // current project (read-only)
   expect(screen.getByText(/ColDP Editor · v/)).toBeInTheDocument(); // footer
   expect(screen.getByText('TREE PAGE')).toBeInTheDocument(); // Outlet
   expect(screen.getByText('Names')).toBeInTheDocument(); // sidebar section
