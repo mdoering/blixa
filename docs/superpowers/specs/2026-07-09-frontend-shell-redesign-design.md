@@ -61,7 +61,10 @@ pages (TaxonDetail, TreePage, etc.) that read it still dedupe.
   path:
   - **Tree** — `IconBinaryTree` (or `IconHierarchy2`) → `/projects/:id/tree`
   - **Names** — `IconList` (or `IconSearch`) → `/projects/:id/names`
-  - **Metadata** — `IconFileDescription` → `/projects/:id/metadata`
+  - **Project** — `IconSettings` → `/projects/:id/metadata` — the project-level settings/metadata
+    page. Labelled **Project** (not "Metadata") because metadata is one facet of the project and more
+    project-level settings are expected to join this section later. Route and page component
+    (`ProjectMetadataPage`) are unchanged; only the nav label + icon differ.
   - **Members** — `IconUsers` → `/projects/:id/members`
 - (References / Issues / Changelog / Tools are **not** added now; they slot in when built.)
 - **Collapse:** a `Burger` in the header toggles the rail. Desktop collapsed/expanded state persists
