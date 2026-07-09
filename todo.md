@@ -26,10 +26,15 @@ Brainstormed into 4 sub-projects (each own spec+plan+ship). Sequencing: refactor
 
 **Synonym management P1–P4 COMPLETE.** backend mvn verify 25u+50IT; frontend 75 tests; browser-verified. main clean.
 
+## Validation + Issues dashboard + changelog — DONE (spec `…/specs/2026-07-09-validation-issues-changelog-design.md`)
+- [x] **4 new validation rules** (commit): `rank_vs_parent` (WARN), `species_epithet_mismatch` (WARN), `genus_year_after_species` (INFO), `synonym_of_non_accepted` (ERROR). RuleContext + convenience ctors; NameUsageMapper lookups (findParentRank, 2 CTEs, non-accepted-target count).
+- [x] **Issues dashboard** (commit) — `Issues` section: summary rollup + Revalidate + status/severity-filtered paged table + Accept/Reject/Reopen. Browser-verified (4 missing_published_in INFO on the seeded ref-less taxa).
+- [x] **History (changelog) view** (commit) — `History` section: reverse-chron `GET /changes` with operation badge + entity + author + relative time + collapsible JSON diff + task filter. Browser-verified (demote/promote + seeder diffs render).
+
 ## Frontend remaining
 - [ ] **References editor** (MRT table like Names + a reference form).
-- [ ] **Issues dashboard** (list/filter + accept/reject/reopen; `POST /revalidate`) and a **changelog** view (`GET /changes`, group by task).
 - [ ] Tree **virtualization** (lazy-per-node is fine for now; needed at Lepidoptera scale).
+- [ ] Issue **entity deep-link** (click an issue's entity → open it in the tree/detail — currently plain text).
 
 ## Features backlog (`features.md`) — bigger pieces
 - [ ] **Status business-rules + acc↔syn workflow**: only accepted names in tree/carry taxon info; synonyms → ≥1 accepted; no synonym chaining; misapplied = synonym; acc→syn demotion picks a new accepted + migrates taxon info (ask user).
