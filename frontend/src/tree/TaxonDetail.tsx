@@ -7,6 +7,7 @@ import {
   Select,
   SimpleGrid,
   Stack,
+  Tabs,
   Text,
   Textarea,
   TextInput,
@@ -19,6 +20,7 @@ import { ApiError, messageFor } from '../api/client';
 import { getProject } from '../api/projects';
 import { getUsage, updateUsage } from '../api/usages';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
+import NameRelationsTab from '../child/NameRelationsTab';
 import IssueList from './IssueList';
 import SynonymList from './SynonymList';
 
@@ -174,54 +176,71 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
 
   return (
     <Box>
-      <form onSubmit={form.onSubmit((v) => mutation.mutate(v))}>
-        <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
-          <Stack gap="md">
-            <SimpleGrid cols={2}>
-              <TextInput label="Scientific name" {...form.getInputProps('scientificName')} />
-              <TextInput label="Authorship" {...form.getInputProps('authorship')} />
-            </SimpleGrid>
-            <SimpleGrid cols={2}>
-              <TextInput label="Rank" {...form.getInputProps('rank')} />
-              <Select label="Status" data={STATUS_OPTIONS} {...form.getInputProps('status')} />
-            </SimpleGrid>
-            <SimpleGrid cols={3}>
-              <NumberInput label="Published in year" {...form.getInputProps('publishedInYear')} />
-              <TextInput label="Published in page" {...form.getInputProps('publishedInPage')} />
-              <TextInput
-                label="Published in page link"
-                {...form.getInputProps('publishedInPageLink')}
-              />
-            </SimpleGrid>
-            <SimpleGrid cols={2}>
-              <TextInput label="Nomenclatural status" {...form.getInputProps('nomStatus')} />
-              <TextInput label="Link" {...form.getInputProps('link')} />
-            </SimpleGrid>
-            <Textarea label="Etymology" rows={2} {...form.getInputProps('etymology')} />
-            <Group>
-              <Button type="submit" loading={mutation.isPending} disabled={!canEdit}>
-                Save
-              </Button>
-            </Group>
-          </Stack>
-        </fieldset>
-      </form>
+      <Tabs defaultValue="details" keepMounted={false}>
+        <Tabs.List>
+          <Tabs.Tab value="details">Details</Tabs.Tab>
+          <Tabs.Tab value="names">Names</Tabs.Tab>
+          <Tabs.Tab value="synonyms">Synonyms</Tabs.Tab>
+          <Tabs.Tab value="issues">Issues</Tabs.Tab>
+        </Tabs.List>
 
-      <Divider my="md" label="Parsed name" labelPosition="left" />
-      <SimpleGrid cols={2} spacing="xs">
-        <Text size="sm" c="dimmed">Name type: {usage.nameType ?? '—'}</Text>
-        <Text size="sm" c="dimmed">Parse state: {usage.parseState ?? '—'}</Text>
-        <Text size="sm" c="dimmed">Uninomial: {usage.uninomial ?? '—'}</Text>
-        <Text size="sm" c="dimmed">Genus: {usage.genus ?? '—'}</Text>
-        <Text size="sm" c="dimmed">Specific epithet: {usage.specificEpithet ?? '—'}</Text>
-        <Text size="sm" c="dimmed">Infraspecific epithet: {usage.infraspecificEpithet ?? '—'}</Text>
-      </SimpleGrid>
+        <Tabs.Panel value="details" pt="md">
+          <form onSubmit={form.onSubmit((v) => mutation.mutate(v))}>
+            <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
+              <Stack gap="md">
+                <SimpleGrid cols={2}>
+                  <TextInput label="Scientific name" {...form.getInputProps('scientificName')} />
+                  <TextInput label="Authorship" {...form.getInputProps('authorship')} />
+                </SimpleGrid>
+                <SimpleGrid cols={2}>
+                  <TextInput label="Rank" {...form.getInputProps('rank')} />
+                  <Select label="Status" data={STATUS_OPTIONS} {...form.getInputProps('status')} />
+                </SimpleGrid>
+                <SimpleGrid cols={3}>
+                  <NumberInput label="Published in year" {...form.getInputProps('publishedInYear')} />
+                  <TextInput label="Published in page" {...form.getInputProps('publishedInPage')} />
+                  <TextInput
+                    label="Published in page link"
+                    {...form.getInputProps('publishedInPageLink')}
+                  />
+                </SimpleGrid>
+                <SimpleGrid cols={2}>
+                  <TextInput label="Nomenclatural status" {...form.getInputProps('nomStatus')} />
+                  <TextInput label="Link" {...form.getInputProps('link')} />
+                </SimpleGrid>
+                <Textarea label="Etymology" rows={2} {...form.getInputProps('etymology')} />
+                <Group>
+                  <Button type="submit" loading={mutation.isPending} disabled={!canEdit}>
+                    Save
+                  </Button>
+                </Group>
+              </Stack>
+            </fieldset>
+          </form>
 
-      <Divider my="md" label="Synonyms" labelPosition="left" />
-      <SynonymList pid={pid} usageId={usageId} status={usage.status} canEdit={canEdit} />
+          <Divider my="md" label="Parsed name" labelPosition="left" />
+          <SimpleGrid cols={2} spacing="xs">
+            <Text size="sm" c="dimmed">Name type: {usage.nameType ?? '—'}</Text>
+            <Text size="sm" c="dimmed">Parse state: {usage.parseState ?? '—'}</Text>
+            <Text size="sm" c="dimmed">Uninomial: {usage.uninomial ?? '—'}</Text>
+            <Text size="sm" c="dimmed">Genus: {usage.genus ?? '—'}</Text>
+            <Text size="sm" c="dimmed">Specific epithet: {usage.specificEpithet ?? '—'}</Text>
+            <Text size="sm" c="dimmed">Infraspecific epithet: {usage.infraspecificEpithet ?? '—'}</Text>
+          </SimpleGrid>
+        </Tabs.Panel>
 
-      <Divider my="md" label="Issues" labelPosition="left" />
-      <IssueList pid={pid} entityId={usageId} />
+        <Tabs.Panel value="names" pt="md">
+          <NameRelationsTab pid={pid} usageId={usageId} canEdit={canEdit} />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="synonyms" pt="md">
+          <SynonymList pid={pid} usageId={usageId} status={usage.status} canEdit={canEdit} />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="issues" pt="md">
+          <IssueList pid={pid} entityId={usageId} />
+        </Tabs.Panel>
+      </Tabs>
     </Box>
   );
 }
