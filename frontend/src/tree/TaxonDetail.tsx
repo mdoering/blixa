@@ -21,6 +21,7 @@ import { getProject } from '../api/projects';
 import { getUsage, updateUsage } from '../api/usages';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import NameRelationsTab from '../child/NameRelationsTab';
+import TypeMaterialTab from '../child/TypeMaterialTab';
 import IssueList from './IssueList';
 import SynonymList from './SynonymList';
 
@@ -180,6 +181,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
         <Tabs.List>
           <Tabs.Tab value="details">Details</Tabs.Tab>
           <Tabs.Tab value="names">Names</Tabs.Tab>
+          <Tabs.Tab value="types">Types</Tabs.Tab>
           <Tabs.Tab value="synonyms">Synonyms</Tabs.Tab>
           <Tabs.Tab value="issues">Issues</Tabs.Tab>
         </Tabs.List>
@@ -231,6 +233,10 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
 
         <Tabs.Panel value="names" pt="md">
           <NameRelationsTab pid={pid} usageId={usageId} canEdit={canEdit} />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="types" pt="md">
+          <TypeMaterialTab pid={pid} usageId={usageId} canEdit={canEdit} />
         </Tabs.Panel>
 
         <Tabs.Panel value="synonyms" pt="md">

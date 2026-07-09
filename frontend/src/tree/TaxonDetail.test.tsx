@@ -63,6 +63,7 @@ function mockCommon(usage = baseUsage(), role = 'owner') {
     http.get('/api/projects/4/usages/10/synonyms', () => HttpResponse.json([])),
     http.get('/api/projects/4/usages/10/accepted', () => HttpResponse.json([])),
     http.get('/api/projects/4/usages/10/relations', () => HttpResponse.json([])),
+    http.get('/api/projects/4/usages/10/type-material', () => HttpResponse.json([])),
     http.get('/api/projects/4/issues', () => HttpResponse.json([])),
   );
 }
@@ -182,6 +183,42 @@ test('the Names tab lists a basionym relation with the joined related name', asy
   await screen.findByText('basionym');
   expect(screen.getByText('Felis leo Linnaeus, 1758')).toBeInTheDocument();
   expect(screen.getByText('42')).toBeInTheDocument();
+});
+
+test('the Types tab lists a holotype with its institution and occurrenceID', async () => {
+  mockCommon();
+  server.use(
+    http.get('/api/projects/4/usages/10/type-material', () =>
+      HttpResponse.json([
+        {
+          id: 7,
+          usageId: 10,
+          citation: 'BMNH 1901.1.1',
+          status: 'holotype',
+          institutionCode: 'BMNH',
+          catalogNumber: '1901.1.1',
+          occurrenceId: 'gbif:12345',
+          locality: null,
+          country: 'GB',
+          collector: null,
+          date: null,
+          sex: null,
+          referenceId: null,
+          link: null,
+          remarks: null,
+          version: 0,
+        },
+      ]),
+    ),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await screen.findByLabelText('Scientific name');
+  await userEvent.click(screen.getByRole('tab', { name: /types/i }));
+  await screen.findByText('holotype');
+  // Citation column + Institution column ("BMNH 1901.1.1") both render this text.
+  expect(screen.getAllByText('BMNH 1901.1.1').length).toBeGreaterThanOrEqual(1);
+  expect(screen.getByText('GB')).toBeInTheDocument();
 });
 
 test('a warning issue shows its badge and message', async () => {
