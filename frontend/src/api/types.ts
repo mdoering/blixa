@@ -150,6 +150,7 @@ export interface UsagePage {
   total: number;
 }
 
+// Mirrors backend IssueResponse. severity/status are lowercase API strings.
 export interface Issue {
   id: number;
   entityType: string;
@@ -157,5 +158,38 @@ export interface Issue {
   rule: string;
   severity: string;
   message: string;
+  status: string;
+  context?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  reviewerId?: number | null;
+  reviewerUsername?: string | null;
+  reviewedAt?: string | null;
+}
+
+// Mirrors backend IssueSummaryResponse: a per-project rollup of issue counts.
+export interface IssueSummary {
+  total: number;
+  byStatus: Record<string, number>;
+  bySeverity: Record<string, number>;
+}
+
+// Mirrors backend Change (audit log row). `diff` is a raw JSON string.
+export interface Change {
+  id: number;
+  userId: number;
+  username: string | null;
+  at: string;
+  entityType: string;
+  entityId: number;
+  operation: string;
+  diff: string;
+  taskId: number | null;
+}
+
+// Mirrors backend TaskResponse (subset used by the History task filter).
+export interface Task {
+  id: number;
+  title: string;
   status: string;
 }
