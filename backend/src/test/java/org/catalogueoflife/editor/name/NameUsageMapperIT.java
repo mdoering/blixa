@@ -3,6 +3,7 @@ package org.catalogueoflife.editor.name;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import org.catalogueoflife.editor.name.dto.RankName;
 import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectMapper;
 import org.catalogueoflife.editor.support.AbstractPostgresIT;
@@ -245,6 +246,50 @@ class NameUsageMapperIT extends AbstractPostgresIT {
     synonymAccepted.link(pid, syn.getId(), accepted.getId(), null);
     synonymAccepted.link(pid, syn.getId(), notAccepted.getId(), null);
     assertThat(nameUsages.countNonAcceptedSynonymTargets(pid, syn.getId())).isEqualTo(1);
+  }
+
+  @Test
+  void findsAncestorClassification() {
+    Project p = new Project();
+    p.setTitle("Classification");
+    projects.insert(p);
+    int pid = p.getId();
+
+    NameUsage kingdom = newMinimalUsage(pid);
+    kingdom.setScientificName("Animalia");
+    kingdom.setRank("kingdom");
+    kingdom.setId(idSeq.allocate(pid, ENTITY));
+    nameUsages.insert(kingdom);
+
+    NameUsage family = newMinimalUsage(pid);
+    family.setScientificName("Felidae");
+    family.setRank("family");
+    family.setParentId(kingdom.getId());
+    family.setId(idSeq.allocate(pid, ENTITY));
+    nameUsages.insert(family);
+
+    NameUsage genus = newMinimalUsage(pid);
+    genus.setScientificName("Panthera");
+    genus.setRank("genus");
+    genus.setParentId(family.getId());
+    genus.setId(idSeq.allocate(pid, ENTITY));
+    nameUsages.insert(genus);
+
+    NameUsage leo = newMinimalUsage(pid);
+    leo.setScientificName("Panthera leo");
+    leo.setRank("species");
+    leo.setParentId(genus.getId());
+    leo.setId(idSeq.allocate(pid, ENTITY));
+    nameUsages.insert(leo);
+
+    // self excluded, root-first: kingdom -> family -> genus (species itself is not in the result)
+    assertThat(nameUsages.findClassification(pid, leo.getId())).containsExactly(
+        new RankName("kingdom", "Animalia"),
+        new RankName("family", "Felidae"),
+        new RankName("genus", "Panthera"));
+
+    // the root has no ancestors at all
+    assertThat(nameUsages.findClassification(pid, kingdom.getId())).isEmpty();
   }
 
   private static NameUsage newMinimalUsage(int projectId) {

@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import org.catalogueoflife.editor.name.dto.RankName;
 
 @Mapper
 public interface NameUsageMapper {
@@ -157,6 +158,25 @@ public interface NameUsageMapper {
       SELECT scientific_name FROM anc WHERE depth > 0 AND rank = 'genus' ORDER BY depth LIMIT 1
       """)
   String findAncestorGenusName(@Param("projectId") int projectId, @Param("id") int id);
+
+  // Full higher classification of a usage: every STRICT ancestor (depth > 0, self excluded),
+  // root-first (ORDER BY depth DESC), skipping unranked ancestors -- fed to the COL name matcher
+  // as higher-classification query params (see Task 4 / the bulk-match plan). Unlike the other
+  // ancestor CTEs here this has no `anc.depth < 10000` cycle guard since the brief's query is used
+  // verbatim; parent_id cycles are already prevented at write time (TreeMapper.isDescendant).
+  @Select("""
+      WITH RECURSIVE anc AS (
+        SELECT parent_id, rank, scientific_name, 0 AS depth
+          FROM name_usage WHERE project_id = #{projectId} AND id = #{usageId}
+        UNION ALL
+        SELECT p.parent_id, p.rank, p.scientific_name, anc.depth + 1
+          FROM name_usage p JOIN anc ON p.project_id = #{projectId} AND p.id = anc.parent_id
+      )
+      SELECT rank, scientific_name AS name FROM anc
+      WHERE depth > 0 AND rank IS NOT NULL
+      ORDER BY depth DESC
+      """)
+  List<RankName> findClassification(@Param("projectId") int projectId, @Param("usageId") int usageId);
 
   // The immediate parent's rank (RankVsParentRule), or null if the id has no parent.
   @Select("""
