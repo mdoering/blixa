@@ -134,13 +134,71 @@ class ColMatchJobIT extends AbstractPostgresIT {
 
     // Idempotency: re-running matchOne for B against the SAME "B1" match now finds matched == stored
     // (B's alternativeId is already col:B1 from the run above), so the correct, stable outcome is
-    // VERIFIED -- not a second ADDED -- and deleteColFlags' clear-then-(no re-insert) leaves B with
-    // NO col_* flag, matching the same "VERIFIED -> no flag" contract exercised by C above. This is
-    // the meaningful idempotency guarantee: re-matching an already-correct usage converges to a
-    // stable, flag-free VERIFIED state rather than re-flagging or duplicating alternativeId entries.
+    // VERIFIED -- not a second ADDED -- and the reconcile's newRule==null deletes B's col_id_added
+    // flag with no re-insert, leaving B with NO col_* flag, matching the same "VERIFIED -> no flag"
+    // contract exercised by C above. This is the meaningful idempotency guarantee: re-matching an
+    // already-correct usage converges to a stable, flag-free VERIFIED state rather than re-flagging
+    // or duplicating alternativeId entries.
     assertThat(service.matchOne(pid, b.getId(), userId)).isEqualTo(ColOutcome.VERIFIED);
     assertThat(nameUsages.findByIdInProject(pid, b.getId()).getAlternativeId()).containsExactly("col:B1");
     assertThat(colIssues(pid, b.getId())).isEmpty();
+  }
+
+  // The main win of the col_* reconcile refactor (see IssueMapper.findColFlags /
+  // ColMatchJobService.reconcileColFlag): a curator's ACCEPTED review of a recurring col_match_missing
+  // flag must survive a bulk re-run -- the old unconditional deleteColFlags-then-insert reset it to
+  // OPEN every time, silently discarding "genuinely not in COL" review decisions.
+  @Test
+  void matchOnePreservesReviewStatusOnRecurringMissingFlag() {
+    int userId = createUser("col-match-job-preserve-owner");
+    int pid = createProject("col-match-job-preserve");
+
+    NameUsage d = createUsage(pid, "Nonexistantus preservus", null, userId);
+    when(clb.match(eq("Nonexistantus preservus"), any(), any(), any(), anyList())).thenReturn(noMatch());
+
+    // First run: no COL match -> a fresh OPEN col_match_missing flag.
+    assertThat(service.matchOne(pid, d.getId(), userId)).isEqualTo(ColOutcome.UNMATCHED);
+    List<Issue> dIssues = colIssues(pid, d.getId());
+    assertThat(dIssues).hasSize(1);
+    Issue missing = dIssues.get(0);
+    assertThat(missing.getRule()).isEqualTo("col_match_missing");
+    assertThat(missing.getStatus()).isEqualTo("OPEN");
+
+    // A curator reviews it: "genuinely not in COL" -> ACCEPTED.
+    issues.review(missing.getId(), "ACCEPTED", userId);
+    assertThat(colIssues(pid, d.getId()).get(0).getStatus()).isEqualTo("ACCEPTED");
+
+    // Re-run matchOne for D: ClbMatchClient is still stubbed to NONE, so col_match_missing recurs
+    // unchanged -- it must be PRESERVED (same row, still ACCEPTED), not reset to OPEN.
+    assertThat(service.matchOne(pid, d.getId(), userId)).isEqualTo(ColOutcome.UNMATCHED);
+    List<Issue> afterRerun = colIssues(pid, d.getId());
+    assertThat(afterRerun).hasSize(1);
+    assertThat(afterRerun.get(0).getId()).isEqualTo(missing.getId());
+    assertThat(afterRerun.get(0).getRule()).isEqualTo("col_match_missing");
+    assertThat(afterRerun.get(0).getStatus()).isEqualTo("ACCEPTED");
+  }
+
+  // Rule-change case: a usage already flagged col_match_missing (from a prior run where CLB returned
+  // NONE) whose NEXT run resolves to VERIFIED (matched now equals the usage's already-stored col id)
+  // must have the stale col_match_missing flag deleted outright -- newRule==null reconciles to "no
+  // flag" the same way a straight VERIFIED does.
+  @Test
+  void matchOneDeletesMissingFlagWhenUsageLaterVerifies() {
+    int userId = createUser("col-match-job-rulechange-owner");
+    int pid = createProject("col-match-job-rulechange");
+
+    NameUsage u = createUsage(pid, "Nonexistantus laterus", List.of("col:KEEP"), userId);
+
+    when(clb.match(eq("Nonexistantus laterus"), any(), any(), any(), anyList())).thenReturn(noMatch());
+    assertThat(service.matchOne(pid, u.getId(), userId)).isEqualTo(ColOutcome.UNMATCHED);
+    List<Issue> uIssues = colIssues(pid, u.getId());
+    assertThat(uIssues).hasSize(1);
+    assertThat(uIssues.get(0).getRule()).isEqualTo("col_match_missing");
+
+    // CLB now confirms the already-stored col:KEEP -> VERIFIED -> the missing flag is deleted.
+    when(clb.match(eq("Nonexistantus laterus"), any(), any(), any(), anyList())).thenReturn(matched("KEEP"));
+    assertThat(service.matchOne(pid, u.getId(), userId)).isEqualTo(ColOutcome.VERIFIED);
+    assertThat(colIssues(pid, u.getId())).isEmpty();
   }
 
   @Test

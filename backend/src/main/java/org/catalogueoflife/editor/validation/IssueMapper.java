@@ -171,9 +171,10 @@ public interface IssueMapper {
 
   // -- col/ColMatchJobService: per-usage flag helpers for the bulk COL-match job. Distinct from
   // insert() above (which populates context/expects Issue's full shape via reflection): these three
-  // rule keys (col_id_added, col_id_updated, col_match_missing) carry no context, and matchOne always
-  // deletes-then-inserts (never updateFinding/reopen) since a re-match's outcome can flip between
-  // them (e.g. VERIFIED -> UPDATED), which is a different rule, not a re-fire of the same one.
+  // rule keys (col_id_added, col_id_updated, col_match_missing) carry no context. matchOne reconciles
+  // against findColFlags below: the SAME rule recurring is PRESERVED as-is (status untouched, e.g. an
+  // ACCEPTED col_match_missing survives a re-run), while a resolved/different-rule flag is deleted and,
+  // if the new outcome still warrants a flag, a fresh one is inserted OPEN via insertColFlag.
 
   @Insert("""
       INSERT INTO issue (project_id, entity_type, entity_id, rule, severity, message, status, created_at, updated_at)
@@ -183,14 +184,14 @@ public interface IssueMapper {
       @Param("entityId") int entityId, @Param("rule") String rule,
       @Param("severity") String severity, @Param("message") String message);
 
-  // Deletes all three col_* rule keys for the entity in one go -- called unconditionally as
-  // matchOne's first write so a re-match is idempotent (at most one col_* flag per usage survives)
-  // regardless of which rule (if any) previously applied; the UNIQUE(project_id, entity_type,
-  // entity_id, rule) constraint means this must run before insertColFlag, never after.
-  @Delete("""
-      DELETE FROM issue WHERE project_id=#{projectId} AND entity_type=#{entityType} AND entity_id=#{entityId}
-        AND rule IN ('col_id_added','col_id_updated','col_match_missing')
-      """)
-  int deleteColFlags(@Param("projectId") int projectId, @Param("entityType") String entityType,
+  // The entity's existing col_* flag(s) (normally 0 or 1) -- ColMatchJobService.matchOne reconciles
+  // against these instead of the old unconditional delete+reinsert, so a still-firing flag (e.g. a
+  // recurring col_match_missing) can be PRESERVED with its reviewer status intact rather than being
+  // dropped and reborn OPEN, mirroring ValidationService.revalidateUsage's status-preserving reconcile.
+  // Same auto-map style as findByEntity above (plain SELECT *, no LOWER()/alias dance -- that's only
+  // for the API-facing IssueResponse queries further down).
+  @Select("SELECT * FROM issue WHERE project_id=#{projectId} AND entity_type=#{entityType} AND entity_id=#{entityId} "
+      + "AND rule IN ('col_id_added','col_id_updated','col_match_missing')")
+  List<Issue> findColFlags(@Param("projectId") int projectId, @Param("entityType") String entityType,
       @Param("entityId") int entityId);
 }

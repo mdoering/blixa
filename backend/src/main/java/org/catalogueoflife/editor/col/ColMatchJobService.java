@@ -13,6 +13,7 @@ import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectMapper;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
+import org.catalogueoflife.editor.validation.Issue;
 import org.catalogueoflife.editor.validation.IssueMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,17 +131,20 @@ public class ColMatchJobService {
 
   // Re-matches one usage against COL and reconciles: VERIFIED (matched == stored, nothing to
   // write), UPDATED (stored != null but changed), ADDED (was unmatched, now matched), or UNMATCHED
-  // (no COL match at all). Always clears any prior col_* flag first (idempotent -- a re-run leaves
-  // at most one col_* flag per usage) then writes at most one new flag. A missing usage (deleted
-  // concurrently, or a stale id) is treated as UNMATCHED with no flag, since there is no entity left
-  // to flag.
+  // (no COL match at all). The outcome/flag-to-write is computed first (newRule/severity/message,
+  // newRule==null for VERIFIED), then reconcileColFlag below reconciles it against whatever col_*
+  // flag(s) already exist for the usage -- the SAME rule recurring is PRESERVED as-is (a curator's
+  // ACCEPTED review of a still-firing col_match_missing survives a re-run instead of being reset to
+  // OPEN), mirroring ValidationService.revalidateUsage's reopen/updateFinding reconcile rather than
+  // matchOne's old unconditional deleteColFlags-then-insert. A missing usage (deleted concurrently,
+  // or a stale id) is treated as UNMATCHED with no flag reconcile at all, since there is no entity
+  // left to flag.
   @Transactional
   public ColOutcome matchOne(int projectId, int usageId, int userId) {
     NameUsage u = usages.findByIdInProject(projectId, usageId);
     if (u == null) {
       return ColOutcome.UNMATCHED;
     }
-    issues.deleteColFlags(projectId, ENTITY, usageId);
     String stored = ColMatchService.colIdFrom(u.getAlternativeId());
     Project project = projects.findById(projectId);
     // Project.nomCode is the NomCode enum (see ProjectService.parseNomCode); its name() is already
@@ -152,33 +156,67 @@ public class ColMatchJobService {
     JsonNode root = clb.match(u.getScientificName(), u.getAuthorship(), rank, code, classification);
     String matched = bestColId(root);
 
+    ColOutcome outcome;
+    String newRule = null;
+    String severity = null;
+    String message = null;
+
     if (matched == null) {
-      issues.insertColFlag(projectId, ENTITY, usageId, RULE_MISSING, "WARNING",
-          "No COL match for " + u.getScientificName());
-      return ColOutcome.UNMATCHED;
+      newRule = RULE_MISSING;
+      severity = "WARNING";
+      message = "No COL match for " + u.getScientificName();
+      outcome = ColOutcome.UNMATCHED;
+    } else if (matched.equals(stored)) {
+      outcome = ColOutcome.VERIFIED;
+    } else {
+      // Add or update the id -- CAS on the version just read above (matchOne runs standalone, not
+      // behind a lock, so a concurrent edit of this same usage loses the race here exactly like any
+      // other optimistic-concurrency write in this app).
+      List<String> merged = NameUsageService.mergeColId(u.getAlternativeId(), matched);
+      int rows = usages.updateAlternativeId(projectId, usageId, merged, userId, u.getVersion());
+      if (rows == 0) {
+        // Lost the optimistic-lock race: the usage was edited concurrently during the CLB round-trip
+        // (u.getVersion() no longer matches the row). Make no claim this run -- insert no col flag
+        // and report VERIFIED (a no-op this run); the next run re-reads the now-changed row and
+        // reconciles then.
+        outcome = ColOutcome.VERIFIED;
+      } else if (stored == null) {
+        newRule = RULE_ADDED;
+        severity = "INFO";
+        message = "Added col:" + matched;
+        outcome = ColOutcome.ADDED;
+      } else {
+        newRule = RULE_UPDATED;
+        severity = "INFO";
+        message = "COL id changed col:" + stored + " -> col:" + matched;
+        outcome = ColOutcome.UPDATED;
+      }
     }
-    if (matched.equals(stored)) {
-      return ColOutcome.VERIFIED;
+
+    reconcileColFlag(projectId, usageId, newRule, severity, message);
+    return outcome;
+  }
+
+  // Reconciles the usage's existing col_* flag(s) (normally 0 or 1, via IssueMapper.findColFlags)
+  // against this run's target flag (newRule==null means "no flag warranted" -- VERIFIED, both the
+  // stored==matched path and the CAS-miss path). The SAME rule recurring is kept untouched (its
+  // review status, e.g. ACCEPTED, survives); anything else found (resolved, a different rule, or a
+  // stray duplicate) is deleted; a genuinely new rule is inserted OPEN. This is the status-preserving
+  // counterpart to ValidationService.revalidateUsage's reopen/updateFinding reconcile, scoped to the
+  // three col_* rule keys that method deliberately ignores (see its `ruleKeys` guard).
+  private void reconcileColFlag(int projectId, int usageId, String newRule, String severity, String message) {
+    List<Issue> existing = issues.findColFlags(projectId, ENTITY, usageId);
+    boolean keptMatching = false;
+    for (Issue e : existing) {
+      if (newRule != null && e.getRule().equals(newRule) && !keptMatching) {
+        keptMatching = true; // same flag recurs -> preserve it (status untouched)
+      } else {
+        issues.deleteById(e.getId()); // resolved / different-rule / stray duplicate -> remove
+      }
     }
-    // Add or update the id -- CAS on the version just read above (matchOne runs standalone, not
-    // behind a lock, so a concurrent edit of this same usage loses the race here exactly like any
-    // other optimistic-concurrency write in this app).
-    List<String> merged = NameUsageService.mergeColId(u.getAlternativeId(), matched);
-    int rows = usages.updateAlternativeId(projectId, usageId, merged, userId, u.getVersion());
-    if (rows == 0) {
-      // Lost the optimistic-lock race: the usage was edited concurrently during the CLB round-trip
-      // (u.getVersion() no longer matches the row). Make no claim this run -- insert no col flag
-      // and report VERIFIED (a no-op this run); the next run re-reads the now-changed row and
-      // reconciles then.
-      return ColOutcome.VERIFIED;
+    if (newRule != null && !keptMatching) {
+      issues.insertColFlag(projectId, ENTITY, usageId, newRule, severity, message); // new -> OPEN
     }
-    if (stored == null) {
-      issues.insertColFlag(projectId, ENTITY, usageId, RULE_ADDED, "INFO", "Added col:" + matched);
-      return ColOutcome.ADDED;
-    }
-    issues.insertColFlag(projectId, ENTITY, usageId, RULE_UPDATED, "INFO",
-        "COL id changed col:" + stored + " -> col:" + matched);
-    return ColOutcome.UPDATED;
   }
 
   // Iterates every usage in the project (findAllIds, id order), running matchOne for each and
@@ -186,16 +224,16 @@ public class ColMatchJobService {
   // `self` (the Spring proxy), not `this` -- exactly like ValidationService.revalidateProject's
   // self.revalidateUsage -- so each iteration's matchOne actually runs under its OWN @Transactional
   // proxy invocation (a plain `this.matchOne(...)` call bypasses the proxy entirely, and the whole
-  // project's worth of deleteColFlags+updateAlternativeId+insertColFlag would silently collapse into
+  // project's worth of reconcileColFlag+updateAlternativeId+insertColFlag would silently collapse into
   // ONE outer transaction for the whole run instead of one per usage). runSync itself must NOT be
   // @Transactional for the same reason. A usage whose matchOne throws (e.g. ClbMatchClient surfacing
   // a 502; a lost CAS race no longer throws -- see matchOne's rows==0 branch) is counted as
   // UNMATCHED here, but matchOne itself is @Transactional, so the exception rolls back that whole
-  // matchOne invocation -- including its deleteColFlags -- for that usage. The usage's prior col_*
-  // flag (and prior col:<id>, if any) is therefore RETAINED, not deleted: a transient failure (e.g.
-  // a CLB 502) never wipes a previously-good match. This does mean the run's UNMATCHED counter and
-  // that usage's actual flag/id can disagree for this run (still showing its unchanged, still-valid
-  // prior match) -- a benign counter/flag mismatch, not data loss.
+  // matchOne invocation -- including its reconcileColFlag deletes/inserts -- for that usage. The
+  // usage's prior col_* flag (and prior col:<id>, if any) is therefore RETAINED, not deleted: a
+  // transient failure (e.g. a CLB 502) never wipes a previously-good match. This does mean the run's
+  // UNMATCHED counter and that usage's actual flag/id can disagree for this run (still showing its
+  // unchanged, still-valid prior match) -- a benign counter/flag mismatch, not data loss.
   public void runSync(int projectId, long runId, int userId) {
     List<Integer> ids = usages.findAllIds(projectId);
     runs.setTotal(runId, ids.size());
