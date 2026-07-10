@@ -58,6 +58,12 @@ Two subagent-driven plans (11 tasks), all on `main`, range e98038a..6d67500. Ful
 - **GBIF preflight (count=0 → grey) — DONE** (commit 0776677): map greys/disables the GBIF layer toggle when the GBIF occurrence count is confirmed 0 (optimistic while loading/on error); handled in the light visibility effect so it never rebuilds the map.
 - **Backlog (non-blocking):** audit trail for bulk alternativeId writes; extract shared code/rank derivation helper (ColMatchService vs ColMatchJobService); ClbMatchClient brace-in-value encoding edge; test the DuplicateKeyException race-backstop path.
 
+## ColDP export/import — IN PROGRESS (spec `…/specs/2026-07-10-coldp-export-import-design.md`)
+Async export (project → ColDP `.zip` file) + import (always into a NEW project / staging store) reusing the CLB `org.catalogueoflife:reader` io (`ColdpReader`/`ColdpTerm`/`TermWriter`, `Identifier.Scope`). Identity = per-project numeric `id`; external ids as `alternativeID` CURIEs. Import offers preserve-ids-under-a-scope. Supervised name-match merge into an existing project is a deferred follow-on. See memory: [[stable-identifiers-principle]], [[reuse-clb-coldp-io]].
+- **Plan 1 — Foundation + io primitives: DONE** (plan `…/plans/2026-07-10-coldp-foundation-io.md`; range 18398ae..96411b3, 9 commits). Dropped `coldp_id` (V14); added `reader` dep (no Spring Boot classpath clash — verified at bytecode level); `ColdpZip` (zip/extract, zip-slip safe); `ColdpTsv` (bare-header TSV round-tripping through `ColdpReader`); `ColdpMetadata` (SnakeYAML **SafeConstructor** — untrusted input); `GET /api/coldp/id-scopes`. Full verify 45u+81IT.
+  - Carry-forward for Plans 2–3: reader `clean()` whitespace-normalizes on read (round-trip IT must assert normalized form for multi-whitespace fields); add a zip-bomb/decompressed-size cap on import extract; `ColdpTsv` writes the full canonical column set (empty where no data).
+- **Plan 2 — Export** and **Plan 3 — Import**: to be written against the concrete core, then executed. User is separately slimming the `reader` transitive deps (a later version bump).
+
 ## Frontend remaining
 - [ ] Tree **virtualization** (lazy-per-node is fine for now; needed at Lepidoptera scale).
 - [x] Issue **entity deep-link** — DONE. IssuesPage entity cell links to
