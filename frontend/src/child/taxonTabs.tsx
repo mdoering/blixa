@@ -1,5 +1,7 @@
+import { Stack } from '@mantine/core';
 import { childApi } from '../api/childApi';
 import ChildEntityTab, { type ColumnDef, type FieldDef } from './ChildEntityTab';
+import DistributionMapPanel from './map/DistributionMapPanel';
 import { referenceOptions } from './NameRelationsTab';
 
 // The 5 taxon-level child entities (accepted-only; the backend guards create and demote drops
@@ -127,27 +129,30 @@ export function DistributionTab({ pid, usageId, canEdit }: TabProps) {
     { name: 'remarks', label: 'Remarks', type: 'textarea', span: 12 },
   ];
   return (
-    <ChildEntityTab<Distribution>
-      pid={pid}
-      usageId={usageId}
-      canEdit={canEdit}
-      entity="distribution"
-      api={distributionApi}
-      columns={columns}
-      fields={fields}
-      rowId={(r) => r.id}
-      rowVersion={(r) => r.version}
-      toForm={(r) => ({
-        area: r.area ?? '',
-        areaId: r.areaId ?? '',
-        gazetteer: r.gazetteer ?? '',
-        establishmentMeans: r.establishmentMeans ?? '',
-        threatStatus: r.threatStatus ?? '',
-        referenceId: r.referenceId ? String(r.referenceId) : '',
-        remarks: r.remarks ?? '',
-      })}
-      describe={(r) => `Delete the distribution for ${r.area ?? r.areaId ?? 'this area'}.`}
-    />
+    <Stack>
+      <DistributionMapPanel pid={pid} usageId={usageId} canEdit={canEdit} />
+      <ChildEntityTab<Distribution>
+        pid={pid}
+        usageId={usageId}
+        canEdit={canEdit}
+        entity="distribution"
+        api={distributionApi}
+        columns={columns}
+        fields={fields}
+        rowId={(r) => r.id}
+        rowVersion={(r) => r.version}
+        toForm={(r) => ({
+          area: r.area ?? '',
+          areaId: r.areaId ?? '',
+          gazetteer: r.gazetteer ?? '',
+          establishmentMeans: r.establishmentMeans ?? '',
+          threatStatus: r.threatStatus ?? '',
+          referenceId: r.referenceId ? String(r.referenceId) : '',
+          remarks: r.remarks ?? '',
+        })}
+        describe={(r) => `Delete the distribution for ${r.area ?? r.areaId ?? 'this area'}.`}
+      />
+    </Stack>
   );
 }
 
