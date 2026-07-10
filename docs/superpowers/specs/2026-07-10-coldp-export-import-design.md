@@ -197,6 +197,17 @@ row's ColDP `referenceID`/`taxonID`/`nameID` = the target record's `id`.
      primary is missing or names differ, fall back to treating it as an ordinary row.
   5. **Child entities**: insert each, resolving `taxonID`/`nameID`→usage id and `referenceID`→ref id
      via the maps (dangling → skipped + issue).
+  - **Status/vocab inverse (round-trip):** parse the ColDP status back to our `Status`
+    (`accepted`→ACCEPTED, `synonym`→SYNONYM, `misapplied`→MISAPPLIED, **`provisionally accepted`→
+    UNASSESSED**). For a row that maps to a **non-accepted** status (SYNONYM/MISAPPLIED/UNASSESSED),
+    its `parentID` is a **`synonym_accepted` link**, NOT a `parent_id` — critical for the UNASSESSED
+    case, since our export writes an UNASSESSED-with-links usage as `parentID`=accepted + a
+    (accepted-type) `provisionally accepted` status. Also invert the writer's lower-casing: parse the
+    space-separated lower-case ColDP vocab back to our UPPER_SNAKE enums, case-insensitively (`code`
+    e.g. `zoological`→ZOOLOGICAL; plus `notho`/`gender`/`environment`/`nameStatus`).
+  - **Known export losses** (no ColDP column — these archives never carry them; import must not expect
+    them): `name_usage.sanctioning_author`, `type_material.occurrence_id` (the GBIF-occurrence join
+    key — re-derivable by re-running the GBIF match), and audit `modified`/`modified_by`.
   6. Commit (one project = one transaction; fatal error → rollback, mark FAILED, delete nothing since
      nothing committed). Then run the **validation engine** over the new project (issues surface in
      the dashboard). Mark DONE with counts.
