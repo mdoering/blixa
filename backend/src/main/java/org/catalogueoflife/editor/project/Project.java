@@ -16,8 +16,8 @@ public class Project {
   private String metadata = "{}";
   private boolean gbifOccurrenceLayer = true;
   // Which alternative_id CURIE scopes (e.g. "col", "gbif") this project's identifier fields use --
-  // loaded here (ProjectMapper's @Results wires the TEXT[] typeHandler) but not yet write-wired;
-  // see ProjectResponse/UpdateProjectMetadataRequest.
+  // loaded/written via ProjectMapper's @Results/UPDATE (both wire the TEXT[] typeHandler); see
+  // ProjectResponse/UpdateProjectMetadataRequest for the wire-facing read/write shape.
   private List<String> identifierScopes;
 
   public Integer getId() { return id; }

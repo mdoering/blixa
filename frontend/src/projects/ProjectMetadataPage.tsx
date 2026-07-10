@@ -9,6 +9,7 @@ import {
   Stack,
   Select,
   Switch,
+  TagsInput,
   Text,
   Textarea,
   TextInput,
@@ -20,6 +21,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { getProject, updateMetadata } from '../api/projects';
+import { getIdScopes } from '../api/coldp';
 import { getColMatchRun, getLatestColMatch, startColMatch } from '../api/col';
 import { exportFileUrl, getExportRun, getLatestExport, startExport } from '../api/export';
 import { messageFor } from '../api/client';
@@ -59,6 +61,7 @@ export default function ProjectMetadataPage() {
       geographicScope: undefined,
       taxonomicScope: undefined,
       gbifOccurrenceLayer: true,
+      identifierScopes: [],
     },
     validate: {
       title: (v) => (v ? null : 'Required'),
@@ -68,11 +71,18 @@ export default function ProjectMetadataPage() {
   const { data } = useQuery({ queryKey: ['project', id], queryFn: () => getProject(id) });
   const canEdit = data ? ['owner', 'editor'].includes(data.role) : false;
 
+  // Seeds the identifier-scopes picker's suggestion list -- the project's own already-configured
+  // scopes (below) still show as chips even if they're not in this vocab (e.g. a legacy custom
+  // entry), since TagsInput's `data` is suggestions only, not a value restriction.
+  const { data: idScopesVocab } = useQuery({ queryKey: ['idScopes'], queryFn: getIdScopes });
+
   useEffect(() => {
     if (data) {
       const values = Object.fromEntries(
         Object.entries(data).map(([k, v]) => [k, v ?? undefined]),
       ) as UpdateMetadataPayload;
+      // TagsInput is a controlled string[] input -- null/absent must become [], not undefined.
+      values.identifierScopes = data.identifierScopes ?? [];
       form.setValues(values);
       form.resetDirty(values);
     }
@@ -318,6 +328,12 @@ export default function ProjectMetadataPage() {
             <Switch
               label="Show GBIF occurrence layer on maps"
               {...form.getInputProps('gbifOccurrenceLayer', { type: 'checkbox' })}
+            />
+            <TagsInput
+              label="Identifier scopes (form fields)"
+              description="Adds a real identifier field to the taxon Details form for each scope (e.g. ipni)"
+              data={idScopesVocab ?? []}
+              {...form.getInputProps('identifierScopes')}
             />
             <Button type="submit" loading={mutation.isPending} disabled={!canEdit}>
               Save

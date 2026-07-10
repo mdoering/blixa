@@ -46,6 +46,7 @@ public interface ProjectMapper {
           nom_code = #{nomCode}, license = #{license},
           geographic_scope = #{geographicScope}, taxonomic_scope = #{taxonomicScope},
           metadata = #{metadata}::jsonb, gbif_occurrence_layer = #{gbifOccurrenceLayer},
+          identifier_scopes = #{identifierScopes,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
           updated_at = now()
       WHERE id = #{id}
       """)

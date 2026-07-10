@@ -18,6 +18,9 @@ export interface Project {
   taxonomicScope: string | null;
   role: Role;
   gbifOccurrenceLayer: boolean;
+  // Which alternative_id CURIE scopes (e.g. "ipni", "gbif") the taxon Details form renders a
+  // real per-scope identifier field for -- null/absent on projects that haven't set any.
+  identifierScopes: string[] | null;
 }
 
 export interface Member {
@@ -56,6 +59,7 @@ export interface UpdateMetadataPayload {
   geographicScope?: string;
   taxonomicScope?: string;
   gbifOccurrenceLayer?: boolean;
+  identifierScopes?: string[];
 }
 
 // Mirrors backend NameUsageResponse (see backend/.../name/dto/NameUsageResponse.java): the

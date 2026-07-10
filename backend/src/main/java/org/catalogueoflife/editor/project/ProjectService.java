@@ -73,6 +73,12 @@ public class ProjectService {
     if (req.gbifOccurrenceLayer() != null) {
       p.setGbifOccurrenceLayer(req.gbifOccurrenceLayer());
     }
+    // Same null-safe carry-over as gbifOccurrenceLayer above: identifierScopes is only sent by
+    // the Project settings save (metadata saves that don't touch it omit the field entirely), so
+    // a null here must not wipe out whatever is already stored.
+    if (req.identifierScopes() != null) {
+      p.setIdentifierScopes(req.identifierScopes());
+    }
     projects.updateMetadata(p);
     return p;
   }

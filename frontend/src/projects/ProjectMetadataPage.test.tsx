@@ -74,6 +74,37 @@ test('toggles the GBIF occurrence layer switch and saves it', async () => {
   await waitFor(() => expect(savedBody.gbifOccurrenceLayer).toBe(false));
 });
 
+test('identifier scopes: prefills the configured scopes and saves an added custom scope', async () => {
+  let savedBody: { identifierScopes?: string[] } = {};
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json({ ...project, identifierScopes: ['ipni'] })),
+    http.put('/api/projects/3/metadata', async ({ request }) => {
+      savedBody = (await request.json()) as { identifierScopes?: string[] };
+      return HttpResponse.json({ ...project, identifierScopes: savedBody.identifierScopes });
+    }),
+    noLatestMatchRun,
+    noLatestExportRun,
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  // Prefilled from the loaded project as a chip/pill.
+  expect(screen.getByText('ipni')).toBeInTheDocument();
+
+  // Free custom entries are allowed on top of the seeded vocab (mocked in test/server.ts as
+  // ['col', 'gbif', 'ipni', 'tsn']) -- 'worms' isn't in that list. getByRole('textbox', ...), not
+  // getByLabelText: Mantine's TagsInput combobox keeps its (hidden) options listbox in the DOM
+  // with the same aria-labelledby as the input, so getByLabelText matches both and errors on
+  // ambiguity (same discipline as TaxonDetail.test.tsx's reference picker).
+  const scopesInput = screen.getByRole('textbox', { name: 'Identifier scopes (form fields)' });
+  await userEvent.type(scopesInput, 'worms{Enter}');
+  expect(screen.getByText('worms')).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+  await waitFor(() => expect(savedBody.identifierScopes).toEqual(['ipni', 'worms']));
+});
+
 test(
   'starts a COL match run, polls it to completion, renders the summary, and invalidates issues',
   async () => {

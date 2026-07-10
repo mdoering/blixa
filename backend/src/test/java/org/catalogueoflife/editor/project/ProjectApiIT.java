@@ -1,5 +1,6 @@
 package org.catalogueoflife.editor.project;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -123,6 +124,43 @@ class ProjectApiIT extends AbstractPostgresIT {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"title\":\"Insects\",\"license\":\"MIT\"}"))
        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @WithMockUser(username = "idScopesOwner")
+  void identifierScopesRoundTrip() throws Exception {
+    ensureUser("idScopesOwner");
+
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Fungi\",\"nomCode\":\"zoological\"}"))
+        .andExpect(status().isCreated())
+        // default null on create -- no identifierScopes sent, none stored.
+        .andExpect(jsonPath("$.identifierScopes").value(nullValue()))
+        .andReturn().getResponse().getContentAsString();
+    long projectId = json.readTree(body).get("id").asLong();
+
+    mvc.perform(put("/api/projects/" + projectId + "/metadata").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Fungi\",\"identifierScopes\":[\"ipni\",\"gbif\"]}"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.identifierScopes[0]").value("ipni"))
+       .andExpect(jsonPath("$.identifierScopes[1]").value("gbif"));
+
+    // identifierScopes omitted from a later metadata save -> must not be nulled/reset, the
+    // previously-saved scopes carry over unchanged (same contract as gbifOccurrenceLayer).
+    mvc.perform(put("/api/projects/" + projectId + "/metadata").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Fungi Updated\"}"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.title").value("Fungi Updated"))
+       .andExpect(jsonPath("$.identifierScopes[0]").value("ipni"))
+       .andExpect(jsonPath("$.identifierScopes[1]").value("gbif"));
+
+    mvc.perform(get("/api/projects/" + projectId))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.identifierScopes[0]").value("ipni"))
+       .andExpect(jsonPath("$.identifierScopes[1]").value("gbif"));
   }
 
   @Test

@@ -185,6 +185,31 @@ test('a 409 conflict shows a notice and refetches the usage', async () => {
   await waitFor(() => expect(authorship).toHaveValue('Linnaeus, 1758'));
 });
 
+test('renders a per-scope identifier field from project.identifierScopes, prefilled from alternativeId, and saving folds the edit back in while preserving col:', async () => {
+  mockCommon(baseUsage({ alternativeId: ['col:XYZ', 'ipni:123'] }));
+  server.use(
+    http.get('/api/projects/4', () => HttpResponse.json({ ...project, role: 'owner', identifierScopes: ['ipni'] })),
+  );
+  let putBody: Record<string, unknown> | undefined;
+  server.use(
+    http.put('/api/projects/4/usages/10', async ({ request }) => {
+      putBody = (await request.json()) as Record<string, unknown>;
+      return HttpResponse.json(baseUsage({ alternativeId: ['col:XYZ', 'ipni:456'], version: 2 }));
+    }),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  const ipni = await screen.findByLabelText('IPNI');
+  await waitFor(() => expect(ipni).toHaveValue('123'));
+
+  await userEvent.clear(ipni);
+  await userEvent.type(ipni, '456');
+  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+
+  await waitFor(() => expect(putBody).toBeDefined());
+  expect(putBody?.alternativeId).toEqual(['col:XYZ', 'ipni:456']);
+});
+
 test('a viewer role sees a disabled Save button', async () => {
   mockCommon(baseUsage(), 'viewer');
   renderWithProviders(<TaxonDetail pid={4} usageId={10} />);

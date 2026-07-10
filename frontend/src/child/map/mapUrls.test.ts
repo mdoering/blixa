@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'vitest';
-import { areaGeojsonUrl, colIdFrom, gbifCountUrl, gbifTileUrl, withColId } from './mapUrls';
+import {
+  areaGeojsonUrl,
+  colIdFrom,
+  gbifCountUrl,
+  gbifTileUrl,
+  scopedId,
+  withColId,
+  withScopedId,
+} from './mapUrls';
 
 const UUID = '7ddf754f-d193-4cc9-b351-99906754a03b';
 
@@ -33,6 +41,43 @@ describe('withColId', () => {
   });
   test('works from an empty list', () => {
     expect(withColId([], '6W3C4')).toEqual(['col:6W3C4']);
+  });
+});
+
+describe('scopedId', () => {
+  test('strips the <scope>: prefix and returns the id', () => {
+    expect(scopedId(['col:X', 'ipni:123'], 'ipni')).toBe('123');
+  });
+  test('is case-insensitive on the scope', () => {
+    expect(scopedId(['IPNI:123'], 'ipni')).toBe('123');
+    expect(scopedId(['ipni:123'], 'IPNI')).toBe('123');
+  });
+  test('returns null when no matching scope entry is present', () => {
+    expect(scopedId(['col:X'], 'ipni')).toBeNull();
+  });
+  test('returns null for empty / missing input', () => {
+    expect(scopedId([], 'ipni')).toBeNull();
+    expect(scopedId(null, 'ipni')).toBeNull();
+    expect(scopedId(undefined, 'ipni')).toBeNull();
+  });
+});
+
+describe('withScopedId', () => {
+  test('replaces an existing scope entry while preserving other entries (incl. col:)', () => {
+    expect(withScopedId(['col:X', 'ipni:1'], 'ipni', '2')).toEqual(['col:X', 'ipni:2']);
+  });
+  test('is case-insensitive on the scope it replaces', () => {
+    expect(withScopedId(['col:X', 'IPNI:1'], 'ipni', '2')).toEqual(['col:X', 'ipni:2']);
+  });
+  test('appends a new scope entry to a list with no existing entry for it', () => {
+    expect(withScopedId(['col:X'], 'ipni', '123')).toEqual(['col:X', 'ipni:123']);
+  });
+  test('an empty value drops/omits the scope entry rather than appending an empty one', () => {
+    expect(withScopedId(['col:X'], 'ipni', '')).toEqual(['col:X']);
+    expect(withScopedId(['col:X', 'ipni:1'], 'ipni', '')).toEqual(['col:X']);
+  });
+  test('works from an empty list', () => {
+    expect(withScopedId([], 'ipni', '123')).toEqual(['ipni:123']);
   });
 });
 

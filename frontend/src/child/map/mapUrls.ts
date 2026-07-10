@@ -23,6 +23,32 @@ export function withColId(alternativeId: string[], colId: string): string[] {
   return [...alternativeId.filter((id) => !/^col:/i.test(id)), `col:${colId}`];
 }
 
+// Extract the bare id for `scope` from a usage's alternativeId list by stripping a
+// case-insensitive `<scope>:` prefix. Generalizes colIdFrom above for the per-scope identifier
+// fields (Project.identifierScopes -> TaxonDetail Details form). Returns the first match, or null
+// when none is present.
+export function scopedId(alternativeId: string[] | null | undefined, scope: string): string | null {
+  if (!alternativeId) return null;
+  const prefix = new RegExp(`^${scope}:(.+)$`, 'i');
+  for (const id of alternativeId) {
+    const m = prefix.exec(id);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+// Merges a per-scope identifier value into a usage's alternativeId list: drops any existing
+// (case-insensitive) `<scope>:` entry, then appends `<scope>:<value>` when value is non-empty --
+// an empty value just drops the entry rather than appending an empty one. Generalizes withColId
+// above so the Details form's per-scope identifier fields (Project.identifierScopes) can fold
+// their edits into alternativeId one scope at a time while preserving every other entry
+// (including `col:`, and scopes the project hasn't configured a field for).
+export function withScopedId(alternativeId: string[], scope: string, value: string): string[] {
+  const prefix = new RegExp(`^${scope}:`, 'i');
+  const kept = alternativeId.filter((id) => !prefix.test(id));
+  return value ? [...kept, `${scope}:${value}`] : kept;
+}
+
 // GBIF v2 occurrence-density raster tile template. Keeps the literal `{z}/{x}/{y}` placeholders
 // (maplibre substitutes them per tile); only the dynamic query values are URL-encoded.
 export function gbifTileUrl(colId: string, checklistKey: string): string {
