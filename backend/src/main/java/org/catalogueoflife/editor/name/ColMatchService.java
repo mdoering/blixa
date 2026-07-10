@@ -6,7 +6,6 @@ import java.util.Locale;
 import org.catalogueoflife.editor.name.dto.ColMatchCandidate;
 import org.catalogueoflife.editor.name.dto.RankName;
 import org.catalogueoflife.editor.project.Project;
-import org.catalogueoflife.editor.project.ProjectMapper;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -24,23 +23,19 @@ public class ColMatchService {
   private final ClbMatchClient clb;
   private final NameUsageMapper usages;
   private final ProjectService projects;
-  private final ProjectMapper projectMapper;
 
-  public ColMatchService(ClbMatchClient clb, NameUsageMapper usages, ProjectService projects,
-      ProjectMapper projectMapper) {
+  public ColMatchService(ClbMatchClient clb, NameUsageMapper usages, ProjectService projects) {
     this.clb = clb;
     this.usages = usages;
     this.projects = projects;
-    this.projectMapper = projectMapper;
   }
 
   public List<ColMatchCandidate> match(int userId, int projectId, int usageId) {
-    projects.requireRole(userId, projectId);
+    Project project = projects.requireVisible(userId, projectId);
     NameUsage u = usages.findByIdInProject(projectId, usageId);
     if (u == null) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "name usage not found");
     }
-    Project project = requireProject(projectId);
     // Project.nomCode is the NomCode enum (see ProjectService.parseNomCode); its name() is already
     // upper-case (ZOOLOGICAL, BOTANICAL, ...) which the CLB `code` param parses tolerantly.
     String code = project.getNomCode() == null ? null : project.getNomCode().name();
@@ -49,7 +44,7 @@ public class ColMatchService {
     JsonNode root = clb.match(u.getScientificName(), u.getAuthorship(), rank, code, classification);
 
     List<ColMatchCandidate> out = new ArrayList<>();
-    addCandidate(out, root.path("usage"), root.path("type").asText(null));
+    addCandidate(out, root.path("usage"), root.path("type").asString(null));
     for (JsonNode alt : root.path("alternatives")) {
       addCandidate(out, alt, "ALTERNATIVE");
     }
@@ -62,14 +57,14 @@ public class ColMatchService {
     if (node == null || node.isMissingNode() || node.isNull()) {
       return;
     }
-    String colId = node.path("id").asText(null);
+    String colId = node.path("id").asString(null);
     if (colId == null) {
       return;
     }
-    String name = node.path("name").asText(null);
-    String authorship = node.path("authorship").asText(null);
-    String rank = node.path("rank").asText(null);
-    String status = node.path("status").asText(null);
+    String name = node.path("name").asString(null);
+    String authorship = node.path("authorship").asString(null);
+    String rank = node.path("rank").asString(null);
+    String status = node.path("status").asString(null);
     String classification = joinClassification(node.path("classification"));
     out.add(new ColMatchCandidate(colId, name, authorship, rank, status, matchType, classification));
   }
@@ -82,20 +77,12 @@ public class ColMatchService {
     }
     List<String> names = new ArrayList<>();
     for (JsonNode n : node) {
-      String name = n.path("name").asText(null);
+      String name = n.path("name").asString(null);
       if (name != null) {
         names.add(name);
       }
     }
     return names.isEmpty() ? null : String.join(" > ", names);
-  }
-
-  private Project requireProject(int projectId) {
-    Project p = projectMapper.findById(projectId);
-    if (p == null) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "project not found");
-    }
-    return p;
   }
 
   // Bare COL id from a name_usage.alternative_id list (e.g. "col:6W3C4" -> "6W3C4"), or null if no
