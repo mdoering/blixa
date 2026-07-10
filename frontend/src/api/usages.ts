@@ -94,6 +94,23 @@ export function getAccepted(pid: number, id: number): Promise<NameUsage[]> {
   return api<NameUsage[]>(`/api/projects/${pid}/usages/${id}/accepted`);
 }
 
+// Matches a single usage against the published COL checklist (backend ColMatchService, GET
+// .../col-match) -- best match first (matchType = the CLB response's overall match type, e.g.
+// EXACT), followed by each of its alternatives (matchType "ALTERNATIVE"). Empty array when
+// unmatched. `classification` (root " > " leaf) disambiguates homonyms in the match UI.
+export interface ColMatchCandidate {
+  colId: string;
+  name: string;
+  authorship: string | null;
+  rank: string | null;
+  status: string | null;
+  matchType: string;
+  classification: string | null;
+}
+export function colMatch(pid: number, usageId: number): Promise<ColMatchCandidate[]> {
+  return api<ColMatchCandidate[]>(`/api/projects/${pid}/usages/${usageId}/col-match`);
+}
+
 // Full replace of alternativeId, optimistic-locked (backend NameUsageService.setIdentifiers) --
 // the write path a later "match to COL" feature uses to persist col:<id>. Not a partial patch:
 // callers must carry over any existing entries (e.g. from the loaded usage's alternativeId) they
