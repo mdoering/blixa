@@ -190,10 +190,12 @@ public class ColMatchJobService {
   // ONE outer transaction for the whole run instead of one per usage). runSync itself must NOT be
   // @Transactional for the same reason. A usage whose matchOne throws (e.g. ClbMatchClient surfacing
   // a 502; a lost CAS race no longer throws -- see matchOne's rows==0 branch) is counted as
-  // UNMATCHED rather than aborting the whole run -- by the time the exception is thrown,
-  // deleteColFlags has already run for that usage (matchOne's first statement, and committed since
-  // it ran in its own transaction), so its col_* flag is simply gone with no replacement, which is
-  // the correct "we don't know" state for that usage.
+  // UNMATCHED here, but matchOne itself is @Transactional, so the exception rolls back that whole
+  // matchOne invocation -- including its deleteColFlags -- for that usage. The usage's prior col_*
+  // flag (and prior col:<id>, if any) is therefore RETAINED, not deleted: a transient failure (e.g.
+  // a CLB 502) never wipes a previously-good match. This does mean the run's UNMATCHED counter and
+  // that usage's actual flag/id can disagree for this run (still showing its unchanged, still-valid
+  // prior match) -- a benign counter/flag mismatch, not data loss.
   public void runSync(int projectId, long runId, int userId) {
     List<Integer> ids = usages.findAllIds(projectId);
     runs.setTotal(runId, ids.size());

@@ -46,4 +46,13 @@ public interface ColMatchRunMapper {
 
   @Select("SELECT * FROM col_match_run WHERE id = #{runId}")
   ColMatchRun findById(@Param("runId") long runId);
+
+  // Startup recovery sweep (ColMatchRunRecovery): the executor backing a run is in-memory and
+  // per-instance (ColMatchAsyncConfig), so a RUNNING row can only be left behind by an instance
+  // that no longer exists (a restart/redeploy killed it mid-run) -- there is nothing left to ever
+  // finish or fail it otherwise. Bulk UPDATE with no id filter: every RUNNING row at startup is,
+  // by definition, stale.
+  @Update("UPDATE col_match_run SET status = 'FAILED', error = 'interrupted by restart', "
+      + "finished_at = now() WHERE status = 'RUNNING'")
+  int failStaleRunning();
 }
