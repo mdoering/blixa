@@ -113,8 +113,14 @@ Combined name+usage form. Columns (our field → ColDP column):
 refs), `link→link`, `remarks→remarks`, `ordinal→ordinal`, `alternative_id[]→alternativeID`
 (comma-joined), `project.nom_code→code`. From `taxon_info` (accepted usages only):
 `extinct→extinct`, `environment[]→environment`, `temporal_range_start→temporalRangeStart`,
-`temporal_range_end→temporalRangeEnd`. For a synonym row, `parentID` is the **accepted usage's id**
-(from `synonym_accepted`); for an accepted row, `parentID` is the classification parent.
+`temporal_range_end→temporalRangeEnd`. For an accepted row, `parentID` is the classification parent.
+**Synonyms** (a usage with `synonym_accepted` links): emit one row per accepted link — the **primary**
+link (first by accepted id) uses the synonym's own `id` as `ID` with `parentID` = that accepted; each
+**additional (pro parte)** link emits a row with a deterministic derived `ID = "<synonymId>-<acceptedTaxonId>"`
+and `parentID` = that accepted, repeating the name fields. (Combined NameUsage has one `parentID`/row;
+this keeps the primary id stable and pro-parte ids reproducible. Consequence: re-importing such an
+archive expands a pro-parte synonym into N synonym usages — provenance kept via `alternativeID`.) A
+synonym with no accepted link emits a single row with empty `parentID`.
 
 ### `Reference.tsv` ← `reference`
 `id→ID`, `citation→citation`, `type→type`, `author→author`, `editor→editor`, `title→title`,
