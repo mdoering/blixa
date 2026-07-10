@@ -148,8 +148,19 @@ public class ReferenceService {
     // querying by refId afterwards would find nothing -- same call update() uses to find its
     // ValidationEvent targets.
     List<Integer> citingUsageIds = usages.findIdsByPublishedInReference(projectId, id);
+    // reference_id[] (taxonomic references) has NO array FK (see V3__name_core.sql's comment), so
+    // unlike published_in_reference_id above there is no DB-level SET NULL to clean up dangling
+    // ids after the delete below -- capture the array-citing usages BEFORE the delete too, same as
+    // citingUsageIds, so both lists are queryable while the reference row still exists.
+    List<Integer> arrayCitingUsageIds = usages.findUsageIdsCitingReference(projectId, id);
     if (references.delete(projectId, id) == 0) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "reference not found");
+    }
+    // Strip the now-deleted id out of every citing usage's reference_id[] -- without this a ColDP
+    // export would keep emitting referenceID for a reference that no longer exists (see
+    // NameUsageMapper.removeReferenceIdFromAll's javadoc for why this doesn't bump version).
+    if (!arrayCitingUsageIds.isEmpty()) {
+      usages.removeReferenceIdFromAll(projectId, id, userId);
     }
     // entity_id is polymorphic (no cascade FK to reference): clean up this reference's own issue
     // rows now, or they'd reference a nonexistent entity forever (see validation/IssueMapper.deleteByEntity).
@@ -161,6 +172,14 @@ public class ReferenceService {
     // delete actually commits.
     for (int usageId : citingUsageIds) {
       events.publishEvent(ValidationEvent.forUsage(projectId, usageId));
+    }
+    // Same AFTER_COMMIT-safe publish for the array-citing usages, deduplicated against
+    // citingUsageIds above so a usage that both published_in's AND taxonomically cites the same
+    // deleted reference doesn't get two redundant revalidations.
+    for (int usageId : arrayCitingUsageIds) {
+      if (!citingUsageIds.contains(usageId)) {
+        events.publishEvent(ValidationEvent.forUsage(projectId, usageId));
+      }
     }
   }
 

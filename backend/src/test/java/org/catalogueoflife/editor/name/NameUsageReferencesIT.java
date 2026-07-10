@@ -31,6 +31,7 @@ class NameUsageReferencesIT extends AbstractPostgresIT {
   @Autowired MockMvc mvc;
   @Autowired AppUserService users;
   @Autowired ObjectMapper json;
+  @Autowired ReferenceService referenceService;
 
   // Stub the external HTTP fetch so the web-reference test is deterministic and offline -- a real
   // network call must never happen in a Spring IT (see WebPageClientTest for the SSRF unit test
@@ -181,5 +182,40 @@ class NameUsageReferencesIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + pid + "/references/" + refId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.title").value("https://example.org/no-title"));
+  }
+
+  // reference_id[] has no array FK (see V3__name_core.sql's comment) so, unlike
+  // published_in_reference_id's DB-level ON DELETE SET NULL, ReferenceService.delete must clean up
+  // any dangling id itself -- otherwise a ColDP export would keep emitting referenceID for a
+  // reference that no longer exists. Regression guard for that array cleanup (NameUsageMapper.
+  // findUsageIdsCitingReference/removeReferenceIdFromAll).
+  @Test
+  void deletingAReferenceStripsItFromCitingUsagesReferenceIdArray() throws Exception {
+    ensureUser("refsOwner");
+    long pid = createProject("refarraycleanupproj");
+    long u = createUsage(pid, "Kus lus");
+    long refA = createReference(pid, "Ref A");
+    long refB = createReference(pid, "Ref B");
+
+    // set reference_id=[refA,refB] via the same PUT the References tab uses -> version bumps to 1.
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + u + "/references").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"referenceIds\":[" + refA + "," + refB + "],\"version\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(1));
+
+    int userId = users.requireByUsernameOrNull("refsOwner").getId();
+    referenceService.delete(userId, (int) pid, (int) refB);
+
+    // refB is gone...
+    mvc.perform(get("/api/projects/" + pid + "/references/" + refB))
+        .andExpect(status().isNotFound());
+    // ...and stripped from the usage's reference_id[], refA untouched, and (per
+    // NameUsageMapper.removeReferenceIdFromAll's javadoc) the array cleanup does NOT bump the
+    // usage's version -- it stays at 1, exactly as the earlier PUT left it.
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + u))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.referenceId", Matchers.contains((int) refA)))
+        .andExpect(jsonPath("$.version").value(1));
   }
 }

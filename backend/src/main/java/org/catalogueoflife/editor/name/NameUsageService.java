@@ -28,7 +28,9 @@ import org.catalogueoflife.editor.project.Role;
 import org.catalogueoflife.editor.tree.TreeMapper;
 import org.catalogueoflife.editor.validation.IssueMapper;
 import org.catalogueoflife.editor.validation.ValidationEvent;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +59,15 @@ public class NameUsageService {
   private final ReferenceMapper references;
   private final ReferenceService referenceService;
   private final WebPageClient webPageClient;
+
+  // Self-reference through the Spring proxy so createAndLinkWebReference's @Transactional actually
+  // applies when called from addWebReference below -- see ExportRunService/ColMatchJobService's
+  // identical `self` field for the same reason: a plain `this.createAndLinkWebReference(...)` call
+  // bypasses the proxy entirely and would silently run with NO transaction. @Lazy avoids a circular
+  // bean-creation error (this bean depending on itself while still being constructed).
+  @Autowired
+  @Lazy
+  private NameUsageService self;
 
   public NameUsageService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted, IdSeqMapper idSeq,
       ProjectService projects, ProjectMapper projectMapper, NameParserService parser, TreeMapper tree,
@@ -215,6 +226,11 @@ public class NameUsageService {
     boolean reparse = changed(u.getScientificName(), req.scientificName())
         || changed(u.getAuthorship(), req.authorship())
         || changed(u.getRank(), req.rank());
+    // Fields NOT set from `req` below (e.g. referenceId) intentionally ride through unchanged from
+    // the freshly-loaded `u` above -- the full update(NameUsage) UPDATE (NameUsageMapper.update)
+    // writes every column including reference_id = #{referenceId}, so leaving a field unset here
+    // (rather than reading it off req) is what stops this generic update from clobbering it; see
+    // setReferences/doSetReferences for that field's own dedicated, narrower write path.
     u.setScientificName(req.scientificName());
     u.setAuthorship(req.authorship());
     u.setRank(req.rank());
@@ -281,8 +297,8 @@ public class NameUsageService {
   }
 
   // The actual implementation, called directly (not via `this.setReferences(...)`) by
-  // addWebReference below: a same-class call to a public @Transactional method bypasses the
-  // Spring AOP proxy, silently downgrading that method's own @Transactional to a no-op (it only
+  // createAndLinkWebReference below: a same-class call to a public @Transactional method bypasses
+  // the Spring AOP proxy, silently downgrading that method's own @Transactional to a no-op (it only
   // "works" because the caller happens to already be transactional) -- calling this private,
   // non-@Transactional helper from both places instead makes the transactional boundary explicit
   // and keeps it working even if either caller's own annotation ever changes.
@@ -310,19 +326,38 @@ public class NameUsageService {
   // title fetch via WebPageClient, SSRF-guarded -- see that class; falls back to the raw URL when
   // no title is found or the fetch fails) via the same reference-create path the References tab's
   // "new reference" form uses (ReferenceService.create), then appends its id to this usage's
-  // reference_id[] via the CAS write above (doSetReferences, not setReferences -- see its comment
-  // on why). Reads the usage fresh for its CURRENT version so this works regardless of what
-  // version the caller's stale form state thinks it's on (a plain add, not a client-supplied
-  // optimistic-locked replace) -- the tab's separate "add existing reference" action goes through
-  // setReferences directly and does carry the client's version.
-  @Transactional
+  // reference_id[] via the CAS write in doSetReferences (not setReferences -- see its comment on
+  // why). DELIBERATELY NOT @Transactional: webPageClient.fetchTitle does an outbound HTTP call
+  // that can take up to ~13s (3s connect + 10s read, see WebPageClient's timeouts), and holding a
+  // pooled JDBC connection open for that whole fetch would risk exhausting the pool under
+  // concurrent web-reference adds -- mirrors ReferenceImportService.resolveDoi's identical
+  // Crossref-fetch-outside-a-transaction split. Only the auth check + a cheap existence probe run
+  // here before the fetch; every DB write (reference create + reference_id[] append + audit) is
+  // pushed into the separate @Transactional createAndLinkWebReference below, called through the
+  // `self` proxy so its @Transactional actually applies (see the `self` field's javadoc).
   public NameUsageResponse addWebReference(int userId, int projectId, int usageId, String url) {
     requireEditor(userId, projectId);
-    NameUsage before = requireInProject(projectId, usageId);
+    requireInProject(projectId, usageId); // cheap 404 sanity check before the outbound fetch
     String title = webPageClient.fetchTitle(url);
+    String accessed = java.time.LocalDate.now().toString();
+    String author = hostOf(url);
+    return self.createAndLinkWebReference(userId, projectId, usageId, url, title, accessed, author);
+  }
+
+  // The DB-only half of addWebReference above: creates the webpage Reference and appends its id to
+  // the usage's reference_id[], all inside one transaction so the two writes are atomic. Reads the
+  // usage FRESH for its CURRENT version (rather than reusing a version read before the outbound
+  // fetch in addWebReference) so this works regardless of what version the caller's stale form
+  // state thinks it's on AND regardless of any edit that happened while the fetch was in flight --
+  // a plain add, not a client-supplied optimistic-locked replace (the tab's separate "add existing
+  // reference" action goes through setReferences directly and does carry the client's version).
+  @Transactional
+  public NameUsageResponse createAndLinkWebReference(int userId, int projectId, int usageId, String url,
+      String title, String accessed, String author) {
+    NameUsage before = requireInProject(projectId, usageId);
     CreateReferenceRequest refReq = new CreateReferenceRequest(
-        null, "webpage", hostOf(url), null, title != null ? title : url, null, null, null, null,
-        null, null, null, null, null, url, java.time.LocalDate.now().toString(), null);
+        null, "webpage", author, null, title != null ? title : url, null, null, null, null,
+        null, null, null, null, null, url, accessed, null);
     Reference ref = referenceService.create(userId, projectId, refReq);
     var ids = new java.util.ArrayList<Integer>(
         before.getReferenceId() == null ? List.of() : before.getReferenceId());

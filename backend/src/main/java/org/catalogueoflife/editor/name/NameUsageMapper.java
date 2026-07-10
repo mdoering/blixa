@@ -158,6 +158,29 @@ public interface NameUsageMapper {
   @Select("SELECT id FROM name_usage WHERE project_id = #{projectId} AND published_in_reference_id = #{refId}")
   List<Integer> findIdsByPublishedInReference(@Param("projectId") int projectId, @Param("refId") int refId);
 
+  // Every usage in the project whose taxonomic reference_id[] contains a given reference id --
+  // reference_id has NO array FK (see V3__name_core.sql's comment), so unlike
+  // published_in_reference_id above there is no DB-level ON DELETE SET NULL to lean on; this is
+  // ReferenceService.delete's read side for finding both the array-cleanup targets AND the usages
+  // that need a ValidationEvent republished.
+  @Select("SELECT id FROM name_usage WHERE project_id = #{projectId} AND #{referenceId} = ANY(reference_id)")
+  List<Integer> findUsageIdsCitingReference(@Param("projectId") int projectId,
+      @Param("referenceId") int referenceId);
+
+  // Strips a deleted reference's id out of every citing usage's reference_id[] (ReferenceService.
+  // delete's write side, the array-column counterpart of the published_in_reference_id FK's ON
+  // DELETE SET NULL). Deliberately does NOT bump version: this is maintenance cleanup after a
+  // reference the usage cited is gone, not an edit the usage's own optimistic lock should guard --
+  // bumping version here would surprise a concurrent, unrelated edit of the same usage with a
+  // spurious 409 CAS failure (mirrors the FK SET NULL path, which also doesn't touch version).
+  @Update("""
+      UPDATE name_usage SET reference_id = array_remove(reference_id, #{referenceId}),
+          modified_by = #{modifiedBy}, modified = now()
+      WHERE project_id = #{projectId} AND #{referenceId} = ANY(reference_id)
+      """)
+  int removeReferenceIdFromAll(@Param("projectId") int projectId, @Param("referenceId") int referenceId,
+      @Param("modifiedBy") int modifiedBy);
+
   // Direct children of a usage (parent_id = id). The tree only ever links accepted->accepted, so
   // these are the accepted children the demote workflow (NameUsageService.demote) must reassign
   // when their parent is turned into a synonym.
