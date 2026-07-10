@@ -27,9 +27,14 @@ export function withColId(alternativeId: string[], colId: string): string[] {
 // case-insensitive `<scope>:` prefix. Generalizes colIdFrom above for the per-scope identifier
 // fields (Project.identifierScopes -> TaxonDetail Details form). Returns the first match, or null
 // when none is present.
+// Escape a CURIE scope (project-admin free-typed, may contain regex metachars) for safe RegExp use.
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function scopedId(alternativeId: string[] | null | undefined, scope: string): string | null {
   if (!alternativeId) return null;
-  const prefix = new RegExp(`^${scope}:(.+)$`, 'i');
+  const prefix = new RegExp(`^${escapeRe(scope)}:(.+)$`, 'i');
   for (const id of alternativeId) {
     const m = prefix.exec(id);
     if (m) return m[1];
@@ -44,7 +49,7 @@ export function scopedId(alternativeId: string[] | null | undefined, scope: stri
 // their edits into alternativeId one scope at a time while preserving every other entry
 // (including `col:`, and scopes the project hasn't configured a field for).
 export function withScopedId(alternativeId: string[], scope: string, value: string): string[] {
-  const prefix = new RegExp(`^${scope}:`, 'i');
+  const prefix = new RegExp(`^${escapeRe(scope)}:`, 'i');
   const kept = alternativeId.filter((id) => !prefix.test(id));
   return value ? [...kept, `${scope}:${value}`] : kept;
 }

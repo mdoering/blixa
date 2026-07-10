@@ -60,6 +60,11 @@ describe('scopedId', () => {
     expect(scopedId(null, 'ipni')).toBeNull();
     expect(scopedId(undefined, 'ipni')).toBeNull();
   });
+  test('treats regex metacharacters in the scope literally (escaped)', () => {
+    // '.' must not act as a wildcard: scope 'a.b' must not match 'axb'.
+    expect(scopedId(['axb:9', 'a.b:5'], 'a.b')).toBe('5');
+    expect(withScopedId(['axb:9', 'a.b:1'], 'a.b', '2')).toEqual(['axb:9', 'a.b:2']);
+  });
 });
 
 describe('withScopedId', () => {
