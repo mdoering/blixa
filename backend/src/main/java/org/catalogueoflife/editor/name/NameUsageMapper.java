@@ -117,6 +117,13 @@ public interface NameUsageMapper {
   @Select("SELECT id FROM name_usage WHERE project_id = #{projectId} ORDER BY id")
   List<Integer> findIdsByProject(@Param("projectId") int projectId);
 
+  // Same query as findIdsByProject, kept as its own named entry point for col/ColMatchJobService.
+  // runSync (the bulk COL-match job's per-usage loop) so the two call sites -- revalidation vs.
+  // COL-matching -- can evolve independently (e.g. a later col-match pass excluding bare/unranked
+  // names) without one accidentally changing the other's scope.
+  @Select("SELECT id FROM name_usage WHERE project_id = #{projectId} ORDER BY id")
+  List<Integer> findAllIds(@Param("projectId") int projectId);
+
   // Count of OTHER usages in the project sharing the same scientificName + authorship --
   // validation/rules/DuplicateNameRule.java's data source. `IS NOT DISTINCT FROM` is Postgres's
   // NULL-safe equality (plain `=` is never true when either side is NULL, which would wrongly

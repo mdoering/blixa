@@ -168,4 +168,29 @@ public interface IssueMapper {
   // Internal aggregation row for countByStatusSeverity -- not exposed via the API directly (see
   // IssueSummaryResponse for the shape the API returns).
   record StatusSeverityCount(String status, String severity, long count) {}
+
+  // -- col/ColMatchJobService: per-usage flag helpers for the bulk COL-match job. Distinct from
+  // insert() above (which populates context/expects Issue's full shape via reflection): these three
+  // rule keys (col_id_added, col_id_updated, col_match_missing) carry no context, and matchOne always
+  // deletes-then-inserts (never updateFinding/reopen) since a re-match's outcome can flip between
+  // them (e.g. VERIFIED -> UPDATED), which is a different rule, not a re-fire of the same one.
+
+  @Insert("""
+      INSERT INTO issue (project_id, entity_type, entity_id, rule, severity, message, status, created_at, updated_at)
+      VALUES (#{projectId}, #{entityType}, #{entityId}, #{rule}, #{severity}, #{message}, 'OPEN', now(), now())
+      """)
+  int insertColFlag(@Param("projectId") int projectId, @Param("entityType") String entityType,
+      @Param("entityId") int entityId, @Param("rule") String rule,
+      @Param("severity") String severity, @Param("message") String message);
+
+  // Deletes all three col_* rule keys for the entity in one go -- called unconditionally as
+  // matchOne's first write so a re-match is idempotent (at most one col_* flag per usage survives)
+  // regardless of which rule (if any) previously applied; the UNIQUE(project_id, entity_type,
+  // entity_id, rule) constraint means this must run before insertColFlag, never after.
+  @Delete("""
+      DELETE FROM issue WHERE project_id=#{projectId} AND entity_type=#{entityType} AND entity_id=#{entityId}
+        AND rule IN ('col_id_added','col_id_updated','col_match_missing')
+      """)
+  int deleteColFlags(@Param("projectId") int projectId, @Param("entityType") String entityType,
+      @Param("entityId") int entityId);
 }
