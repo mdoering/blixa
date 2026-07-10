@@ -291,6 +291,21 @@ public interface NameUsageMapper {
   int setStatus(@Param("projectId") int projectId, @Param("id") int id,
       @Param("status") String status, @Param("modifiedBy") int modifiedBy);
 
+  // Pass-2 write of the ColDP import job (coldp/imprt/ImportRunService.loadNameUsages): parent_id/
+  // basionym_id are non-deferrable self-referencing compound FKs (V3__name_core.sql/V8), so a
+  // Pass-1 insert can never set them for a forward reference -- this narrow update sets just those
+  // two columns (plus the usual version/modified bookkeeping) once every usage in the archive has
+  // been inserted and the import job's source-id -> new-id map is complete. Unlike update()/
+  // reparentChildren above, this is NOT CAS-guarded on version: nothing else can be racing this
+  // usage mid-import (the whole load runs in one transaction, see loadTransactional's javadoc).
+  @Update("""
+      UPDATE name_usage SET parent_id = #{parentId}, basionym_id = #{basionymId},
+         version = version + 1, modified = now(), modified_by = #{modifiedBy}
+      WHERE project_id = #{projectId} AND id = #{id}""")
+  int updateHierarchy(@Param("projectId") int projectId, @Param("id") int id,
+      @Param("parentId") Integer parentId, @Param("basionymId") Integer basionymId,
+      @Param("modifiedBy") int modifiedBy);
+
   @Update("""
       UPDATE name_usage
       SET alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},

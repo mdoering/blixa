@@ -7,9 +7,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import life.catalogue.api.model.VerbatimRecord;
+import life.catalogue.api.vocab.Environment;
+import life.catalogue.api.vocab.Gender;
+import life.catalogue.api.vocab.NomStatus;
 import life.catalogue.coldp.ColdpTerm;
 import life.catalogue.csv.ColdpReader;
 import org.catalogueoflife.editor.coldp.imprt.dto.ImportRunResponse;
@@ -19,12 +28,19 @@ import org.catalogueoflife.editor.coldp.io.ColdpZip;
 import org.catalogueoflife.editor.name.Author;
 import org.catalogueoflife.editor.name.AuthorMapper;
 import org.catalogueoflife.editor.name.IdSeqMapper;
+import org.catalogueoflife.editor.name.NameUsage;
+import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.Reference;
 import org.catalogueoflife.editor.name.ReferenceMapper;
+import org.catalogueoflife.editor.name.Status;
+import org.catalogueoflife.editor.name.SynonymAcceptedMapper;
+import org.catalogueoflife.editor.name.TaxonInfoMapper;
+import org.catalogueoflife.editor.parse.NameParserService;
 import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.dto.CreateProjectRequest;
 import org.catalogueoflife.editor.project.dto.UpdateProjectMetadataRequest;
+import org.gbif.nameparser.api.NamePart;
 import org.gbif.nameparser.api.NomCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,9 +62,11 @@ import tools.jackson.databind.ObjectMapper;
 // immediately with a 202 while the (possibly long) archive walk proceeds in the background).
 // Mirrors ExportRunService's start/run shape, but authorization is "any authenticated user" (no
 // project-role check -- the project doesn't exist yet; the caller becomes its OWNER, exactly like
-// POST /projects). run() opens the archive, creates the project, then loads references and authors
-// (phases 1-3); Tasks 4-5 extend loadTransactional further to load names and the taxon/synonym tree,
-// consuming the ImportContext (refIds/authorIds source-id maps) built here.
+// POST /projects). run() opens the archive, creates the project, then loads references, authors and
+// name-usages (loadReferences/loadAuthors/loadNameUsages, phases 1-4), consuming/extending the
+// ImportContext (refIds/authorIds/usageIds source-id maps) built here; a later task may extend
+// loadTransactional further for any remaining ColDP resource types (vernacular names, distributions,
+// media, ...).
 @Service
 public class ImportRunService {
 
@@ -60,6 +78,12 @@ public class ImportRunService {
   // rows besides direct-mapper test fixtures like ReferenceExportIT's AUTHOR_ENTITY).
   private static final String REFERENCE_ENTITY = "reference";
   private static final String AUTHOR_ENTITY = "author";
+  // Matches NameUsageService.ENTITY / the idSeq entity string NameUsageColdpWriter's rows are keyed
+  // by on export -- see NameUsageService's private ENTITY constant of the same value.
+  private static final String NAME_USAGE_ENTITY = "name_usage";
+  // A pro-parte derived row's id, exactly as NameUsageColdpWriter.synonymRows mints it:
+  // "<primaryUsageId>-<acceptedId>", both plain non-negative integers.
+  private static final Pattern PRO_PARTE_ID = Pattern.compile("^(\\d+)-(\\d+)$");
 
   private final ImportRunMapper runs;
   private final ProjectService projectService;
@@ -69,6 +93,10 @@ public class ImportRunService {
   private final IdSeqMapper idSeq;
   private final ReferenceMapper references;
   private final AuthorMapper authors;
+  private final NameUsageMapper usages;
+  private final SynonymAcceptedMapper synonymAccepted;
+  private final TaxonInfoMapper taxonInfo;
+  private final NameParserService parser;
 
   // Self-reference through the Spring proxy so run()'s @Async and loadTransactional's @Transactional
   // actually go through their proxied annotations -- see ExportRunService's identical `self` field
@@ -80,7 +108,8 @@ public class ImportRunService {
   private ImportRunService self;
 
   public ImportRunService(ImportRunMapper runs, ProjectService projectService, ObjectMapper json,
-      IdSeqMapper idSeq, ReferenceMapper references, AuthorMapper authors,
+      IdSeqMapper idSeq, ReferenceMapper references, AuthorMapper authors, NameUsageMapper usages,
+      SynonymAcceptedMapper synonymAccepted, TaxonInfoMapper taxonInfo, NameParserService parser,
       @Value("${coldp.import.dir:${java.io.tmpdir}/coldp-imports}") String importDir,
       @Value("${coldp.import.max-bytes:104857600}") long maxBytes) {
     this.runs = runs;
@@ -89,6 +118,10 @@ public class ImportRunService {
     this.idSeq = idSeq;
     this.references = references;
     this.authors = authors;
+    this.usages = usages;
+    this.synonymAccepted = synonymAccepted;
+    this.taxonInfo = taxonInfo;
+    this.parser = parser;
     this.importDir = Path.of(importDir);
     this.maxBytes = maxBytes;
     try {
@@ -182,8 +215,6 @@ public class ImportRunService {
   public void run(long runId, Path dir, int userId, boolean preserveIds, String idScope) {
     try {
       ImportContext ctx = self.loadTransactional(runId, dir, userId, preserveIds, idScope);
-      // nameUsageCount stays 0 in this task -- Task 4 extends loadTransactional to actually load
-      // names/usages and populate ctx.nameUsageCount.
       runs.finish(runId, ctx.nameUsageCount, ctx.referenceCount, ctx.authorCount,
           ctx.issues.isEmpty() ? null : json.writeValueAsString(ctx.issues));
     } catch (Exception e) {
@@ -233,6 +264,7 @@ public class ImportRunService {
     ImportContext ctx = new ImportContext(p.getId());
     loadReferences(reader, ctx, userId, preserveIds, idScope);
     loadAuthors(reader, ctx, userId, preserveIds, idScope);
+    loadNameUsages(reader, ctx, userId, preserveIds, idScope, nomCode);
     return ctx;
   }
 
@@ -302,6 +334,356 @@ public class ImportRunService {
       ctx.authorIds.put(rec.get(ColdpTerm.ID), a.getId());
       ctx.authorCount++;
     });
+  }
+
+  // Task 4: loads name-usages, either from the combined NameUsage.tsv (readCombinedRows) or, when
+  // the archive instead has separate Name+Taxon(+Synonym) files, synthesized into the same combined
+  // shape (readSplitFormRows) so every row from here on is processed identically regardless of
+  // archive shape (Step 7 in the design brief).
+  //
+  // Two-phase insert: name_usage.parent_id/basionym_id are non-deferrable self-referencing compound
+  // FKs (V3__name_core.sql/V8), so a row referencing a not-yet-inserted parent/basionym would fail
+  // at insert, and import can't assume the archive lists parents before their children. Pass 1
+  // (insertPrimaryUsage) therefore inserts every row with parent_id/basionym_id left NULL --
+  // published_in_reference_id/reference_id[] CAN be set already since References were loaded
+  // earlier in this same transaction (Task 3) -- while allocating the row's id and recording the
+  // source-id -> new-id mapping in ctx.usageIds. Only once every row has been inserted and
+  // ctx.usageIds is complete does Pass 2 resolve parent_id/basionym_id via the new
+  // NameUsageMapper.updateHierarchy and create synonym_accepted links.
+  //
+  // Status inverse: a NON-accepted row's parentID is a synonym_accepted LINK, not a parent_id --
+  // the exact inverse of NameUsageColdpWriter.synonymRows, including the UNASSESSED case (exported
+  // as parentID=<accepted> + status "provisionally accepted", see coldpStatus's javadoc): on import
+  // that parentID becomes a synonym link, never a classification parent_id.
+  //
+  // Pro-parte re-merge: NameUsageColdpWriter.synonymRows emits a pro-parte synonym (one usage
+  // linked to N accepted names) as a primary row (ID=<usageId>, parentID=lowest acceptedId) plus
+  // one derived "<usageId>-<acceptedId>" row per additional target; this reverses that by NOT
+  // creating a second usage for a "<n>-<m>" row when a primary row ID=<n> exists with the same
+  // scientificName -- instead adding an extra synonym_accepted link onto the already-inserted
+  // primary. A "<n>-<m>" row with no matching primary (or a differing name) falls back to an
+  // ordinary row (best-effort, per the design brief).
+  private void loadNameUsages(ColdpReader reader, ImportContext ctx, int userId, boolean preserveIds,
+      String idScope, NomCode nomCode) {
+    List<Map<ColdpTerm, String>> allRows = reader.hasSchema(ColdpTerm.NameUsage)
+        ? readCombinedRows(reader)
+        : readSplitFormRows(reader, ctx);
+
+    Map<String, Map<ColdpTerm, String>> byId = new LinkedHashMap<>();
+    for (Map<ColdpTerm, String> row : allRows) {
+      String id = row.get(ColdpTerm.ID);
+      if (id != null) {
+        byId.putIfAbsent(id, row);
+      }
+    }
+
+    List<Map<ColdpTerm, String>> primaryRows = new ArrayList<>();
+    List<Map<ColdpTerm, String>> proParteExtra = new ArrayList<>();
+    for (Map<ColdpTerm, String> row : allRows) {
+      String id = row.get(ColdpTerm.ID);
+      Matcher m = id == null ? null : PRO_PARTE_ID.matcher(id);
+      Map<ColdpTerm, String> primary = (m != null && m.matches()) ? byId.get(m.group(1)) : null;
+      boolean isProParteExtra = primary != null
+          && Objects.equals(primary.get(ColdpTerm.scientificName), row.get(ColdpTerm.scientificName));
+      (isProParteExtra ? proParteExtra : primaryRows).add(row);
+    }
+
+    // Pass 1: insert every primary row with parent_id/basionym_id NULL, remembering (usage, row)
+    // pairs for Pass 2 below.
+    record Pending(NameUsage usage, Map<ColdpTerm, String> row) {}
+    List<Pending> pending = new ArrayList<>(primaryRows.size());
+    for (Map<ColdpTerm, String> row : primaryRows) {
+      NameUsage u = insertPrimaryUsage(row, ctx, userId, preserveIds, idScope, nomCode);
+      pending.add(new Pending(u, row));
+    }
+
+    // Pass 2: every usage now exists, so parent_id/basionym_id (accepted) or a synonym_accepted
+    // link (non-accepted) can finally be resolved; a dangling reference is surfaced as an
+    // ImportIssue rather than failing the whole import.
+    for (Pending p : pending) {
+      Map<ColdpTerm, String> row = p.row();
+      String rowId = row.get(ColdpTerm.ID);
+      Integer basionymNewId = resolveUsageRef(ctx, row.get(ColdpTerm.basionymID), "basionym", rowId);
+      if (p.usage().getStatus() == Status.ACCEPTED) {
+        Integer parentNewId = resolveUsageRef(ctx, row.get(ColdpTerm.parentID), "parent", rowId);
+        usages.updateHierarchy(ctx.projectId, p.usage().getId(), parentNewId, basionymNewId, userId);
+      } else {
+        Integer acceptedNewId = resolveUsageRef(ctx, row.get(ColdpTerm.parentID), "parent", rowId);
+        usages.updateHierarchy(ctx.projectId, p.usage().getId(), null, basionymNewId, userId);
+        if (acceptedNewId != null) {
+          synonymAccepted.link(ctx.projectId, p.usage().getId(), acceptedNewId, 0);
+        }
+      }
+    }
+
+    // Pro-parte re-merge: each "<primaryId>-<acceptedId>" row becomes one extra synonym_accepted
+    // link on the already-inserted primary synonym, ordinal 1, 2, ... continuing after the
+    // primary's own ordinal-0 link created in Pass 2 above.
+    Map<String, Integer> nextOrdinal = new HashMap<>();
+    for (Map<ColdpTerm, String> row : proParteExtra) {
+      String id = row.get(ColdpTerm.ID);
+      Matcher m = PRO_PARTE_ID.matcher(id);
+      m.matches(); // already verified true when this row was classified into proParteExtra above
+      String primarySrcId = m.group(1);
+      String acceptedSrcId = m.group(2);
+      Integer synNewId = ctx.usageIds.get(primarySrcId);
+      Integer accNewId = ctx.usageIds.get(acceptedSrcId);
+      if (synNewId == null || accNewId == null) {
+        ctx.issue("name_usage", id, "pro-parte accepted " + acceptedSrcId + " not found");
+        continue;
+      }
+      int ordinal = nextOrdinal.merge(primarySrcId, 1, Integer::sum);
+      synonymAccepted.link(ctx.projectId, synNewId, accNewId, ordinal);
+    }
+  }
+
+  // Pass 1 for one primary row: allocates the id, builds + parses the NameUsage, inserts it with
+  // parent_id/basionym_id left null, upserts taxon_info for an accepted row carrying any of
+  // extinct/environment/temporalRange, and records the source-id -> new-id mapping Pass 2 (and any
+  // later task consuming ctx.usageIds) resolves everything else through.
+  private NameUsage insertPrimaryUsage(Map<ColdpTerm, String> row, ImportContext ctx, int userId,
+      boolean preserveIds, String idScope, NomCode nomCode) {
+    NameUsage u = new NameUsage();
+    u.setProjectId(ctx.projectId);
+    u.setId(idSeq.allocate(ctx.projectId, NAME_USAGE_ENTITY));
+    u.setModifiedBy(userId);
+
+    // Inverts NameUsageColdpWriter.nameFields/acceptedRow field-for-field.
+    u.setScientificName(row.get(ColdpTerm.scientificName));
+    u.setAuthorship(row.get(ColdpTerm.authorship));
+    u.setRank(row.get(ColdpTerm.rank));
+    u.setUninomial(row.get(ColdpTerm.uninomial));
+    u.setGenus(row.get(ColdpTerm.genericName));
+    u.setInfragenericEpithet(row.get(ColdpTerm.infragenericEpithet));
+    u.setSpecificEpithet(row.get(ColdpTerm.specificEpithet));
+    u.setInfraspecificEpithet(row.get(ColdpTerm.infraspecificEpithet));
+    u.setCultivarEpithet(row.get(ColdpTerm.cultivarEpithet));
+    u.setNotho(ColdpParse.parseEnum(NamePart.class, row.get(ColdpTerm.notho)));
+    u.setCombinationAuthorship(row.get(ColdpTerm.combinationAuthorship));
+    u.setCombinationExAuthorship(row.get(ColdpTerm.combinationExAuthorship));
+    u.setCombinationAuthorshipYear(row.get(ColdpTerm.combinationAuthorshipYear));
+    u.setBasionymAuthorship(row.get(ColdpTerm.basionymAuthorship));
+    u.setBasionymExAuthorship(row.get(ColdpTerm.basionymExAuthorship));
+    u.setBasionymAuthorshipYear(row.get(ColdpTerm.basionymAuthorshipYear));
+    u.setNamePhrase(row.get(ColdpTerm.namePhrase));
+    u.setPublishedInYear(ColdpParse.intOrNull(row.get(ColdpTerm.namePublishedInYear)));
+    u.setPublishedInPage(row.get(ColdpTerm.namePublishedInPage));
+    u.setPublishedInPageLink(row.get(ColdpTerm.namePublishedInPageLink));
+    u.setGender(ColdpParse.parseEnum(Gender.class, row.get(ColdpTerm.gender)));
+    u.setEtymology(row.get(ColdpTerm.etymology));
+    u.setNomStatus(ColdpParse.parseEnum(NomStatus.class, row.get(ColdpTerm.nameStatus)));
+    u.setOrdinal(ColdpParse.intOrNull(row.get(ColdpTerm.ordinal)));
+    u.setRemarks(row.get(ColdpTerm.remarks));
+
+    List<String> altIds = new ArrayList<>(ColdpParse.csv(row.get(ColdpTerm.alternativeID)));
+    if (preserveIds) {
+      String curie = idScope + ":" + row.get(ColdpTerm.ID);
+      if (!altIds.contains(curie)) {
+        altIds.add(curie);
+      }
+    }
+    u.setAlternativeId(altIds.isEmpty() ? null : altIds);
+
+    Status status = ColdpParse.parseStatus(row.get(ColdpTerm.status));
+    u.setStatus(status == null ? Status.UNASSESSED : status);
+
+    // extinct/environment/temporalRange* live in taxon_info and only ever apply to accepted usages
+    // -- acceptedRow is the only NameUsageColdpWriter branch that writes them (synonymRows never
+    // does), so only an ACCEPTED row is allowed to populate them here.
+    if (u.getStatus() == Status.ACCEPTED) {
+      String extinctStr = row.get(ColdpTerm.extinct);
+      u.setExtinct(extinctStr == null ? null : Boolean.valueOf(extinctStr));
+      List<Environment> envs = ColdpParse.csv(row.get(ColdpTerm.environment)).stream()
+          .map(e -> ColdpParse.parseEnum(Environment.class, e))
+          .filter(Objects::nonNull)
+          .toList();
+      u.setEnvironment(envs.isEmpty() ? null : envs);
+      u.setTemporalRangeStart(row.get(ColdpTerm.temporalRangeStart));
+      u.setTemporalRangeEnd(row.get(ColdpTerm.temporalRangeEnd));
+    }
+
+    // References were already inserted earlier in this same transaction (Task 3, loadReferences),
+    // so remapping both the single published-in reference and the taxonomic reference_id[] is safe
+    // right now, well before Pass 2 resolves the self-referencing hierarchy columns.
+    u.setPublishedInReferenceId(ctx.refIds.get(row.get(ColdpTerm.nameReferenceID)));
+    u.setReferenceId(ColdpParse.csvInts(row.get(ColdpTerm.referenceID)).stream()
+        .map(i -> ctx.refIds.get(String.valueOf(i)))
+        .filter(Objects::nonNull)
+        .toList());
+
+    // parent_id/basionym_id stay null here -- Pass 2 in loadNameUsages sets them via
+    // NameUsageMapper.updateHierarchy once every usage in the archive has been inserted.
+
+    // Archive atomized columns set above are advisory: parseInto unconditionally clears and
+    // re-derives them (plus sanctioningAuthor -- a known loss) from scientificName/authorship/rank,
+    // matching NameUsageService.create's own parse-before-insert order exactly. Never throws.
+    parser.parseInto(u, nomCode);
+
+    usages.insert(u);
+    if (u.getStatus() == Status.ACCEPTED && hasTaxonInfo(u)) {
+      taxonInfo.upsert(ctx.projectId, u.getId(), u.getExtinct(), u.getEnvironment(),
+          u.getTemporalRangeStart(), u.getTemporalRangeEnd());
+    }
+    ctx.usageIds.put(row.get(ColdpTerm.ID), u.getId());
+    ctx.nameUsageCount++;
+    return u;
+  }
+
+  private static boolean hasTaxonInfo(NameUsage u) {
+    return u.getExtinct() != null || u.getEnvironment() != null
+        || u.getTemporalRangeStart() != null || u.getTemporalRangeEnd() != null;
+  }
+
+  // Pass-2 helper: resolves a row's parentID/basionymID source-id string to the new id Pass 1
+  // allocated for it, or issues a dangling-reference ImportIssue and returns null (a bad/missing
+  // reference in the archive is surfaced, never fatal to the rest of the import).
+  private Integer resolveUsageRef(ImportContext ctx, String sourceId, String kind, String rowId) {
+    if (sourceId == null || sourceId.isBlank()) {
+      return null;
+    }
+    Integer newId = ctx.usageIds.get(sourceId);
+    if (newId == null) {
+      ctx.issue("name_usage", rowId, kind + " " + sourceId + " not found");
+    }
+    return newId;
+  }
+
+  // The fixed set of ColdpTerm columns loadNameUsages reads off every row, whichever form the
+  // archive uses: for the combined form (readCombinedRows/toUsageRow) these are literally
+  // NameUsage.tsv's own column names; for the split form (readSplitFormRows/synthesizeUsageRow)
+  // they are synthesized under the SAME keys, so insertPrimaryUsage/loadNameUsages never need to
+  // care which form actually produced a given row.
+  private static final List<ColdpTerm> USAGE_ROW_TERMS = List.of(
+      ColdpTerm.ID, ColdpTerm.parentID, ColdpTerm.basionymID, ColdpTerm.status,
+      ColdpTerm.scientificName, ColdpTerm.authorship, ColdpTerm.rank, ColdpTerm.notho,
+      ColdpTerm.uninomial, ColdpTerm.genericName, ColdpTerm.infragenericEpithet,
+      ColdpTerm.specificEpithet, ColdpTerm.infraspecificEpithet, ColdpTerm.cultivarEpithet,
+      ColdpTerm.combinationAuthorship, ColdpTerm.combinationExAuthorship,
+      ColdpTerm.combinationAuthorshipYear, ColdpTerm.basionymAuthorship,
+      ColdpTerm.basionymExAuthorship, ColdpTerm.basionymAuthorshipYear, ColdpTerm.namePhrase,
+      ColdpTerm.nameReferenceID, ColdpTerm.namePublishedInYear, ColdpTerm.namePublishedInPage,
+      ColdpTerm.namePublishedInPageLink, ColdpTerm.gender, ColdpTerm.etymology,
+      ColdpTerm.nameStatus, ColdpTerm.referenceID, ColdpTerm.ordinal, ColdpTerm.remarks,
+      ColdpTerm.alternativeID, ColdpTerm.extinct, ColdpTerm.environment,
+      ColdpTerm.temporalRangeStart, ColdpTerm.temporalRangeEnd);
+
+  private static List<Map<ColdpTerm, String>> readCombinedRows(ColdpReader reader) {
+    return reader.stream(ColdpTerm.NameUsage).map(ImportRunService::toUsageRow).toList();
+  }
+
+  private static Map<ColdpTerm, String> toUsageRow(VerbatimRecord rec) {
+    Map<ColdpTerm, String> row = new LinkedHashMap<>();
+    for (ColdpTerm t : USAGE_ROW_TERMS) {
+      row.put(t, rec.get(t));
+    }
+    return row;
+  }
+
+  // Split-form synthesis (design brief Step 7): the archive has Name+Taxon(+Synonym) instead of a
+  // combined NameUsage file. Our model is combined, so every Taxon/Synonym row is joined to its
+  // Name (via nameID) into one synthetic combined row under the same USAGE_ROW_TERMS keys
+  // readCombinedRows uses -- a Name shared by N usages therefore correctly yields N separate
+  // name_usage rows, one per Taxon/Synonym row that references it. A dangling nameID (no matching
+  // Name row) is surfaced as an ImportIssue and that Taxon/Synonym row is skipped.
+  private List<Map<ColdpTerm, String>> readSplitFormRows(ColdpReader reader, ImportContext ctx) {
+    Map<String, VerbatimRecord> namesById = new HashMap<>();
+    reader.stream(ColdpTerm.Name).forEach(r -> namesById.put(r.get(ColdpTerm.ID), r));
+
+    List<Map<ColdpTerm, String>> rows = new ArrayList<>();
+    reader.stream(ColdpTerm.Taxon).forEach(r -> {
+      VerbatimRecord nameRec = namesById.get(r.get(ColdpTerm.nameID));
+      if (nameRec == null) {
+        ctx.issue("name_usage", r.get(ColdpTerm.ID),
+            "nameID " + r.get(ColdpTerm.nameID) + " not found in Name.tsv");
+        return;
+      }
+      rows.add(synthesizeUsageRow(nameRec, r, false));
+    });
+    if (reader.hasSchema(ColdpTerm.Synonym)) {
+      reader.stream(ColdpTerm.Synonym).forEach(r -> {
+        VerbatimRecord nameRec = namesById.get(r.get(ColdpTerm.nameID));
+        if (nameRec == null) {
+          ctx.issue("name_usage", r.get(ColdpTerm.ID),
+              "nameID " + r.get(ColdpTerm.nameID) + " not found in Name.tsv");
+          return;
+        }
+        rows.add(synthesizeUsageRow(nameRec, r, true));
+      });
+    }
+    return rows;
+  }
+
+  // Joins one Name row with the Taxon/Synonym row using it: name-level columns come from `nameRec`
+  // (Name.tsv's own column names -- genus/referenceID/publishedInYear/.../status differ from the
+  // combined form's genericName/nameReferenceID/namePublishedInYear/.../nameStatus, so this is
+  // exactly where that renaming happens), taxon/synonym-level columns come from `usageRec`. A
+  // Synonym row's own taxonID becomes the combined row's parentID (Synonym has no parentID column
+  // of its own). A Taxon row's own status is implicit -- ColDP's Taxon.tsv carries no status column
+  // at all, so "accepted" is assumed, or "provisionally accepted" when the row carries
+  // provisional=true. A Synonym row's own status column (synonym/ambiguous synonym/misapplied) is
+  // honored as-is, defaulting to "synonym" when blank.
+  private static Map<ColdpTerm, String> synthesizeUsageRow(VerbatimRecord nameRec, VerbatimRecord usageRec,
+      boolean isSynonym) {
+    Map<ColdpTerm, String> row = new LinkedHashMap<>();
+    row.put(ColdpTerm.ID, usageRec.get(ColdpTerm.ID));
+    row.put(ColdpTerm.parentID, isSynonym ? usageRec.get(ColdpTerm.taxonID) : usageRec.get(ColdpTerm.parentID));
+    row.put(ColdpTerm.basionymID, nameRec.get(ColdpTerm.basionymID));
+    if (isSynonym) {
+      String synStatus = usageRec.get(ColdpTerm.status);
+      row.put(ColdpTerm.status, synStatus == null ? "synonym" : synStatus);
+    } else {
+      boolean provisional = Boolean.parseBoolean(usageRec.get(ColdpTerm.provisional));
+      row.put(ColdpTerm.status, provisional ? "provisionally accepted" : "accepted");
+    }
+    row.put(ColdpTerm.scientificName, nameRec.get(ColdpTerm.scientificName));
+    row.put(ColdpTerm.authorship, nameRec.get(ColdpTerm.authorship));
+    row.put(ColdpTerm.rank, nameRec.get(ColdpTerm.rank));
+    row.put(ColdpTerm.notho, nameRec.get(ColdpTerm.notho));
+    row.put(ColdpTerm.uninomial, nameRec.get(ColdpTerm.uninomial));
+    row.put(ColdpTerm.genericName, nameRec.get(ColdpTerm.genus));
+    row.put(ColdpTerm.infragenericEpithet, nameRec.get(ColdpTerm.infragenericEpithet));
+    row.put(ColdpTerm.specificEpithet, nameRec.get(ColdpTerm.specificEpithet));
+    row.put(ColdpTerm.infraspecificEpithet, nameRec.get(ColdpTerm.infraspecificEpithet));
+    row.put(ColdpTerm.cultivarEpithet, nameRec.get(ColdpTerm.cultivarEpithet));
+    row.put(ColdpTerm.combinationAuthorship, nameRec.get(ColdpTerm.combinationAuthorship));
+    row.put(ColdpTerm.combinationExAuthorship, nameRec.get(ColdpTerm.combinationExAuthorship));
+    row.put(ColdpTerm.combinationAuthorshipYear, nameRec.get(ColdpTerm.combinationAuthorshipYear));
+    row.put(ColdpTerm.basionymAuthorship, nameRec.get(ColdpTerm.basionymAuthorship));
+    row.put(ColdpTerm.basionymExAuthorship, nameRec.get(ColdpTerm.basionymExAuthorship));
+    row.put(ColdpTerm.basionymAuthorshipYear, nameRec.get(ColdpTerm.basionymAuthorshipYear));
+    row.put(ColdpTerm.namePhrase, usageRec.get(ColdpTerm.namePhrase));
+    row.put(ColdpTerm.nameReferenceID, nameRec.get(ColdpTerm.referenceID));
+    row.put(ColdpTerm.namePublishedInYear, nameRec.get(ColdpTerm.publishedInYear));
+    row.put(ColdpTerm.namePublishedInPage, nameRec.get(ColdpTerm.publishedInPage));
+    row.put(ColdpTerm.namePublishedInPageLink, nameRec.get(ColdpTerm.publishedInPageLink));
+    row.put(ColdpTerm.gender, nameRec.get(ColdpTerm.gender));
+    row.put(ColdpTerm.etymology, nameRec.get(ColdpTerm.etymology));
+    row.put(ColdpTerm.nameStatus, nameRec.get(ColdpTerm.status));
+    row.put(ColdpTerm.referenceID, usageRec.get(ColdpTerm.referenceID));
+    row.put(ColdpTerm.remarks, usageRec.get(ColdpTerm.remarks));
+    row.put(ColdpTerm.alternativeID, mergeCsv(nameRec.get(ColdpTerm.alternativeID),
+        isSynonym ? null : usageRec.get(ColdpTerm.alternativeID)));
+    if (!isSynonym) {
+      row.put(ColdpTerm.ordinal, usageRec.get(ColdpTerm.ordinal));
+      row.put(ColdpTerm.extinct, usageRec.get(ColdpTerm.extinct));
+      row.put(ColdpTerm.environment, usageRec.get(ColdpTerm.environment));
+      row.put(ColdpTerm.temporalRangeStart, usageRec.get(ColdpTerm.temporalRangeStart));
+      row.put(ColdpTerm.temporalRangeEnd, usageRec.get(ColdpTerm.temporalRangeEnd));
+    }
+    return row;
+  }
+
+  // Union of two alternativeID CSV strings (Name's own + Taxon's own -- Synonym.tsv has no
+  // alternativeID column at all, see ColdpTerm.RESOURCES), de-duplicated, comma-joined; null when
+  // both are empty.
+  private static String mergeCsv(String a, String b) {
+    List<String> merged = new ArrayList<>(ColdpParse.csv(a));
+    for (String v : ColdpParse.csv(b)) {
+      if (!merged.contains(v)) {
+        merged.add(v);
+      }
+    }
+    return merged.isEmpty() ? null : String.join(",", merged);
   }
 
   // Shared alternativeId-building for both loadReferences and loadAuthors: the archive row's own

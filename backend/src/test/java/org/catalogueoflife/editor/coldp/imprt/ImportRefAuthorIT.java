@@ -172,7 +172,10 @@ class ImportRefAuthorIT extends AbstractPostgresIT {
     assertThat(done.get("error").isNull()).isTrue();
     assertThat(done.get("referenceCount").asInt()).isEqualTo(2);
     assertThat(done.get("authorCount").asInt()).isEqualTo(1);
-    assertThat(done.get("nameUsageCount").asInt()).isEqualTo(0);
+    // buildArchive's one-row NameUsage.tsv exists only to satisfy loadTransactional's "has usage
+    // data" precondition -- Task 4 (ImportNameUsageIT/ImportSplitFormIT) is the real test of
+    // name-usage loading; this just reflects that the row is now actually loaded, not skipped.
+    assertThat(done.get("nameUsageCount").asInt()).isEqualTo(1);
     int projectId = done.get("projectId").asInt();
 
     List<Reference> refs = references.findAllByProject(projectId);
