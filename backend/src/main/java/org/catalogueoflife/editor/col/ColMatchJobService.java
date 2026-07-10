@@ -79,10 +79,16 @@ public class ColMatchJobService {
     }
     // Add or update the id -- CAS on the version just read above (matchOne runs standalone, not
     // behind a lock, so a concurrent edit of this same usage loses the race here exactly like any
-    // other optimistic-concurrency write in this app; runSync's catch below turns that into an
-    // UNMATCHED tally rather than aborting the whole run).
+    // other optimistic-concurrency write in this app).
     List<String> merged = NameUsageService.mergeColId(u.getAlternativeId(), matched);
-    usages.updateAlternativeId(projectId, usageId, merged, userId, u.getVersion());
+    int rows = usages.updateAlternativeId(projectId, usageId, merged, userId, u.getVersion());
+    if (rows == 0) {
+      // Lost the optimistic-lock race: the usage was edited concurrently during the CLB round-trip
+      // (u.getVersion() no longer matches the row). Make no claim this run -- insert no col flag
+      // and report VERIFIED (a no-op this run); the next run re-reads the now-changed row and
+      // reconciles then.
+      return ColOutcome.VERIFIED;
+    }
     if (stored == null) {
       issues.insertColFlag(projectId, ENTITY, usageId, RULE_ADDED, "INFO", "Added col:" + matched);
       return ColOutcome.ADDED;
@@ -94,10 +100,11 @@ public class ColMatchJobService {
 
   // Iterates every usage in the project (findAllIds, id order), running matchOne for each and
   // tallying processed + the matching per-outcome counter into the col_match_run row. A usage whose
-  // matchOne throws (e.g. a stale-version CAS loss, or ClbMatchClient surfacing a 502) is counted as
-  // UNMATCHED rather than aborting the whole run -- by the time the exception is thrown,
-  // deleteColFlags has already run for that usage (matchOne's first statement), so its col_* flag is
-  // simply gone with no replacement, which is the correct "we don't know" state for that usage.
+  // matchOne throws (e.g. ClbMatchClient surfacing a 502; a lost CAS race no longer throws -- see
+  // matchOne's rows==0 branch) is counted as UNMATCHED rather than aborting the whole run -- by the
+  // time the exception is thrown, deleteColFlags has already run for that usage (matchOne's first
+  // statement), so its col_* flag is simply gone with no replacement, which is the correct "we
+  // don't know" state for that usage.
   public void runSync(int projectId, long runId, int userId) {
     List<Integer> ids = usages.findAllIds(projectId);
     runs.setTotal(runId, ids.size());
