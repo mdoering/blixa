@@ -21,6 +21,20 @@ import life.catalogue.api.vocab.Gender;
 import life.catalogue.api.vocab.NomStatus;
 import life.catalogue.coldp.ColdpTerm;
 import life.catalogue.csv.ColdpReader;
+import org.catalogueoflife.editor.child.DistributionMapper;
+import org.catalogueoflife.editor.child.EstimateMapper;
+import org.catalogueoflife.editor.child.MediaMapper;
+import org.catalogueoflife.editor.child.NameRelationMapper;
+import org.catalogueoflife.editor.child.PropertyMapper;
+import org.catalogueoflife.editor.child.TypeMaterialMapper;
+import org.catalogueoflife.editor.child.VernacularMapper;
+import org.catalogueoflife.editor.child.dto.DistributionRequest;
+import org.catalogueoflife.editor.child.dto.EstimateRequest;
+import org.catalogueoflife.editor.child.dto.MediaRequest;
+import org.catalogueoflife.editor.child.dto.NameRelationRequest;
+import org.catalogueoflife.editor.child.dto.PropertyRequest;
+import org.catalogueoflife.editor.child.dto.TypeMaterialRequest;
+import org.catalogueoflife.editor.child.dto.VernacularRequest;
 import org.catalogueoflife.editor.coldp.imprt.dto.ImportRunResponse;
 import org.catalogueoflife.editor.coldp.io.ColdpMetadata;
 import org.catalogueoflife.editor.coldp.io.ColdpMetadata.ColdpMetadataDto;
@@ -40,6 +54,7 @@ import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.dto.CreateProjectRequest;
 import org.catalogueoflife.editor.project.dto.UpdateProjectMetadataRequest;
+import org.catalogueoflife.editor.validation.ValidationService;
 import org.gbif.nameparser.api.NamePart;
 import org.gbif.nameparser.api.NomCode;
 import org.slf4j.Logger;
@@ -62,11 +77,15 @@ import tools.jackson.databind.ObjectMapper;
 // immediately with a 202 while the (possibly long) archive walk proceeds in the background).
 // Mirrors ExportRunService's start/run shape, but authorization is "any authenticated user" (no
 // project-role check -- the project doesn't exist yet; the caller becomes its OWNER, exactly like
-// POST /projects). run() opens the archive, creates the project, then loads references, authors and
-// name-usages (loadReferences/loadAuthors/loadNameUsages, phases 1-4), consuming/extending the
-// ImportContext (refIds/authorIds/usageIds source-id maps) built here; a later task may extend
-// loadTransactional further for any remaining ColDP resource types (vernacular names, distributions,
-// media, ...).
+// POST /projects). run() opens the archive, creates the project, then loads references, authors,
+// name-usages and finally the 7 taxon/name child-entity files (loadReferences/loadAuthors/
+// loadNameUsages/loadChildEntities, phases 1-5), consuming/extending the ImportContext
+// (refIds/authorIds/usageIds source-id maps) built here. Once loadTransactional's transaction
+// commits, run() explicitly revalidates the whole new project (ValidationService.revalidateProject)
+// -- the raw-mapper inserts throughout this whole load never go through
+// NameUsageService/ReferenceService/AbstractChildEntityService, so none of them ever publish a
+// ValidationEvent (see ValidationTrigger); nothing would otherwise validate an imported project at
+// all.
 @Service
 public class ImportRunService {
 
@@ -85,6 +104,19 @@ public class ImportRunService {
   // "<primaryUsageId>-<acceptedId>", both plain non-negative integers.
   private static final Pattern PRO_PARTE_ID = Pattern.compile("^(\\d+)-(\\d+)$");
 
+  // The 7 child-entity idSeq entity strings -- each MUST match its own AbstractChildEntityService
+  // subclass's entity()/ENTITY (DistributionService/EstimateService/MediaService/PropertyService/
+  // VernacularService's `entity()` override, TypeMaterialService/NameRelationService's own ENTITY
+  // constant) since id_seq's per-(project, entity) counter is shared with every other writer of that
+  // entity -- reusing a different string here would silently allocate ids from the wrong counter.
+  private static final String TYPE_MATERIAL_ENTITY = "type_material";
+  private static final String DISTRIBUTION_ENTITY = "distribution";
+  private static final String VERNACULAR_ENTITY = "vernacular";
+  private static final String MEDIA_ENTITY = "media";
+  private static final String ESTIMATE_ENTITY = "estimate";
+  private static final String NAME_RELATION_ENTITY = "name_relation";
+  private static final String PROPERTY_ENTITY = "property";
+
   private final ImportRunMapper runs;
   private final ProjectService projectService;
   private final ObjectMapper json;
@@ -97,6 +129,14 @@ public class ImportRunService {
   private final SynonymAcceptedMapper synonymAccepted;
   private final TaxonInfoMapper taxonInfo;
   private final NameParserService parser;
+  private final TypeMaterialMapper typeMaterials;
+  private final DistributionMapper distributions;
+  private final VernacularMapper vernaculars;
+  private final MediaMapper media;
+  private final EstimateMapper estimates;
+  private final NameRelationMapper nameRelations;
+  private final PropertyMapper properties;
+  private final ValidationService validationService;
 
   // Self-reference through the Spring proxy so run()'s @Async and loadTransactional's @Transactional
   // actually go through their proxied annotations -- see ExportRunService's identical `self` field
@@ -110,6 +150,9 @@ public class ImportRunService {
   public ImportRunService(ImportRunMapper runs, ProjectService projectService, ObjectMapper json,
       IdSeqMapper idSeq, ReferenceMapper references, AuthorMapper authors, NameUsageMapper usages,
       SynonymAcceptedMapper synonymAccepted, TaxonInfoMapper taxonInfo, NameParserService parser,
+      TypeMaterialMapper typeMaterials, DistributionMapper distributions, VernacularMapper vernaculars,
+      MediaMapper media, EstimateMapper estimates, NameRelationMapper nameRelations,
+      PropertyMapper properties, ValidationService validationService,
       @Value("${coldp.import.dir:${java.io.tmpdir}/coldp-imports}") String importDir,
       @Value("${coldp.import.max-bytes:104857600}") long maxBytes) {
     this.runs = runs;
@@ -122,6 +165,14 @@ public class ImportRunService {
     this.synonymAccepted = synonymAccepted;
     this.taxonInfo = taxonInfo;
     this.parser = parser;
+    this.typeMaterials = typeMaterials;
+    this.distributions = distributions;
+    this.vernaculars = vernaculars;
+    this.media = media;
+    this.estimates = estimates;
+    this.nameRelations = nameRelations;
+    this.properties = properties;
+    this.validationService = validationService;
     this.importDir = Path.of(importDir);
     this.maxBytes = maxBytes;
     try {
@@ -211,12 +262,23 @@ public class ImportRunService {
   // propagate the exception to once we're here, same contract as ExportRunService.run /
   // ColMatchJobService.run. The extracted temp dir is always removed afterwards, success or failure:
   // once this method returns, nothing further ever reads it again.
+  //
+  // validationService.revalidateProject runs LAST, after loadTransactional's transaction has already
+  // committed (ctx is only ever assigned once that call returns successfully) and after runs.finish
+  // has recorded DONE -- never nested inside loadTransactional itself: revalidateProject manages its
+  // OWN per-usage transactions via ValidationService's own @Lazy self (see its javadoc), so calling
+  // it from in here would wrap every one of those per-usage transactions inside loadTransactional's
+  // single outer @Transactional instead, holding every usage's IssueMapper.lockUsage advisory lock
+  // for the whole recompute. If loadTransactional throws, ctx is never assigned, this line never
+  // runs, and the catch below marks the run FAILED -- exactly the "only revalidate on success"
+  // contract; there is nothing to revalidate for a project whose load never committed.
   @Async(ImportAsyncConfig.EXECUTOR_BEAN)
   public void run(long runId, Path dir, int userId, boolean preserveIds, String idScope) {
     try {
       ImportContext ctx = self.loadTransactional(runId, dir, userId, preserveIds, idScope);
       runs.finish(runId, ctx.nameUsageCount, ctx.referenceCount, ctx.authorCount,
           ctx.issues.isEmpty() ? null : json.writeValueAsString(ctx.issues));
+      validationService.revalidateProject(ctx.projectId);
     } catch (Exception e) {
       log.warn("import run {} failed for user {}: {}", runId, userId, e.getMessage(), e);
       runs.fail(runId, e.getMessage());
@@ -228,8 +290,8 @@ public class ImportRunService {
   // Phases 1-3 of the import: open the archive, require it actually has usage data, read
   // metadata.yaml, peek the nomenclatural code off the first data row, create + configure the
   // project, then load references and authors -- in that order, since they have no forward
-  // dependencies on anything else in the archive (Task 4's name/usage load, and Task 5's tree load,
-  // both come after and consume the ImportContext this method returns). @Transactional so a failure
+  // dependencies on anything else in the archive (Task 4's name/usage load, and Task 5's child-entity
+  // load, both come after and consume the ImportContext this method returns). @Transactional so a failure
   // partway through (e.g. an invalid license in metadata.yaml, or a malformed reference row) rolls
   // back the whole thing -- the just-inserted project row along with it -- rather than leaving a
   // half-configured project behind; matches the spec's "rollback + FAILED, delete nothing [from the
@@ -265,6 +327,7 @@ public class ImportRunService {
     loadReferences(reader, ctx, userId, preserveIds, idScope);
     loadAuthors(reader, ctx, userId, preserveIds, idScope);
     loadNameUsages(reader, ctx, userId, preserveIds, idScope, nomCode);
+    loadChildEntities(reader, ctx, userId);
     return ctx;
   }
 
@@ -466,6 +529,259 @@ public class ImportRunService {
       int ordinal = nextOrdinal.merge(primarySrcId, 1, Integer::sum);
       synonymAccepted.link(ctx.projectId, synNewId, accNewId, ordinal);
     }
+  }
+
+  // Task 5: loads the 7 taxon/name child-entity files, called AFTER loadNameUsages so ctx.usageIds
+  // is complete for every usage the archive could possibly reference. TypeMaterial + NameRelation
+  // key off the NAME (ColdpTerm.nameID = the usage id, since our model collapses name+taxon into one
+  // row -- see NameUsage's class doc); the other five (Distribution/VernacularName/Media/
+  // SpeciesEstimate/TaxonProperty) key off the TAXON (ColdpTerm.taxonID = the usage id) -- exactly
+  // which FK column a file uses is fixed by ColdpTerm.RESOURCES, not a per-writer/-reader choice; see
+  // ChildColdpWriter's javadoc, which every one of the 7 loaders below inverts field-for-field, row
+  // method by row method. Every insert here bypasses AbstractChildEntityService/the individual
+  // per-entity Services entirely (no audit trail, no per-row ValidationEvent -- the whole project is
+  // explicitly revalidated once, after the load transaction commits; see run()) and instead allocates
+  // a fresh id and calls the mapper's raw insert() directly, exactly like loadReferences/loadAuthors/
+  // insertPrimaryUsage above. A row whose parent usage (taxonID/nameID) can't be resolved is skipped
+  // with a ctx.issue rather than failing the whole import -- never fatal, matching every other
+  // dangling-reference case in this file.
+  private void loadChildEntities(ColdpReader reader, ImportContext ctx, int userId) {
+    loadTypeMaterial(reader, ctx, userId);
+    loadDistribution(reader, ctx, userId);
+    loadVernacular(reader, ctx, userId);
+    loadMedia(reader, ctx, userId);
+    loadEstimate(reader, ctx, userId);
+    loadNameRelation(reader, ctx, userId);
+    loadProperty(reader, ctx, userId);
+  }
+
+  // Inverts ChildColdpWriter.typeMaterialRow. nameID, not taxonID (see loadChildEntities' javadoc).
+  // occurrenceId is left null: TypeMaterial carries no occurrenceID ColdpTerm column at all (see
+  // ChildColdpWriter.typeMaterialRow's own comment), so there is nothing to invert it from.
+  private void loadTypeMaterial(ColdpReader reader, ImportContext ctx, int userId) {
+    if (!reader.hasSchema(ColdpTerm.TypeMaterial)) {
+      return;
+    }
+    reader.stream(ColdpTerm.TypeMaterial).forEach(rec -> {
+      String rowId = rec.get(ColdpTerm.ID);
+      String nameSrc = rec.get(ColdpTerm.nameID);
+      Integer usageId = ctx.usageIds.get(nameSrc);
+      if (usageId == null) {
+        ctx.issue(TYPE_MATERIAL_ENTITY, rowId, "name " + nameSrc + " not found");
+        return;
+      }
+      TypeMaterialRequest r = new TypeMaterialRequest(
+          rec.get(ColdpTerm.citation),
+          rec.get(ColdpTerm.status),
+          rec.get(ColdpTerm.institutionCode),
+          rec.get(ColdpTerm.catalogNumber),
+          null,
+          rec.get(ColdpTerm.locality),
+          rec.get(ColdpTerm.country),
+          rec.get(ColdpTerm.collector),
+          rec.get(ColdpTerm.date),
+          rec.get(ColdpTerm.sex),
+          resolveRef(ctx, TYPE_MATERIAL_ENTITY, rowId, rec.get(ColdpTerm.referenceID)),
+          rec.get(ColdpTerm.link),
+          rec.get(ColdpTerm.remarks),
+          ColdpParse.doubleOrNull(rec.get(ColdpTerm.latitude)),
+          ColdpParse.doubleOrNull(rec.get(ColdpTerm.longitude)),
+          null);
+      int id = idSeq.allocate(ctx.projectId, TYPE_MATERIAL_ENTITY);
+      typeMaterials.insert(ctx.projectId, id, usageId, r, userId);
+    });
+  }
+
+  // Inverts ChildColdpWriter.distributionRow. taxonID (see loadChildEntities' javadoc). Distribution
+  // has no ID column of its own in ColDP (see ColdpTerm.RESOURCES) -- a fresh id is always allocated,
+  // never read off the row.
+  private void loadDistribution(ColdpReader reader, ImportContext ctx, int userId) {
+    if (!reader.hasSchema(ColdpTerm.Distribution)) {
+      return;
+    }
+    reader.stream(ColdpTerm.Distribution).forEach(rec -> {
+      String rowId = rec.get(ColdpTerm.ID);
+      String taxonSrc = rec.get(ColdpTerm.taxonID);
+      Integer usageId = ctx.usageIds.get(taxonSrc);
+      if (usageId == null) {
+        ctx.issue(DISTRIBUTION_ENTITY, rowId, "taxon " + taxonSrc + " not found");
+        return;
+      }
+      DistributionRequest r = new DistributionRequest(
+          rec.get(ColdpTerm.area),
+          rec.get(ColdpTerm.areaID),
+          rec.get(ColdpTerm.gazetteer),
+          rec.get(ColdpTerm.establishmentMeans),
+          rec.get(ColdpTerm.threatStatus),
+          resolveRef(ctx, DISTRIBUTION_ENTITY, rowId, rec.get(ColdpTerm.referenceID)),
+          rec.get(ColdpTerm.remarks),
+          null);
+      int id = idSeq.allocate(ctx.projectId, DISTRIBUTION_ENTITY);
+      distributions.insert(ctx.projectId, id, usageId, r, userId);
+    });
+  }
+
+  // Inverts ChildColdpWriter.vernacularRow. taxonID (see loadChildEntities' javadoc); no ID column
+  // (see loadDistribution). `preferred` inverts str(Boolean) the same way Task 4's extinct column
+  // does (u.setExtinct in insertPrimaryUsage): null stays null, any non-null string goes through
+  // Boolean.valueOf.
+  private void loadVernacular(ColdpReader reader, ImportContext ctx, int userId) {
+    if (!reader.hasSchema(ColdpTerm.VernacularName)) {
+      return;
+    }
+    reader.stream(ColdpTerm.VernacularName).forEach(rec -> {
+      String rowId = rec.get(ColdpTerm.ID);
+      String taxonSrc = rec.get(ColdpTerm.taxonID);
+      Integer usageId = ctx.usageIds.get(taxonSrc);
+      if (usageId == null) {
+        ctx.issue(VERNACULAR_ENTITY, rowId, "taxon " + taxonSrc + " not found");
+        return;
+      }
+      String preferredStr = rec.get(ColdpTerm.preferred);
+      VernacularRequest r = new VernacularRequest(
+          rec.get(ColdpTerm.name),
+          rec.get(ColdpTerm.language),
+          rec.get(ColdpTerm.country),
+          rec.get(ColdpTerm.sex),
+          preferredStr == null ? null : Boolean.valueOf(preferredStr),
+          resolveRef(ctx, VERNACULAR_ENTITY, rowId, rec.get(ColdpTerm.referenceID)),
+          rec.get(ColdpTerm.remarks),
+          null);
+      int id = idSeq.allocate(ctx.projectId, VERNACULAR_ENTITY);
+      vernaculars.insert(ctx.projectId, id, usageId, r, userId);
+    });
+  }
+
+  // Inverts ChildColdpWriter.mediaRow. taxonID (see loadChildEntities' javadoc); no ID column (see
+  // loadDistribution).
+  private void loadMedia(ColdpReader reader, ImportContext ctx, int userId) {
+    if (!reader.hasSchema(ColdpTerm.Media)) {
+      return;
+    }
+    reader.stream(ColdpTerm.Media).forEach(rec -> {
+      String rowId = rec.get(ColdpTerm.ID);
+      String taxonSrc = rec.get(ColdpTerm.taxonID);
+      Integer usageId = ctx.usageIds.get(taxonSrc);
+      if (usageId == null) {
+        ctx.issue(MEDIA_ENTITY, rowId, "taxon " + taxonSrc + " not found");
+        return;
+      }
+      MediaRequest r = new MediaRequest(
+          rec.get(ColdpTerm.url),
+          rec.get(ColdpTerm.type),
+          rec.get(ColdpTerm.title),
+          rec.get(ColdpTerm.creator),
+          rec.get(ColdpTerm.license),
+          rec.get(ColdpTerm.link),
+          rec.get(ColdpTerm.remarks),
+          null);
+      int id = idSeq.allocate(ctx.projectId, MEDIA_ENTITY);
+      media.insert(ctx.projectId, id, usageId, r, userId);
+    });
+  }
+
+  // Inverts ChildColdpWriter.estimateRow. taxonID (see loadChildEntities' javadoc); no ID column
+  // (see loadDistribution).
+  private void loadEstimate(ColdpReader reader, ImportContext ctx, int userId) {
+    if (!reader.hasSchema(ColdpTerm.SpeciesEstimate)) {
+      return;
+    }
+    reader.stream(ColdpTerm.SpeciesEstimate).forEach(rec -> {
+      String rowId = rec.get(ColdpTerm.ID);
+      String taxonSrc = rec.get(ColdpTerm.taxonID);
+      Integer usageId = ctx.usageIds.get(taxonSrc);
+      if (usageId == null) {
+        ctx.issue(ESTIMATE_ENTITY, rowId, "taxon " + taxonSrc + " not found");
+        return;
+      }
+      EstimateRequest r = new EstimateRequest(
+          ColdpParse.intOrNull(rec.get(ColdpTerm.estimate)),
+          rec.get(ColdpTerm.type),
+          resolveRef(ctx, ESTIMATE_ENTITY, rowId, rec.get(ColdpTerm.referenceID)),
+          rec.get(ColdpTerm.remarks),
+          null);
+      int id = idSeq.allocate(ctx.projectId, ESTIMATE_ENTITY);
+      estimates.insert(ctx.projectId, id, usageId, r, userId);
+    });
+  }
+
+  // Inverts ChildColdpWriter.nameRelationRow. Both endpoints are NAMES, not taxa (nameID +
+  // relatedNameID -- see loadChildEntities' javadoc and ColdpTerm.RESOURCES); no ID column (see
+  // loadDistribution). Unlike referenceID (optional -- resolveRef only issues when the column is
+  // actually populated), relatedNameID is this entity's whole point, so a blank/missing/dangling
+  // value skips the row with an issue exactly like the primary nameID does, rather than inserting a
+  // relation to nothing.
+  private void loadNameRelation(ColdpReader reader, ImportContext ctx, int userId) {
+    if (!reader.hasSchema(ColdpTerm.NameRelation)) {
+      return;
+    }
+    reader.stream(ColdpTerm.NameRelation).forEach(rec -> {
+      String rowId = rec.get(ColdpTerm.ID);
+      String nameSrc = rec.get(ColdpTerm.nameID);
+      Integer usageId = ctx.usageIds.get(nameSrc);
+      if (usageId == null) {
+        ctx.issue(NAME_RELATION_ENTITY, rowId, "name " + nameSrc + " not found");
+        return;
+      }
+      String relatedSrc = rec.get(ColdpTerm.relatedNameID);
+      Integer relatedUsageId = relatedSrc == null ? null : ctx.usageIds.get(relatedSrc);
+      if (relatedUsageId == null) {
+        ctx.issue(NAME_RELATION_ENTITY, rowId,
+            relatedSrc == null ? "missing relatedNameID" : "relatedNameID " + relatedSrc + " not found");
+        return;
+      }
+      NameRelationRequest r = new NameRelationRequest(
+          relatedUsageId,
+          rec.get(ColdpTerm.type),
+          resolveRef(ctx, NAME_RELATION_ENTITY, rowId, rec.get(ColdpTerm.referenceID)),
+          rec.get(ColdpTerm.page),
+          rec.get(ColdpTerm.remarks),
+          null);
+      int id = idSeq.allocate(ctx.projectId, NAME_RELATION_ENTITY);
+      nameRelations.insert(ctx.projectId, id, usageId, r, userId);
+    });
+  }
+
+  // Inverts ChildColdpWriter.propertyRow. taxonID (see loadChildEntities' javadoc); no ID column
+  // (see loadDistribution).
+  private void loadProperty(ColdpReader reader, ImportContext ctx, int userId) {
+    if (!reader.hasSchema(ColdpTerm.TaxonProperty)) {
+      return;
+    }
+    reader.stream(ColdpTerm.TaxonProperty).forEach(rec -> {
+      String rowId = rec.get(ColdpTerm.ID);
+      String taxonSrc = rec.get(ColdpTerm.taxonID);
+      Integer usageId = ctx.usageIds.get(taxonSrc);
+      if (usageId == null) {
+        ctx.issue(PROPERTY_ENTITY, rowId, "taxon " + taxonSrc + " not found");
+        return;
+      }
+      PropertyRequest r = new PropertyRequest(
+          rec.get(ColdpTerm.property),
+          rec.get(ColdpTerm.value),
+          rec.get(ColdpTerm.page),
+          resolveRef(ctx, PROPERTY_ENTITY, rowId, rec.get(ColdpTerm.referenceID)),
+          rec.get(ColdpTerm.remarks),
+          null);
+      int id = idSeq.allocate(ctx.projectId, PROPERTY_ENTITY);
+      properties.insert(ctx.projectId, id, usageId, r, userId);
+    });
+  }
+
+  // Shared referenceID resolution for all 7 child loaders above: unlike the parent taxonID/nameID
+  // (mandatory -- a missing/dangling one skips the whole row), a child entity's own referenceID is
+  // optional (every one of the 7 Request DTOs has a nullable referenceId) -- blank/missing is simply
+  // null, no issue; only an actually-populated-but-dangling value is surfaced, mirroring
+  // insertPrimaryUsage's own referenceID/nameReferenceID handling above.
+  private Integer resolveRef(ImportContext ctx, String entity, String rowId, String refSourceId) {
+    if (refSourceId == null || refSourceId.isBlank()) {
+      return null;
+    }
+    Integer refId = ctx.refIds.get(refSourceId);
+    if (refId == null) {
+      ctx.issue(entity, rowId, "referenceID " + refSourceId + " not found");
+    }
+    return refId;
   }
 
   // Pass 1 for one primary row: allocates the id, builds + parses the NameUsage, inserts it with

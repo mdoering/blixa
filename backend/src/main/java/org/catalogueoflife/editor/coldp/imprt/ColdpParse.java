@@ -39,4 +39,11 @@ public final class ColdpParse {
     if (s == null || s.isBlank()) return null;
     try { return Integer.valueOf(s.trim()); } catch (NumberFormatException e) { return null; }
   }
+  // Task 5's TypeMaterial.latitude/longitude: same null/blank/unparseable -> null contract as
+  // intOrNull, just for Double (Distribution's own area/areaID stay free-text -- only TypeMaterial's
+  // coordinates are numeric; see ChildColdpWriter.typeMaterialRow).
+  public static Double doubleOrNull(String s) {
+    if (s == null || s.isBlank()) return null;
+    try { return Double.valueOf(s.trim()); } catch (NumberFormatException e) { return null; }
+  }
 }
