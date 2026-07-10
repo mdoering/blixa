@@ -26,6 +26,11 @@ function renderPage() {
 // care about the latest-run view override this with server.use(...) (MSW's last-registered handler
 // for a given route wins).
 const noLatestMatchRun = http.get('/api/projects/3/col-match/latest', () => new HttpResponse(null, { status: 204 }));
+// Shared default: no export run has ever been started. Unlike noLatestMatchRun (only needed by
+// canEdit tests, since that query is gated on canEdit), the export latest query is unconditional --
+// ANY member sees the Export ColDP section -- so every test in this file needs this mocked, viewer
+// role included.
+const noLatestExportRun = http.get('/api/projects/3/export/latest', () => new HttpResponse(null, { status: 204 }));
 
 test('prefills the form and saves updated metadata', async () => {
   server.use(
@@ -35,6 +40,7 @@ test('prefills the form and saves updated metadata', async () => {
       return HttpResponse.json({ ...project, title: body.title });
     }),
     noLatestMatchRun,
+    noLatestExportRun,
   );
   renderPage();
   const title = await screen.findByLabelText('Title');
@@ -54,6 +60,7 @@ test('toggles the GBIF occurrence layer switch and saves it', async () => {
       return HttpResponse.json({ ...project, gbifOccurrenceLayer: savedBody.gbifOccurrenceLayer });
     }),
     noLatestMatchRun,
+    noLatestExportRun,
   );
   renderPage();
   const toggle = await screen.findByLabelText('Show GBIF occurrence layer on maps');
@@ -74,6 +81,7 @@ test(
     server.use(
       http.get('/api/projects/3', () => HttpResponse.json(project)),
       noLatestMatchRun,
+      noLatestExportRun,
       http.post('/api/projects/3/col-match', () =>
         HttpResponse.json(
           {
@@ -195,6 +203,7 @@ test('a DONE latest run renders its summary on mount without the user clicking',
         error: null,
       }),
     ),
+    noLatestExportRun,
   );
   renderPage();
   const title = await screen.findByLabelText('Title');
@@ -242,6 +251,7 @@ test('a RUNNING latest run disables the button and resumes the progress display 
         error: null,
       }),
     ),
+    noLatestExportRun,
   );
   renderPage();
   const title = await screen.findByLabelText('Title');
@@ -255,6 +265,7 @@ test('starting a match run while one is already in progress shows a friendly 409
   server.use(
     http.get('/api/projects/3', () => HttpResponse.json(project)),
     noLatestMatchRun,
+    noLatestExportRun,
     http.post('/api/projects/3/col-match', () =>
       HttpResponse.json(
         { error: 'a COL match run is already in progress for this project' },
@@ -278,6 +289,7 @@ test('starting a match run while one is already in progress shows a friendly 409
 test('viewer role sees a disabled Save button', async () => {
   server.use(
     http.get('/api/projects/3', () => HttpResponse.json({ ...project, role: 'viewer' })),
+    noLatestExportRun,
   );
   renderPage();
   const title = await screen.findByLabelText('Title');
@@ -286,4 +298,149 @@ test('viewer role sees a disabled Save button', async () => {
   // not the pre-fetch `data === undefined` default.
   await waitFor(() => expect(title).toHaveValue('Mammals'));
   expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();
+});
+
+test(
+  'starts an export, polls it to completion, and shows a working Download link',
+  async () => {
+    let getCalls = 0;
+    server.use(
+      http.get('/api/projects/3', () => HttpResponse.json(project)),
+      noLatestMatchRun,
+      noLatestExportRun,
+      http.post('/api/projects/3/export', () =>
+        HttpResponse.json(
+          {
+            id: 55,
+            projectId: 3,
+            status: 'RUNNING',
+            fileName: null,
+            fileSize: null,
+            nameUsageCount: null,
+            referenceCount: null,
+            startedAt: '2026-07-09T00:00:00Z',
+            finishedAt: null,
+            error: null,
+          },
+          { status: 202 },
+        ),
+      ),
+      // First poll still RUNNING (no file yet); second poll DONE with the file link -- this is what
+      // drives the Export button's refetchInterval loop under test, same discipline as the
+      // "starts a COL match run" test above.
+      http.get('/api/projects/3/export/55', () => {
+        getCalls += 1;
+        const done = getCalls > 1;
+        return HttpResponse.json({
+          id: 55,
+          projectId: 3,
+          status: done ? 'DONE' : 'RUNNING',
+          fileName: done ? 'mammals-coldp.zip' : null,
+          fileSize: done ? 2048 : null,
+          nameUsageCount: done ? 12 : null,
+          referenceCount: done ? 3 : null,
+          startedAt: '2026-07-09T00:00:00Z',
+          finishedAt: done ? '2026-07-09T00:00:05Z' : null,
+          error: null,
+        });
+      }),
+    );
+
+    renderPage();
+    const title = await screen.findByLabelText('Title');
+    await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export ColDP' }));
+
+    // RUNNING: a simple status line (the export job has no total/processed tally to show progress).
+    await waitFor(() => expect(screen.getByText('Exporting…')).toBeInTheDocument());
+
+    // DONE: the Download link plus a small summary. Generous timeout: the mocked RUNNING -> DONE
+    // transition above only surfaces after one EXPORT_POLL_MS refetchInterval tick (1500ms), longer
+    // than @testing-library's default 1000ms waitFor timeout.
+    await waitFor(
+      () => expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument(),
+      { timeout: 5000 },
+    );
+    expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute(
+      'href',
+      '/api/projects/3/export/55/file',
+    );
+    expect(screen.getByText(/mammals-coldp\.zip/)).toBeInTheDocument();
+    expect(screen.getByText('usages 12')).toBeInTheDocument();
+    expect(screen.getByText('references 3')).toBeInTheDocument();
+  },
+  10000,
+);
+
+test('a DONE latest export renders its Download link on mount without the user clicking', async () => {
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    noLatestMatchRun,
+    http.get('/api/projects/3/export/latest', () =>
+      HttpResponse.json({
+        id: 66,
+        projectId: 3,
+        status: 'DONE',
+        fileName: 'mammals-coldp.zip',
+        fileSize: 4096,
+        nameUsageCount: 20,
+        referenceCount: 5,
+        startedAt: '2026-07-09T00:00:00Z',
+        finishedAt: '2026-07-09T00:00:05Z',
+        error: null,
+      }),
+    ),
+    // The latest-run id (66) is seeded into exportRunId, which then drives the same poll query the
+    // export test above exercises via POST -- GET .../export/66 must be mocked for that query to
+    // resolve.
+    http.get('/api/projects/3/export/66', () =>
+      HttpResponse.json({
+        id: 66,
+        projectId: 3,
+        status: 'DONE',
+        fileName: 'mammals-coldp.zip',
+        fileSize: 4096,
+        nameUsageCount: 20,
+        referenceCount: 5,
+        startedAt: '2026-07-09T00:00:00Z',
+        finishedAt: '2026-07-09T00:00:05Z',
+        error: null,
+      }),
+    ),
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  // No click on "Export ColDP" anywhere in this test -- the Download link must appear purely from
+  // the load-on-mount latest-run lookup seeding exportRunId.
+  await waitFor(() => expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument());
+  expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute(
+    'href',
+    '/api/projects/3/export/66/file',
+  );
+});
+
+test('starting an export while one is already in progress shows a friendly 409 notification', async () => {
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    noLatestMatchRun,
+    noLatestExportRun,
+    http.post('/api/projects/3/export', () =>
+      HttpResponse.json(
+        { error: 'an export is already in progress for this project' },
+        { status: 409 },
+      ),
+    ),
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  await userEvent.click(screen.getByRole('button', { name: 'Export ColDP' }));
+
+  await waitFor(() =>
+    expect(screen.getByText('an export is already in progress for this project')).toBeInTheDocument(),
+  );
 });
