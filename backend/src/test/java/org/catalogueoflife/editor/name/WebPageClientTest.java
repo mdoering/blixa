@@ -46,6 +46,14 @@ class WebPageClientTest {
     assertRejectedBeforeAnyFetch("not a url");
   }
 
+  @Test
+  void rejectsAnIpv6UniqueLocalAddress() {
+    // fd00::/8 (part of the RFC 4193 fc00::/7 ULA range) is the real-world "private IPv6" range --
+    // Inet6Address.isSiteLocalAddress() does NOT cover it (it only implements the deprecated
+    // fec0::/10 prefix), so this exercises the explicit isIpv6UniqueLocal check.
+    assertRejectedBeforeAnyFetch("http://[fd00::1]/x");
+  }
+
   private void assertRejectedBeforeAnyFetch(String url) {
     assertThatThrownBy(() -> client.fetchTitle(url))
         .isInstanceOf(ResponseStatusException.class)

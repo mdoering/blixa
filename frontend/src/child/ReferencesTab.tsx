@@ -42,7 +42,18 @@ export default function ReferencesTab({
   });
   const byId = new Map((data ?? []).map((r) => [r.id, r]));
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['usage', pid, usageId] });
+  // Invalidates the loaded usage (so referenceIds/version flow back down as fresh props),
+  // the project's reference list (so a just-created web reference resolves to its title/badge
+  // immediately instead of falling back to '#<id>' until an unrelated remount), and the History
+  // page's changes feed -- the same three query keys ChildEntityTab's invalidate() uses for
+  // every other child-entity tab's mutations, kept in sync here since this tab is a bespoke
+  // component rather than a ChildEntityTab config.
+  const invalidate = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['usage', pid, usageId] }),
+      queryClient.invalidateQueries({ queryKey: ['references', pid] }),
+      queryClient.invalidateQueries({ queryKey: ['changes', pid] }),
+    ]);
 
   const setRefs = useMutation({
     mutationFn: (ids: number[]) => setUsageReferences(pid, usageId, ids, version),
@@ -141,7 +152,12 @@ export default function ReferencesTab({
                 queryKey={['refOptions', pid]}
               />
             </div>
-            <Button leftSection={<IconPlus size={14} />} onClick={addExisting} disabled={!pickedId}>
+            <Button
+              leftSection={<IconPlus size={14} />}
+              onClick={addExisting}
+              disabled={!pickedId}
+              loading={setRefs.isPending}
+            >
               Add
             </Button>
           </Group>
@@ -155,7 +171,7 @@ export default function ReferencesTab({
             />
             <Button
               leftSection={<IconPlus size={14} />}
-              onClick={() => addWeb.mutate(url)}
+              onClick={() => addWeb.mutate(url.trim())}
               disabled={!url.trim()}
               loading={addWeb.isPending}
             >

@@ -119,6 +119,21 @@ class NameUsageReferencesIT extends AbstractPostgresIT {
         .andExpect(status().isBadRequest());
   }
 
+  // Regression guard: a null element in referenceIds must 400, not NPE from auto-unboxing a null
+  // Integer into a primitive `int` in the per-id validation loop (see
+  // NameUsageService.doSetReferences, which iterates as boxed Integer with an explicit null check).
+  @Test
+  void setReferencesRejectsANullElementInsteadOfServerError() throws Exception {
+    ensureUser("refsOwner");
+    long pid = createProject("refsprojnull");
+    long u = createUsage(pid, "Ius jus");
+
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + u + "/references").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"referenceIds\":[null],\"version\":0}"))
+        .andExpect(status().isBadRequest());
+  }
+
   @Test
   void addWebReferenceCreatesAWebpageReferenceAndLinksIt() throws Exception {
     ensureUser("refsOwner");

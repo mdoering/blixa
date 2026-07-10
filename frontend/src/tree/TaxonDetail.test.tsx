@@ -390,6 +390,40 @@ test('adding a web URL on the References tab POSTs to web-reference', async () =
   expect(postBody?.url).toBe('https://example.org/new-page');
 });
 
+test('adding a web URL re-fetches the reference list so the new row shows its title, not a bare id', async () => {
+  mockCommon(baseUsage({ referenceId: [] }));
+  let referencesGetCalls = 0;
+  server.use(
+    http.get('/api/projects/4/references', () => {
+      referencesGetCalls += 1;
+      // Only the newly-created reference (id 20) shows up after the web-reference POST -- the
+      // initial (pre-add) list is empty, matching referenceId: [] above.
+      return HttpResponse.json(
+        referencesGetCalls === 1
+          ? []
+          : [{ id: 20, citation: null, title: 'Example Page', type: 'webpage', link: 'https://example.org/new-page', version: 0 }],
+      );
+    }),
+    http.post('/api/projects/4/usages/10/web-reference', () =>
+      HttpResponse.json(baseUsage({ referenceId: [20], version: 2 })),
+    ),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await screen.findByLabelText('Scientific name');
+  await userEvent.click(screen.getByRole('tab', { name: /references/i }));
+
+  const urlInput = await screen.findByLabelText('Add web URL');
+  await userEvent.type(urlInput, 'https://example.org/new-page');
+  await userEvent.click(screen.getAllByRole('button', { name: 'Add' })[1]);
+
+  // The row resolves to the webpage's title (and the "web" badge), not the '#20' id fallback --
+  // this only happens if adding a web reference also invalidates/refetches ['references', pid],
+  // not just ['usage', pid, usageId].
+  await screen.findByText('Example Page');
+  expect(screen.queryByText('#20')).not.toBeInTheDocument();
+});
+
 test('removing a reference on the References tab PUTs the id list without it', async () => {
   mockCommon(baseUsage({ referenceId: [7, 9], version: 5 }));
   server.use(

@@ -272,17 +272,29 @@ public class NameUsageService {
 
   // Narrow write of just reference_id (PUT /usages/{id}/references): a full replace of the
   // taxonomic-references field, not a merge -- the caller must send back any ids it wants to
-  // keep. Each id must resolve to a reference in THIS project (a foreign-project or nonexistent
-  // id -> 400) before the CAS write is attempted, mirroring requireValidParent's cross-project
-  // integrity guard for parentId. Also the write path addWebReference (below) reuses to append
-  // its newly-created reference's id.
+  // keep. Each id must resolve to a reference in THIS project (a foreign-project, nonexistent, or
+  // null id -> 400) before the CAS write is attempted, mirroring requireValidParent's
+  // cross-project integrity guard for parentId.
   @Transactional
   public NameUsageResponse setReferences(int userId, int projectId, int id, ReferenceIdsRequest req) {
+    return doSetReferences(userId, projectId, id, req);
+  }
+
+  // The actual implementation, called directly (not via `this.setReferences(...)`) by
+  // addWebReference below: a same-class call to a public @Transactional method bypasses the
+  // Spring AOP proxy, silently downgrading that method's own @Transactional to a no-op (it only
+  // "works" because the caller happens to already be transactional) -- calling this private,
+  // non-@Transactional helper from both places instead makes the transactional boundary explicit
+  // and keeps it working even if either caller's own annotation ever changes.
+  private NameUsageResponse doSetReferences(int userId, int projectId, int id, ReferenceIdsRequest req) {
     requireEditor(userId, projectId);
     Project project = requireProject(projectId);
     NameUsage before = requireInProject(projectId, id);
     var ids = req.referenceIds() == null ? List.<Integer>of() : req.referenceIds();
-    for (int refId : ids) {
+    for (Integer refId : ids) {
+      if (refId == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "referenceIds must not contain null");
+      }
       requireReferenceInProject(projectId, refId);
     }
     if (usages.updateReferenceIds(projectId, id, ids, userId, req.version()) == 0) {
@@ -298,10 +310,11 @@ public class NameUsageService {
   // title fetch via WebPageClient, SSRF-guarded -- see that class; falls back to the raw URL when
   // no title is found or the fetch fails) via the same reference-create path the References tab's
   // "new reference" form uses (ReferenceService.create), then appends its id to this usage's
-  // reference_id[] via the CAS write above. Reads the usage fresh for its CURRENT version so this
-  // works regardless of what version the caller's stale form state thinks it's on (a plain add,
-  // not a client-supplied optimistic-locked replace) -- the tab's separate "add existing
-  // reference" action goes through setReferences directly and does carry the client's version.
+  // reference_id[] via the CAS write above (doSetReferences, not setReferences -- see its comment
+  // on why). Reads the usage fresh for its CURRENT version so this works regardless of what
+  // version the caller's stale form state thinks it's on (a plain add, not a client-supplied
+  // optimistic-locked replace) -- the tab's separate "add existing reference" action goes through
+  // setReferences directly and does carry the client's version.
   @Transactional
   public NameUsageResponse addWebReference(int userId, int projectId, int usageId, String url) {
     requireEditor(userId, projectId);
@@ -314,7 +327,7 @@ public class NameUsageService {
     var ids = new java.util.ArrayList<Integer>(
         before.getReferenceId() == null ? List.of() : before.getReferenceId());
     ids.add(ref.getId());
-    return setReferences(userId, projectId, usageId, new ReferenceIdsRequest(ids, before.getVersion()));
+    return doSetReferences(userId, projectId, usageId, new ReferenceIdsRequest(ids, before.getVersion()));
   }
 
   // The URL's host, for the web-reference's author field (a plain literal string, not a
