@@ -121,10 +121,12 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
   });
   const canEdit = project ? ['owner', 'editor'].includes(project.role) : false;
   // Which alternative_id CURIE scopes this project renders a real identifier field for (Project
-  // settings page). scopesKey is a primitive (not the array itself) so the identifiers-seeding
-  // effect below only reruns when the actual scope list changes, not on every render's fresh `??
-  // []` array literal.
-  const scopes = project?.identifierScopes ?? [];
+  // settings page). project.identifierScopes is now a list of {scope, datasetKey} objects (the
+  // datasetKey drives CLB matching, unused by this per-scope-field logic) -- reduce to the bare
+  // scope strings this form has always worked with. scopesKey is a primitive (not the array
+  // itself) so the identifiers-seeding effect below only reruns when the actual scope list
+  // changes, not on every render's fresh `?? []`/`.map(...)` array literal.
+  const scopes = (project?.identifierScopes ?? []).map((s) => s.scope);
   const scopesKey = scopes.join(' ');
 
   const usageQuery = useQuery({

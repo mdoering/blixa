@@ -15,10 +15,11 @@ public class Project {
   private String taxonomicScope;
   private String metadata = "{}";
   private boolean gbifOccurrenceLayer = true;
-  // Which alternative_id CURIE scopes (e.g. "col", "gbif") this project's identifier fields use --
-  // loaded/written via ProjectMapper's @Results/UPDATE (both wire the TEXT[] typeHandler); see
+  // Which alternative_id CURIE scopes (e.g. "col", "gbif") this project's identifier fields use,
+  // each with an optional CLB dataset key (matchable iff datasetKey is set) -- loaded/written via
+  // ProjectMapper's @Results/UPDATE (both wire the JSONB typeHandler); see
   // ProjectResponse/UpdateProjectMetadataRequest for the wire-facing read/write shape.
-  private List<String> identifierScopes;
+  private List<IdentifierScope> identifierScopes;
 
   public Integer getId() { return id; }
   public void setId(Integer id) { this.id = id; }
@@ -40,6 +41,6 @@ public class Project {
   public void setMetadata(String metadata) { this.metadata = metadata; }
   public boolean getGbifOccurrenceLayer() { return gbifOccurrenceLayer; }
   public void setGbifOccurrenceLayer(boolean gbifOccurrenceLayer) { this.gbifOccurrenceLayer = gbifOccurrenceLayer; }
-  public List<String> getIdentifierScopes() { return identifierScopes; }
-  public void setIdentifierScopes(List<String> identifierScopes) { this.identifierScopes = identifierScopes; }
+  public List<IdentifierScope> getIdentifierScopes() { return identifierScopes; }
+  public void setIdentifierScopes(List<IdentifierScope> identifierScopes) { this.identifierScopes = identifierScopes; }
 }

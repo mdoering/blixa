@@ -9,7 +9,6 @@ import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
-import org.catalogueoflife.editor.name.StringArrayTypeHandler;
 
 @Mapper
 public interface ProjectMapper {
@@ -21,13 +20,14 @@ public interface ProjectMapper {
   @Options(useGeneratedKeys = true, keyProperty = "id")
   void insert(Project p);
 
-  // identifier_scopes is a Postgres TEXT[] -- map-underscore-to-camel-case handles the column
-  // name but not the array conversion, so it needs the explicit typeHandler here (see
-  // StringArrayTypeHandler); every other column still auto-maps (partial @Results).
+  // identifier_scopes is a Postgres JSONB list of {scope, datasetKey} objects --
+  // map-underscore-to-camel-case handles the column name but not the JSONB <-> record-list
+  // conversion, so it needs the explicit typeHandler here (see IdentifierScopeListTypeHandler);
+  // every other column still auto-maps (partial @Results).
   @Select("SELECT * FROM project WHERE id = #{id}")
   @Results(id = "projectResult", value = {
       @Result(property = "identifierScopes", column = "identifier_scopes",
-          typeHandler = StringArrayTypeHandler.class)
+          typeHandler = IdentifierScopeListTypeHandler.class)
   })
   Project findById(int id);
 
@@ -46,7 +46,7 @@ public interface ProjectMapper {
           nom_code = #{nomCode}, license = #{license},
           geographic_scope = #{geographicScope}, taxonomic_scope = #{taxonomicScope},
           metadata = #{metadata}::jsonb, gbif_occurrence_layer = #{gbifOccurrenceLayer},
-          identifier_scopes = #{identifierScopes,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
+          identifier_scopes = #{identifierScopes,typeHandler=org.catalogueoflife.editor.project.IdentifierScopeListTypeHandler,jdbcType=OTHER},
           updated_at = now()
       WHERE id = #{id}
       """)

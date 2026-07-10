@@ -189,7 +189,7 @@ test('a 409 conflict shows a notice and refetches the usage', async () => {
 test('renders a per-scope identifier field from project.identifierScopes, prefilled from alternativeId, and saving folds the edit back in while preserving col:', async () => {
   mockCommon(baseUsage({ alternativeId: ['col:XYZ', 'ipni:123'] }));
   server.use(
-    http.get('/api/projects/4', () => HttpResponse.json({ ...project, role: 'owner', identifierScopes: ['ipni'] })),
+    http.get('/api/projects/4', () => HttpResponse.json({ ...project, role: 'owner', identifierScopes: [{ scope: 'ipni' }] })),
   );
   let putBody: Record<string, unknown> | undefined;
   server.use(

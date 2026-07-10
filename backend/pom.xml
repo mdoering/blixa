@@ -76,10 +76,13 @@
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>
     </dependency>
+    <!-- Was scope=runtime (only the JDBC driver, loaded reflectively, was needed); now also
+         referenced directly at compile time by IdentifierScopeListTypeHandler for
+         org.postgresql.util.PGobject (JSONB parameter binding), so the default (compile)
+         scope is required. -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <scope>runtime</scope>
     </dependency>
 
     <dependency>

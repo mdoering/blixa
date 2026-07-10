@@ -74,12 +74,14 @@ test('toggles the GBIF occurrence layer switch and saves it', async () => {
   await waitFor(() => expect(savedBody.gbifOccurrenceLayer).toBe(false));
 });
 
-test('identifier scopes: prefills the configured scopes and saves an added custom scope', async () => {
-  let savedBody: { identifierScopes?: string[] } = {};
+test('identifier scopes: prefills configured rows, defaults the COL dataset key, and saves added rows', async () => {
+  let savedBody: { identifierScopes?: { scope: string; datasetKey?: string }[] } = {};
   server.use(
-    http.get('/api/projects/3', () => HttpResponse.json({ ...project, identifierScopes: ['ipni'] })),
+    http.get('/api/projects/3', () =>
+      HttpResponse.json({ ...project, identifierScopes: [{ scope: 'ipni', datasetKey: null }] }),
+    ),
     http.put('/api/projects/3/metadata', async ({ request }) => {
-      savedBody = (await request.json()) as { identifierScopes?: string[] };
+      savedBody = (await request.json()) as typeof savedBody;
       return HttpResponse.json({ ...project, identifierScopes: savedBody.identifierScopes });
     }),
     noLatestMatchRun,
@@ -89,20 +91,59 @@ test('identifier scopes: prefills the configured scopes and saves an added custo
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
-  // Prefilled from the loaded project as a chip/pill.
-  expect(screen.getByText('ipni')).toBeInTheDocument();
+  // Prefilled from the loaded project: row 1 is 'ipni' with an empty (null -> '') dataset key.
+  const scopeRow1 = await screen.findByRole('textbox', { name: 'Scope 1' });
+  await waitFor(() => expect(scopeRow1).toHaveValue('ipni'));
+  expect(screen.getByRole('textbox', { name: 'Dataset key 1' })).toHaveValue('');
 
-  // Free custom entries are allowed on top of the seeded vocab (mocked in test/server.ts as
-  // ['col', 'gbif', 'ipni', 'tsn']) -- 'worms' isn't in that list. getByRole('textbox', ...), not
-  // getByLabelText: Mantine's TagsInput combobox keeps its (hidden) options listbox in the DOM
-  // with the same aria-labelledby as the input, so getByLabelText matches both and errors on
-  // ambiguity (same discipline as TaxonDetail.test.tsx's reference picker).
-  const scopesInput = screen.getByRole('textbox', { name: 'Identifier scopes (form fields)' });
-  await userEvent.type(scopesInput, 'worms{Enter}');
-  expect(screen.getByText('worms')).toBeInTheDocument();
+  // Add a row and type the "col" scope (case-insensitive) -- its dataset key auto-defaults to the
+  // CLB alias (3LXR) plus a hint, without the user having to look it up.
+  await userEvent.click(screen.getByRole('button', { name: 'Add scope' }));
+  const scopeRow2 = screen.getByRole('textbox', { name: 'Scope 2' });
+  await userEvent.type(scopeRow2, 'col');
+  const datasetKeyRow2 = screen.getByRole('textbox', { name: 'Dataset key 2' });
+  await waitFor(() => expect(datasetKeyRow2).toHaveValue('3LXR'));
+  expect(screen.getByText(/COL is a CLB project alias for dataset 3LXR/)).toBeInTheDocument();
 
   await userEvent.click(screen.getByRole('button', { name: /save/i }));
-  await waitFor(() => expect(savedBody.identifierScopes).toEqual(['ipni', 'worms']));
+  await waitFor(() =>
+    expect(savedBody.identifierScopes).toEqual([
+      { scope: 'ipni' },
+      { scope: 'col', datasetKey: '3LXR' },
+    ]),
+  );
+});
+
+test('identifier scopes: removing a row drops it from the saved payload', async () => {
+  let savedBody: { identifierScopes?: { scope: string; datasetKey?: string }[] } = {};
+  server.use(
+    http.get('/api/projects/3', () =>
+      HttpResponse.json({
+        ...project,
+        identifierScopes: [
+          { scope: 'ipni', datasetKey: null },
+          { scope: 'gbif', datasetKey: null },
+        ],
+      }),
+    ),
+    http.put('/api/projects/3/metadata', async ({ request }) => {
+      savedBody = (await request.json()) as typeof savedBody;
+      return HttpResponse.json({ ...project, identifierScopes: savedBody.identifierScopes });
+    }),
+    noLatestMatchRun,
+    noLatestExportRun,
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  await waitFor(() =>
+    expect(screen.getByRole('textbox', { name: 'Scope 2' })).toHaveValue('gbif'),
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Remove scope 1' }));
+
+  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+  await waitFor(() => expect(savedBody.identifierScopes).toEqual([{ scope: 'gbif' }]));
 });
 
 test(
@@ -292,30 +333,39 @@ test('a RUNNING latest run disables the button and resumes the progress display 
   expect(screen.getByRole('button', { name: 'Match all to COL' })).toBeDisabled();
 });
 
-test('starting a match run while one is already in progress shows a friendly 409 notification', async () => {
-  server.use(
-    http.get('/api/projects/3', () => HttpResponse.json(project)),
-    noLatestMatchRun,
-    noLatestExportRun,
-    http.post('/api/projects/3/col-match', () =>
-      HttpResponse.json(
-        { error: 'a COL match run is already in progress for this project' },
-        { status: 409 },
+test(
+  'starting a match run while one is already in progress shows a friendly 409 notification',
+  async () => {
+    server.use(
+      http.get('/api/projects/3', () => HttpResponse.json(project)),
+      noLatestMatchRun,
+      noLatestExportRun,
+      http.post('/api/projects/3/col-match', () =>
+        HttpResponse.json(
+          { error: 'a COL match run is already in progress for this project' },
+          { status: 409 },
+        ),
       ),
-    ),
-  );
-  renderPage();
-  const title = await screen.findByLabelText('Title');
-  await waitFor(() => expect(title).toHaveValue('Mammals'));
+    );
+    renderPage();
+    const title = await screen.findByLabelText('Title');
+    await waitFor(() => expect(title).toHaveValue('Mammals'));
 
-  await userEvent.click(screen.getByRole('button', { name: 'Match all to COL' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Match all to COL' }));
 
-  await waitFor(() =>
-    expect(
-      screen.getByText('a COL match run is already in progress for this project'),
-    ).toBeInTheDocument(),
-  );
-});
+    // Generous timeout (like the poll-driven assertions elsewhere in this file): this file's form
+    // now mounts the identifier-scopes row editor on every render, and jsdom under a full suite
+    // run can occasionally take the notification mount past the default 1000ms waitFor budget.
+    await waitFor(
+      () =>
+        expect(
+          screen.getByText('a COL match run is already in progress for this project'),
+        ).toBeInTheDocument(),
+      { timeout: 5000 },
+    );
+  },
+  10000,
+);
 
 test('viewer role sees a disabled Save button', async () => {
   server.use(
@@ -453,25 +503,34 @@ test('a DONE latest export renders its Download link on mount without the user c
   );
 });
 
-test('starting an export while one is already in progress shows a friendly 409 notification', async () => {
-  server.use(
-    http.get('/api/projects/3', () => HttpResponse.json(project)),
-    noLatestMatchRun,
-    noLatestExportRun,
-    http.post('/api/projects/3/export', () =>
-      HttpResponse.json(
-        { error: 'an export is already in progress for this project' },
-        { status: 409 },
+test(
+  'starting an export while one is already in progress shows a friendly 409 notification',
+  async () => {
+    server.use(
+      http.get('/api/projects/3', () => HttpResponse.json(project)),
+      noLatestMatchRun,
+      noLatestExportRun,
+      http.post('/api/projects/3/export', () =>
+        HttpResponse.json(
+          { error: 'an export is already in progress for this project' },
+          { status: 409 },
+        ),
       ),
-    ),
-  );
-  renderPage();
-  const title = await screen.findByLabelText('Title');
-  await waitFor(() => expect(title).toHaveValue('Mammals'));
+    );
+    renderPage();
+    const title = await screen.findByLabelText('Title');
+    await waitFor(() => expect(title).toHaveValue('Mammals'));
 
-  await userEvent.click(screen.getByRole('button', { name: 'Export ColDP' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Export ColDP' }));
 
-  await waitFor(() =>
-    expect(screen.getByText('an export is already in progress for this project')).toBeInTheDocument(),
-  );
-});
+    // Generous timeout -- see the analogous "starting a match run..." test above for why.
+    await waitFor(
+      () =>
+        expect(
+          screen.getByText('an export is already in progress for this project'),
+        ).toBeInTheDocument(),
+      { timeout: 5000 },
+    );
+  },
+  10000,
+);

@@ -1,6 +1,8 @@
 import {
+  ActionIcon,
   Alert,
   Anchor,
+  Autocomplete,
   Badge,
   Button,
   Group,
@@ -9,7 +11,6 @@ import {
   Stack,
   Select,
   Switch,
-  TagsInput,
   Text,
   Textarea,
   TextInput,
@@ -17,6 +18,7 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
+import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
@@ -27,6 +29,11 @@ import { exportFileUrl, getExportRun, getLatestExport, startExport } from '../ap
 import { messageFor } from '../api/client';
 import type { UpdateMetadataPayload } from '../api/types';
 import { NOM_CODES } from './CreateProjectModal';
+
+// The CLB dataset key COL's own checklist is published under -- "col" conventionally aliases
+// this dataset, so picking that scope defaults its Dataset key field to save a lookup (see the
+// scope Autocomplete's onChange below). Editable afterwards like any other row.
+const COL_DATASET_KEY = '3LXR';
 
 const LICENSES = ['CC0-1.0', 'CC-BY-4.0'];
 // Poll interval for the bulk "Match all to COL" run while it's RUNNING -- a live but not chatty
@@ -71,9 +78,9 @@ export default function ProjectMetadataPage() {
   const { data } = useQuery({ queryKey: ['project', id], queryFn: () => getProject(id) });
   const canEdit = data ? ['owner', 'editor'].includes(data.role) : false;
 
-  // Seeds the identifier-scopes picker's suggestion list -- the project's own already-configured
-  // scopes (below) still show as chips even if they're not in this vocab (e.g. a legacy custom
-  // entry), since TagsInput's `data` is suggestions only, not a value restriction.
+  // Seeds each scope row's Autocomplete suggestion list -- the project's own already-configured
+  // scopes still populate their row even if they're not in this vocab (e.g. a legacy custom
+  // entry), since Autocomplete's `data` is suggestions only, not a value restriction.
   const { data: idScopesVocab } = useQuery({ queryKey: ['idScopes'], queryFn: getIdScopes });
 
   useEffect(() => {
@@ -81,8 +88,13 @@ export default function ProjectMetadataPage() {
       const values = Object.fromEntries(
         Object.entries(data).map(([k, v]) => [k, v ?? undefined]),
       ) as UpdateMetadataPayload;
-      // TagsInput is a controlled string[] input -- null/absent must become [], not undefined.
-      values.identifierScopes = data.identifierScopes ?? [];
+      // The row editor is a controlled array of {scope, datasetKey} inputs -- null/absent must
+      // become [], and each row's datasetKey (nullable on the wire) must become '' so the
+      // TextInput below stays controlled.
+      values.identifierScopes = (data.identifierScopes ?? []).map((s) => ({
+        scope: s.scope,
+        datasetKey: s.datasetKey ?? '',
+      }));
       form.setValues(values);
       form.resetDirty(values);
     }
@@ -299,7 +311,17 @@ export default function ProjectMetadataPage() {
         </Stack>
       )}
 
-      <form onSubmit={form.onSubmit((v) => mutation.mutate(v))}>
+      <form
+        onSubmit={form.onSubmit((v) => {
+          // Blank rows (added via "Add scope" but never filled in) are dropped rather than saved
+          // as an empty-scope entry; a blank datasetKey is sent as undefined (-> null on the
+          // backend, not matchable) rather than "" so the two states can't drift apart.
+          const identifierScopes = (v.identifierScopes ?? [])
+            .map((s) => ({ scope: s.scope.trim(), datasetKey: (s.datasetKey ?? '').trim() || undefined }))
+            .filter((s) => s.scope !== '');
+          mutation.mutate({ ...v, identifierScopes });
+        })}
+      >
         <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
           <Stack gap="md">
             <TextInput label="Title" {...form.getInputProps('title')} />
@@ -329,12 +351,67 @@ export default function ProjectMetadataPage() {
               label="Show GBIF occurrence layer on maps"
               {...form.getInputProps('gbifOccurrenceLayer', { type: 'checkbox' })}
             />
-            <TagsInput
-              label="Identifier scopes (form fields)"
-              description="Adds a real identifier field to the taxon Details form for each scope (e.g. ipni)"
-              data={idScopesVocab ?? []}
-              {...form.getInputProps('identifierScopes')}
-            />
+            <Stack gap="xs">
+              <Stack gap={2}>
+                <Text size="sm" fw={500}>
+                  Identifier scopes (form fields)
+                </Text>
+                <Text size="xs" c="dimmed">
+                  Adds a real identifier field to the taxon Details form for each scope (e.g.
+                  ipni). A scope with a CLB dataset key is also eligible for identifier matching.
+                </Text>
+              </Stack>
+              {form.values.identifierScopes?.map((row, index) => (
+                <Group key={index} align="flex-end" gap="xs" wrap="nowrap">
+                  <Autocomplete
+                    aria-label={`Scope ${index + 1}`}
+                    placeholder="e.g. ipni"
+                    data={idScopesVocab ?? []}
+                    style={{ flex: 1 }}
+                    {...form.getInputProps(`identifierScopes.${index}.scope`)}
+                    onChange={(value) => {
+                      form.setFieldValue(`identifierScopes.${index}.scope`, value);
+                      // COL conventionally aliases the CLB dataset published under
+                      // COL_DATASET_KEY -- default it in once, but only if this row doesn't
+                      // already have a dataset key (an existing custom value is never clobbered).
+                      if (value.trim().toLowerCase() === 'col' && !row.datasetKey) {
+                        form.setFieldValue(`identifierScopes.${index}.datasetKey`, COL_DATASET_KEY);
+                      }
+                    }}
+                  />
+                  <TextInput
+                    aria-label={`Dataset key ${index + 1}`}
+                    placeholder="CLB dataset key"
+                    style={{ flex: 1 }}
+                    {...form.getInputProps(`identifierScopes.${index}.datasetKey`)}
+                  />
+                  <ActionIcon
+                    type="button"
+                    variant="subtle"
+                    color="red"
+                    aria-label={`Remove scope ${index + 1}`}
+                    onClick={() => form.removeListItem('identifierScopes', index)}
+                  >
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                </Group>
+              ))}
+              {form.values.identifierScopes?.some((s) => s.scope.trim().toLowerCase() === 'col') && (
+                <Text size="xs" c="dimmed">
+                  COL is a CLB project alias for dataset {COL_DATASET_KEY}.
+                </Text>
+              )}
+              <Button
+                type="button"
+                variant="subtle"
+                size="xs"
+                leftSection={<IconPlus size={14} />}
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() => form.insertListItem('identifierScopes', { scope: '', datasetKey: '' })}
+              >
+                Add scope
+              </Button>
+            </Stack>
             <Button type="submit" loading={mutation.isPending} disabled={!canEdit}>
               Save
             </Button>

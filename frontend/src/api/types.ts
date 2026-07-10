@@ -19,8 +19,15 @@ export interface Project {
   role: Role;
   gbifOccurrenceLayer: boolean;
   // Which alternative_id CURIE scopes (e.g. "ipni", "gbif") the taxon Details form renders a
-  // real per-scope identifier field for -- null/absent on projects that haven't set any.
-  identifierScopes: string[] | null;
+  // real per-scope identifier field for -- null/absent on projects that haven't set any. Each
+  // scope carries an optional CLB dataset key -- a scope is matchable (eligible for "match all
+  // identifiers") iff datasetKey is set.
+  identifierScopes: IdentifierScope[] | null;
+}
+
+export interface IdentifierScope {
+  scope: string;
+  datasetKey?: string | null;
 }
 
 export interface Member {
@@ -59,7 +66,7 @@ export interface UpdateMetadataPayload {
   geographicScope?: string;
   taxonomicScope?: string;
   gbifOccurrenceLayer?: boolean;
-  identifierScopes?: string[];
+  identifierScopes?: IdentifierScope[];
 }
 
 // Mirrors backend NameUsageResponse (see backend/.../name/dto/NameUsageResponse.java): the

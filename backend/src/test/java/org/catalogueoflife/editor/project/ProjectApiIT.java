@@ -140,12 +140,17 @@ class ProjectApiIT extends AbstractPostgresIT {
         .andReturn().getResponse().getContentAsString();
     long projectId = json.readTree(body).get("id").asLong();
 
+    // "col" carries a CLB dataset key (matchable); "ipni" has none (datasetKey omitted -> null,
+    // not matchable) -- both the scope and the optional datasetKey must round-trip.
     mvc.perform(put("/api/projects/" + projectId + "/metadata").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"title\":\"Fungi\",\"identifierScopes\":[\"ipni\",\"gbif\"]}"))
+            .content("{\"title\":\"Fungi\",\"identifierScopes\":"
+                + "[{\"scope\":\"col\",\"datasetKey\":\"3LXR\"},{\"scope\":\"ipni\"}]}"))
        .andExpect(status().isOk())
-       .andExpect(jsonPath("$.identifierScopes[0]").value("ipni"))
-       .andExpect(jsonPath("$.identifierScopes[1]").value("gbif"));
+       .andExpect(jsonPath("$.identifierScopes[0].scope").value("col"))
+       .andExpect(jsonPath("$.identifierScopes[0].datasetKey").value("3LXR"))
+       .andExpect(jsonPath("$.identifierScopes[1].scope").value("ipni"))
+       .andExpect(jsonPath("$.identifierScopes[1].datasetKey").value(nullValue()));
 
     // identifierScopes omitted from a later metadata save -> must not be nulled/reset, the
     // previously-saved scopes carry over unchanged (same contract as gbifOccurrenceLayer).
@@ -154,13 +159,17 @@ class ProjectApiIT extends AbstractPostgresIT {
             .content("{\"title\":\"Fungi Updated\"}"))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.title").value("Fungi Updated"))
-       .andExpect(jsonPath("$.identifierScopes[0]").value("ipni"))
-       .andExpect(jsonPath("$.identifierScopes[1]").value("gbif"));
+       .andExpect(jsonPath("$.identifierScopes[0].scope").value("col"))
+       .andExpect(jsonPath("$.identifierScopes[0].datasetKey").value("3LXR"))
+       .andExpect(jsonPath("$.identifierScopes[1].scope").value("ipni"))
+       .andExpect(jsonPath("$.identifierScopes[1].datasetKey").value(nullValue()));
 
     mvc.perform(get("/api/projects/" + projectId))
        .andExpect(status().isOk())
-       .andExpect(jsonPath("$.identifierScopes[0]").value("ipni"))
-       .andExpect(jsonPath("$.identifierScopes[1]").value("gbif"));
+       .andExpect(jsonPath("$.identifierScopes[0].scope").value("col"))
+       .andExpect(jsonPath("$.identifierScopes[0].datasetKey").value("3LXR"))
+       .andExpect(jsonPath("$.identifierScopes[1].scope").value("ipni"))
+       .andExpect(jsonPath("$.identifierScopes[1].datasetKey").value(nullValue()));
   }
 
   @Test
