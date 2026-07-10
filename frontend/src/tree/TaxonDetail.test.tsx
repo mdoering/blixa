@@ -46,7 +46,6 @@ function baseUsage(overrides: Partial<Record<string, unknown>> = {}) {
     etymology: null,
     nameType: 'SCIENTIFIC',
     parseState: 'COMPLETE',
-    link: null,
     remarks: null,
     formattedName: 'Panthera leo Linnaeus, 1758',
     acceptedParentIds: [],

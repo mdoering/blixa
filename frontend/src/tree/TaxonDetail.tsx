@@ -50,7 +50,6 @@ interface EditableFields {
   publishedInPageLink: string;
   nomStatus: string;
   etymology: string;
-  link: string;
 }
 
 function toFormValues(u: NameUsage): EditableFields {
@@ -64,7 +63,6 @@ function toFormValues(u: NameUsage): EditableFields {
     publishedInPageLink: u.publishedInPageLink ?? '',
     nomStatus: u.nomStatus ?? '',
     etymology: u.etymology ?? '',
-    link: u.link ?? '',
   };
 }
 
@@ -90,7 +88,6 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
       publishedInPageLink: '',
       nomStatus: '',
       etymology: '',
-      link: '',
     },
     validate: {
       scientificName: (v) => (v ? null : 'Required'),
@@ -144,7 +141,6 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
         temporalRangeStart: usage.temporalRangeStart ?? undefined,
         temporalRangeEnd: usage.temporalRangeEnd ?? undefined,
         etymology: values.etymology || undefined,
-        link: values.link || undefined,
         remarks: usage.remarks ?? undefined,
         version: usage.version,
       };
@@ -223,10 +219,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                     {...form.getInputProps('publishedInPageLink')}
                   />
                 </SimpleGrid>
-                <SimpleGrid cols={2}>
-                  <TextInput label="Nomenclatural status" {...form.getInputProps('nomStatus')} />
-                  <TextInput label="Link" {...form.getInputProps('link')} />
-                </SimpleGrid>
+                <TextInput label="Nomenclatural status" {...form.getInputProps('nomStatus')} />
                 <Textarea label="Etymology" rows={2} {...form.getInputProps('etymology')} />
                 <Group>
                   <Button type="submit" loading={mutation.isPending} disabled={!canEdit}>

@@ -58,7 +58,6 @@ public class NameUsage {
   private String etymology;
   private NameType nameType;
   private String parseState;
-  private String link;
   private String remarks;
   private OffsetDateTime modified;
   private Integer modifiedBy;
@@ -142,8 +141,6 @@ public class NameUsage {
   public void setNameType(NameType nameType) { this.nameType = nameType; }
   public String getParseState() { return parseState; }
   public void setParseState(String parseState) { this.parseState = parseState; }
-  public String getLink() { return link; }
-  public void setLink(String link) { this.link = link; }
   public String getRemarks() { return remarks; }
   public void setRemarks(String remarks) { this.remarks = remarks; }
   public OffsetDateTime getModified() { return modified; }

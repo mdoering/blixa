@@ -51,7 +51,6 @@ const animaliaUsage = {
   etymology: null,
   nameType: 'SCIENTIFIC',
   parseState: 'COMPLETE',
-  link: null,
   remarks: null,
   formattedName: 'Animalia',
   acceptedParentIds: [],

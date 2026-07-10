@@ -4,8 +4,12 @@ import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import org.catalogueoflife.editor.name.StringArrayTypeHandler;
 
 @Mapper
 public interface ProjectMapper {
@@ -17,7 +21,14 @@ public interface ProjectMapper {
   @Options(useGeneratedKeys = true, keyProperty = "id")
   void insert(Project p);
 
+  // identifier_scopes is a Postgres TEXT[] -- map-underscore-to-camel-case handles the column
+  // name but not the array conversion, so it needs the explicit typeHandler here (see
+  // StringArrayTypeHandler); every other column still auto-maps (partial @Results).
   @Select("SELECT * FROM project WHERE id = #{id}")
+  @Results(id = "projectResult", value = {
+      @Result(property = "identifierScopes", column = "identifier_scopes",
+          typeHandler = StringArrayTypeHandler.class)
+  })
   Project findById(int id);
 
   @Select("""
@@ -26,6 +37,7 @@ public interface ProjectMapper {
       WHERE m.user_id = #{userId}
       ORDER BY p.title
       """)
+  @ResultMap("projectResult")
   List<Project> findByMember(int userId);
 
   @Update("""

@@ -166,7 +166,6 @@ public class NameUsageService {
     u.setEnvironment(parseEnvironments(req.environment()));
     u.setTemporalRangeStart(req.temporalRangeStart());
     u.setTemporalRangeEnd(req.temporalRangeEnd());
-    u.setLink(req.link());
     u.setRemarks(req.remarks());
     u.setModifiedBy(userId);
     // parse BEFORE insert so the atomized fields + nameType/parseState are populated on the row.
@@ -224,7 +223,6 @@ public class NameUsageService {
     u.setTemporalRangeStart(req.temporalRangeStart());
     u.setTemporalRangeEnd(req.temporalRangeEnd());
     u.setEtymology(req.etymology());
-    u.setLink(req.link());
     u.setRemarks(req.remarks());
     u.setModifiedBy(userId);
     u.setVersion(req.version());
@@ -493,7 +491,6 @@ public class NameUsageService {
     c.setPublishedInPageLink(source.getPublishedInPageLink());
     c.setGender(source.getGender());
     c.setEtymology(source.getEtymology());
-    c.setLink(source.getLink());
     c.setRemarks(source.getRemarks());
     c.setModifiedBy(userId);
     parser.parseInto(c, project.getNomCode());

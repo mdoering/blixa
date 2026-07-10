@@ -97,7 +97,6 @@ export interface NameUsage {
   etymology: string | null;
   nameType: string | null;
   parseState: string | null;
-  link: string | null;
   remarks: string | null;
   formattedName: string | null;
   acceptedParentIds: number[] | null;
@@ -128,7 +127,6 @@ export interface UpdateUsagePayload {
   temporalRangeStart?: string;
   temporalRangeEnd?: string;
   etymology?: string;
-  link?: string;
   remarks?: string;
   version: number;
 }

@@ -24,5 +24,4 @@ public record CreateNameUsageRequest(
     List<String> environment,
     String temporalRangeStart,
     String temporalRangeEnd,
-    String link,
     String remarks) {}

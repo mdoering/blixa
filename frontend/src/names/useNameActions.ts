@@ -45,7 +45,6 @@ function toUpdatePayload(usage: NameUsage, status: string): UpdateUsagePayload {
     temporalRangeStart: usage.temporalRangeStart ?? undefined,
     temporalRangeEnd: usage.temporalRangeEnd ?? undefined,
     etymology: usage.etymology ?? undefined,
-    link: usage.link ?? undefined,
     remarks: usage.remarks ?? undefined,
     version: usage.version,
   };

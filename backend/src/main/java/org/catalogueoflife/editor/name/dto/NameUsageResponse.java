@@ -47,7 +47,6 @@ public record NameUsageResponse(
     String etymology,
     String nameType,
     String parseState,
-    String link,
     String remarks,
     String formattedName,
     List<Integer> acceptedParentIds,
@@ -66,7 +65,7 @@ public record NameUsageResponse(
         u.getBasionymAuthorshipYear(), u.getSanctioningAuthor(), name(u.getNomStatus()),
         u.getPublishedInReferenceId(), u.getPublishedInYear(), u.getPublishedInPage(),
         u.getPublishedInPageLink(), name(u.getGender()), u.getEtymology(), name(u.getNameType()), u.getParseState(),
-        u.getLink(), u.getRemarks(), formattedName, acceptedParentIds, synonymIds, u.getVersion());
+        u.getRemarks(), formattedName, acceptedParentIds, synonymIds, u.getVersion());
   }
 
   private static String name(Enum<?> e) {

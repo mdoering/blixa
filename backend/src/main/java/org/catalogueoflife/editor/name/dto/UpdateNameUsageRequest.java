@@ -22,6 +22,5 @@ public record UpdateNameUsageRequest(
     String temporalRangeStart,
     String temporalRangeEnd,
     String etymology,
-    String link,
     String remarks,
     int version) {}

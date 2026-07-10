@@ -129,7 +129,6 @@ public class NameUsageColdpWriter {
     row.put(ColdpTerm.nameStatus, lower(u.getNomStatus()));
     row.put(ColdpTerm.referenceID, joinInts(u.getReferenceId()));
     row.put(ColdpTerm.ordinal, str(u.getOrdinal()));
-    row.put(ColdpTerm.link, u.getLink());
     row.put(ColdpTerm.remarks, u.getRemarks());
     return row;
   }

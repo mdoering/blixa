@@ -24,6 +24,9 @@ public class Reference {
   private String isbn;
   private String issn;
   private String link;
+  // When the cited online resource was last accessed (free-text, e.g. an ISO date) -- loaded here
+  // (SELECT * auto-maps it) but not yet write-wired; see ReferenceMapper/CreateReferenceRequest.
+  private String accessed;
   private String remarks;
   private OffsetDateTime modified;
   private Integer modifiedBy;
@@ -65,6 +68,8 @@ public class Reference {
   public void setIssn(String issn) { this.issn = issn; }
   public String getLink() { return link; }
   public void setLink(String link) { this.link = link; }
+  public String getAccessed() { return accessed; }
+  public void setAccessed(String accessed) { this.accessed = accessed; }
   public String getRemarks() { return remarks; }
   public void setRemarks(String remarks) { this.remarks = remarks; }
   public OffsetDateTime getModified() { return modified; }

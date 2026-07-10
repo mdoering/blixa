@@ -30,7 +30,7 @@ public interface NameUsageMapper {
           basionym_authorship, basionym_ex_authorship, basionym_authorship_year,
           sanctioning_author, nom_status, published_in_reference_id, published_in_year,
           published_in_page, published_in_page_link, gender, etymology, name_type,
-          parse_state, link, remarks, modified_by)
+          parse_state, remarks, modified_by)
       VALUES (
           #{projectId}, #{id},
           #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
@@ -43,7 +43,7 @@ public interface NameUsageMapper {
           #{basionymAuthorship}, #{basionymExAuthorship}, #{basionymAuthorshipYear},
           #{sanctioningAuthor}, #{nomStatus}, #{publishedInReferenceId}, #{publishedInYear},
           #{publishedInPage}, #{publishedInPageLink}, #{gender}, #{etymology}, #{nameType},
-          #{parseState}, #{link}, #{remarks}, #{modifiedBy})
+          #{parseState}, #{remarks}, #{modifiedBy})
       """)
   void insert(NameUsage u);
 
@@ -288,7 +288,7 @@ public interface NameUsageMapper {
           published_in_reference_id = #{publishedInReferenceId}, published_in_year = #{publishedInYear},
           published_in_page = #{publishedInPage}, published_in_page_link = #{publishedInPageLink},
           gender = #{gender}, etymology = #{etymology}, name_type = #{nameType},
-          parse_state = #{parseState}, link = #{link}, remarks = #{remarks},
+          parse_state = #{parseState}, remarks = #{remarks},
           modified = now(), modified_by = #{modifiedBy}, version = version + 1
       WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}
       """)
