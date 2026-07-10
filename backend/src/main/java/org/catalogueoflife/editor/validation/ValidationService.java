@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.Reference;
@@ -77,6 +78,10 @@ public class ValidationService {
         .flatMap(Optional::stream)
         .toList();
     List<Issue> existing = issues.findByEntity(projectId, ENTITY_NAME_USAGE, usageId);
+    // Non-rule flags (e.g. the bulk COL-match job's col_id_added / col_id_updated / col_match_missing,
+    // stamped straight onto issue.rule) are owned elsewhere and must never be swept by the stale loop
+    // below -- only rows whose rule is a registered ValidationRule.key() are this method's business.
+    Set<String> ruleKeys = rules.stream().map(ValidationRule::key).collect(Collectors.toSet());
 
     // for f in current: insert / reopen / updateFinding (see IssueMapper for exactly what each
     // transition touches).
@@ -97,6 +102,9 @@ public class ValidationService {
     for (Issue existingIssue : existing) {
       if (currentRuleKeys.contains(existingIssue.getRule())) {
         continue;
+      }
+      if (!ruleKeys.contains(existingIssue.getRule())) {
+        continue; // non-rule flags (e.g. col_*) are owned elsewhere
       }
       String status = existingIssue.getStatus();
       if (IssueStatus.ACCEPTED.name().equals(status)) {

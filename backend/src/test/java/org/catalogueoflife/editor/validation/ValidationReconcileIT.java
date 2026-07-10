@@ -171,4 +171,37 @@ class ValidationReconcileIT extends AbstractPostgresIT {
 
     assertThat(issueMapper.findByEntity((int) pid, "name_usage", (int) synId)).isEmpty();
   }
+
+  // Task 1 regression: col_id_added / col_id_updated / col_match_missing are flags the (later) bulk
+  // COL-match job stamps directly onto issue.rule -- they are NOT produced by any ValidationRule.
+  // Before the fix, revalidateUsage's stale-handling loop treated "rule not in this run's current
+  // findings" as "sweep it" for ANY existing issue, so a plain edit-triggered revalidate would delete
+  // a col_match_missing flag outright (OPEN -> deleteById, see the loop above). The fix scopes that
+  // loop to rows whose rule is a registered ValidationRule.key(), leaving non-rule flags alone.
+  @Test
+  @WithMockUser(username = "colFlagOwner")
+  void revalidateUsageLeavesNonRuleFlagsAlone() throws Exception {
+    ensureUser("colFlagOwner");
+    long pid = createProject("colflagproj");
+    long usageId = createUsage(pid, "Flagus alpha", "L.", "species", "accepted");
+
+    Issue flag = new Issue();
+    flag.setProjectId((int) pid);
+    flag.setEntityType("name_usage");
+    flag.setEntityId((int) usageId);
+    flag.setRule("col_match_missing");
+    flag.setSeverity(Severity.WARNING.name());
+    flag.setMessage("no COL match found");
+    issueMapper.insert(flag);
+    assertThat(flag.getStatus()).isNull(); // status defaults to OPEN in the DB, not set here
+
+    validationService.revalidateUsage((int) pid, (int) usageId);
+
+    List<Issue> stored = issueMapper.findByEntity((int) pid, "name_usage", (int) usageId);
+    Issue stillThere = stored.stream().filter(i -> "col_match_missing".equals(i.getRule())).findFirst()
+        .orElse(null);
+    assertThat(stillThere).isNotNull();
+    assertThat(stillThere.getId()).isEqualTo(flag.getId());
+    assertThat(stillThere.getStatus()).isEqualTo(IssueStatus.OPEN.name());
+  }
 }
