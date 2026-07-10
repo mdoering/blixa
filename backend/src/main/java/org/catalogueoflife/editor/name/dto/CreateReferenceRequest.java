@@ -16,4 +16,5 @@ public record CreateReferenceRequest(
     String isbn,
     String issn,
     String link,
+    String accessed,
     String remarks) {}

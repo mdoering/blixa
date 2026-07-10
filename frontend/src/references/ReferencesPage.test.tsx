@@ -19,6 +19,7 @@ function mockProject(role = 'owner') {
           issued: '1758',
           containerTitle: null,
           doi: '10.5/abc',
+          accessed: '2026-07-01',
           version: 0,
         },
       ]),
@@ -65,6 +66,26 @@ test('Import DOI resolves and opens the form pre-filled', async () => {
   await userEvent.click(within(dialog).getByRole('button', { name: 'Fetch' }));
   // the resolved preview lands in the reference form's Title field
   expect(await screen.findByDisplayValue('Resolved Title')).toBeInTheDocument();
+});
+
+test('editing a reference round-trips the accessed field', async () => {
+  mockProject();
+  let body: unknown = null;
+  server.use(
+    http.put('/api/projects/3/references/1', async ({ request }) => {
+      body = await request.json();
+      return HttpResponse.json({ id: 1, version: 1 });
+    }),
+  );
+  renderPage();
+  await userEvent.click(await screen.findByText('Systema Naturae'));
+  const dialog = await screen.findByRole('dialog');
+  const accessedInput = within(dialog).getByLabelText('Accessed');
+  expect(accessedInput).toHaveValue('2026-07-01');
+  await userEvent.clear(accessedInput);
+  await userEvent.type(accessedInput, '2026-07-09');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  expect(body).toMatchObject({ accessed: '2026-07-09' });
 });
 
 test('a viewer sees no editing controls', async () => {

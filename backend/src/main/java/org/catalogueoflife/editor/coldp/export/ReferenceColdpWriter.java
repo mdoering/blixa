@@ -51,6 +51,7 @@ public class ReferenceColdpWriter {
     row.put(ColdpTerm.isbn, r.getIsbn());
     row.put(ColdpTerm.issn, r.getIssn());
     row.put(ColdpTerm.link, r.getLink());
+    row.put(ColdpTerm.accessed, r.getAccessed());
     row.put(ColdpTerm.remarks, r.getRemarks());
     return row;
   }

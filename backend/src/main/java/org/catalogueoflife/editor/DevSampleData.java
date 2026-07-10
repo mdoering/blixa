@@ -93,7 +93,7 @@ public class DevSampleData implements ApplicationRunner {
             + "Laurentius Salvius, Stockholm.",
         "book", "Linnaeus, C.", null, "Systema Naturae per regna tria naturae",
         null, "1758", "1", null, "1-824", "Laurentius Salvius",
-        null, null, null, "https://www.biodiversitylibrary.org/item/10277", null));
+        null, null, null, "https://www.biodiversitylibrary.org/item/10277", null, null));
     int ref = linnaeus.getId();
 
     // Accepted classification, built strictly top-down so each parent is already an accepted usage

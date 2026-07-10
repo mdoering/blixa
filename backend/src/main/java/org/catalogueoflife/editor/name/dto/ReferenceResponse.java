@@ -19,6 +19,7 @@ public record ReferenceResponse(
     String isbn,
     String issn,
     String link,
+    String accessed,
     String remarks,
     Integer version) {
 
@@ -26,6 +27,6 @@ public record ReferenceResponse(
     return new ReferenceResponse(r.getId(), r.getCitation(), r.getType(), r.getAuthor(),
         r.getEditor(), r.getTitle(), r.getContainerTitle(), r.getIssued(), r.getVolume(),
         r.getIssue(), r.getPage(), r.getPublisher(), r.getDoi(), r.getIsbn(), r.getIssn(),
-        r.getLink(), r.getRemarks(), r.getVersion());
+        r.getLink(), r.getAccessed(), r.getRemarks(), r.getVersion());
   }
 }

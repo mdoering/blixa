@@ -80,12 +80,12 @@ class ReferenceExportIT extends AbstractPostgresIT {
     Reference plain = referenceService.create(userId, pid, new CreateReferenceRequest(
         "Plain, A. 2019. A plain citation.", "article-journal", "Plain A", null,
         "A plain title", "Journal of Plain Things", "2019", "1", "2", "10-20",
-        null, null, null, null, null, null));
+        null, null, null, null, null, "2026-07-10", null));
 
     Reference withDoiAndAltId = referenceService.create(userId, pid, new CreateReferenceRequest(
         "Doi, B. 2020. A DOI'd citation.", "article-journal", "Doi B", null,
         "A DOI title", "Journal of DOIs", "2020", "3", "4", "40-50",
-        "Springer", "10.1234/abcd", null, null, null, null));
+        "Springer", "10.1234/abcd", null, null, null, null, null));
     withDoiAndAltId.setAlternativeId(List.of("col:REF-2"));
     references.update(withDoiAndAltId);
 
@@ -113,6 +113,7 @@ class ReferenceExportIT extends AbstractPostgresIT {
     // CsvReader.clean() turns an empty cell into a true null (see NameUsageExportIT).
     assertThat(plainRec.get(ColdpTerm.doi)).isNull();
     assertThat(plainRec.get(ColdpTerm.alternativeID)).isNull();
+    assertThat(plainRec.get(ColdpTerm.accessed)).isEqualTo("2026-07-10");
 
     VerbatimRecord doiRec = findOneById(recs, withDoiAndAltId.getId());
     assertThat(doiRec.get(ColdpTerm.citation)).isEqualTo(withDoiAndAltId.getCitation());
@@ -143,7 +144,7 @@ class ReferenceExportIT extends AbstractPostgresIT {
     // reference purely to keep the archive readable -- unrelated to what this test asserts.
     referenceService.create(userId, pid, new CreateReferenceRequest(
         "Filler, C. 2021. A filler reference.", null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null));
+        null, null, null, null, null, null, null, null));
 
     Path targetZip = tmp.resolve("export.zip");
     writer.write(pid, targetZip);

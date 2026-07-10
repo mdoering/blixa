@@ -124,4 +124,34 @@ class ReferenceApiIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + pid + "/references/" + refId))
        .andExpect(status().isNotFound());
   }
+
+  @Test
+  @WithMockUser(username = "refAccessedOwner")
+  void accessedRoundTripsThroughCreateGetUpdate() throws Exception {
+    ensureUser("refAccessedOwner");
+    long pid = createProject("refaccessedproj");
+
+    String createBody = mvc.perform(post("/api/projects/" + pid + "/references").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"Some online source\",\"accessed\":\"2026-07-10\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.accessed").value("2026-07-10"))
+        .andReturn().getResponse().getContentAsString();
+    JsonNode created = json.readTree(createBody);
+    long refId = created.get("id").asLong();
+
+    mvc.perform(get("/api/projects/" + pid + "/references/" + refId))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.accessed").value("2026-07-10"));
+
+    mvc.perform(put("/api/projects/" + pid + "/references/" + refId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"Some online source\",\"accessed\":\"2026-07-11\",\"version\":0}"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.accessed").value("2026-07-11"));
+
+    mvc.perform(get("/api/projects/" + pid + "/references/" + refId))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.accessed").value("2026-07-11"));
+  }
 }

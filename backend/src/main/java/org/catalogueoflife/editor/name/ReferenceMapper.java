@@ -22,11 +22,11 @@ public interface ReferenceMapper {
   @Insert("""
       INSERT INTO reference (project_id, id, alternative_id, citation, type, author, editor,
                               title, container_title, issued, volume, issue, page, publisher,
-                              doi, isbn, issn, link, remarks, modified_by)
+                              doi, isbn, issn, link, accessed, remarks, modified_by)
       VALUES (#{projectId}, #{id}, #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
               #{citation}, #{type}, #{author}, #{editor}, #{title}, #{containerTitle}, #{issued},
               #{volume}, #{issue}, #{page}, #{publisher}, #{doi}, #{isbn}, #{issn}, #{link},
-              #{remarks}, #{modifiedBy})
+              #{accessed}, #{remarks}, #{modifiedBy})
       """)
   void insert(Reference r);
 
@@ -74,7 +74,8 @@ public interface ReferenceMapper {
           citation = #{citation}, type = #{type}, author = #{author}, editor = #{editor},
           title = #{title}, container_title = #{containerTitle}, issued = #{issued},
           volume = #{volume}, issue = #{issue}, page = #{page}, publisher = #{publisher},
-          doi = #{doi}, isbn = #{isbn}, issn = #{issn}, link = #{link}, remarks = #{remarks},
+          doi = #{doi}, isbn = #{isbn}, issn = #{issn}, link = #{link}, accessed = #{accessed},
+          remarks = #{remarks},
           modified = now(), modified_by = #{modifiedBy}, version = version + 1
       WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}
       """)

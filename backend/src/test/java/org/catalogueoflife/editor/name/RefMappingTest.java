@@ -44,6 +44,21 @@ class RefMappingTest {
   }
 
   @Test
+  void mapsBibtexUrldateToAccessed() {
+    String bibtex =
+        """
+        @misc{key2,
+          title = {A dataset},
+          url = {https://example.org/data},
+          urldate = {2026-07-10}
+        }
+        """;
+    List<CreateReferenceRequest> refs = RefMapping.fromBibtex(bibtex);
+    assertThat(refs).hasSize(1);
+    assertThat(refs.get(0).accessed()).isEqualTo("2026-07-10");
+  }
+
+  @Test
   void mapsCrossrefMessage() {
     String json =
         """
@@ -73,5 +88,33 @@ class RefMappingTest {
     assertThat(r.link()).isEqualTo("https://doi.org/10.5/abc");
     assertThat(r.type()).isEqualTo("book");
     assertThat(r.citation()).contains("Linnaeus").contains("Systema Naturae");
+  }
+
+  @Test
+  void mapsCrossrefAccessedDateParts() {
+    String json =
+        """
+        {
+          "title": ["A dataset"],
+          "accessed": {"date-parts": [[2026, 7, 10]]}
+        }
+        """;
+    JsonNode message = JSON.readTree(json);
+    CreateReferenceRequest r = RefMapping.fromCrossref(message);
+    assertThat(r.accessed()).isEqualTo("2026-07-10");
+  }
+
+  @Test
+  void mapsCrossrefAccessedYearOnly() {
+    String json =
+        """
+        {
+          "title": ["A dataset"],
+          "accessed": {"date-parts": [[2026]]}
+        }
+        """;
+    JsonNode message = JSON.readTree(json);
+    CreateReferenceRequest r = RefMapping.fromCrossref(message);
+    assertThat(r.accessed()).isEqualTo("2026");
   }
 }

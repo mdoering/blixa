@@ -176,6 +176,7 @@ export interface Reference {
   isbn: string | null;
   issn: string | null;
   link: string | null;
+  accessed: string | null;
   remarks: string | null;
   version: number;
 }
@@ -197,6 +198,7 @@ export interface CreateRefPayload {
   isbn?: string;
   issn?: string;
   link?: string;
+  accessed?: string;
   remarks?: string;
 }
 

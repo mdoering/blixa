@@ -31,6 +31,7 @@ const FIELDS = [
   'isbn',
   'issn',
   'link',
+  'accessed',
   'remarks',
 ] as const;
 type FormValues = Record<(typeof FIELDS)[number], string>;
@@ -121,6 +122,11 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
             <TextInput label="ISSN" {...form.getInputProps('issn')} />
             <TextInput label="Link" {...form.getInputProps('link')} />
           </SimpleGrid>
+          <TextInput
+            label="Accessed"
+            placeholder="YYYY-MM-DD"
+            {...form.getInputProps('accessed')}
+          />
           <Textarea label="Remarks" rows={2} {...form.getInputProps('remarks')} />
           <Group justify="flex-end">
             <Button variant="default" onClick={onClose}>

@@ -16,5 +16,6 @@ public record UpdateReferenceRequest(
     String isbn,
     String issn,
     String link,
+    String accessed,
     String remarks,
     int version) {}

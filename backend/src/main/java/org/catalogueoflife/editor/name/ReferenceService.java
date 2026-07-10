@@ -79,6 +79,7 @@ public class ReferenceService {
     r.setIsbn(req.isbn());
     r.setIssn(req.issn());
     r.setLink(req.link());
+    r.setAccessed(req.accessed());
     r.setRemarks(req.remarks());
     r.setModifiedBy(userId);
     // allocate the next per-project id BEFORE inserting: reference has no DB identity column
@@ -118,6 +119,7 @@ public class ReferenceService {
     r.setIsbn(req.isbn());
     r.setIssn(req.issn());
     r.setLink(req.link());
+    r.setAccessed(req.accessed());
     r.setRemarks(req.remarks());
     r.setModifiedBy(userId);
     r.setVersion(req.version());

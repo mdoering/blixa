@@ -37,9 +37,10 @@ public final class RefMapping {
     String issn = text(message.path("ISSN").path(0));
     String link = text(message.path("URL"));
     String type = text(message.path("type"));
+    String accessed = crossrefDate(message.path("accessed"));
     String citation = citation(author, year, title, container, volume, issue, page);
     return new CreateReferenceRequest(citation, type, author, editor, title, container, year, volume,
-        issue, page, publisher, doi, isbn, issn, link, null);
+        issue, page, publisher, doi, isbn, issn, link, accessed, null);
   }
 
   private static String crossrefNames(JsonNode arr) {
@@ -67,6 +68,25 @@ public final class RefMapping {
   private static String crossrefYear(JsonNode issued) {
     JsonNode y = issued.path("date-parts").path(0).path(0);
     return (y.isMissingNode() || y.isNull()) ? null : String.valueOf(y.asInt());
+  }
+
+  // CSL date field (e.g. "accessed") -> an ISO string, as precise as the date-parts triple allows:
+  // [[2026,7,10]] -> "2026-07-10", [[2026,7]] -> "2026-07", [[2026]] -> "2026". Zero-pads month/day.
+  private static String crossrefDate(JsonNode dateField) {
+    JsonNode parts = dateField.path("date-parts").path(0);
+    JsonNode y = parts.path(0);
+    if (y.isMissingNode() || y.isNull()) {
+      return null;
+    }
+    JsonNode m = parts.path(1);
+    if (m.isMissingNode() || m.isNull()) {
+      return String.valueOf(y.asInt());
+    }
+    JsonNode d = parts.path(2);
+    if (d.isMissingNode() || d.isNull()) {
+      return "%04d-%02d".formatted(y.asInt(), m.asInt());
+    }
+    return "%04d-%02d-%02d".formatted(y.asInt(), m.asInt(), d.asInt());
   }
 
   private static String text(JsonNode n) {
@@ -103,7 +123,7 @@ public final class RefMapping {
       String citation = citation(author, year, title, container, volume, issue, page);
       out.add(new CreateReferenceRequest(citation, type, author, editor, title, container, year,
           volume, issue, page, field(e, "publisher"), field(e, "doi"), field(e, "isbn"),
-          field(e, "issn"), field(e, "url"), null));
+          field(e, "issn"), field(e, "url"), field(e, "urldate"), null));
     }
     if (out.isEmpty()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "no BibTeX entries found");

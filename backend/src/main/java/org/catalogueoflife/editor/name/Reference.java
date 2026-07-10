@@ -24,8 +24,8 @@ public class Reference {
   private String isbn;
   private String issn;
   private String link;
-  // When the cited online resource was last accessed (free-text, e.g. an ISO date) -- loaded here
-  // (SELECT * auto-maps it) but not yet write-wired; see ReferenceMapper/CreateReferenceRequest.
+  // When the cited online resource was last accessed (free-text, e.g. an ISO date). CSL "accessed"
+  // / BibTeX "urldate" (see RefMapping).
   private String accessed;
   private String remarks;
   private OffsetDateTime modified;
