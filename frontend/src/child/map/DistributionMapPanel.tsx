@@ -4,6 +4,7 @@ import { IconMap } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { getMapData } from '../../api/map';
 import { getProject } from '../../api/projects';
+import MatchColModal from './MatchColModal';
 import type { LayerVisibility } from './MapView';
 
 // COL GBIF checklist UUID — matches backend `coldp.col.gbif-checklist-key`.
@@ -39,8 +40,7 @@ export default function DistributionMapPanel({ pid, usageId, canEdit }: Props) {
   // user override. Kept user-toggleable either way.
   const [gbifOverride, setGbifOverride] = useState<boolean | null>(null);
 
-  // Task 8 wires the match-to-COL modal into this state; the button is a no-op placeholder for now.
-  const [, setMatchOpen] = useState(false);
+  const [matchOpen, setMatchOpen] = useState(false);
 
   const mapData = mapQuery.data;
   const colId = mapData?.colId ?? null;
@@ -142,6 +142,8 @@ export default function DistributionMapPanel({ pid, usageId, canEdit }: Props) {
           </Text>
         )}
       </Stack>
+
+      <MatchColModal pid={pid} usageId={usageId} opened={matchOpen} onClose={() => setMatchOpen(false)} />
     </Paper>
   );
 }

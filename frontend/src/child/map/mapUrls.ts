@@ -12,6 +12,14 @@ export function colIdFrom(alternativeId: string[] | null | undefined): string | 
   return null;
 }
 
+// Merges a picked COL id into a usage's alternativeId list: drops any existing (case-insensitive)
+// `col:` entry, then appends `col:<colId>`. Mirrors the backend's mergeColId (see
+// NameUsageService.setIdentifiers) so the "match to COL" write path stays a full replace that
+// carries over non-col ids (e.g. `tsn:1`) instead of clobbering them.
+export function withColId(alternativeId: string[], colId: string): string[] {
+  return [...alternativeId.filter((id) => !/^col:/i.test(id)), `col:${colId}`];
+}
+
 // GBIF v2 occurrence-density raster tile template. Keeps the literal `{z}/{x}/{y}` placeholders
 // (maplibre substitutes them per tile); only the dynamic query values are URL-encoded.
 export function gbifTileUrl(colId: string, checklistKey: string): string {

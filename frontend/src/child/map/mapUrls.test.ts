@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaGeojsonUrl, colIdFrom, gbifTileUrl } from './mapUrls';
+import { areaGeojsonUrl, colIdFrom, gbifTileUrl, withColId } from './mapUrls';
 
 const UUID = '7ddf754f-d193-4cc9-b351-99906754a03b';
 
@@ -17,6 +17,22 @@ describe('colIdFrom', () => {
     expect(colIdFrom([])).toBeNull();
     expect(colIdFrom(null)).toBeNull();
     expect(colIdFrom(undefined)).toBeNull();
+  });
+});
+
+describe('withColId', () => {
+  test('appends col:<id> to a list with no existing col: entry', () => {
+    expect(withColId(['tsn:1'], '6W3C4')).toEqual(['tsn:1', 'col:6W3C4']);
+  });
+  test('drops an existing col: entry (case-insensitive) and appends the new one', () => {
+    expect(withColId(['tsn:1', 'COL:OLD1', 'gbif:2'], '6W3C4')).toEqual([
+      'tsn:1',
+      'gbif:2',
+      'col:6W3C4',
+    ]);
+  });
+  test('works from an empty list', () => {
+    expect(withColId([], '6W3C4')).toEqual(['col:6W3C4']);
   });
 });
 

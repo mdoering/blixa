@@ -21,6 +21,7 @@ import { getProject } from '../api/projects';
 import { getUsage, updateUsage } from '../api/usages';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import NameRelationsTab from '../child/NameRelationsTab';
+import { colIdFrom } from '../child/map/mapUrls';
 import TypeMaterialTab from '../child/TypeMaterialTab';
 import {
   DistributionTab,
@@ -244,6 +245,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
             <Text size="sm" c="dimmed">Genus: {usage.genus ?? '—'}</Text>
             <Text size="sm" c="dimmed">Specific epithet: {usage.specificEpithet ?? '—'}</Text>
             <Text size="sm" c="dimmed">Infraspecific epithet: {usage.infraspecificEpithet ?? '—'}</Text>
+            <Text size="sm" c="dimmed">COL id: {colIdFrom(usage.alternativeId) ?? '—'}</Text>
           </SimpleGrid>
         </Tabs.Panel>
 
