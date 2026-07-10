@@ -9,8 +9,11 @@
 -- FROM unnest(...) row set). An UPDATE's SET expression has no such restriction.
 ALTER TABLE project ADD COLUMN identifier_scopes_jsonb JSONB;
 
+-- COALESCE to '[]' so a non-null but EMPTY array ('{}') becomes [] rather than NULL
+-- (jsonb_agg over zero rows returns NULL): preserves the never-set (NULL) vs explicitly-cleared ([])
+-- distinction that UpdateProjectMetadataRequest relies on. NULL rows are skipped by the WHERE.
 UPDATE project SET identifier_scopes_jsonb = (
-  SELECT jsonb_agg(jsonb_build_object('scope', s)) FROM unnest(identifier_scopes) s
+  SELECT COALESCE(jsonb_agg(jsonb_build_object('scope', s)), '[]'::jsonb) FROM unnest(identifier_scopes) s
 ) WHERE identifier_scopes IS NOT NULL;
 
 ALTER TABLE project DROP COLUMN identifier_scopes;
