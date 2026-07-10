@@ -23,4 +23,10 @@ public record UpdateNameUsageRequest(
     String temporalRangeEnd,
     String etymology,
     String remarks,
+    // Full replace of name_usage.alternative_id, same "carry over what you don't expose" contract
+    // as every other field here (see UpdateUsagePayload on the frontend) -- a null/omitted value
+    // clears the column rather than leaving it untouched. Lets the Details form's PUT persist
+    // alternativeId in the same request as the rest of the usage, alongside the narrower
+    // PUT /usages/{id}/identifiers (setIdentifiers) which stays available for identifiers-only writes.
+    List<String> alternativeId,
     int version) {}

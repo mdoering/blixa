@@ -106,9 +106,10 @@ export interface NameUsage {
 
 // Mirrors backend UpdateNameUsageRequest: a full replace of every writable field, NOT a partial
 // patch -- callers must carry over the loaded usage's current values for fields not exposed in
-// the edit form (parentId, namePhrase, publishedInReferenceId, gender, extinct, environment,
-// temporalRangeStart/End, remarks), or those fields would be wiped out on save. `version` is the
-// loaded usage's version, for optimistic locking (a stale version -> 409).
+// the edit form (parentId, namePhrase, gender, extinct, environment, temporalRangeStart/End,
+// alternativeId -- a later per-scope-identifier form will populate alternativeId directly), or
+// those fields would be wiped out on save. `version` is the loaded usage's version, for
+// optimistic locking (a stale version -> 409).
 export interface UpdateUsagePayload {
   scientificName: string;
   authorship?: string;
@@ -128,6 +129,7 @@ export interface UpdateUsagePayload {
   temporalRangeEnd?: string;
   etymology?: string;
   remarks?: string;
+  alternativeId?: string[];
   version: number;
 }
 

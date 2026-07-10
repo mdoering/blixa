@@ -224,6 +224,7 @@ public class NameUsageService {
     u.setTemporalRangeEnd(req.temporalRangeEnd());
     u.setEtymology(req.etymology());
     u.setRemarks(req.remarks());
+    u.setAlternativeId(req.alternativeId());
     u.setModifiedBy(userId);
     u.setVersion(req.version());
     if (reparse) {

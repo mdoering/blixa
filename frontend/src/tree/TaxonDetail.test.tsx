@@ -69,6 +69,8 @@ function mockCommon(usage = baseUsage(), role = 'owner') {
     http.get('/api/projects/4/usages/10/estimates', () => HttpResponse.json([])),
     http.get('/api/projects/4/usages/10/properties', () => HttpResponse.json([])),
     http.get('/api/projects/4/issues', () => HttpResponse.json([])),
+    // The Details tab's published-in EntitySelect loads this unconditionally on mount.
+    http.get('/api/projects/4/references', () => HttpResponse.json([])),
   );
 }
 
@@ -105,6 +107,56 @@ test('editing authorship and saving PUTs the update with the loaded version', as
   expect(putBody).toBeDefined();
   expect(putBody?.authorship).toBe('L., 1758');
   expect(putBody?.version).toBe(1);
+  expect(putBody?.scientificName).toBe('Panthera leo');
+});
+
+test('the published-in reference picker and remarks field render, seeded from the usage', async () => {
+  mockCommon(baseUsage({ publishedInReferenceId: 7, remarks: 'Needs review' }));
+  server.use(
+    http.get('/api/projects/4/references', () =>
+      HttpResponse.json([
+        { id: 7, citation: 'Mill. 1768', title: 'Abies alba desc', version: 0 },
+      ]),
+    ),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await waitFor(() =>
+    expect(screen.getByLabelText('Scientific name')).toHaveValue('Panthera leo'),
+  );
+  // The reference select resolves the loaded reference's title as its label, not a bare '#7'.
+  // getByRole('textbox', ...), not getByLabelText: Mantine's Select combobox keeps its (hidden)
+  // options listbox in the DOM with the same aria-labelledby as the input, so getByLabelText
+  // matches both and errors on ambiguity.
+  await waitFor(() =>
+    expect(screen.getByRole('textbox', { name: 'Published in reference' })).toHaveValue(
+      'Abies alba desc',
+    ),
+  );
+  expect(screen.getByLabelText('Remarks')).toHaveValue('Needs review');
+});
+
+test('editing remarks and saving PUTs the update with the new remarks', async () => {
+  mockCommon();
+  let putBody: Record<string, unknown> | undefined;
+  server.use(
+    http.put('/api/projects/4/usages/10', async ({ request }) => {
+      putBody = (await request.json()) as Record<string, unknown>;
+      return HttpResponse.json(baseUsage({ remarks: 'Reviewed', version: 2 }));
+    }),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  const remarks = await screen.findByLabelText('Remarks');
+  await waitFor(() => expect(screen.getByLabelText('Scientific name')).toHaveValue('Panthera leo'));
+  await userEvent.type(remarks, 'Reviewed');
+  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+
+  // Asserting on putBody (rather than the "Saved" notification text, which the earlier
+  // authorship-save test also produces and which Mantine's notification store doesn't clear
+  // between tests) keeps this independent of notification ordering across the file.
+  await waitFor(() => expect(putBody).toBeDefined());
+  expect(putBody?.remarks).toBe('Reviewed');
   expect(putBody?.scientificName).toBe('Panthera leo');
 });
 

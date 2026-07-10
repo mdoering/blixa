@@ -20,7 +20,8 @@ import { ApiError, messageFor } from '../api/client';
 import { getProject } from '../api/projects';
 import { getUsage, updateUsage } from '../api/usages';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
-import NameRelationsTab from '../child/NameRelationsTab';
+import EntitySelect from '../child/EntitySelect';
+import NameRelationsTab, { referenceOptions } from '../child/NameRelationsTab';
 import { colIdFrom } from '../child/map/mapUrls';
 import TypeMaterialTab from '../child/TypeMaterialTab';
 import {
@@ -45,11 +46,13 @@ interface EditableFields {
   authorship: string;
   rank: string;
   status: string;
+  publishedInReferenceId: number | '';
   publishedInYear: number | '';
   publishedInPage: string;
   publishedInPageLink: string;
   nomStatus: string;
   etymology: string;
+  remarks: string;
 }
 
 function toFormValues(u: NameUsage): EditableFields {
@@ -58,11 +61,13 @@ function toFormValues(u: NameUsage): EditableFields {
     authorship: u.authorship ?? '',
     rank: u.rank ?? '',
     status: u.status ?? 'ACCEPTED',
+    publishedInReferenceId: u.publishedInReferenceId ?? '',
     publishedInYear: u.publishedInYear ?? '',
     publishedInPage: u.publishedInPage ?? '',
     publishedInPageLink: u.publishedInPageLink ?? '',
     nomStatus: u.nomStatus ?? '',
     etymology: u.etymology ?? '',
+    remarks: u.remarks ?? '',
   };
 }
 
@@ -83,11 +88,13 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
       authorship: '',
       rank: '',
       status: 'ACCEPTED',
+      publishedInReferenceId: '',
       publishedInYear: '',
       publishedInPage: '',
       publishedInPageLink: '',
       nomStatus: '',
       etymology: '',
+      remarks: '',
     },
     validate: {
       scientificName: (v) => (v ? null : 'Required'),
@@ -131,7 +138,8 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
         parentId: usage.parentId ?? undefined,
         namePhrase: usage.namePhrase ?? undefined,
         nomStatus: values.nomStatus || undefined,
-        publishedInReferenceId: usage.publishedInReferenceId ?? undefined,
+        publishedInReferenceId:
+          values.publishedInReferenceId === '' ? undefined : values.publishedInReferenceId,
         publishedInYear: values.publishedInYear === '' ? undefined : values.publishedInYear,
         publishedInPage: values.publishedInPage || undefined,
         publishedInPageLink: values.publishedInPageLink || undefined,
@@ -141,7 +149,11 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
         temporalRangeStart: usage.temporalRangeStart ?? undefined,
         temporalRangeEnd: usage.temporalRangeEnd ?? undefined,
         etymology: values.etymology || undefined,
-        remarks: usage.remarks ?? undefined,
+        remarks: values.remarks || undefined,
+        // Not yet exposed as its own form field (Task 3 adds per-scope identifier fields that
+        // populate this) -- carry the loaded usage's value through so this full-replace save
+        // doesn't wipe it out.
+        alternativeId: usage.alternativeId ?? undefined,
         version: usage.version,
       };
       return updateUsage(pid, usageId, payload);
@@ -211,6 +223,27 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                   <TextInput label="Rank" {...form.getInputProps('rank')} />
                   <Select label="Status" data={STATUS_OPTIONS} {...form.getInputProps('status')} />
                 </SimpleGrid>
+                <EntitySelect
+                  label="Published in reference"
+                  value={
+                    form.values.publishedInReferenceId === ''
+                      ? null
+                      : String(form.values.publishedInReferenceId)
+                  }
+                  onChange={(v) =>
+                    form.setFieldValue('publishedInReferenceId', v ? Number(v) : '')
+                  }
+                  load={referenceOptions(pid)}
+                  queryKey={['refOptions', pid]}
+                  current={
+                    usage.publishedInReferenceId
+                      ? {
+                          value: String(usage.publishedInReferenceId),
+                          label: `#${usage.publishedInReferenceId}`,
+                        }
+                      : null
+                  }
+                />
                 <SimpleGrid cols={3}>
                   <NumberInput label="Published in year" {...form.getInputProps('publishedInYear')} />
                   <TextInput label="Published in page" {...form.getInputProps('publishedInPage')} />
@@ -221,6 +254,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                 </SimpleGrid>
                 <TextInput label="Nomenclatural status" {...form.getInputProps('nomStatus')} />
                 <Textarea label="Etymology" rows={2} {...form.getInputProps('etymology')} />
+                <Textarea label="Remarks" rows={2} {...form.getInputProps('remarks')} />
                 <Group>
                   <Button type="submit" loading={mutation.isPending} disabled={!canEdit}>
                     Save

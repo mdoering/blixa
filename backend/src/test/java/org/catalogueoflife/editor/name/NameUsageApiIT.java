@@ -499,4 +499,44 @@ class NameUsageApiIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + pid + "/usages/999999/accepted"))
         .andExpect(status().isNotFound());
   }
+
+  // The full-replace PUT /usages/{id} (UpdateNameUsageRequest) now also writes alternative_id --
+  // previously only the narrower PUT /usages/{id}/identifiers (setIdentifiers) persisted it, so a
+  // Details-form save that round-trips a loaded usage's alternativeId used to silently drop it.
+  // publishedInReferenceId is exercised via update here too (elsewhere it's only ever set on create).
+  @Test
+  @WithMockUser(username = "altIdOwner")
+  void alternativeIdAndPublishedInReferenceRoundTripThroughUpdate() throws Exception {
+    ensureUser("altIdOwner");
+    long pid = createProject("altidproj");
+
+    String refBody = mvc.perform(post("/api/projects/" + pid + "/references").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"Mill. 1768\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    long refId = json.readTree(refBody).get("id").asLong();
+
+    long id = createUsage(pid, "Alt id species", "Auth.", "species", "accepted");
+    String getBody = mvc.perform(get("/api/projects/" + pid + "/usages/" + id))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    int version = json.readTree(getBody).get("version").asInt();
+
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + id).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Alt id species\",\"authorship\":\"Auth.\","
+                + "\"rank\":\"species\",\"status\":\"accepted\","
+                + "\"publishedInReferenceId\":" + refId + ",\"alternativeId\":[\"ipni:123\"],"
+                + "\"version\":" + version + "}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.publishedInReferenceId").value(refId))
+        .andExpect(jsonPath("$.alternativeId[0]").value("ipni:123"));
+
+    // and it's not just an echo of the request -- it's actually persisted.
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + id))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.publishedInReferenceId").value(refId))
+        .andExpect(jsonPath("$.alternativeId[0]").value("ipni:123"));
+  }
 }
