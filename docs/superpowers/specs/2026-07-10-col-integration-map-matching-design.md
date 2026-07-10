@@ -51,7 +51,13 @@ and the same COL checklist UUID (exposed to the client via the project/map paylo
 
 - **CLB match** (proxied by our backend):
   `GET {clb}/dataset/{matchDataset}/match/nameusage?scientificName&authorship&rank&code&verbose=true`
-  plus higher-classification params `kingdom,phylum,class,order,family,genus`.
+  plus higher-classification params — **every ancestor at a supported rank**, not just the major
+  Linnean ones. The endpoint's `Classification` bean accepts:
+  `superkingdom, kingdom, subkingdom, superphylum, phylum, subphylum, superclass, class, subclass,
+  superorder, order, suborder, superfamily, family, subfamily, tribe, subtribe, genus, subgenus,
+  section`. We pass all ancestors whose rank is in this set and **omit `species`** (per the CLB
+  matching guidance — the query name itself supplies the species). Ancestors at any other rank
+  (e.g. clades, unranked) are skipped.
   Response `UsageMatchWithOriginal`: `usage{id,name,authorship,rank,status,namesIndexId,classification}`,
   `type` (EXACT/VARIANT/CANONICAL/AMBIGUOUS/NONE/UNSUPPORTED), `alternatives[]` (candidate list,
   richer when `verbose=true`). The matched **COL id** = `usage.id`.
@@ -112,6 +118,10 @@ Frontend:
   project `nomCode` (uppercased), builds the classification from ancestors
   (`NameUsageMapper.findClassification` — recursive CTE returning `[{rank,name}]`, reused by the
   bulk job), calls the client, maps to `ColMatchCandidate[]`.
+- Classification mapping: for each ancestor, map its rank to the matching CLB query param via a
+  small allow-list (the supported ranks above; `section_botany`/`section_zoology` → `section`),
+  skipping `species` and any rank not in the set. Every supported ancestor rank is passed, not
+  just the majors — a `subgenus`/`superfamily`/`tribe` ancestor is included when present.
 - `ColMatchCandidate = { colId, name, authorship, rank, status, matchType, classification }`
   (best match first, then `alternatives`).
 - `GET /api/projects/{pid}/usages/{uid}/col-match` → `ColMatchCandidate[]` (read-only; stores nothing).
