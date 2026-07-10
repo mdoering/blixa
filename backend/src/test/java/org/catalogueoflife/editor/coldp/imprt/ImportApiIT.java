@@ -229,7 +229,26 @@ class ImportApiIT extends AbstractPostgresIT {
     MockMultipartFile file = new MockMultipartFile("file", "huge.zip", "application/zip", tooBig);
 
     mvc.perform(multipart("/api/projects/import").file(file).with(csrf()))
-        .andExpect(status().isPayloadTooLarge());
+        .andExpect(status().isContentTooLarge());
+  }
+
+  // ImportRunService.start's other pre-check: preserveIds=true without an idScope is rejected
+  // synchronously with a 400 before the RUNNING row is even inserted -- distinct from the
+  // oversize-upload 413 above, and from the file-required 400, this is the "preserveIds requires
+  // idScope" branch (see start()'s second guard clause).
+  @Test
+  @WithMockUser(username = "importRunPreserveIdsNoScope")
+  void preserveIdsWithoutIdScopeIsRejectedWith400(@TempDir Path tmp) throws Exception {
+    ensureUser("importRunPreserveIdsNoScope");
+
+    Path dir = tmp.resolve("archive");
+    Files.createDirectories(dir);
+    byte[] zipBytes = buildArchive(dir,
+        new ColdpMetadataDto("Preserve Ids Checklist", null, null, null, null, null), null);
+    MockMultipartFile file = new MockMultipartFile("file", "preserve.zip", "application/zip", zipBytes);
+
+    mvc.perform(multipart("/api/projects/import").file(file).param("preserveIds", "true").with(csrf()))
+        .andExpect(status().isBadRequest());
   }
 
   // get()'s "never leak another user's import" contract: a runId that genuinely exists, but was

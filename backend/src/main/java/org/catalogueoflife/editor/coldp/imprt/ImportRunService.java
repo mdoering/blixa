@@ -92,7 +92,7 @@ public class ImportRunService {
           "idScope is required when preserveIds is set");
     }
     if (file.getSize() > maxBytes) {
-      throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
+      throw new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE,
           "archive exceeds " + maxBytes + " bytes");
     }
 
@@ -181,7 +181,7 @@ public class ImportRunService {
   // proof) statements, so the FAILED status write always survives even when this transaction rolls
   // back -- exactly the split ColMatchJobService.run/runSync/matchOneScope uses (there, matchOneScope
   // is the @Transactional leaf and runSync/run stay outside it).
-  @Transactional
+  @Transactional(rollbackFor = Exception.class)
   public void loadTransactional(long runId, Path dir, int userId) throws IOException {
     ColdpReader reader = ColdpReader.from(dir);
     if (!(reader.hasSchema(ColdpTerm.NameUsage)
