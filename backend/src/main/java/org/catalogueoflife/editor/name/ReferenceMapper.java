@@ -47,6 +47,14 @@ public interface ReferenceMapper {
   List<Reference> findByProject(@Param("projectId") int projectId, @Param("limit") int limit,
       @Param("offset") int offset);
 
+  // Unpaginated: all of a project's references in one go, ORDER BY id -- for the ColDP export
+  // (ReferenceColdpWriter), which needs every row rather than a UI page. Don't reuse
+  // findByProject/LIMIT for this: a project with more references than any reasonable page size
+  // would silently truncate the export.
+  @Select("SELECT * FROM reference WHERE project_id = #{projectId} ORDER BY id")
+  @ResultMap("referenceResult")
+  List<Reference> findAllByProject(@Param("projectId") int projectId);
+
   @Select("""
       SELECT * FROM reference
       WHERE project_id = #{projectId} AND citation % #{q}

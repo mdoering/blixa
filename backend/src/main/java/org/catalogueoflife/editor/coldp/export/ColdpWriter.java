@@ -17,23 +17,28 @@ import org.springframework.web.server.ResponseStatusException;
 // The ColDP entity-writing entry point for an export (called off-request by ExportRunService.run,
 // on ExportAsyncConfig.EXECUTOR_BEAN): builds a flat ColDP folder in a fresh temp dir, zips it to
 // targetZip (ColdpZip.zipFolder), and cleans the temp dir up. Writes metadata.yaml (the project's
-// own fields, via ColdpMetadata.write) and the combined NameUsage.tsv (NameUsageColdpWriter) --
-// later tasks add reference.tsv etc to this same method's temp-dir population step, without
-// touching the zip/cleanup shape or its (int projectId, Path targetZip) signature.
+// own fields, via ColdpMetadata.write), the combined NameUsage.tsv (NameUsageColdpWriter),
+// Reference.tsv (ReferenceColdpWriter, always written) and Author.tsv (AuthorColdpWriter, written
+// only when the project has authors) -- later tasks add further entity files to this same method's
+// temp-dir population step, without touching the zip/cleanup shape or its
+// (int projectId, Path targetZip) signature.
 @Component
 public class ColdpWriter {
 
   private final ProjectMapper projects;
   private final NameUsageColdpWriter nameUsageWriter;
+  private final ReferenceColdpWriter referenceWriter;
+  private final AuthorColdpWriter authorWriter;
 
-  public ColdpWriter(ProjectMapper projects, NameUsageColdpWriter nameUsageWriter) {
+  public ColdpWriter(ProjectMapper projects, NameUsageColdpWriter nameUsageWriter,
+      ReferenceColdpWriter referenceWriter, AuthorColdpWriter authorWriter) {
     this.projects = projects;
     this.nameUsageWriter = nameUsageWriter;
+    this.referenceWriter = referenceWriter;
+    this.authorWriter = authorWriter;
   }
 
-  // Per-entity tallies for the export_run row's *_count columns. referenceCount is still 0 -- no
-  // reference.tsv file is written yet; a later task populates it the same way nameUsageCount is
-  // populated here.
+  // Per-entity tallies for the export_run row's *_count columns.
   public record Counts(int nameUsageCount, int referenceCount) {
     public static final Counts ZERO = new Counts(0, 0);
   }
@@ -48,14 +53,17 @@ public class ColdpWriter {
     }
     Path tempDir = Files.createTempDirectory("coldp-export-" + projectId + "-");
     int nameUsageCount;
+    int referenceCount;
     try {
       ColdpMetadata.write(tempDir, toMetadataDto(project));
       nameUsageCount = nameUsageWriter.write(tempDir, projectId, project.getNomCode());
+      referenceCount = referenceWriter.write(tempDir, projectId);
+      authorWriter.write(tempDir, projectId);
       ColdpZip.zipFolder(tempDir, targetZip);
     } finally {
       deleteRecursively(tempDir);
     }
-    return new Counts(nameUsageCount, 0);
+    return new Counts(nameUsageCount, referenceCount);
   }
 
   private static ColdpMetadataDto toMetadataDto(Project p) {
