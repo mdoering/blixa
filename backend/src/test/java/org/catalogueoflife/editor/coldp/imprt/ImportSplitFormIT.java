@@ -192,4 +192,68 @@ class ImportSplitFormIT extends AbstractPostgresIT {
     return all.stream().filter(u -> scientificName.equals(u.getScientificName())).findFirst()
         .orElseThrow(() -> new AssertionError("no usage found for scientificName=" + scientificName));
   }
+
+  // Review-fix coverage: in a split-form archive, Name.basionymID is a Name-id (n1 below), but
+  // ctx.usageIds is keyed by Taxon/Synonym ids (t1) -- so a plain ctx.usageIds lookup for it always
+  // misses even though the archive is perfectly valid. n1's own Taxon row is t1, so the fix's
+  // nameIdToUsage fallback (built from the Name-id -> Taxon/Synonym-id side index readSplitFormRows
+  // records) must bridge n2's basionymID="n1" to t1's resulting usage id, WITHOUT emitting a
+  // false-positive "basionym not found" issue.
+  private byte[] buildBasionymArchive(Path dir) throws IOException {
+    ColdpMetadata.write(dir, new ColdpMetadataDto("Split Form Basionym Checklist", null, null, null, null, null));
+
+    Map<ColdpTerm, String> n1 = row(ColdpTerm.ID, "n1", ColdpTerm.scientificName, "Panthera leo",
+        ColdpTerm.authorship, "(Linnaeus, 1758)", ColdpTerm.rank, "species");
+    Map<ColdpTerm, String> n2 = row(ColdpTerm.ID, "n2", ColdpTerm.scientificName, "Felis leo",
+        ColdpTerm.authorship, "Linnaeus, 1758", ColdpTerm.rank, "species",
+        ColdpTerm.basionymID, "n1");
+    ColdpTsv.writeFile(dir, ColdpTerm.Name, List.of(n1, n2));
+
+    Map<ColdpTerm, String> t1 = row(ColdpTerm.ID, "t1", ColdpTerm.nameID, "n1");
+    Map<ColdpTerm, String> t2 = row(ColdpTerm.ID, "t2", ColdpTerm.nameID, "n2", ColdpTerm.parentID, "t1");
+    ColdpTsv.writeFile(dir, ColdpTerm.Taxon, List.of(t1, t2));
+
+    Path zip = dir.resolveSibling(dir.getFileName() + ".zip");
+    ColdpZip.zipFolder(dir, zip);
+    return Files.readAllBytes(zip);
+  }
+
+  @Test
+  @WithMockUser(username = "importSplitFormBasionymOwner")
+  void resolvesSplitFormBasionymFromNameIdToItsOwnUsage(@TempDir Path tmp) throws Exception {
+    ensureUser("importSplitFormBasionymOwner");
+
+    Path dir = tmp.resolve("archive");
+    Files.createDirectories(dir);
+    byte[] zipBytes = buildBasionymArchive(dir);
+    MockMultipartFile file = new MockMultipartFile("file", "splitformbasionym.zip", "application/zip", zipBytes);
+
+    String startBody = mvc.perform(multipart("/api/projects/import").file(file).with(csrf()))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    long runId = json.readTree(startBody).get("id").asLong();
+
+    JsonNode done = pollUntilTerminal(runId);
+    assertThat(done.get("status").asString()).isEqualTo("DONE");
+    assertThat(done.get("error").isNull()).isTrue();
+    int projectId = done.get("projectId").asInt();
+
+    assertThat(done.get("nameUsageCount").asInt()).isEqualTo(2);
+    List<NameUsage> all = usages.findAllByProject(projectId);
+    NameUsage pantheraLeo = byName(all, "Panthera leo");
+    NameUsage felisLeo = byName(all, "Felis leo");
+
+    // The whole point of the fix: basionym_id resolves to Panthera leo's usage id, even though
+    // Felis leo's Name.basionymID="n1" is a Name-id, not a Taxon-id.
+    assertThat(felisLeo.getBasionymId()).isEqualTo(pantheraLeo.getId());
+
+    // ...and no false-positive "basionym not found" issue was raised for it.
+    JsonNode issues = done.get("issues");
+    assertThat(issues).isNotNull();
+    for (JsonNode issue : issues) {
+      assertThat(issue.get("message").asString())
+          .as("no basionym-not-found issue expected, got: " + issue)
+          .doesNotContain("basionym");
+    }
+  }
 }

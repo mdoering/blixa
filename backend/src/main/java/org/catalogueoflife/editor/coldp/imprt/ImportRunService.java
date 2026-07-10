@@ -365,9 +365,19 @@ public class ImportRunService {
   // ordinary row (best-effort, per the design brief).
   private void loadNameUsages(ColdpReader reader, ImportContext ctx, int userId, boolean preserveIds,
       String idScope, NomCode nomCode) {
-    List<Map<ColdpTerm, String>> allRows = reader.hasSchema(ColdpTerm.NameUsage)
-        ? readCombinedRows(reader)
-        : readSplitFormRows(reader, ctx);
+    List<Map<ColdpTerm, String>> allRows;
+    // source Name ID -> the Taxon/Synonym row ID that used it (first-wins if a Name is shared),
+    // built by readSplitFormRows below; empty (and therefore a no-op) for the combined form, which
+    // never populates it. See its use resolving split-form basionymID below.
+    Map<String, String> nameIdToUsageSourceId;
+    if (reader.hasSchema(ColdpTerm.NameUsage)) {
+      allRows = readCombinedRows(reader);
+      nameIdToUsageSourceId = Map.of();
+    } else {
+      SplitFormRows split = readSplitFormRows(reader, ctx);
+      allRows = split.rows();
+      nameIdToUsageSourceId = split.nameIdToUsageSourceId();
+    }
 
     Map<String, Map<ColdpTerm, String>> byId = new LinkedHashMap<>();
     for (Map<ColdpTerm, String> row : allRows) {
@@ -389,26 +399,47 @@ public class ImportRunService {
     }
 
     // Pass 1: insert every primary row with parent_id/basionym_id NULL, remembering (usage, row)
-    // pairs for Pass 2 below.
+    // pairs for Pass 2 below. insertPrimaryUsage returns null (having already recorded its own
+    // ctx.issue) for a row it refuses to insert at all -- e.g. a blank/missing scientificName --
+    // which must NOT enter Pass 2's pending list or ctx.usageIds, so neither Pass 2 nor the
+    // pro-parte re-merge below ever resolve a reference to a usage that doesn't exist.
     record Pending(NameUsage usage, Map<ColdpTerm, String> row) {}
     List<Pending> pending = new ArrayList<>(primaryRows.size());
     for (Map<ColdpTerm, String> row : primaryRows) {
       NameUsage u = insertPrimaryUsage(row, ctx, userId, preserveIds, idScope, nomCode);
-      pending.add(new Pending(u, row));
+      if (u != null) {
+        pending.add(new Pending(u, row));
+      }
+    }
+
+    // Name-ID -> new-usage-id, derived from nameIdToUsageSourceId now that Pass 1 has finished and
+    // ctx.usageIds (source usage id -> new id) is complete. Split-form Name.basionymID is a Name-id,
+    // not a Taxon/Synonym id, so a plain ctx.usageIds lookup for it always misses even for a
+    // perfectly valid archive -- this is the fallback Pass 2 tries next, below.
+    Map<String, Integer> nameIdToUsage = new HashMap<>();
+    for (Map.Entry<String, String> e : nameIdToUsageSourceId.entrySet()) {
+      Integer usageId = ctx.usageIds.get(e.getValue());
+      if (usageId != null) {
+        nameIdToUsage.put(e.getKey(), usageId);
+      }
     }
 
     // Pass 2: every usage now exists, so parent_id/basionym_id (accepted) or a synonym_accepted
     // link (non-accepted) can finally be resolved; a dangling reference is surfaced as an
-    // ImportIssue rather than failing the whole import.
+    // ImportIssue rather than failing the whole import. basionymID additionally falls back to
+    // nameIdToUsage (split form only -- see above); parentID never does, since a split-form
+    // parentID/taxonID is already a Taxon/Synonym id, resolved by ctx.usageIds directly exactly
+    // like the combined form.
     for (Pending p : pending) {
       Map<ColdpTerm, String> row = p.row();
       String rowId = row.get(ColdpTerm.ID);
-      Integer basionymNewId = resolveUsageRef(ctx, row.get(ColdpTerm.basionymID), "basionym", rowId);
+      Integer basionymNewId =
+          resolveUsageRef(ctx, nameIdToUsage, row.get(ColdpTerm.basionymID), "basionym", rowId);
       if (p.usage().getStatus() == Status.ACCEPTED) {
-        Integer parentNewId = resolveUsageRef(ctx, row.get(ColdpTerm.parentID), "parent", rowId);
+        Integer parentNewId = resolveUsageRef(ctx, null, row.get(ColdpTerm.parentID), "parent", rowId);
         usages.updateHierarchy(ctx.projectId, p.usage().getId(), parentNewId, basionymNewId, userId);
       } else {
-        Integer acceptedNewId = resolveUsageRef(ctx, row.get(ColdpTerm.parentID), "parent", rowId);
+        Integer acceptedNewId = resolveUsageRef(ctx, null, row.get(ColdpTerm.parentID), "parent", rowId);
         usages.updateHierarchy(ctx.projectId, p.usage().getId(), null, basionymNewId, userId);
         if (acceptedNewId != null) {
           synonymAccepted.link(ctx.projectId, p.usage().getId(), acceptedNewId, 0);
@@ -440,16 +471,26 @@ public class ImportRunService {
   // Pass 1 for one primary row: allocates the id, builds + parses the NameUsage, inserts it with
   // parent_id/basionym_id left null, upserts taxon_info for an accepted row carrying any of
   // extinct/environment/temporalRange, and records the source-id -> new-id mapping Pass 2 (and any
-  // later task consuming ctx.usageIds) resolves everything else through.
+  // later task consuming ctx.usageIds) resolves everything else through. Returns null (having
+  // already recorded a ctx.issue and inserted NOTHING) for a row this import cannot possibly use --
+  // currently only a blank/missing scientificName, since name_usage.scientific_name is NOT NULL
+  // (V3) and a usage with no name at all is meaningless; the caller must skip such a row rather
+  // than add it to Pass 2's pending list or ctx.usageIds.
   private NameUsage insertPrimaryUsage(Map<ColdpTerm, String> row, ImportContext ctx, int userId,
       boolean preserveIds, String idScope, NomCode nomCode) {
+    String scientificName = row.get(ColdpTerm.scientificName);
+    if (scientificName == null || scientificName.isBlank()) {
+      ctx.issue("name_usage", row.get(ColdpTerm.ID), "skipped: blank scientificName");
+      return null;
+    }
+
     NameUsage u = new NameUsage();
     u.setProjectId(ctx.projectId);
     u.setId(idSeq.allocate(ctx.projectId, NAME_USAGE_ENTITY));
     u.setModifiedBy(userId);
 
     // Inverts NameUsageColdpWriter.nameFields/acceptedRow field-for-field.
-    u.setScientificName(row.get(ColdpTerm.scientificName));
+    u.setScientificName(scientificName);
     u.setAuthorship(row.get(ColdpTerm.authorship));
     u.setRank(row.get(ColdpTerm.rank));
     u.setUninomial(row.get(ColdpTerm.uninomial));
@@ -504,12 +545,34 @@ public class ImportRunService {
 
     // References were already inserted earlier in this same transaction (Task 3, loadReferences),
     // so remapping both the single published-in reference and the taxonomic reference_id[] is safe
-    // right now, well before Pass 2 resolves the self-referencing hierarchy columns.
-    u.setPublishedInReferenceId(ctx.refIds.get(row.get(ColdpTerm.nameReferenceID)));
-    u.setReferenceId(ColdpParse.csvInts(row.get(ColdpTerm.referenceID)).stream()
-        .map(i -> ctx.refIds.get(String.valueOf(i)))
-        .filter(Objects::nonNull)
-        .toList());
+    // right now, well before Pass 2 resolves the self-referencing hierarchy columns. Both the
+    // single nameReferenceID and each entry of the referenceID list are looked up directly in
+    // ctx.refIds (a plain source-id string match, exactly how References were keyed in
+    // loadReferences) and a dangling entry in either is surfaced as a ctx.issue -- symmetric
+    // handling, rather than referenceID silently dropping non-numeric/unmatched ids while
+    // nameReferenceID silently nulled them.
+    String nameRefSrc = row.get(ColdpTerm.nameReferenceID);
+    if (nameRefSrc == null || nameRefSrc.isBlank()) {
+      u.setPublishedInReferenceId(null);
+    } else {
+      Integer nameRefId = ctx.refIds.get(nameRefSrc);
+      if (nameRefId == null) {
+        ctx.issue("name_usage", row.get(ColdpTerm.ID), "nameReferenceID " + nameRefSrc + " not found");
+      }
+      u.setPublishedInReferenceId(nameRefId);
+    }
+    List<Integer> refIdList = new ArrayList<>();
+    for (String refSrc : ColdpParse.csv(row.get(ColdpTerm.referenceID))) {
+      Integer refId = ctx.refIds.get(refSrc);
+      if (refId == null) {
+        ctx.issue("name_usage", row.get(ColdpTerm.ID), "referenceID " + refSrc + " not found");
+      } else {
+        refIdList.add(refId);
+      }
+    }
+    // Empty -> null (not []), matching NameUsageService.create's own convention for a usage with no
+    // taxonomic references; both export as null anyway (NameUsageColdpWriter).
+    u.setReferenceId(refIdList.isEmpty() ? null : refIdList);
 
     // parent_id/basionym_id stay null here -- Pass 2 in loadNameUsages sets them via
     // NameUsageMapper.updateHierarchy once every usage in the archive has been inserted.
@@ -518,6 +581,16 @@ public class ImportRunService {
     // re-derives them (plus sanctioningAuthor -- a known loss) from scientificName/authorship/rank,
     // matching NameUsageService.create's own parse-before-insert order exactly. Never throws.
     parser.parseInto(u, nomCode);
+    // parseInto only ever (re-)sets rank when the parse itself yields one -- see its javadoc and
+    // ParsedNameMapping.applyTo's `if (pn.getRank() != null)` guard -- so an unparsable name
+    // (virus/OTU/BOLD-BIN/placeholder, or simply a blank archive rank column) can leave
+    // u.getRank() null/blank, which would violate name_usage.rank's NOT NULL constraint (V3).
+    // Fall back to the parser's own UNRANKED sentinel, stored in the SAME lower-case form
+    // ParsedNameMapping.applyTo uses on a successful parse (Rank.UNRANKED.name().toLowerCase()),
+    // rather than let one bad archive row abort the entire import with an opaque SQL error.
+    if (u.getRank() == null || u.getRank().isBlank()) {
+      u.setRank("unranked");
+    }
 
     usages.insert(u);
     if (u.getStatus() == Status.ACCEPTED && hasTaxonInfo(u)) {
@@ -536,12 +609,19 @@ public class ImportRunService {
 
   // Pass-2 helper: resolves a row's parentID/basionymID source-id string to the new id Pass 1
   // allocated for it, or issues a dangling-reference ImportIssue and returns null (a bad/missing
-  // reference in the archive is surfaced, never fatal to the rest of the import).
-  private Integer resolveUsageRef(ImportContext ctx, String sourceId, String kind, String rowId) {
+  // reference in the archive is surfaced, never fatal to the rest of the import). `fallback`, when
+  // non-null, is tried only after a plain ctx.usageIds miss -- used for split-form basionymID (see
+  // loadNameUsages' nameIdToUsage); every other caller passes null, so a miss there is always a
+  // genuine dangling reference.
+  private Integer resolveUsageRef(ImportContext ctx, Map<String, Integer> fallback, String sourceId,
+      String kind, String rowId) {
     if (sourceId == null || sourceId.isBlank()) {
       return null;
     }
     Integer newId = ctx.usageIds.get(sourceId);
+    if (newId == null && fallback != null) {
+      newId = fallback.get(sourceId);
+    }
     if (newId == null) {
       ctx.issue("name_usage", rowId, kind + " " + sourceId + " not found");
     }
@@ -579,38 +659,49 @@ public class ImportRunService {
     return row;
   }
 
+  // readSplitFormRows' return: the synthesized combined rows, plus the source Name-ID -> source
+  // Taxon/Synonym-ID side index loadNameUsages needs to resolve a split-form Name.basionymID (see
+  // its nameIdToUsage / Fix-3 comment there) -- Name.basionymID is a Name-id, but ctx.usageIds is
+  // keyed by Taxon/Synonym ids, so that side index is the only way to bridge the two.
+  private record SplitFormRows(List<Map<ColdpTerm, String>> rows, Map<String, String> nameIdToUsageSourceId) {}
+
   // Split-form synthesis (design brief Step 7): the archive has Name+Taxon(+Synonym) instead of a
   // combined NameUsage file. Our model is combined, so every Taxon/Synonym row is joined to its
   // Name (via nameID) into one synthetic combined row under the same USAGE_ROW_TERMS keys
   // readCombinedRows uses -- a Name shared by N usages therefore correctly yields N separate
   // name_usage rows, one per Taxon/Synonym row that references it. A dangling nameID (no matching
-  // Name row) is surfaced as an ImportIssue and that Taxon/Synonym row is skipped.
-  private List<Map<ColdpTerm, String>> readSplitFormRows(ColdpReader reader, ImportContext ctx) {
+  // Name row) is surfaced as an ImportIssue and that Taxon/Synonym row is skipped. Also records,
+  // first-wins, each Name's own ID against the ID of the first Taxon/Synonym row that used it, so
+  // loadNameUsages can later resolve a basionymID that points at a Name rather than a usage.
+  private SplitFormRows readSplitFormRows(ColdpReader reader, ImportContext ctx) {
     Map<String, VerbatimRecord> namesById = new HashMap<>();
     reader.stream(ColdpTerm.Name).forEach(r -> namesById.put(r.get(ColdpTerm.ID), r));
 
     List<Map<ColdpTerm, String>> rows = new ArrayList<>();
+    Map<String, String> nameIdToUsageSourceId = new HashMap<>();
     reader.stream(ColdpTerm.Taxon).forEach(r -> {
-      VerbatimRecord nameRec = namesById.get(r.get(ColdpTerm.nameID));
+      String nameId = r.get(ColdpTerm.nameID);
+      VerbatimRecord nameRec = namesById.get(nameId);
       if (nameRec == null) {
-        ctx.issue("name_usage", r.get(ColdpTerm.ID),
-            "nameID " + r.get(ColdpTerm.nameID) + " not found in Name.tsv");
+        ctx.issue("name_usage", r.get(ColdpTerm.ID), "nameID " + nameId + " not found in Name.tsv");
         return;
       }
+      nameIdToUsageSourceId.putIfAbsent(nameId, r.get(ColdpTerm.ID));
       rows.add(synthesizeUsageRow(nameRec, r, false));
     });
     if (reader.hasSchema(ColdpTerm.Synonym)) {
       reader.stream(ColdpTerm.Synonym).forEach(r -> {
-        VerbatimRecord nameRec = namesById.get(r.get(ColdpTerm.nameID));
+        String nameId = r.get(ColdpTerm.nameID);
+        VerbatimRecord nameRec = namesById.get(nameId);
         if (nameRec == null) {
-          ctx.issue("name_usage", r.get(ColdpTerm.ID),
-              "nameID " + r.get(ColdpTerm.nameID) + " not found in Name.tsv");
+          ctx.issue("name_usage", r.get(ColdpTerm.ID), "nameID " + nameId + " not found in Name.tsv");
           return;
         }
+        nameIdToUsageSourceId.putIfAbsent(nameId, r.get(ColdpTerm.ID));
         rows.add(synthesizeUsageRow(nameRec, r, true));
       });
     }
-    return rows;
+    return new SplitFormRows(rows, nameIdToUsageSourceId);
   }
 
   // Joins one Name row with the Taxon/Synonym row using it: name-level columns come from `nameRec`

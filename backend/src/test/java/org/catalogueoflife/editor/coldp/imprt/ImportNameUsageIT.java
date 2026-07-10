@@ -249,4 +249,99 @@ class ImportNameUsageIT extends AbstractPostgresIT {
     return all.stream().filter(u -> scientificName.equals(u.getScientificName())).findFirst()
         .orElseThrow(() -> new AssertionError("no usage found for scientificName=" + scientificName));
   }
+
+  // Review-fix coverage (per-row degrade, not whole-import abort): a row with a blank
+  // scientificName (row "1") must be skipped -- ctx.issue, not inserted, not counted -- while a
+  // row with a non-blank but UNPARSABLE scientificName and a blank rank (row "2", "BOLD:AAA0001",
+  // the same known-unparsable fixture NameParserServiceTest uses) must still insert, with rank
+  // defaulted to "unranked" rather than left null (which would violate name_usage.rank's NOT NULL
+  // constraint -- see NameParserService.parseInto's javadoc: an UnparsableNameException leaves
+  // rank untouched). Rows "3"/"4" carry, respectively, a referenceID list with one real id and one
+  // dangling id, and a dangling single nameReferenceID -- both must surface a ctx.issue while the
+  // rest of the row still imports (referenceID's resolved half still applied, nameReferenceID left
+  // null). All four rows live in ONE archive specifically to prove a bad row never aborts the
+  // others.
+  private byte[] buildBadRowsArchive(Path dir) throws IOException {
+    ColdpMetadata.write(dir, new ColdpMetadataDto("Bad Rows Checklist", null, null, null, null, null));
+
+    Map<ColdpTerm, String> ref1 = row(ColdpTerm.ID, "1", ColdpTerm.citation, "Real Citation");
+    ColdpTsv.writeFile(dir, ColdpTerm.Reference, List.of(ref1));
+
+    Map<ColdpTerm, String> blankName = row(
+        ColdpTerm.ID, "1", ColdpTerm.rank, "species", ColdpTerm.status, "accepted",
+        ColdpTerm.code, "zoological");
+    Map<ColdpTerm, String> unparsableNoRank = row(
+        ColdpTerm.ID, "2", ColdpTerm.scientificName, "BOLD:AAA0001", ColdpTerm.status, "accepted",
+        ColdpTerm.code, "zoological");
+    Map<ColdpTerm, String> danglingReferenceIdList = row(
+        ColdpTerm.ID, "3", ColdpTerm.scientificName, "Test normalus", ColdpTerm.rank, "species",
+        ColdpTerm.status, "accepted", ColdpTerm.referenceID, "1,999", ColdpTerm.code, "zoological");
+    Map<ColdpTerm, String> danglingNameReferenceId = row(
+        ColdpTerm.ID, "4", ColdpTerm.scientificName, "Test normalus secundus", ColdpTerm.rank, "species",
+        ColdpTerm.status, "accepted", ColdpTerm.nameReferenceID, "888", ColdpTerm.code, "zoological");
+
+    ColdpTsv.writeFile(dir, ColdpTerm.NameUsage, List.of(
+        blankName, unparsableNoRank, danglingReferenceIdList, danglingNameReferenceId));
+
+    Path zip = dir.resolveSibling(dir.getFileName() + ".zip");
+    ColdpZip.zipFolder(dir, zip);
+    return Files.readAllBytes(zip);
+  }
+
+  @Test
+  @WithMockUser(username = "importBadRowsOwner")
+  void skipsBlankNameRowAndDefaultsUnparsableRankWhileSurfacingDanglingReferenceIssues(@TempDir Path tmp)
+      throws Exception {
+    ensureUser("importBadRowsOwner");
+
+    Path dir = tmp.resolve("archive");
+    Files.createDirectories(dir);
+    byte[] zipBytes = buildBadRowsArchive(dir);
+    MockMultipartFile file = new MockMultipartFile("file", "badrows.zip", "application/zip", zipBytes);
+
+    String startBody = mvc.perform(multipart("/api/projects/import").file(file).with(csrf()))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    long runId = json.readTree(startBody).get("id").asLong();
+
+    JsonNode done = pollUntilTerminal(runId);
+    assertThat(done.get("status").asString()).isEqualTo("DONE");
+    assertThat(done.get("error").isNull()).isTrue();
+    int projectId = done.get("projectId").asInt();
+
+    // 4 archive rows minus the 1 blank-scientificName row that's skipped entirely.
+    assertThat(done.get("nameUsageCount").asInt()).isEqualTo(3);
+    List<NameUsage> all = usages.findAllByProject(projectId);
+    assertThat(all).hasSize(3);
+    assertThat(all.stream().anyMatch(u -> u.getScientificName() == null || u.getScientificName().isBlank()))
+        .as("no usage was ever inserted for the blank-scientificName row").isFalse();
+
+    JsonNode issues = done.get("issues");
+    assertThat(issues).isNotNull();
+    assertThat(issues.isArray()).isTrue();
+    List<String[]> issuePairs = new java.util.ArrayList<>(); // [sourceId, message]
+    for (JsonNode issue : issues) {
+      issuePairs.add(new String[] {issue.get("sourceId").asString(), issue.get("message").asString()});
+    }
+
+    // Row "1": skipped with an issue, never inserted, never counted.
+    assertThat(issuePairs).anyMatch(p -> p[0].equals("1") && p[1].contains("blank") && p[1].contains("scientificName"));
+
+    // Row "2": unparsable name, blank archive rank -> still inserted, rank defaulted to "unranked".
+    NameUsage unparsable = byName(all, "BOLD:AAA0001");
+    assertThat(unparsable.getRank()).isEqualTo("unranked");
+
+    // Row "3": referenceID="1,999" -> the real ref (1) resolved, the dangling one (999) surfaced
+    // as an issue and simply dropped (not a crash, not the whole row skipped).
+    NameUsage normalus = byName(all, "Test normalus");
+    List<Reference> refs = references.findAllByProject(projectId);
+    Reference ref1 = refs.stream().filter(r -> "Real Citation".equals(r.getCitation())).findFirst().orElseThrow();
+    assertThat(normalus.getReferenceId()).containsExactly(ref1.getId());
+    assertThat(issuePairs).anyMatch(p -> p[0].equals("3") && p[1].contains("999"));
+
+    // Row "4": dangling single nameReferenceID -> left null (not silently ignored -- surfaced too).
+    NameUsage normalusSecundus = byName(all, "Test normalus secundus");
+    assertThat(normalusSecundus.getPublishedInReferenceId()).isNull();
+    assertThat(issuePairs).anyMatch(p -> p[0].equals("4") && p[1].contains("888"));
+  }
 }
