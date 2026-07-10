@@ -66,6 +66,20 @@ public interface NameUsageMapper {
   })
   NameUsage findByIdInProject(@Param("projectId") int projectId, @Param("id") int id);
 
+  // The same full-row projection findByIdInProject uses (including the taxon_info LEFT JOIN), but
+  // for every usage in the project rather than a single id, id-ordered for a stable/deterministic
+  // file -- ColDP export's NameUsage.tsv source (coldp/export/NameUsageColdpWriter.write).
+  @Select("""
+      SELECT nu.*, ti.extinct, ti.environment,
+             ti.temporal_range_start, ti.temporal_range_end
+      FROM name_usage nu
+      LEFT JOIN taxon_info ti ON ti.project_id = nu.project_id AND ti.usage_id = nu.id
+      WHERE nu.project_id = #{projectId}
+      ORDER BY nu.id
+      """)
+  @ResultMap("nameUsageResult")
+  List<NameUsage> findAllByProject(@Param("projectId") int projectId);
+
   // Unified list/search: q/rank/status are each optional (null -> unfiltered), ANDed together.
   // q is the existing pg_trgm fuzzy filter (scientific_name % q); rank/status are exact matches
   // against their STORED string form (rank: the name-parser Rank's lower-cased name(); status:

@@ -49,6 +49,19 @@ public interface SynonymAcceptedMapper {
       """)
   List<Integer> findSynonymsOf(@Param("projectId") int projectId, @Param("acceptedId") int acceptedId);
 
+  // Every (synonym_id, accepted_id) link in the project, ordered by synonym_id then accepted_id --
+  // coldp/export/NameUsageColdpWriter groups these per synonym (ascending by acceptedId, the
+  // group's natural order here) to place the primary NameUsage.tsv row on the lowest accepted id
+  // and derive a "<synonymId>-<acceptedId>" row for each additional pro-parte target, without an
+  // N+1 per-synonym findAcceptedFor call. Record properties are matched to columns by MyBatis's
+  // automatic record support (map-underscore-to-camel-case), same as name/dto/RankName.
+  @Select("""
+      SELECT synonym_id, accepted_id FROM synonym_accepted
+      WHERE project_id = #{projectId}
+      ORDER BY synonym_id, accepted_id
+      """)
+  List<SynAccLink> findAllLinks(@Param("projectId") int projectId);
+
   // How many accepted usages a synonym is linked to -- validation/rules/SynonymWithoutAcceptedRule
   // fires when this is 0 for a SYNONYM/MISAPPLIED usage (see RuleContext.synonymAcceptedCount()).
   @Select("""
