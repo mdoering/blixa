@@ -16,4 +16,6 @@ public record TypeMaterialRequest(
     Integer referenceId,
     String link,
     String remarks,
+    Double latitude,
+    Double longitude,
     Integer version) {}

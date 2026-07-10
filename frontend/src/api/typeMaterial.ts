@@ -16,6 +16,8 @@ export interface TypeMaterial {
   referenceId: number | null;
   link: string | null;
   remarks: string | null;
+  latitude: number | null;
+  longitude: number | null;
   version: number;
 }
 

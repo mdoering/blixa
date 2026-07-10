@@ -56,11 +56,14 @@ class TypeMaterialIT extends AbstractPostgresIT {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"citation\":\"BMNH 1901.1.1\",\"status\":\"holotype\","
                 + "\"institutionCode\":\"BMNH\",\"occurrenceId\":\"gbif:12345\","
-                + "\"country\":\"GB\",\"date\":\"1901-01-01\"}"))
+                + "\"country\":\"GB\",\"date\":\"1901-01-01\","
+                + "\"latitude\":-0.5,\"longitude\":36.8}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.status").value("holotype"))
         .andExpect(jsonPath("$.occurrenceId").value("gbif:12345"))
         .andExpect(jsonPath("$.date").value("1901-01-01"))
+        .andExpect(jsonPath("$.latitude").value(-0.5))
+        .andExpect(jsonPath("$.longitude").value(36.8))
         .andReturn().getResponse().getContentAsString();
     long tmId = json.readTree(body).get("id").asLong();
     int version = json.readTree(body).get("version").asInt();

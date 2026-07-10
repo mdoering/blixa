@@ -16,7 +16,8 @@ public interface TypeMaterialMapper {
   // "date" is quoted: it is a keyword in SQL, though non-reserved in Postgres.
   String SELECT = """
       SELECT id, usage_id, citation, status, institution_code, catalog_number, occurrence_id,
-             locality, country, collector, "date", sex, reference_id, link, remarks, version
+             locality, country, collector, "date", sex, reference_id, link, remarks,
+             latitude, longitude, version
       FROM type_material
       """;
 
@@ -29,10 +30,11 @@ public interface TypeMaterialMapper {
   @Insert("""
       INSERT INTO type_material (project_id, id, usage_id, citation, status, institution_code,
           catalog_number, occurrence_id, locality, country, collector, "date", sex, reference_id,
-          link, remarks, modified_by)
+          link, remarks, latitude, longitude, modified_by)
       VALUES (#{projectId}, #{id}, #{usageId}, #{r.citation}, #{r.status}, #{r.institutionCode},
           #{r.catalogNumber}, #{r.occurrenceId}, #{r.locality}, #{r.country}, #{r.collector},
-          #{r.date}, #{r.sex}, #{r.referenceId}, #{r.link}, #{r.remarks}, #{modifiedBy})
+          #{r.date}, #{r.sex}, #{r.referenceId}, #{r.link}, #{r.remarks}, #{r.latitude}, #{r.longitude},
+          #{modifiedBy})
       """)
   void insert(@Param("projectId") int projectId, @Param("id") int id, @Param("usageId") int usageId,
       @Param("r") TypeMaterialRequest r, @Param("modifiedBy") int modifiedBy);
@@ -43,6 +45,7 @@ public interface TypeMaterialMapper {
           occurrence_id = #{r.occurrenceId}, locality = #{r.locality}, country = #{r.country},
           collector = #{r.collector}, "date" = #{r.date}, sex = #{r.sex},
           reference_id = #{r.referenceId}, link = #{r.link}, remarks = #{r.remarks},
+          latitude = #{r.latitude}, longitude = #{r.longitude},
           modified = now(), modified_by = #{modifiedBy}, version = version + 1
       WHERE project_id = #{projectId} AND id = #{id} AND version = #{r.version}
       """)

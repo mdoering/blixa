@@ -63,6 +63,8 @@ export default function TypeMaterialTab({
       span: 8,
     },
     { name: 'link', label: 'Link', span: 4 },
+    { name: 'latitude', label: 'Latitude', type: 'number', span: 3 },
+    { name: 'longitude', label: 'Longitude', type: 'number', span: 3 },
     { name: 'remarks', label: 'Remarks', type: 'textarea', span: 12 },
   ];
 
@@ -95,6 +97,8 @@ export default function TypeMaterialTab({
         sex: r.sex ?? '',
         referenceId: r.referenceId ? String(r.referenceId) : '',
         link: r.link ?? '',
+        latitude: r.latitude == null ? '' : String(r.latitude),
+        longitude: r.longitude == null ? '' : String(r.longitude),
         remarks: r.remarks ?? '',
       })}
       describe={(r) => `Delete the ${r.status ?? ''} type material ${r.citation ?? ''}.`}
