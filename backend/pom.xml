@@ -111,7 +111,7 @@
     <dependency>
       <groupId>org.catalogueoflife</groupId>
       <artifactId>vocab</artifactId>
-      <version>1.2.3-SNAPSHOT</version>
+      <version>1.3.0-SNAPSHOT</version>
     </dependency>
     <!-- ColDP io (ColdpTerm, ColdpReader, TabWriter); pulls in the CLB `api` module
          (Jackson 2 `com.fasterxml`, guava, commons, httpclient5, mapdb, kryo, fastutil) -
@@ -119,7 +119,7 @@
     <dependency>
       <groupId>org.catalogueoflife</groupId>
       <artifactId>reader</artifactId>
-      <version>1.2.3-SNAPSHOT</version>
+      <version>1.3.0-SNAPSHOT</version>
       <exclusions>
         <!-- test engines / logging brought transitively; Spring Boot manages logback + JUnit 5 already -->
         <exclusion><groupId>org.junit.vintage</groupId><artifactId>junit-vintage-engine</artifactId></exclusion>
