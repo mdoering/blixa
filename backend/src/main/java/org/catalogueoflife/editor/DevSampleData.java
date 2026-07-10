@@ -149,7 +149,6 @@ public class DevSampleData implements ApplicationRunner {
         null,  // environment
         null,  // temporalRangeStart
         null,  // temporalRangeEnd
-        null,  // link
         null)); // remarks
   }
 }
