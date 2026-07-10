@@ -224,7 +224,7 @@ test(
     await userEvent.click(screen.getByRole('button', { name: 'Match all identifiers' }));
 
     // RUNNING: a progress indicator over the mocked 1-of-2 poll response.
-    await waitFor(() => expect(screen.getByText(/Matching usage 1 of 2/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Matched 1 of 2/)).toBeInTheDocument());
 
     // DONE: the final per-outcome summary + the Issues-view pointer. Generous timeout: the mocked
     // RUNNING -> DONE transition above only surfaces after one COL_MATCH_POLL_MS refetchInterval
@@ -373,7 +373,7 @@ test('a RUNNING latest run disables the button and resumes the progress display 
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
-  await waitFor(() => expect(screen.getByText(/Matching usage 1 of 4/)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/Matched 1 of 4/)).toBeInTheDocument());
   expect(screen.getByRole('button', { name: 'Match all identifiers' })).toBeDisabled();
 });
 

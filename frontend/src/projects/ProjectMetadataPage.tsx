@@ -292,7 +292,7 @@ export default function ProjectMetadataPage() {
                 animated
               />
               <Text size="sm" c="dimmed">
-                Matching usage {matchRun.processed} of {matchRun.total}…
+                Matched {matchRun.processed} of {matchRun.total}…
               </Text>
             </Stack>
           )}

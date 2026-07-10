@@ -186,7 +186,10 @@ public class ColMatchJobService {
         code, classification);
     String matched = bestColId(root);
 
-    String scopeKey = scope.scope();
+    // Lower-case the scope for the rule keys so they match the CURIE prefix casing (scopedIdFrom /
+    // mergeScopedId lower-case it too) -- a project configuring `IPNI` stores `ipni:<id>` and
+    // `ipni_id_*` flags consistently, not `IPNI_id_*`.
+    String scopeKey = scope.scope().toLowerCase(Locale.ROOT);
     String addedRule = scopeKey + "_id_added";
     String updatedRule = scopeKey + "_id_updated";
     String missingRule = scopeKey + "_id_missing";
@@ -304,6 +307,10 @@ public class ColMatchJobService {
       return List.of();
     }
     return project.getIdentifierScopes().stream()
+        // A blank/absent scope name can only arrive via a direct API POST (the UI drops blank-scope
+        // rows); guard it here too so a `{datasetKey}`-only entry can't become "matchable" and then
+        // NPE in mergeScopedId / write a `:<id>` CURIE and `null_id_*` flags.
+        .filter(s -> s.scope() != null && !s.scope().isBlank())
         .filter(s -> s.datasetKey() != null && !s.datasetKey().isBlank())
         .toList();
   }
