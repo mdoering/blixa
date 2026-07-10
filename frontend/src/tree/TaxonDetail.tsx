@@ -23,6 +23,7 @@ import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import EntitySelect from '../child/EntitySelect';
 import NameRelationsTab, { referenceOptions } from '../child/NameRelationsTab';
 import { colIdFrom, scopedId, withScopedId } from '../child/map/mapUrls';
+import ReferencesTab from '../child/ReferencesTab';
 import TypeMaterialTab from '../child/TypeMaterialTab';
 import {
   DistributionTab,
@@ -239,6 +240,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
           <Tabs.Tab value="details">Details</Tabs.Tab>
           <Tabs.Tab value="names">Names</Tabs.Tab>
           <Tabs.Tab value="types">Types</Tabs.Tab>
+          <Tabs.Tab value="references">References</Tabs.Tab>
           {isAccepted && <Tabs.Tab value="vernaculars">Vernaculars</Tabs.Tab>}
           {isAccepted && <Tabs.Tab value="distribution">Distribution</Tabs.Tab>}
           {isAccepted && <Tabs.Tab value="media">Media</Tabs.Tab>}
@@ -330,6 +332,16 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
 
         <Tabs.Panel value="types" pt="md">
           <TypeMaterialTab pid={pid} usageId={usageId} canEdit={canEdit} />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="references" pt="md">
+          <ReferencesTab
+            pid={pid}
+            usageId={usageId}
+            referenceIds={usage.referenceId ?? []}
+            version={usage.version}
+            canEdit={canEdit}
+          />
         </Tabs.Panel>
 
         {isAccepted && (

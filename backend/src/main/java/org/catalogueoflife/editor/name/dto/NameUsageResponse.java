@@ -17,6 +17,7 @@ public record NameUsageResponse(
     List<String> alternativeId,
     String status,
     String namePhrase,
+    List<Integer> referenceId,
     Boolean extinct,
     List<String> environment,
     String temporalRangeStart,
@@ -56,7 +57,7 @@ public record NameUsageResponse(
   public static NameUsageResponse of(NameUsage u, String formattedName, List<Integer> acceptedParentIds,
       List<Integer> synonymIds) {
     return new NameUsageResponse(u.getId(), u.getParentId(), u.getAlternativeId(), name(u.getStatus()),
-        u.getNamePhrase(),
+        u.getNamePhrase(), u.getReferenceId(),
         u.getExtinct(), names(u.getEnvironment()), u.getTemporalRangeStart(), u.getTemporalRangeEnd(),
         u.getScientificName(), u.getAuthorship(), u.getRank(), u.getUninomial(),
         u.getGenus(), u.getInfragenericEpithet(), u.getSpecificEpithet(), u.getInfraspecificEpithet(),

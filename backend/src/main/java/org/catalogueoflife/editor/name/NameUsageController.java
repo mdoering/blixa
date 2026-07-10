@@ -8,8 +8,10 @@ import org.catalogueoflife.editor.name.dto.DemoteRequest;
 import org.catalogueoflife.editor.name.dto.IdentifiersRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.name.dto.PromoteRequest;
+import org.catalogueoflife.editor.name.dto.ReferenceIdsRequest;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.UsagePage;
+import org.catalogueoflife.editor.name.dto.WebReferenceRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -72,6 +74,26 @@ public class NameUsageController {
       @Valid @RequestBody IdentifiersRequest req) {
     int uid = currentUser.require().getId();
     return service.setIdentifiers(uid, pid, id, req);
+  }
+
+  // Full replace of reference_id (the usage's taxonomic references), optimistic-locked
+  // (NameUsageService.setReferences) -- the References tab's "add/remove existing reference"
+  // write path.
+  @PutMapping("/{id}/references")
+  public NameUsageResponse setReferences(@PathVariable int pid, @PathVariable int id,
+      @Valid @RequestBody ReferenceIdsRequest req) {
+    int uid = currentUser.require().getId();
+    return service.setReferences(uid, pid, id, req);
+  }
+
+  // Creates a type=webpage Reference from a URL (server-side title fetch, SSRF-guarded -- see
+  // WebPageClient) and appends it to the usage's reference_id[] (NameUsageService.addWebReference).
+  // Returns the updated usage.
+  @PostMapping("/{id}/web-reference")
+  public NameUsageResponse addWebReference(@PathVariable int pid, @PathVariable int id,
+      @Valid @RequestBody WebReferenceRequest req) {
+    int uid = currentUser.require().getId();
+    return service.addWebReference(uid, pid, id, req.url());
   }
 
   @GetMapping("/{id}/synonyms")

@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test } from 'vitest';
 import { renderWithProviders } from '../test/utils';
@@ -16,6 +16,7 @@ function baseUsage(overrides: Partial<Record<string, unknown>> = {}) {
     parentId: 1,
     status: 'ACCEPTED',
     namePhrase: null,
+    referenceId: null,
     extinct: null,
     environment: null,
     temporalRangeStart: null,
@@ -300,6 +301,125 @@ test('the Types tab lists a holotype with its institution and occurrenceID', asy
   // Citation column + Institution column ("BMNH 1901.1.1") both render this text.
   expect(screen.getAllByText('BMNH 1901.1.1').length).toBeGreaterThanOrEqual(1);
   expect(screen.getByText('GB')).toBeInTheDocument();
+});
+
+test('the References tab lists the usage\'s references, a citation and a webpage title with a web badge/link', async () => {
+  mockCommon(baseUsage({ referenceId: [7, 9] }));
+  server.use(
+    http.get('/api/projects/4/references', () =>
+      HttpResponse.json([
+        { id: 7, citation: 'Mill. 1768, Gardeners Dictionary', title: null, type: null, link: null, version: 0 },
+        { id: 9, citation: null, title: 'Example Page', type: 'webpage', link: 'https://example.org/page', version: 0 },
+      ]),
+    ),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await screen.findByLabelText('Scientific name');
+  await userEvent.click(screen.getByRole('tab', { name: /references/i }));
+  // getAllByText, not getByText: the "Add existing reference" EntitySelect's hidden options
+  // listbox renders the same reference labels elsewhere in the DOM (see the published-in
+  // reference picker test's note on this same Mantine Select behavior).
+  await waitFor(() =>
+    expect(screen.getAllByText('Mill. 1768, Gardeners Dictionary').length).toBeGreaterThanOrEqual(1),
+  );
+  expect(screen.getAllByText('Example Page').length).toBeGreaterThanOrEqual(1);
+  expect(screen.getByText('web')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /Example Page/ })).toHaveAttribute(
+    'href',
+    'https://example.org/page',
+  );
+});
+
+test('adding an existing reference on the References tab PUTs the updated id list', async () => {
+  mockCommon(baseUsage({ referenceId: [7], version: 3 }));
+  server.use(
+    http.get('/api/projects/4/references', () =>
+      HttpResponse.json([
+        { id: 7, citation: 'Mill. 1768', title: null, type: null, link: null, version: 0 },
+        { id: 11, citation: null, title: 'New Reference', type: null, link: null, version: 0 },
+      ]),
+    ),
+  );
+  let putBody: Record<string, unknown> | undefined;
+  server.use(
+    http.put('/api/projects/4/usages/10/references', async ({ request }) => {
+      putBody = (await request.json()) as Record<string, unknown>;
+      return HttpResponse.json(baseUsage({ referenceId: [7, 11], version: 4 }));
+    }),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await screen.findByLabelText('Scientific name');
+  await userEvent.click(screen.getByRole('tab', { name: /references/i }));
+  await waitFor(() => expect(screen.getAllByText('Mill. 1768').length).toBeGreaterThanOrEqual(1));
+
+  const picker = await screen.findByRole('textbox', { name: 'Add existing reference' });
+  await userEvent.click(picker);
+  await userEvent.click(await screen.findByText('New Reference'));
+  // Two "Add" buttons on this tab (existing-reference / web-URL) -- the first is this one's.
+  await userEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]);
+
+  await waitFor(() => expect(putBody).toBeDefined());
+  expect(putBody?.referenceIds).toEqual([7, 11]);
+  expect(putBody?.version).toBe(3);
+});
+
+test('adding a web URL on the References tab POSTs to web-reference', async () => {
+  mockCommon(baseUsage({ referenceId: [] }));
+  let postBody: Record<string, unknown> | undefined;
+  let posted = false;
+  server.use(
+    http.post('/api/projects/4/usages/10/web-reference', async ({ request }) => {
+      postBody = (await request.json()) as Record<string, unknown>;
+      posted = true;
+      return HttpResponse.json(baseUsage({ referenceId: [20], version: 2 }));
+    }),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await screen.findByLabelText('Scientific name');
+  await userEvent.click(screen.getByRole('tab', { name: /references/i }));
+
+  const urlInput = await screen.findByLabelText('Add web URL');
+  await userEvent.type(urlInput, 'https://example.org/new-page');
+  // Two "Add" buttons on this tab (existing-reference / web-URL) -- the second is this one's.
+  await userEvent.click(screen.getAllByRole('button', { name: 'Add' })[1]);
+
+  await waitFor(() => expect(posted).toBe(true));
+  expect(postBody?.url).toBe('https://example.org/new-page');
+});
+
+test('removing a reference on the References tab PUTs the id list without it', async () => {
+  mockCommon(baseUsage({ referenceId: [7, 9], version: 5 }));
+  server.use(
+    http.get('/api/projects/4/references', () =>
+      HttpResponse.json([
+        { id: 7, citation: 'Mill. 1768', title: null, type: null, link: null, version: 0 },
+        { id: 9, citation: null, title: 'Example Page', type: 'webpage', link: 'https://example.org/page', version: 0 },
+      ]),
+    ),
+  );
+  let putBody: Record<string, unknown> | undefined;
+  server.use(
+    http.put('/api/projects/4/usages/10/references', async ({ request }) => {
+      putBody = (await request.json()) as Record<string, unknown>;
+      return HttpResponse.json(baseUsage({ referenceId: [9], version: 6 }));
+    }),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await screen.findByLabelText('Scientific name');
+  await userEvent.click(screen.getByRole('tab', { name: /references/i }));
+  await waitFor(() => expect(screen.getAllByText('Mill. 1768').length).toBeGreaterThanOrEqual(1));
+
+  await userEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+  const dialog = await screen.findByRole('dialog');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+  await waitFor(() => expect(putBody).toBeDefined());
+  expect(putBody?.referenceIds).toEqual([9]);
+  expect(putBody?.version).toBe(5);
 });
 
 test('the Vernaculars tab (accepted only) lists a vernacular name', async () => {

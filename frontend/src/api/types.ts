@@ -71,6 +71,7 @@ export interface NameUsage {
   alternativeId?: string[];
   status: string | null;
   namePhrase: string | null;
+  referenceId: number[] | null;
   extinct: boolean | null;
   environment: string[] | null;
   temporalRangeStart: string | null;

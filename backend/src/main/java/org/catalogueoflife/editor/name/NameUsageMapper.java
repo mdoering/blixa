@@ -306,4 +306,19 @@ public interface NameUsageMapper {
   int updateAlternativeId(@Param("projectId") int projectId, @Param("id") int id,
       @Param("alternativeId") List<String> alternativeId,
       @Param("modifiedBy") int modifiedBy, @Param("version") Integer version);
+
+  // Narrow CAS write of just reference_id (PUT /usages/{id}/references and the web-reference
+  // append, see NameUsageService.setReferences/addWebReference): the References tab's write
+  // path, kept separate from update() so editing a usage's taxonomic references doesn't require
+  // touching (or re-parsing) any of its name/nomenclatural fields. Same INTEGER[] binding as
+  // insert()/update() above. Bumps version/modified like every other name_usage write; 0 rows
+  // updated -> caller treats as a stale-version 409.
+  @Update("""
+      UPDATE name_usage SET reference_id = #{referenceIds,typeHandler=org.catalogueoflife.editor.name.IntegerArrayTypeHandler},
+          modified = now(), modified_by = #{modifiedBy}, version = version + 1
+      WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}
+      """)
+  int updateReferenceIds(@Param("projectId") int projectId, @Param("id") int id,
+      @Param("referenceIds") List<Integer> referenceIds,
+      @Param("modifiedBy") int modifiedBy, @Param("version") Integer version);
 }

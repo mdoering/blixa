@@ -11,10 +11,12 @@ import life.catalogue.api.vocab.NomStatus;
 import org.catalogueoflife.editor.audit.AuditService;
 import org.catalogueoflife.editor.audit.Operation;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
+import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.catalogueoflife.editor.name.dto.DemoteRequest;
 import org.catalogueoflife.editor.name.dto.IdentifiersRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.name.dto.PromoteRequest;
+import org.catalogueoflife.editor.name.dto.ReferenceIdsRequest;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.UsagePage;
 import org.catalogueoflife.editor.parse.NameParserService;
@@ -52,11 +54,15 @@ public class NameUsageService {
   private final IssueMapper issues;
   private final TaxonInfoMapper taxonInfo;
   private final org.catalogueoflife.editor.child.TaxonChildMapper taxonChildren;
+  private final ReferenceMapper references;
+  private final ReferenceService referenceService;
+  private final WebPageClient webPageClient;
 
   public NameUsageService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted, IdSeqMapper idSeq,
       ProjectService projects, ProjectMapper projectMapper, NameParserService parser, TreeMapper tree,
       AuditService audit, ObjectMapper objectMapper, ApplicationEventPublisher events, IssueMapper issues,
-      TaxonInfoMapper taxonInfo, org.catalogueoflife.editor.child.TaxonChildMapper taxonChildren) {
+      TaxonInfoMapper taxonInfo, org.catalogueoflife.editor.child.TaxonChildMapper taxonChildren,
+      ReferenceMapper references, ReferenceService referenceService, WebPageClient webPageClient) {
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
     this.idSeq = idSeq;
@@ -70,6 +76,9 @@ public class NameUsageService {
     this.issues = issues;
     this.taxonInfo = taxonInfo;
     this.taxonChildren = taxonChildren;
+    this.references = references;
+    this.referenceService = referenceService;
+    this.webPageClient = webPageClient;
   }
 
   // Unified list/search backing GET /usages: q/rank/status are each optional and ANDed together
@@ -259,6 +268,74 @@ public class NameUsageService {
     audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
     events.publishEvent(ValidationEvent.forUsage(projectId, id));
     return toResponse(after, project);
+  }
+
+  // Narrow write of just reference_id (PUT /usages/{id}/references): a full replace of the
+  // taxonomic-references field, not a merge -- the caller must send back any ids it wants to
+  // keep. Each id must resolve to a reference in THIS project (a foreign-project or nonexistent
+  // id -> 400) before the CAS write is attempted, mirroring requireValidParent's cross-project
+  // integrity guard for parentId. Also the write path addWebReference (below) reuses to append
+  // its newly-created reference's id.
+  @Transactional
+  public NameUsageResponse setReferences(int userId, int projectId, int id, ReferenceIdsRequest req) {
+    requireEditor(userId, projectId);
+    Project project = requireProject(projectId);
+    NameUsage before = requireInProject(projectId, id);
+    var ids = req.referenceIds() == null ? List.<Integer>of() : req.referenceIds();
+    for (int refId : ids) {
+      requireReferenceInProject(projectId, refId);
+    }
+    if (usages.updateReferenceIds(projectId, id, ids, userId, req.version()) == 0) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
+    }
+    NameUsage after = requireInProject(projectId, id);
+    audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
+    events.publishEvent(ValidationEvent.forUsage(projectId, id));
+    return toResponse(after, project);
+  }
+
+  // POST /usages/{id}/web-reference: creates a new type=webpage Reference from `url` (server-side
+  // title fetch via WebPageClient, SSRF-guarded -- see that class; falls back to the raw URL when
+  // no title is found or the fetch fails) via the same reference-create path the References tab's
+  // "new reference" form uses (ReferenceService.create), then appends its id to this usage's
+  // reference_id[] via the CAS write above. Reads the usage fresh for its CURRENT version so this
+  // works regardless of what version the caller's stale form state thinks it's on (a plain add,
+  // not a client-supplied optimistic-locked replace) -- the tab's separate "add existing
+  // reference" action goes through setReferences directly and does carry the client's version.
+  @Transactional
+  public NameUsageResponse addWebReference(int userId, int projectId, int usageId, String url) {
+    requireEditor(userId, projectId);
+    NameUsage before = requireInProject(projectId, usageId);
+    String title = webPageClient.fetchTitle(url);
+    CreateReferenceRequest refReq = new CreateReferenceRequest(
+        null, "webpage", hostOf(url), null, title != null ? title : url, null, null, null, null,
+        null, null, null, null, null, url, java.time.LocalDate.now().toString(), null);
+    Reference ref = referenceService.create(userId, projectId, refReq);
+    var ids = new java.util.ArrayList<Integer>(
+        before.getReferenceId() == null ? List.of() : before.getReferenceId());
+    ids.add(ref.getId());
+    return setReferences(userId, projectId, usageId, new ReferenceIdsRequest(ids, before.getVersion()));
+  }
+
+  // The URL's host, for the web-reference's author field (a plain literal string, not a
+  // structured Person -- see Reference.author), or null if the URL can't be parsed as a URI (it
+  // already passed WebPageClient's own validation to get here, but this is defensive/best-effort
+  // display only, not a security check).
+  private static String hostOf(String url) {
+    try {
+      return new java.net.URI(url).getHost();
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  // App-layer cross-project integrity guard for reference_id[] entries (setReferences): every id
+  // the caller sends must resolve to a reference in THIS project, mirroring requireValidParent's
+  // guard for parentId and requireUsage-style guards elsewhere in the codebase.
+  private void requireReferenceInProject(int projectId, int refId) {
+    if (references.findByIdInProject(projectId, refId) == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reference not in project: " + refId);
+    }
   }
 
   // Replaces any existing col: entry (case-insensitive on the prefix) in `ids` with `colId`

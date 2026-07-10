@@ -126,3 +126,28 @@ export function updateIdentifiers(
     json: { alternativeId, version },
   });
 }
+
+// Full replace of reference_id (the usage's taxonomic references), optimistic-locked (backend
+// NameUsageService.setReferences) -- the References tab's add-existing/remove write path. Not a
+// partial patch: callers must carry over any existing ids they want to keep.
+export function setUsageReferences(
+  pid: number,
+  id: number,
+  referenceIds: number[],
+  version: number,
+): Promise<NameUsage> {
+  return api<NameUsage>(`/api/projects/${pid}/usages/${id}/references`, {
+    method: 'PUT',
+    json: { referenceIds, version },
+  });
+}
+
+// Creates a type=webpage reference from a URL (server-side title fetch, SSRF-guarded on the
+// backend) and appends it to the usage's reference_id[] (backend NameUsageService.addWebReference).
+// Returns the updated usage.
+export function addWebReference(pid: number, id: number, url: string): Promise<NameUsage> {
+  return api<NameUsage>(`/api/projects/${pid}/usages/${id}/web-reference`, {
+    method: 'POST',
+    json: { url },
+  });
+}
