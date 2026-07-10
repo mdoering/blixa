@@ -16,11 +16,11 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { getProject, updateMetadata } from '../api/projects';
-import { getColMatchRun, startColMatch } from '../api/col';
+import { getColMatchRun, getLatestColMatch, startColMatch } from '../api/col';
 import { messageFor } from '../api/client';
 import type { UpdateMetadataPayload } from '../api/types';
 import { NOM_CODES } from './CreateProjectModal';
@@ -81,6 +81,29 @@ export default function ProjectMetadataPage() {
   // ColMatchRunController). The run id lives in component state rather than the query key alone so
   // a second click restarts polling for the NEW run.
   const [matchRunId, setMatchRunId] = useState<number | null>(null);
+
+  // Latest-run view: on mount, look up the project's most recent run (if any) so reopening the page
+  // resumes a still-RUNNING run's progress display, or shows the last run's summary, without the
+  // user having to click the button again. Seeded into matchRunId exactly once (seededLatest guard)
+  // so a run the user starts in THIS session is never clobbered by a slow-to-resolve latest lookup
+  // racing behind it -- by the time that lookup resolves, matchRunId is already non-null from
+  // startMatchMut's onSuccess, and the functional setMatchRunId below leaves it alone. Gated on
+  // canEdit: the whole match-run section below is canEdit-only, so a viewer never needs this fetch.
+  const { data: latestMatchRun, isSuccess: latestMatchLoaded } = useQuery({
+    queryKey: ['colMatchLatest', id],
+    queryFn: () => getLatestColMatch(id),
+    enabled: canEdit,
+  });
+  const seededLatest = useRef(false);
+  useEffect(() => {
+    if (latestMatchLoaded && !seededLatest.current) {
+      seededLatest.current = true;
+      if (latestMatchRun) {
+        setMatchRunId((current) => current ?? latestMatchRun.id);
+      }
+    }
+  }, [latestMatchLoaded, latestMatchRun]);
+
   const { data: matchRun } = useQuery({
     queryKey: ['colMatchRun', id, matchRunId],
     queryFn: () => getColMatchRun(id, matchRunId as number),

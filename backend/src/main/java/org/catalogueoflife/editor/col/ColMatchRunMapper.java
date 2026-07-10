@@ -47,6 +47,19 @@ public interface ColMatchRunMapper {
   @Select("SELECT * FROM col_match_run WHERE id = #{runId}")
   ColMatchRun findById(@Param("runId") long runId);
 
+  // Latest-run view (ProjectMetadataPage on mount, via ColMatchJobService.latest): the most recent
+  // run for the project regardless of status, or null if none has ever been started. started_at DESC
+  // uses col_match_run_project_idx (project_id, started_at DESC); the ", id DESC" tiebreaker only
+  // matters for two rows sharing a started_at timestamp (same-millisecond inserts), same tiebreak
+  // convention as most-recent-first listings elsewhere in this app.
+  @Select("SELECT * FROM col_match_run WHERE project_id = #{projectId} ORDER BY started_at DESC, id DESC LIMIT 1")
+  ColMatchRun findLatestByProject(@Param("projectId") int projectId);
+
+  // One-active-run-per-project guard (ColMatchJobService.start's pre-check; col_match_run_active_idx
+  // is the race-proof DB-level backstop for the same invariant).
+  @Select("SELECT * FROM col_match_run WHERE project_id = #{projectId} AND status = 'RUNNING' LIMIT 1")
+  ColMatchRun findRunningByProject(@Param("projectId") int projectId);
+
   // Startup recovery sweep (ColMatchRunRecovery): the executor backing a run is in-memory and
   // per-instance (ColMatchAsyncConfig), so a RUNNING row can only be left behind by an instance
   // that no longer exists (a restart/redeploy killed it mid-run) -- there is nothing left to ever

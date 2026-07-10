@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.task.TaskRejectedException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -72,15 +73,32 @@ public class ColMatchJobService {
     this.runs = runs;
   }
 
+  private static final String RUN_IN_PROGRESS = "a COL match run is already in progress for this project";
+
   // Authorizes the caller (owner/editor, same tier as IssueService.revalidateProject -- a write-
-  // adjacent bulk action, not a read), inserts the RUNNING col_match_run row synchronously (so the
-  // 202 response always has a real id to poll), and fires the async run through `self` so @Async
-  // actually applies, then reads the row straight back for the response body.
+  // adjacent bulk action, not a read), enforces the one-active-run-per-project guard, inserts the
+  // RUNNING col_match_run row synchronously (so the 202 response always has a real id to poll), and
+  // fires the async run through `self` so @Async actually applies, then reads the row straight back
+  // for the response body.
   public ColMatchRunResponse start(int userId, int projectId) {
     requireOwnerOrEditor(projectService.requireRole(userId, projectId));
+    // Friendly pre-check: avoids the multi-minute job even starting a second time for the common
+    // case (no race). col_match_run_active_idx (V13) is the race-proof backstop below for the two-
+    // concurrent-requests case this check alone can't catch.
+    if (runs.findRunningByProject(projectId) != null) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, RUN_IN_PROGRESS);
+    }
     ColMatchRun run = new ColMatchRun();
     run.setProjectId(projectId);
-    runs.insertRunning(run);
+    try {
+      runs.insertRunning(run);
+    } catch (DuplicateKeyException e) {
+      // Lost the race against another concurrent start() for the same project: both passed the
+      // pre-check above before either INSERT committed. col_match_run_active_idx (a partial unique
+      // index on project_id WHERE status='RUNNING') rejects the second INSERT -- same friendly 409
+      // as the pre-check, just reached via the DB-level backstop instead.
+      throw new ResponseStatusException(HttpStatus.CONFLICT, RUN_IN_PROGRESS);
+    }
     try {
       self.run(projectId, run.getId(), userId);
     } catch (TaskRejectedException e) {
@@ -106,6 +124,16 @@ public class ColMatchJobService {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "col-match run not found");
     }
     return ColMatchRunResponse.of(run);
+  }
+
+  // Latest-run view (ProjectMetadataPage load-on-mount): any project member may read (same "any
+  // role may read" convention as getRun above), returns null (-> 204 at the controller) rather than
+  // 404 when the project has never had a run -- distinct from getRun's 404, which signals a runId
+  // that doesn't belong to this project at all.
+  public ColMatchRunResponse latest(int userId, int projectId) {
+    projectService.requireRole(userId, projectId);
+    ColMatchRun run = runs.findLatestByProject(projectId);
+    return run == null ? null : ColMatchRunResponse.of(run);
   }
 
   private static void requireOwnerOrEditor(String role) {

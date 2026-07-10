@@ -28,3 +28,13 @@ export function startColMatch(pid: number): Promise<ColMatchRun> {
 export function getColMatchRun(pid: number, runId: number): Promise<ColMatchRun> {
   return api<ColMatchRun>(`/api/projects/${pid}/col-match/${runId}`);
 }
+
+// Latest-run view (Project page, load on mount): the most recent run for the project, or null if
+// none has ever been started. The backend returns 204 No Content for "none" -- the shared `api()`
+// client (client.ts) already turns a 204 into `undefined` before this ever sees a body, so the `??
+// null` below just normalizes that `undefined` into an explicit `null` for callers.
+export function getLatestColMatch(pid: number): Promise<ColMatchRun | null> {
+  return api<ColMatchRun | undefined>(`/api/projects/${pid}/col-match/latest`).then(
+    (run) => run ?? null,
+  );
+}

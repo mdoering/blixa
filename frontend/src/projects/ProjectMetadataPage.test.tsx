@@ -22,6 +22,11 @@ function renderPage() {
   );
 }
 
+// Shared default: no COL match run has ever been started for this project. Individual tests that
+// care about the latest-run view override this with server.use(...) (MSW's last-registered handler
+// for a given route wins).
+const noLatestMatchRun = http.get('/api/projects/3/col-match/latest', () => new HttpResponse(null, { status: 204 }));
+
 test('prefills the form and saves updated metadata', async () => {
   server.use(
     http.get('/api/projects/3', () => HttpResponse.json(project)),
@@ -29,6 +34,7 @@ test('prefills the form and saves updated metadata', async () => {
       const body = (await request.json()) as { title: string };
       return HttpResponse.json({ ...project, title: body.title });
     }),
+    noLatestMatchRun,
   );
   renderPage();
   const title = await screen.findByLabelText('Title');
@@ -47,6 +53,7 @@ test('toggles the GBIF occurrence layer switch and saves it', async () => {
       savedBody = (await request.json()) as { gbifOccurrenceLayer?: boolean };
       return HttpResponse.json({ ...project, gbifOccurrenceLayer: savedBody.gbifOccurrenceLayer });
     }),
+    noLatestMatchRun,
   );
   renderPage();
   const toggle = await screen.findByLabelText('Show GBIF occurrence layer on maps');
@@ -66,6 +73,7 @@ test(
     let getCalls = 0;
     server.use(
       http.get('/api/projects/3', () => HttpResponse.json(project)),
+      noLatestMatchRun,
       http.post('/api/projects/3/col-match', () =>
         HttpResponse.json(
           {
@@ -148,6 +156,124 @@ test(
   },
   10000,
 );
+
+test('a DONE latest run renders its summary on mount without the user clicking', async () => {
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    http.get('/api/projects/3/col-match/latest', () =>
+      HttpResponse.json({
+        id: 7,
+        projectId: 3,
+        status: 'DONE',
+        total: 2,
+        processed: 2,
+        verified: 1,
+        added: 1,
+        updated: 0,
+        unmatched: 0,
+        startedAt: '2026-07-09T00:00:00Z',
+        finishedAt: '2026-07-09T00:00:05Z',
+        error: null,
+      }),
+    ),
+    // The latest-run id (7) is seeded into matchRunId, which then drives the same poll query the
+    // "starts a COL match run" test above exercises via POST -- GET .../col-match/7 must be mocked
+    // for that query to resolve.
+    http.get('/api/projects/3/col-match/7', () =>
+      HttpResponse.json({
+        id: 7,
+        projectId: 3,
+        status: 'DONE',
+        total: 2,
+        processed: 2,
+        verified: 1,
+        added: 1,
+        updated: 0,
+        unmatched: 0,
+        startedAt: '2026-07-09T00:00:00Z',
+        finishedAt: '2026-07-09T00:00:05Z',
+        error: null,
+      }),
+    ),
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  // No click on "Match all to COL" anywhere in this test -- the summary must appear purely from the
+  // load-on-mount latest-run lookup seeding matchRunId.
+  await waitFor(() => expect(screen.getByText('added 1')).toBeInTheDocument());
+  expect(screen.getByText('verified 1')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Match all to COL' })).not.toBeDisabled();
+});
+
+test('a RUNNING latest run disables the button and resumes the progress display on mount', async () => {
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    http.get('/api/projects/3/col-match/latest', () =>
+      HttpResponse.json({
+        id: 9,
+        projectId: 3,
+        status: 'RUNNING',
+        total: 4,
+        processed: 1,
+        verified: 0,
+        added: 0,
+        updated: 0,
+        unmatched: 0,
+        startedAt: '2026-07-09T00:00:00Z',
+        finishedAt: null,
+        error: null,
+      }),
+    ),
+    http.get('/api/projects/3/col-match/9', () =>
+      HttpResponse.json({
+        id: 9,
+        projectId: 3,
+        status: 'RUNNING',
+        total: 4,
+        processed: 1,
+        verified: 0,
+        added: 0,
+        updated: 0,
+        unmatched: 0,
+        startedAt: '2026-07-09T00:00:00Z',
+        finishedAt: null,
+        error: null,
+      }),
+    ),
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  await waitFor(() => expect(screen.getByText(/Matching usage 1 of 4/)).toBeInTheDocument());
+  expect(screen.getByRole('button', { name: 'Match all to COL' })).toBeDisabled();
+});
+
+test('starting a match run while one is already in progress shows a friendly 409 notification', async () => {
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    noLatestMatchRun,
+    http.post('/api/projects/3/col-match', () =>
+      HttpResponse.json(
+        { error: 'a COL match run is already in progress for this project' },
+        { status: 409 },
+      ),
+    ),
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  await userEvent.click(screen.getByRole('button', { name: 'Match all to COL' }));
+
+  await waitFor(() =>
+    expect(
+      screen.getByText('a COL match run is already in progress for this project'),
+    ).toBeInTheDocument(),
+  );
+});
 
 test('viewer role sees a disabled Save button', async () => {
   server.use(

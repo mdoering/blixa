@@ -46,6 +46,7 @@ class ColMatchRunApiIT extends AbstractPostgresIT {
   @Autowired MockMvc mvc;
   @Autowired AppUserService users;
   @Autowired ObjectMapper json;
+  @Autowired ColMatchRunMapper runs;
 
   @MockitoBean ClbMatchClient clb;
 
@@ -205,5 +206,58 @@ class ColMatchRunApiIT extends AbstractPostgresIT {
     // a non-member gets 404, same as every other project-scoped endpoint.
     mvc.perform(post("/api/projects/" + pid + "/col-match").with(csrf()).with(user("colMatchRunPermOutsider")))
         .andExpect(status().isNotFound());
+  }
+
+  // Latest-run view (ColMatchJobService.latest / GET .../col-match/latest): also doubles as the
+  // routing proof that the literal "/latest" segment resolves to latest() rather than being
+  // swallowed by the "/{runId}" mapping (a runId="latest" would 400 on the long conversion, not
+  // reach here at all) -- combined with getReturns404WhenRunBelongsToAnotherProject exercising
+  // "/{runId}" elsewhere in this class, both endpoints are proven to resolve correctly.
+  @Test
+  @WithMockUser(username = "colMatchRunLatestOwner")
+  void latestReturns204WithNoRunsThenTheMostRecentRunOnceOneCompletes() throws Exception {
+    ensureUser("colMatchRunLatestOwner");
+    long pid = createProject("colmatchrunlatestproj");
+    createUsage(pid, "Panthera tigris");
+
+    // No run has ever been started for this project -- 204, not 404 (the project itself exists and
+    // is visible to this member; there is simply nothing to report yet).
+    mvc.perform(get("/api/projects/" + pid + "/col-match/latest"))
+        .andExpect(status().isNoContent());
+
+    when(clb.match(anyString(), any(), any(), any(), anyList()))
+        .thenReturn(json.readTree("{\"type\":\"EXACT\",\"usage\":{\"id\":\"FIXEDCOL\"}}"));
+
+    String startBody = mvc.perform(post("/api/projects/" + pid + "/col-match").with(csrf()))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    long runId = json.readTree(startBody).get("id").asLong();
+
+    pollUntilTerminal(pid, runId);
+
+    String latestBody = mvc.perform(get("/api/projects/" + pid + "/col-match/latest"))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    JsonNode latest = json.readTree(latestBody);
+    assertThat(latest.get("id").asLong()).isEqualTo(runId);
+    assertThat(latest.get("status").asString()).isEqualTo("DONE");
+  }
+
+  // One-active-run-per-project guard (ColMatchJobService.start's findRunningByProject pre-check).
+  // Inserts a RUNNING row directly via the mapper -- exactly like ColMatchJobIT/ColMatchRunRecoveryIT
+  // do to set up mapper-level state -- rather than racing the real async executor, so the 409 is
+  // asserted deterministically instead of depending on a still-RUNNING window after a real POST.
+  @Test
+  @WithMockUser(username = "colMatchRunConflictOwner")
+  void startReturns409WhileARunIsAlreadyInProgress() throws Exception {
+    ensureUser("colMatchRunConflictOwner");
+    long pid = createProject("colmatchrunconflictproj");
+
+    ColMatchRun alreadyRunning = new ColMatchRun();
+    alreadyRunning.setProjectId((int) pid);
+    runs.insertRunning(alreadyRunning);
+
+    mvc.perform(post("/api/projects/" + pid + "/col-match").with(csrf()))
+        .andExpect(status().isConflict());
   }
 }

@@ -40,9 +40,13 @@ class ColMatchRunRecoveryIT extends AbstractPostgresIT {
   void failStaleRunningMarksRunningRowsFailedAndLeavesDoneRowsAlone() {
     int pid = createProject("col-match-recovery");
 
-    long staleRunId = insertRunning(pid);
+    // Finish the first row before inserting the second: col_match_run_active_idx (V13) allows only
+    // one RUNNING row per project at a time, so both rows can never be RUNNING simultaneously here
+    // -- order doesn't matter to the assertions below, only that one ends up DONE and the other
+    // stays RUNNING (stale) for the sweep to find.
     long doneRunId = insertRunning(pid);
     runs.finish(doneRunId);
+    long staleRunId = insertRunning(pid);
 
     int reconciled = runs.failStaleRunning();
     assertThat(reconciled).isGreaterThanOrEqualTo(1);
