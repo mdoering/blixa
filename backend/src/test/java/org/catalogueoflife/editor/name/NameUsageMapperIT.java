@@ -38,7 +38,6 @@ class NameUsageMapperIT extends AbstractPostgresIT {
     NameUsage accepted = new NameUsage();
     accepted.setProjectId(projectId);
     accepted.setId(idSeq.allocate(projectId, ENTITY));
-    accepted.setColdpId("acc-1");
     accepted.setAlternativeId(List.of("alt-1", "alt-2"));
     accepted.setReferenceId(List.of(100, 200));
     accepted.setStatus(Status.ACCEPTED);
@@ -52,7 +51,6 @@ class NameUsageMapperIT extends AbstractPostgresIT {
     NameUsage synonym = new NameUsage();
     synonym.setProjectId(projectId);
     synonym.setId(idSeq.allocate(projectId, ENTITY));
-    synonym.setColdpId("syn-1");
     synonym.setStatus(Status.SYNONYM);
     synonym.setScientificName("Pinus picea");
     synonym.setRank("species");
@@ -93,7 +91,6 @@ class NameUsageMapperIT extends AbstractPostgresIT {
     NameUsage nu = new NameUsage();
     nu.setProjectId(projectId);
     nu.setId(idSeq.allocate(projectId, ENTITY));
-    nu.setColdpId("cas-1");
     nu.setStatus(Status.ACCEPTED);
     nu.setScientificName("Abies alba");
     nu.setRank("species");

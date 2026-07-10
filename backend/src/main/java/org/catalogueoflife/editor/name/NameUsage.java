@@ -19,7 +19,6 @@ import org.gbif.nameparser.api.NameType;
 public class NameUsage {
   private Integer id;
   private Integer projectId;
-  private String coldpId;
   private List<String> alternativeId;
   private Integer parentId;
   private Integer basionymId;
@@ -69,8 +68,6 @@ public class NameUsage {
   public void setId(Integer id) { this.id = id; }
   public Integer getProjectId() { return projectId; }
   public void setProjectId(Integer projectId) { this.projectId = projectId; }
-  public String getColdpId() { return coldpId; }
-  public void setColdpId(String coldpId) { this.coldpId = coldpId; }
   public List<String> getAlternativeId() { return alternativeId; }
   public void setAlternativeId(List<String> alternativeId) { this.alternativeId = alternativeId; }
   public Integer getParentId() { return parentId; }

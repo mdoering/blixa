@@ -20,10 +20,10 @@ public interface ReferenceMapper {
   // (0 / now()) apply -- setting them explicitly to a null POJO value would insert
   // an explicit NULL and violate the NOT NULL constraint instead of using the default.
   @Insert("""
-      INSERT INTO reference (project_id, id, coldp_id, alternative_id, citation, type, author, editor,
+      INSERT INTO reference (project_id, id, alternative_id, citation, type, author, editor,
                               title, container_title, issued, volume, issue, page, publisher,
                               doi, isbn, issn, link, remarks, modified_by)
-      VALUES (#{projectId}, #{id}, #{coldpId}, #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
+      VALUES (#{projectId}, #{id}, #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
               #{citation}, #{type}, #{author}, #{editor}, #{title}, #{containerTitle}, #{issued},
               #{volume}, #{issue}, #{page}, #{publisher}, #{doi}, #{isbn}, #{issn}, #{link},
               #{remarks}, #{modifiedBy})
@@ -62,8 +62,7 @@ public interface ReferenceMapper {
 
   @Update("""
       UPDATE reference
-      SET coldp_id = #{coldpId},
-          alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
+      SET alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
           citation = #{citation}, type = #{type}, author = #{author}, editor = #{editor},
           title = #{title}, container_title = #{containerTitle}, issued = #{issued},
           volume = #{volume}, issue = #{issue}, page = #{page}, publisher = #{publisher},

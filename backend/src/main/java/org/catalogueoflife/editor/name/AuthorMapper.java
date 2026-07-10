@@ -20,10 +20,10 @@ public interface AuthorMapper {
   // (0 / now()) apply -- setting them explicitly to a null POJO value would insert
   // an explicit NULL and violate the NOT NULL constraint instead of using the default.
   @Insert("""
-      INSERT INTO author (project_id, id, coldp_id, alternative_id, given, family, suffix,
+      INSERT INTO author (project_id, id, alternative_id, given, family, suffix,
                            abbreviation_botany, affiliation, birth, death, birth_place, country,
                            link, remarks, modified_by)
-      VALUES (#{projectId}, #{id}, #{coldpId}, #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
+      VALUES (#{projectId}, #{id}, #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
               #{given}, #{family}, #{suffix}, #{abbreviationBotany}, #{affiliation}, #{birth},
               #{death}, #{birthPlace}, #{country}, #{link}, #{remarks}, #{modifiedBy})
       """)
@@ -47,8 +47,7 @@ public interface AuthorMapper {
 
   @Update("""
       UPDATE author
-      SET coldp_id = #{coldpId},
-          alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
+      SET alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
           given = #{given}, family = #{family}, suffix = #{suffix},
           abbreviation_botany = #{abbreviationBotany}, affiliation = #{affiliation},
           birth = #{birth}, death = #{death}, birth_place = #{birthPlace}, country = #{country},

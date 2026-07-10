@@ -22,7 +22,7 @@ public interface NameUsageMapper {
   // an explicit NULL and violate the NOT NULL constraint instead of using the default.
   @Insert("""
       INSERT INTO name_usage (
-          project_id, id, coldp_id, alternative_id, parent_id, basionym_id, ordinal,
+          project_id, id, alternative_id, parent_id, basionym_id, ordinal,
           status, name_phrase, reference_id,
           scientific_name, authorship, rank, uninomial, genus, infrageneric_epithet,
           specific_epithet, infraspecific_epithet, cultivar_epithet, notho,
@@ -32,7 +32,7 @@ public interface NameUsageMapper {
           published_in_page, published_in_page_link, gender, etymology, name_type,
           parse_state, link, remarks, modified_by)
       VALUES (
-          #{projectId}, #{id}, #{coldpId},
+          #{projectId}, #{id},
           #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
           #{parentId}, #{basionymId}, #{ordinal},
           #{status}, #{namePhrase},
@@ -256,8 +256,7 @@ public interface NameUsageMapper {
 
   @Update("""
       UPDATE name_usage
-      SET coldp_id = #{coldpId},
-          alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
+      SET alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
           parent_id = #{parentId}, basionym_id = #{basionymId}, ordinal = #{ordinal},
           status = #{status}, name_phrase = #{namePhrase},
           reference_id = #{referenceId,typeHandler=org.catalogueoflife.editor.name.IntegerArrayTypeHandler},

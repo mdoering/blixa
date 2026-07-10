@@ -8,7 +8,6 @@ import java.util.List;
 public class Reference {
   private Integer id;
   private Integer projectId;
-  private String coldpId;
   private List<String> alternativeId;
   private String citation;
   private String type;
@@ -34,8 +33,6 @@ public class Reference {
   public void setId(Integer id) { this.id = id; }
   public Integer getProjectId() { return projectId; }
   public void setProjectId(Integer projectId) { this.projectId = projectId; }
-  public String getColdpId() { return coldpId; }
-  public void setColdpId(String coldpId) { this.coldpId = coldpId; }
   public List<String> getAlternativeId() { return alternativeId; }
   public void setAlternativeId(List<String> alternativeId) { this.alternativeId = alternativeId; }
   public String getCitation() { return citation; }
