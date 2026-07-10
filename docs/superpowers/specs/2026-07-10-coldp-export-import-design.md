@@ -91,9 +91,11 @@ All data files are **TSV**; `metadata.yaml` is YAML. Column names are the `Coldp
 mapping of *our fields* → ColdpTerm is below.
 
 ### `metadata.yaml` ← `project`
-title, alias→name/alias, description, `nom_code`→code, license, `geographic_scope`→geographicScope,
+title, alias→name/alias, description, license, `geographic_scope`→geographicScope,
 `taxonomic_scope`→taxonomicScope. (No creator/contact — we don't store them.) Import reads the same
-fields to create the new project.
+fields to create the new project. **Note:** `nom_code` is **not** a metadata.yaml key — the
+nomenclatural code travels on the `NameUsage.code` column (below); on import, `project.nom_code` is
+taken from the rows' `code`.
 
 ### `NameUsage.tsv` ← `name_usage` (+ `taxon_info`, `synonym_accepted`)
 Combined name+usage form. Columns (our field → ColDP column):
