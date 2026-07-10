@@ -86,7 +86,7 @@ Async export (project → ColDP `.zip` file) + import (always into a NEW project
 - [ ] Hide the "Sign in with ORCID" button when ORCID isn't configured (expose an `orcidEnabled` flag) — otherwise it dead-ends with an `invalid client_id` error locally.
 
 ## Working conventions (do not re-derive)
-- Commit directly to `main` (no branches). Build with **JDK 25**: `cd backend && JAVA_HOME=~/.sdkman/candidates/java/25.0.1-librca mvn ...` (default java 21 won't compile). No OrbStack Testcontainers workaround.
+- Commit directly to `main` (no branches). Build with **JDK 25**: `cd backend && JAVA_HOME=~/.sdkman/candidates/java/current ./mvnw ...` (currently `25.0.3-librca`; the older `25.0.1-librca` path was removed — use `current` to be robust to patch bumps; default java 21 won't compile). **Run `clean verify` when a record's arity changes** (incremental compilation false-greens on record-constructor changes). No OrbStack Testcontainers workaround. CLB deps are `org.catalogueoflife:{vocab,reader}:1.3.0-SNAPSHOT` (JDK25, slim).
 - Per-row actions = `⋮` + right-click menu (not text buttons). Create = toolbar ＋New + contextual add-child/synonym.
 - Wire forms: name-usage `status` UPPERCASE, `rank` lowercase; project `nomCode` lowercase, `license` SPDX (`CC0-1.0`/`CC-BY-4.0`).
 - IDE "cannot find module / undefined" diagnostics after subagent edits are usually **stale** — verify with an actual `mvn verify` / `npm run build`.
