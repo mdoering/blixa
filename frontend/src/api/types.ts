@@ -17,6 +17,7 @@ export interface Project {
   geographicScope: string | null;
   taxonomicScope: string | null;
   role: Role;
+  gbifOccurrenceLayer: boolean;
 }
 
 export interface Member {
@@ -54,6 +55,7 @@ export interface UpdateMetadataPayload {
   license?: string;
   geographicScope?: string;
   taxonomicScope?: string;
+  gbifOccurrenceLayer?: boolean;
 }
 
 // Mirrors backend NameUsageResponse (see backend/.../name/dto/NameUsageResponse.java): the

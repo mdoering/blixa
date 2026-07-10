@@ -68,6 +68,11 @@ public class ProjectService {
     p.setLicense(license);
     p.setGeographicScope(req.geographicScope());
     p.setTaxonomicScope(req.taxonomicScope());
+    // Field is omitted (null) on most metadata saves -- don't let a full-replace null it out;
+    // fall back to whatever is already stored (loaded above via findById).
+    if (req.gbifOccurrenceLayer() != null) {
+      p.setGbifOccurrenceLayer(req.gbifOccurrenceLayer());
+    }
     projects.updateMetadata(p);
     return p;
   }

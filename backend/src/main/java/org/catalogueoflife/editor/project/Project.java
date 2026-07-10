@@ -13,6 +13,7 @@ public class Project {
   private String geographicScope;
   private String taxonomicScope;
   private String metadata = "{}";
+  private boolean gbifOccurrenceLayer = true;
 
   public Integer getId() { return id; }
   public void setId(Integer id) { this.id = id; }
@@ -32,4 +33,6 @@ public class Project {
   public void setTaxonomicScope(String taxonomicScope) { this.taxonomicScope = taxonomicScope; }
   public String getMetadata() { return metadata; }
   public void setMetadata(String metadata) { this.metadata = metadata; }
+  public boolean getGbifOccurrenceLayer() { return gbifOccurrenceLayer; }
+  public void setGbifOccurrenceLayer(boolean gbifOccurrenceLayer) { this.gbifOccurrenceLayer = gbifOccurrenceLayer; }
 }

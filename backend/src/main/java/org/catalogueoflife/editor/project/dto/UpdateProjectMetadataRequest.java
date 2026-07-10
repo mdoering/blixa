@@ -9,4 +9,5 @@ public record UpdateProjectMetadataRequest(
     String nomCode,
     String license,
     String geographicScope,
-    String taxonomicScope) {}
+    String taxonomicScope,
+    Boolean gbifOccurrenceLayer) {}

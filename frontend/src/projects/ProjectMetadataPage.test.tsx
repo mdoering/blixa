@@ -9,6 +9,7 @@ import ProjectMetadataPage from './ProjectMetadataPage';
 const project = {
   id: 3, title: 'Mammals', alias: null, description: null, nomCode: 'zoological',
   license: null, geographicScope: null, taxonomicScope: null, role: 'owner',
+  gbifOccurrenceLayer: true,
 };
 
 function renderPage() {
@@ -35,6 +36,27 @@ test('prefills the form and saves updated metadata', async () => {
   await userEvent.type(title, 'Mammalia');
   await userEvent.click(screen.getByRole('button', { name: /save/i }));
   await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument());
+});
+
+test('toggles the GBIF occurrence layer switch and saves it', async () => {
+  let savedBody: { gbifOccurrenceLayer?: boolean } = {};
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    http.put('/api/projects/3/metadata', async ({ request }) => {
+      savedBody = (await request.json()) as { gbifOccurrenceLayer?: boolean };
+      return HttpResponse.json({ ...project, gbifOccurrenceLayer: savedBody.gbifOccurrenceLayer });
+    }),
+  );
+  renderPage();
+  const toggle = await screen.findByLabelText('Show GBIF occurrence layer on maps');
+  await waitFor(() => expect(toggle).toBeChecked());
+  await userEvent.click(toggle);
+  expect(toggle).not.toBeChecked();
+  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+  // Assert on the captured request body rather than the "Saved" notification text: the
+  // notifications store is global and the prior test in this file may leave a same-text
+  // notification mounted, making `getByText('Saved')` ambiguous.
+  await waitFor(() => expect(savedBody.gbifOccurrenceLayer).toBe(false));
 });
 
 test('viewer role sees a disabled Save button', async () => {

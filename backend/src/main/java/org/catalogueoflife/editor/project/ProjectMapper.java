@@ -33,7 +33,8 @@ public interface ProjectMapper {
       SET title = #{title}, alias = #{alias}, description = #{description},
           nom_code = #{nomCode}, license = #{license},
           geographic_scope = #{geographicScope}, taxonomic_scope = #{taxonomicScope},
-          metadata = #{metadata}::jsonb, updated_at = now()
+          metadata = #{metadata}::jsonb, gbif_occurrence_layer = #{gbifOccurrenceLayer},
+          updated_at = now()
       WHERE id = #{id}
       """)
   void updateMetadata(Project p);

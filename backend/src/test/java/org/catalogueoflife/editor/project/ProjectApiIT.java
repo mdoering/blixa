@@ -45,7 +45,8 @@ class ProjectApiIT extends AbstractPostgresIT {
        .andExpect(status().isCreated())
        .andExpect(jsonPath("$.title").value("Birds"))
        .andExpect(jsonPath("$.nomCode").value("zoological"))
-       .andExpect(jsonPath("$.role").value("owner"));
+       .andExpect(jsonPath("$.role").value("owner"))
+       .andExpect(jsonPath("$.gbifOccurrenceLayer").value(true));
 
     mvc.perform(get("/api/projects"))
        .andExpect(status().isOk())
@@ -85,19 +86,25 @@ class ProjectApiIT extends AbstractPostgresIT {
        .andExpect(jsonPath("$.alias").value("Mamm"))
        .andExpect(jsonPath("$.description").value("Updated description"))
        .andExpect(jsonPath("$.nomCode").value("zoological"))
-       .andExpect(jsonPath("$.license").value("CC0-1.0"));
+       .andExpect(jsonPath("$.license").value("CC0-1.0"))
+       // gbifOccurrenceLayer omitted from the request -> must not be nulled/reset, the DB
+       // default (true) carries over unchanged.
+       .andExpect(jsonPath("$.gbifOccurrenceLayer").value(true));
 
-    // The other permitted license also round-trips as its SPDX id.
+    // The other permitted license also round-trips as its SPDX id, and gbifOccurrenceLayer can
+    // be explicitly turned off.
     mvc.perform(put("/api/projects/" + projectId + "/metadata").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"title\":\"Mammals Updated\",\"license\":\"CC-BY-4.0\"}"))
+            .content("{\"title\":\"Mammals Updated\",\"license\":\"CC-BY-4.0\",\"gbifOccurrenceLayer\":false}"))
        .andExpect(status().isOk())
-       .andExpect(jsonPath("$.license").value("CC-BY-4.0"));
+       .andExpect(jsonPath("$.license").value("CC-BY-4.0"))
+       .andExpect(jsonPath("$.gbifOccurrenceLayer").value(false));
 
     mvc.perform(get("/api/projects/" + projectId))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.title").value("Mammals Updated"))
-       .andExpect(jsonPath("$.license").value("CC-BY-4.0"));
+       .andExpect(jsonPath("$.license").value("CC-BY-4.0"))
+       .andExpect(jsonPath("$.gbifOccurrenceLayer").value(false));
   }
 
   @Test

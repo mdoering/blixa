@@ -1,4 +1,4 @@
-import { Button, SimpleGrid, Stack, Select, Textarea, TextInput } from '@mantine/core';
+import { Button, SimpleGrid, Stack, Select, Switch, Textarea, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useEffect } from 'react';
@@ -25,6 +25,7 @@ export default function ProjectMetadataPage() {
       license: undefined,
       geographicScope: undefined,
       taxonomicScope: undefined,
+      gbifOccurrenceLayer: true,
     },
     validate: {
       title: (v) => (v ? null : 'Required'),
@@ -82,6 +83,10 @@ export default function ProjectMetadataPage() {
             <TextInput label="Geographic scope" {...form.getInputProps('geographicScope')} />
             <TextInput label="Taxonomic scope" {...form.getInputProps('taxonomicScope')} />
           </SimpleGrid>
+          <Switch
+            label="Show GBIF occurrence layer on maps"
+            {...form.getInputProps('gbifOccurrenceLayer', { type: 'checkbox' })}
+          />
           <Button type="submit" loading={mutation.isPending} disabled={!canEdit}>
             Save
           </Button>
