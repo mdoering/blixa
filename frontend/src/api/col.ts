@@ -1,8 +1,10 @@
 import { api } from './client';
 
 // One row of the backend's col_match_run table (see ColMatchRunResponse): the progress/tally of one
-// project-wide "Match all to COL" run. total/processed/etc. are 0 until the async job has actually
-// started tallying (see ColMatchJobService.runSync), never null once the row exists.
+// project-wide "Match all identifiers" run (matches every configured identifier scope with a
+// dataset key, not just COL -- the endpoint/type names stay col-match/ColMatchRun for historical
+// reasons). total/processed/etc. are 0 until the async job has actually started tallying (see
+// ColMatchJobService.runSync), never null once the row exists.
 export interface ColMatchRun {
   id: number;
   projectId: number;

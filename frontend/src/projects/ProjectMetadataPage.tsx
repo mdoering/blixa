@@ -36,8 +36,8 @@ import { NOM_CODES } from './CreateProjectModal';
 const COL_DATASET_KEY = '3LXR';
 
 const LICENSES = ['CC0-1.0', 'CC-BY-4.0'];
-// Poll interval for the bulk "Match all to COL" run while it's RUNNING -- a live but not chatty
-// progress indicator over what is, per usage, a sequential CLB round-trip (see
+// Poll interval for the bulk "Match all identifiers" run while it's RUNNING -- a live but not
+// chatty progress indicator over what is, per usage, a sequential CLB round-trip (see
 // ColMatchAsyncConfig's single-thread pool on the backend).
 const COL_MATCH_POLL_MS = 1500;
 // Poll interval for the "Export ColDP" run while it's RUNNING -- the export job has no
@@ -111,10 +111,12 @@ export default function ProjectMetadataPage() {
     onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Save failed') }),
   });
 
-  // Bulk "Match all to COL" job: startColMatch kicks it off and returns the run's id, which then
-  // drives a polling GET while the run is still RUNNING (react-query refetchInterval, backend
+  // Bulk "Match all identifiers" job: startColMatch kicks it off and returns the run's id, which
+  // then drives a polling GET while the run is still RUNNING (react-query refetchInterval, backend
   // ColMatchRunController). The run id lives in component state rather than the query key alone so
-  // a second click restarts polling for the NEW run.
+  // a second click restarts polling for the NEW run. The endpoint/type names stay COL-specific
+  // (col-match, ColMatchRun) even though the job now matches every matchable identifier scope --
+  // only the UI copy is generalized here.
   const [matchRunId, setMatchRunId] = useState<number | null>(null);
 
   // Latest-run view: on mount, look up the project's most recent run (if any) so reopening the page
@@ -160,11 +162,22 @@ export default function ProjectMetadataPage() {
     mutationFn: () => startColMatch(id),
     onSuccess: (run) => setMatchRunId(run.id),
     onError: (e) =>
-      notifications.show({ color: 'red', message: messageFor(e, 'Match all to COL failed to start') }),
+      notifications.show({
+        color: 'red',
+        message: messageFor(e, 'Match all identifiers failed to start'),
+      }),
   });
   const matchRunning = startMatchMut.isPending || matchRun?.status === 'RUNNING';
 
-  // "Export ColDP" job: same start-then-poll shape as "Match all to COL" above (startExport ->
+  // A run is a no-op (total 0) unless the PERSISTED project has at least one identifier scope with
+  // a non-blank dataset key -- derived from `data` (not `form.values`, which can drift from the
+  // saved project before the user hits Save) so the button's enabled state always matches what a
+  // click would actually do.
+  const hasMatchableScope = (data?.identifierScopes ?? []).some(
+    (s) => (s.datasetKey ?? '').trim() !== '',
+  );
+
+  // "Export ColDP" job: same start-then-poll shape as "Match all identifiers" above (startExport ->
   // react-query refetchInterval while RUNNING), but open to ANY project member (export only reads
   // project data -- see ExportRunService.start's requireRole, vs col-match's owner/editor gate), so
   // this section renders outside the canEdit-only block below.
@@ -256,17 +269,22 @@ export default function ProjectMetadataPage() {
         <Stack gap="xs">
           <Group justify="space-between">
             <Title order={4} m={0}>
-              Match all to COL
+              Match all identifiers
             </Title>
             <Button
               variant="default"
               loading={startMatchMut.isPending}
-              disabled={matchRunning}
+              disabled={matchRunning || !hasMatchableScope}
               onClick={() => startMatchMut.mutate()}
             >
-              Match all to COL
+              Match all identifiers
             </Button>
           </Group>
+          {!hasMatchableScope && (
+            <Text size="sm" c="dimmed">
+              Configure an identifier scope with a dataset key below to enable matching.
+            </Text>
+          )}
           {matchRun?.status === 'RUNNING' && (
             <Stack gap={4}>
               <Progress
@@ -304,7 +322,7 @@ export default function ProjectMetadataPage() {
             </Stack>
           )}
           {matchRun?.status === 'FAILED' && (
-            <Alert color="red" title="Match all to COL failed">
+            <Alert color="red" title="Match all identifiers failed">
               {matchRun.error ?? 'Unknown error'}
             </Alert>
           )}

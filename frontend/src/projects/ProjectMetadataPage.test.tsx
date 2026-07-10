@@ -13,6 +13,14 @@ const project = {
   gbifOccurrenceLayer: true,
 };
 
+// "Match all identifiers" is disabled unless the persisted project has a matchable identifier
+// scope (a non-blank datasetKey) -- most tests in this file need the button enabled to exercise
+// its click behavior, so this fixture layers a matchable 'col' scope onto the base project.
+const projectWithMatchableScope = {
+  ...project,
+  identifierScopes: [{ scope: 'col', datasetKey: '3LXR' }],
+};
+
 function renderPage() {
   return renderWithProviders(
     <Routes>
@@ -151,7 +159,7 @@ test(
   async () => {
     let getCalls = 0;
     server.use(
-      http.get('/api/projects/3', () => HttpResponse.json(project)),
+      http.get('/api/projects/3', () => HttpResponse.json(projectWithMatchableScope)),
       noLatestMatchRun,
       noLatestExportRun,
       http.post('/api/projects/3/col-match', () =>
@@ -213,7 +221,7 @@ test(
     const title = await screen.findByLabelText('Title');
     await waitFor(() => expect(title).toHaveValue('Mammals'));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Match all to COL' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Match all identifiers' }));
 
     // RUNNING: a progress indicator over the mocked 1-of-2 poll response.
     await waitFor(() => expect(screen.getByText(/Matching usage 1 of 2/)).toBeInTheDocument());
@@ -237,9 +245,45 @@ test(
   10000,
 );
 
+test('a project with no matchable identifier scope disables "Match all identifiers" and shows a hint', async () => {
+  server.use(
+    http.get('/api/projects/3', () =>
+      HttpResponse.json({ ...project, identifierScopes: [{ scope: 'ipni', datasetKey: null }] }),
+    ),
+    noLatestMatchRun,
+    noLatestExportRun,
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  // No entry in identifierScopes has a non-blank datasetKey -- a run would be a no-op (total 0),
+  // so the button stays disabled and a hint points the user at the fix (below, in the row editor).
+  expect(screen.getByRole('button', { name: 'Match all identifiers' })).toBeDisabled();
+  expect(
+    screen.getByText('Configure an identifier scope with a dataset key below to enable matching.'),
+  ).toBeInTheDocument();
+});
+
+test('a project with a matchable identifier scope enables "Match all identifiers"', async () => {
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(projectWithMatchableScope)),
+    noLatestMatchRun,
+    noLatestExportRun,
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  expect(screen.getByRole('button', { name: 'Match all identifiers' })).not.toBeDisabled();
+  expect(
+    screen.queryByText('Configure an identifier scope with a dataset key below to enable matching.'),
+  ).not.toBeInTheDocument();
+});
+
 test('a DONE latest run renders its summary on mount without the user clicking', async () => {
   server.use(
-    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    http.get('/api/projects/3', () => HttpResponse.json(projectWithMatchableScope)),
     http.get('/api/projects/3/col-match/latest', () =>
       HttpResponse.json({
         id: 7,
@@ -281,16 +325,16 @@ test('a DONE latest run renders its summary on mount without the user clicking',
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
-  // No click on "Match all to COL" anywhere in this test -- the summary must appear purely from the
-  // load-on-mount latest-run lookup seeding matchRunId.
+  // No click on "Match all identifiers" anywhere in this test -- the summary must appear purely
+  // from the load-on-mount latest-run lookup seeding matchRunId.
   await waitFor(() => expect(screen.getByText('added 1')).toBeInTheDocument());
   expect(screen.getByText('verified 1')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Match all to COL' })).not.toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Match all identifiers' })).not.toBeDisabled();
 });
 
 test('a RUNNING latest run disables the button and resumes the progress display on mount', async () => {
   server.use(
-    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    http.get('/api/projects/3', () => HttpResponse.json(projectWithMatchableScope)),
     http.get('/api/projects/3/col-match/latest', () =>
       HttpResponse.json({
         id: 9,
@@ -330,14 +374,14 @@ test('a RUNNING latest run disables the button and resumes the progress display 
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
   await waitFor(() => expect(screen.getByText(/Matching usage 1 of 4/)).toBeInTheDocument());
-  expect(screen.getByRole('button', { name: 'Match all to COL' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Match all identifiers' })).toBeDisabled();
 });
 
 test(
   'starting a match run while one is already in progress shows a friendly 409 notification',
   async () => {
     server.use(
-      http.get('/api/projects/3', () => HttpResponse.json(project)),
+      http.get('/api/projects/3', () => HttpResponse.json(projectWithMatchableScope)),
       noLatestMatchRun,
       noLatestExportRun,
       http.post('/api/projects/3/col-match', () =>
@@ -351,7 +395,7 @@ test(
     const title = await screen.findByLabelText('Title');
     await waitFor(() => expect(title).toHaveValue('Mammals'));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Match all to COL' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Match all identifiers' }));
 
     // Generous timeout (like the poll-driven assertions elsewhere in this file): this file's form
     // now mounts the identifier-scopes row editor on every render, and jsdom under a full suite
