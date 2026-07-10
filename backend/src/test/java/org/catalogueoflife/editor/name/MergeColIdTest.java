@@ -2,6 +2,7 @@ package org.catalogueoflife.editor.name;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -26,5 +27,11 @@ class MergeColIdTest {
   void nullInputListIsHandled() {
     List<String> result = NameUsageService.mergeColId(null, "Y");
     assertThat(result).containsExactly("col:Y");
+  }
+
+  @Test
+  void nullElementInIdsListIsDroppedNotNpe() {
+    List<String> result = NameUsageService.mergeColId(Arrays.asList("col:X", null, "tsn:1"), "NEW");
+    assertThat(result).containsExactly("tsn:1", "col:NEW");
   }
 }

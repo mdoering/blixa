@@ -37,7 +37,8 @@ export function gbifTileUrl(colId: string, checklistKey: string): string {
   return `https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}@1x.png?${params}`;
 }
 
-// ChecklistBank gazetteer area GeoJSON endpoint for a coded area (e.g. tdwg:AB).
+// ChecklistBank gazetteer area GeoJSON endpoint for a coded area (e.g. tdwg:AB). gazetteer/areaId
+// are DB-sourced free text, so both are URL-encoded before interpolation (mirrors gbifTileUrl above).
 export function areaGeojsonUrl(gazetteer: string, areaId: string): string {
-  return `https://api.checklistbank.org/vocab/area/${gazetteer}:${areaId}`;
+  return `https://api.checklistbank.org/vocab/area/${encodeURIComponent(gazetteer)}:${encodeURIComponent(areaId)}`;
 }

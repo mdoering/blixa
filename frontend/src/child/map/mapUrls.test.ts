@@ -55,4 +55,8 @@ describe('areaGeojsonUrl', () => {
       'https://api.checklistbank.org/vocab/area/tdwg:AB',
     );
   });
+  test('url-encodes a special character in the areaId segment', () => {
+    expect(areaGeojsonUrl('tdwg', 'A/B')).toContain('A%2FB');
+    expect(areaGeojsonUrl('tdwg', 'A/B')).not.toContain('A/B');
+  });
 });

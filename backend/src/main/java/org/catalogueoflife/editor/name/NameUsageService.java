@@ -269,7 +269,8 @@ public class NameUsageService {
   public static List<String> mergeColId(List<String> ids, String colId) {
     var out = new java.util.ArrayList<String>();
     if (ids != null) {
-      ids.stream().filter(s -> !s.toLowerCase(Locale.ROOT).startsWith("col:")).forEach(out::add);
+      ids.stream().filter(s -> s != null && !s.toLowerCase(Locale.ROOT).startsWith("col:"))
+          .forEach(out::add);
     }
     if (colId != null && !colId.isBlank()) {
       out.add("col:" + colId);

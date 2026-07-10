@@ -1,6 +1,8 @@
 package org.catalogueoflife.editor.name;
 
+import java.time.Duration;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -18,13 +20,19 @@ public class CrossrefClient {
   private final ObjectMapper objectMapper;
 
   // RestClient.builder() (the static factory, not the auto-configured RestClient.Builder bean, which
-  // isn't present in this app) keeps this self-contained.
+  // isn't present in this app) keeps this self-contained. A connect+read timeout keeps a slow-but-
+  // not-erroring Crossref from blocking the serving thread indefinitely -- the spec promises
+  // "timeout -> 502" (see the catch below).
   public CrossrefClient(ObjectMapper objectMapper) {
+    var requestFactory = new SimpleClientHttpRequestFactory();
+    requestFactory.setConnectTimeout(Duration.ofSeconds(3));
+    requestFactory.setReadTimeout(Duration.ofSeconds(10));
     this.http = RestClient.builder()
         .baseUrl("https://api.crossref.org")
         // Crossref etiquette: identify the client + a contact so we land in the "polite" pool.
         .defaultHeader("User-Agent",
             "coldp-editor/0.1 (+https://github.com/CatalogueOfLife/coldp-editor; mailto:info@catalogueoflife.org)")
+        .requestFactory(requestFactory)
         .build();
     this.objectMapper = objectMapper;
   }

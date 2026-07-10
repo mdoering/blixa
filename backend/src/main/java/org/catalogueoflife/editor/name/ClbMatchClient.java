@@ -1,10 +1,12 @@
 package org.catalogueoflife.editor.name;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import org.catalogueoflife.editor.name.dto.RankName;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -55,10 +57,15 @@ public class ClbMatchClient {
 
   // RestClient.builder() (the static factory, not the auto-configured RestClient.Builder bean,
   // which isn't present in this app) keeps this self-contained -- same pattern as CrossrefClient.
+  // A connect+read timeout keeps a slow-but-not-erroring CLB from blocking the serving thread
+  // indefinitely -- the spec promises "timeout -> 502" (see the catch below).
   public ClbMatchClient(ObjectMapper objectMapper,
       @Value("${coldp.clb.base-url:https://api.checklistbank.org}") String baseUrl,
       @Value("${coldp.col.match-dataset:3LXR}") String matchDataset) {
-    this.http = RestClient.builder().baseUrl(baseUrl).build();
+    var requestFactory = new SimpleClientHttpRequestFactory();
+    requestFactory.setConnectTimeout(Duration.ofSeconds(3));
+    requestFactory.setReadTimeout(Duration.ofSeconds(10));
+    this.http = RestClient.builder().baseUrl(baseUrl).requestFactory(requestFactory).build();
     this.objectMapper = objectMapper;
     this.matchDataset = matchDataset;
   }
