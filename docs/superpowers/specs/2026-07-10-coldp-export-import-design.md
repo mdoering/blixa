@@ -189,6 +189,12 @@ row's ColDP `referenceID`/`taxonID`/`nameID` = the target record's `id`.
      (synonym); `basionymID`→`basionym_id`; `nameReferenceID`→`published_in_reference_id`;
      `referenceID[]`→`reference_id[]`; `taxon_info` from the accepted rows' extinct/env/temporal.
      Unresolvable ids (not in the map) → skipped + a non-fatal `import_run.issues` entry.
+     **Pro-parte re-merge (own-archive round-trip):** a combined `NameUsage` row whose `ID` matches our
+     derived pattern `"<primaryId>-<acceptedId>"`, where a row with `ID = <primaryId>` exists and shares
+     the same `scientificName`, is NOT a new usage — instead add an extra `synonym_accepted` link
+     (→ `<acceptedId>`) onto the primary synonym usage, so re-importing our own export reconstructs the
+     pro-parte synonym (one usage, N accepted) rather than N separate synonyms. Best-effort: if the
+     primary is missing or names differ, fall back to treating it as an ordinary row.
   5. **Child entities**: insert each, resolving `taxonID`/`nameID`→usage id and `referenceID`→ref id
      via the maps (dangling → skipped + issue).
   6. Commit (one project = one transaction; fatal error → rollback, mark FAILED, delete nothing since
