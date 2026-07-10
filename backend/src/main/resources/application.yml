@@ -7,6 +7,14 @@ spring:
     password: ${DB_PASSWORD:coldp_editor}
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      # Comfortably above coldp.import.max-bytes' default (100MB, see below) -- ImportRunService.start
+      # does the real, configurable size gating (a clean 413 with a message); these just need to be
+      # large enough that a legitimately-sized upload never hits Spring's own (otherwise 1MB/10MB
+      # default) multipart resolver limit first.
+      max-file-size: 150MB
+      max-request-size: 150MB
   security:
     oauth2:
       client:
@@ -39,3 +47,6 @@ coldp:
   export:
     dir: ${java.io.tmpdir}/coldp-exports
     ttl: P7D
+  import:
+    dir: ${java.io.tmpdir}/coldp-imports
+    max-bytes: 104857600

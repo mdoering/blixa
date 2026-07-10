@@ -59,4 +59,42 @@ class ColdpZipTest {
     Path escaped = tmp.resolve("evil.txt");
     assertThat(escaped).doesNotExist();
   }
+
+  @Test
+  void archiveExceedingByteCapIsRejected(@TempDir Path tmp) throws IOException {
+    Path src = tmp.resolve("src");
+    Files.createDirectories(src);
+    Path dest = tmp.resolve("dest");
+    Path zip = tmp.resolve("big.zip");
+
+    // A single entry well over the tiny cap below -- proves the running decompressed-byte total
+    // (not the entry's self-reported/compressed size) drives the check.
+    byte[] content = new byte[10_000];
+    Files.write(src.resolve("NameUsage.tsv"), content);
+    ColdpZip.zipFolder(src, zip);
+
+    try (var in = Files.newInputStream(zip)) {
+      assertThatThrownBy(() -> ColdpZip.extractToTemp(in, dest, 1_000L))
+          .isInstanceOf(IOException.class)
+          .hasMessageContaining("1000 bytes");
+    }
+  }
+
+  @Test
+  void archiveWithinByteCapExtractsNormally(@TempDir Path tmp) throws IOException {
+    Path src = tmp.resolve("src");
+    Files.createDirectories(src);
+    Path dest = tmp.resolve("dest");
+    Path zip = tmp.resolve("small.zip");
+
+    byte[] content = "ID\tscientificName\n1\tAbies alba\n".getBytes(StandardCharsets.UTF_8);
+    Files.write(src.resolve("NameUsage.tsv"), content);
+    ColdpZip.zipFolder(src, zip);
+
+    try (var in = Files.newInputStream(zip)) {
+      ColdpZip.extractToTemp(in, dest, 1_000_000L);
+    }
+    assertThat(dest.resolve("NameUsage.tsv")).exists();
+    assertThat(Files.readAllBytes(dest.resolve("NameUsage.tsv"))).isEqualTo(content);
+  }
 }
