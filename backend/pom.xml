@@ -113,6 +113,19 @@
       <artifactId>vocab</artifactId>
       <version>1.2.3-SNAPSHOT</version>
     </dependency>
+    <!-- ColDP io (ColdpTerm, ColdpReader, TabWriter); pulls in the CLB `api` module
+         (Jackson 2 `com.fasterxml`, guava, commons, httpclient5, mapdb, kryo, fastutil) -
+         coexists with our Jackson 3 (`tools.jackson`) stack since the packages differ. -->
+    <dependency>
+      <groupId>org.catalogueoflife</groupId>
+      <artifactId>reader</artifactId>
+      <version>1.2.3-SNAPSHOT</version>
+      <exclusions>
+        <!-- test engines / logging brought transitively; Spring Boot manages logback + JUnit 5 already -->
+        <exclusion><groupId>org.junit.vintage</groupId><artifactId>junit-vintage-engine</artifactId></exclusion>
+        <exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId></exclusion>
+      </exclusions>
+    </dependency>
     <!-- BibTeX parsing for reference import (see name/RefMapping.fromBibtex). -->
     <dependency>
       <groupId>org.jbibtex</groupId>
