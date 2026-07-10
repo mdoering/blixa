@@ -82,4 +82,20 @@ class UsageIdentifiersIT extends AbstractPostgresIT {
             .content("{\"alternativeId\":[\"col:STALE\"],\"version\":0}"))
         .andExpect(status().isConflict());
   }
+
+  // Regression guard: version omitted entirely (null, not 0) must still degrade to the standard
+  // stale-version 409 -- NOT throw an NPE from auto-unboxing a null Integer into the mapper's
+  // primitive int parameter (see NameUsageMapper.updateAlternativeId; fixed to take a boxed
+  // Integer, matching every other CAS write path in this codebase).
+  @Test
+  void putIdentifiersMissingVersionIsConflictNotServerError() throws Exception {
+    ensureUser("identifiersOwner");
+    long pid = createProject();
+    long u = createUsage(pid, "Cus dus");
+
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + u + "/identifiers").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"alternativeId\":[\"col:AAA\"]}"))
+        .andExpect(status().isConflict());
+  }
 }

@@ -262,5 +262,5 @@ public interface NameUsageMapper {
       """)
   int updateAlternativeId(@Param("projectId") int projectId, @Param("id") int id,
       @Param("alternativeId") List<String> alternativeId,
-      @Param("modifiedBy") int modifiedBy, @Param("version") int version);
+      @Param("modifiedBy") int modifiedBy, @Param("version") Integer version);
 }

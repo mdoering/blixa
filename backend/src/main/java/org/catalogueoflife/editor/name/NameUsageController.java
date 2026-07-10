@@ -69,7 +69,7 @@ public class NameUsageController {
   // write path a later "match to COL" feature uses to persist col:<id>.
   @PutMapping("/{id}/identifiers")
   public NameUsageResponse setIdentifiers(@PathVariable int pid, @PathVariable int id,
-      @RequestBody IdentifiersRequest req) {
+      @Valid @RequestBody IdentifiersRequest req) {
     int uid = currentUser.require().getId();
     return service.setIdentifiers(uid, pid, id, req);
   }
