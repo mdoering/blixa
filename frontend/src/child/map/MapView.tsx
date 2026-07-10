@@ -108,8 +108,8 @@ export default function MapView({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [failed, setFailed] = useState(false);
   // Latest visibility props, read inside async callbacks after layers get added.
-  const visRef = useRef({ layers, gbifEnabled });
-  visRef.current = { layers, gbifEnabled };
+  const visRef = useRef({ layers, gbifEnabled, gbifAvailable });
+  visRef.current = { layers, gbifEnabled, gbifAvailable };
 
   // Build (or rebuild) the map whenever the underlying data changes. Visibility toggles are
   // handled by the lighter effect below without a rebuild.
@@ -134,12 +134,12 @@ export default function MapView({
     mapRef.current = map;
 
     const applyVisibility = () => {
-      const { layers: l, gbifEnabled: g } = visRef.current;
+      const { layers: l, gbifEnabled: g, gbifAvailable: ga } = visRef.current;
       setVisible(map, LAYER_IDS.distFocal, l.distFocal);
       setVisible(map, LAYER_IDS.distChildren, l.distChildren);
       setVisible(map, LAYER_IDS.typeFocal, l.typeFocal);
       setVisible(map, LAYER_IDS.typeChildren, l.typeChildren);
-      setVisible(map, LAYER_IDS.gbif, g);
+      setVisible(map, LAYER_IDS.gbif, g && ga);
     };
 
     const build = async () => {
@@ -192,12 +192,13 @@ export default function MapView({
       addPointGroup('type-focal', true, TYPE_FOCAL_COLOR);
       addPointGroup('type-children', false, TYPE_CHILDREN_COLOR);
 
-      // GBIF occurrence-density raster (only meaningful once matched to COL, and only when the
-      // preflight count hasn't confirmed zero occurrences — no point adding an empty raster).
-      // Gated on colId/gbifAvailable only (not gbifEnabled): this mirrors every other layer group
-      // above, which is added unconditionally and then shown/hidden by applyVisibility() below,
-      // so toggling the checkbox stays a cheap visibility flip and never needs a map rebuild.
-      if (colId && gbifAvailable) {
+      // GBIF occurrence-density raster (only meaningful once matched to COL). Gated on colId only
+      // (not gbifEnabled or gbifAvailable): this mirrors every other layer group above, which is
+      // added unconditionally and then shown/hidden by applyVisibility() below, so toggling the
+      // checkbox — or a preflight count resolving — stays a cheap visibility flip and never needs
+      // a map rebuild. An invisible raster costs nothing: maplibre doesn't request tiles for a
+      // layer whose visibility is 'none'.
+      if (colId) {
         map.addSource('gbif', {
           type: 'raster',
           tiles: [gbifTileUrl(colId, checklistKey)],
@@ -227,9 +228,12 @@ export default function MapView({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colId, checklistKey, distributions, typeSpecimens, gbifAvailable]);
+  }, [colId, checklistKey, distributions, typeSpecimens]);
 
-  // Cheap visibility updates when a checkbox toggles (no rebuild / re-fetch).
+  // Cheap visibility updates when a checkbox toggles, or the GBIF preflight count resolves (no
+  // rebuild / re-fetch). gbifAvailable only ever affects visibility here — never the heavy build
+  // effect above — so a zero-count result hides the (already-created) GBIF layer in place instead
+  // of tearing down and rebuilding the whole map.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -237,8 +241,8 @@ export default function MapView({
     setVisible(map, LAYER_IDS.distChildren, layers.distChildren);
     setVisible(map, LAYER_IDS.typeFocal, layers.typeFocal);
     setVisible(map, LAYER_IDS.typeChildren, layers.typeChildren);
-    setVisible(map, LAYER_IDS.gbif, gbifEnabled);
-  }, [layers, gbifEnabled]);
+    setVisible(map, LAYER_IDS.gbif, gbifEnabled && gbifAvailable);
+  }, [layers, gbifEnabled, gbifAvailable]);
 
   if (failed) {
     return (

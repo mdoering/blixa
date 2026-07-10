@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getMapData } from '../../api/map';
 import { getProject } from '../../api/projects';
 import MatchColModal from './MatchColModal';
-import { GBIF_CHECKLIST_KEY, gbifCountUrl } from './mapUrls';
+import { GBIF_CHECKLIST_KEY, getGbifCount } from './mapUrls';
 import type { LayerVisibility } from './MapView';
 
 // maplibre-gl lives entirely inside MapView; lazy-load it so its ~230KB (gzip) bundle stays out
@@ -49,10 +49,7 @@ export default function DistributionMapPanel({ pid, usageId, canEdit }: Props) {
   const countQuery = useQuery({
     queryKey: ['gbifCount', colId],
     enabled: !!colId,
-    queryFn: () =>
-      fetch(gbifCountUrl(colId as string, GBIF_CHECKLIST_KEY))
-        .then((r) => r.json())
-        .then((j) => j.count as number),
+    queryFn: () => getGbifCount(colId as string),
   });
   const gbifAvailable = countQuery.data === undefined ? true : countQuery.data > 0;
 

@@ -60,3 +60,12 @@ export function gbifCountUrl(colId: string, checklistKey: string): string {
 export function areaGeojsonUrl(gazetteer: string, areaId: string): string {
   return `https://api.checklistbank.org/vocab/area/${encodeURIComponent(gazetteer)}:${encodeURIComponent(areaId)}`;
 }
+
+// Fetches the GBIF preflight occurrence count (see gbifCountUrl) for a COL id and parses out
+// `count`. Colocated with the URL builders so DistributionMapPanel's queryFn stays a plain
+// `api/*`-style wrapper call instead of an inline fetch+parse.
+export async function getGbifCount(colId: string): Promise<number> {
+  const res = await fetch(gbifCountUrl(colId, GBIF_CHECKLIST_KEY));
+  const json = (await res.json()) as { count: number };
+  return json.count;
+}
