@@ -62,6 +62,7 @@ export interface UpdateMetadataPayload {
 export interface NameUsage {
   id: number;
   parentId: number | null;
+  alternativeId?: string[];
   status: string | null;
   namePhrase: string | null;
   extinct: boolean | null;

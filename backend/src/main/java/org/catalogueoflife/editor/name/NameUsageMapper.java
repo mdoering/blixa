@@ -250,4 +250,17 @@ public interface NameUsageMapper {
       WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}
       """)
   int update(NameUsage u);
+
+  // Narrow CAS write of just alternative_id (PUT /usages/{id}/identifiers): the "match to COL"
+  // write path stores col:<id> here (see NameUsageService.mergeColId) without touching any of the
+  // name/nomenclatural fields the full update() above rewrites. Bumps version/modified like every
+  // other name_usage write; 0 rows updated -> caller treats as a stale-version 409.
+  @Update("""
+      UPDATE name_usage SET alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
+          modified = now(), modified_by = #{modifiedBy}, version = version + 1
+      WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}
+      """)
+  int updateAlternativeId(@Param("projectId") int projectId, @Param("id") int id,
+      @Param("alternativeId") List<String> alternativeId,
+      @Param("modifiedBy") int modifiedBy, @Param("version") int version);
 }

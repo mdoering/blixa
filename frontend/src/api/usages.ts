@@ -93,3 +93,19 @@ export function getSynonyms(pid: number, id: number): Promise<NameUsage[]> {
 export function getAccepted(pid: number, id: number): Promise<NameUsage[]> {
   return api<NameUsage[]>(`/api/projects/${pid}/usages/${id}/accepted`);
 }
+
+// Full replace of alternativeId, optimistic-locked (backend NameUsageService.setIdentifiers) --
+// the write path a later "match to COL" feature uses to persist col:<id>. Not a partial patch:
+// callers must carry over any existing entries (e.g. from the loaded usage's alternativeId) they
+// want to keep.
+export function updateIdentifiers(
+  pid: number,
+  id: number,
+  alternativeId: string[],
+  version: number,
+): Promise<NameUsage> {
+  return api<NameUsage>(`/api/projects/${pid}/usages/${id}/identifiers`, {
+    method: 'PUT',
+    json: { alternativeId, version },
+  });
+}

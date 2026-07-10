@@ -5,6 +5,7 @@ import java.util.List;
 import org.catalogueoflife.editor.auth.CurrentUser;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.DemoteRequest;
+import org.catalogueoflife.editor.name.dto.IdentifiersRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.name.dto.PromoteRequest;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
@@ -62,6 +63,15 @@ public class NameUsageController {
       @Valid @RequestBody UpdateNameUsageRequest req) {
     int uid = currentUser.require().getId();
     return service.update(uid, pid, id, req);
+  }
+
+  // Full replace of alternative_id, optimistic-locked (NameUsageService.setIdentifiers) -- the
+  // write path a later "match to COL" feature uses to persist col:<id>.
+  @PutMapping("/{id}/identifiers")
+  public NameUsageResponse setIdentifiers(@PathVariable int pid, @PathVariable int id,
+      @RequestBody IdentifiersRequest req) {
+    int uid = currentUser.require().getId();
+    return service.setIdentifiers(uid, pid, id, req);
   }
 
   @GetMapping("/{id}/synonyms")

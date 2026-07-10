@@ -12,6 +12,7 @@ import org.catalogueoflife.editor.audit.AuditService;
 import org.catalogueoflife.editor.audit.Operation;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.DemoteRequest;
+import org.catalogueoflife.editor.name.dto.IdentifiersRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.name.dto.PromoteRequest;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
@@ -239,6 +240,41 @@ public class NameUsageService {
     audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
     events.publishEvent(ValidationEvent.forUsage(projectId, id));
     return toResponse(after, project);
+  }
+
+  // Narrow write of just alternative_id (PUT /usages/{id}/identifiers): a full replace of the
+  // field, not a merge -- the caller must send back any entries it wants to keep. This is the
+  // write path a later "match to COL" feature uses to persist col:<id> (see mergeColId below),
+  // kept separate from the general update() so matching a usage to COL doesn't require touching
+  // (or re-parsing) any of its name/nomenclatural fields.
+  @Transactional
+  public NameUsageResponse setIdentifiers(int userId, int projectId, int id, IdentifiersRequest req) {
+    requireEditor(userId, projectId);
+    Project project = requireProject(projectId);
+    NameUsage before = requireInProject(projectId, id);
+    var ids = req.alternativeId() == null ? List.<String>of() : req.alternativeId();
+    if (usages.updateAlternativeId(projectId, id, ids, userId, req.version()) == 0) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
+    }
+    NameUsage after = requireInProject(projectId, id);
+    audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
+    events.publishEvent(ValidationEvent.forUsage(projectId, id));
+    return toResponse(after, project);
+  }
+
+  // Replaces any existing col: entry (case-insensitive on the prefix) in `ids` with `colId`
+  // (stored as the full CURIE col:<colId>), preserving every other scope untouched. `colId` blank
+  // or null just drops the col: entry. Used by the (later) bulk-match write path together with
+  // setIdentifiers above.
+  public static List<String> mergeColId(List<String> ids, String colId) {
+    var out = new java.util.ArrayList<String>();
+    if (ids != null) {
+      ids.stream().filter(s -> !s.toLowerCase(Locale.ROOT).startsWith("col:")).forEach(out::add);
+    }
+    if (colId != null && !colId.isBlank()) {
+      out.add("col:" + colId);
+    }
+    return out;
   }
 
   @Transactional

@@ -14,6 +14,7 @@ import org.catalogueoflife.editor.name.NameUsage;
 public record NameUsageResponse(
     Integer id,
     Integer parentId,
+    List<String> alternativeId,
     String status,
     String namePhrase,
     Boolean extinct,
@@ -55,7 +56,8 @@ public record NameUsageResponse(
 
   public static NameUsageResponse of(NameUsage u, String formattedName, List<Integer> acceptedParentIds,
       List<Integer> synonymIds) {
-    return new NameUsageResponse(u.getId(), u.getParentId(), name(u.getStatus()), u.getNamePhrase(),
+    return new NameUsageResponse(u.getId(), u.getParentId(), u.getAlternativeId(), name(u.getStatus()),
+        u.getNamePhrase(),
         u.getExtinct(), names(u.getEnvironment()), u.getTemporalRangeStart(), u.getTemporalRangeEnd(),
         u.getScientificName(), u.getAuthorship(), u.getRank(), u.getUninomial(),
         u.getGenus(), u.getInfragenericEpithet(), u.getSpecificEpithet(), u.getInfraspecificEpithet(),
