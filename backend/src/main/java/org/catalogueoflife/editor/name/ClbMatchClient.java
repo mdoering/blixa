@@ -19,10 +19,11 @@ import tools.jackson.databind.ObjectMapper;
 // Server-side name matching against a published ChecklistBank dataset via /match/nameusage. The
 // dataset to match against is passed explicitly to match() -- ColMatchService (single-taxon "Match
 // to COL" modal) always uses the configured COL default (coldp.col.match-dataset, see
-// defaultColDataset()); the upcoming bulk job (Task 3+) will pass each configured scope's own
-// dataset key instead. Isolated behind this component -- mirrors CrossrefClient -- so the external
-// HTTP call can be @MockitoBean'd in tests (see ColMatchIT) and the response-shape mapping
-// (ColMatchService.addCandidate) exercised apart from the network.
+// defaultColDataset()); the bulk multi-scope match job (ColMatchJobService.matchOneScope) instead
+// passes each configured matchable IdentifierScope's own dataset key. Isolated behind this
+// component -- mirrors CrossrefClient -- so the external HTTP call can be @MockitoBean'd in tests
+// (see ColMatchIT) and the response-shape mapping (ColMatchService.addCandidate) exercised apart
+// from the network.
 @Component
 public class ClbMatchClient {
 
@@ -74,9 +75,11 @@ public class ClbMatchClient {
   }
 
   // The configured default COL dataset key (coldp.col.match-dataset, normally 3LXR) that
-  // ColMatchService's single-taxon match always targets. Exposed so other callers that don't yet
-  // have a per-scope dataset key of their own (e.g. ColMatchJobService.matchOne, until Task 3 wires
-  // up per-scope keys) can fall back to the same default rather than duplicating the config lookup.
+  // ColMatchService's single-taxon match always targets. The bulk multi-scope match job
+  // (ColMatchJobService.matchOneScope) does NOT use this -- it always passes the project's own
+  // configured IdentifierScope.datasetKey(), one call per matchable scope, even for the "col" scope
+  // (whose datasetKey conventionally defaults to this same value, see IdentifierScope's javadoc,
+  // but that's a frontend UX convention, not something this method enforces).
   public String defaultColDataset() {
     return matchDataset;
   }

@@ -9,6 +9,7 @@ import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.NameUsageService;
 import org.catalogueoflife.editor.name.dto.RankName;
+import org.catalogueoflife.editor.project.IdentifierScope;
 import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectMapper;
 import org.catalogueoflife.editor.project.ProjectService;
@@ -28,24 +29,23 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
 
-// The project-wide bulk COL-match job: matchOne re-matches a single usage against COL and
-// reconciles the stored col: alternativeId + a col_* issue flag; runSync iterates every usage in a
-// project and tallies the outcomes into a col_match_run row; start/run are Task 3's async trigger
-// (ColMatchRunController -> start, which authorizes the caller and inserts the RUNNING row on the
-// request thread, then fires run() -- @Async off ColMatchAsyncConfig's dedicated single-thread pool
-// -- so the request returns immediately with a 202 while the (possibly long) project-wide match
-// proceeds in the background). matchOne/runSync stay deliberately off-request internally (no
-// AuditService.record/ValidationEvent): the flags + the col_match_run row ARE the audit record for
-// this feature.
+// The project-wide bulk match job: matchOneScope re-matches a single usage against ONE of the
+// project's configured matchable identifier scopes (an IdentifierScope whose datasetKey is
+// non-blank -- see Project.getIdentifierScopes) and reconciles the stored <scope>: alternativeId +
+// a <scope>_id_* issue flag; runSync iterates every usage x every matchable scope in a project and
+// tallies the outcomes into a col_match_run row (one row still covers the whole run, across all
+// scopes). start/run are the async trigger (ColMatchRunController -> start, which authorizes the
+// caller and inserts the RUNNING row on the request thread, then fires run() -- @Async off
+// ColMatchAsyncConfig's dedicated single-thread pool -- so the request returns immediately with a
+// 202 while the (possibly long) project-wide match proceeds in the background). matchOneScope/
+// runSync stay deliberately off-request internally (no AuditService.record/ValidationEvent): the
+// flags + the col_match_run row ARE the audit record for this feature.
 @Service
 public class ColMatchJobService {
 
   private static final Logger log = LoggerFactory.getLogger(ColMatchJobService.class);
 
   private static final String ENTITY = "name_usage";
-  private static final String RULE_ADDED = "col_id_added";
-  private static final String RULE_UPDATED = "col_id_updated";
-  private static final String RULE_MISSING = "col_match_missing";
 
   private final NameUsageMapper usages;
   private final IssueMapper issues;
@@ -54,11 +54,11 @@ public class ColMatchJobService {
   private final ClbMatchClient clb;
   private final ColMatchRunMapper runs;
 
-  // Self-reference through the Spring proxy so run()'s @Async and runSync's per-usage matchOne calls
-  // actually go through their proxied annotations (@Async / @Transactional) -- see start()/run()/
-  // runSync() below, and ValidationService's identical `self` field for the same reason: a plain
-  // `this.foo(...)` call bypasses the proxy entirely. @Lazy avoids a circular bean-creation error
-  // (this bean depending on itself while still being constructed).
+  // Self-reference through the Spring proxy so run()'s @Async and runSync's per-usage-per-scope
+  // matchOneScope calls actually go through their proxied annotations (@Async / @Transactional) --
+  // see start()/run()/runSync() below, and ValidationService's identical `self` field for the same
+  // reason: a plain `this.foo(...)` call bypasses the proxy entirely. @Lazy avoids a circular
+  // bean-creation error (this bean depending on itself while still being constructed).
   @Autowired
   @Lazy
   private ColMatchJobService self;
@@ -157,23 +157,24 @@ public class ColMatchJobService {
     }
   }
 
-  // Re-matches one usage against COL and reconciles: VERIFIED (matched == stored, nothing to
-  // write), UPDATED (stored != null but changed), ADDED (was unmatched, now matched), or UNMATCHED
-  // (no COL match at all). The outcome/flag-to-write is computed first (newRule/severity/message,
-  // newRule==null for VERIFIED), then reconcileColFlag below reconciles it against whatever col_*
-  // flag(s) already exist for the usage -- the SAME rule recurring is PRESERVED as-is (a curator's
-  // ACCEPTED review of a still-firing col_match_missing survives a re-run instead of being reset to
-  // OPEN), mirroring ValidationService.revalidateUsage's reopen/updateFinding reconcile rather than
-  // matchOne's old unconditional deleteColFlags-then-insert. A missing usage (deleted concurrently,
-  // or a stale id) is treated as UNMATCHED with no flag reconcile at all, since there is no entity
-  // left to flag.
+  // Re-matches one usage against ONE matchable scope's CLB dataset and reconciles: VERIFIED
+  // (matched == stored, nothing to write), UPDATED (stored != null but changed), ADDED (was
+  // unmatched, now matched), or UNMATCHED (no match at all in this scope). The outcome/flag-to-write
+  // is computed first (newRule/severity/message, newRule==null for VERIFIED), then
+  // reconcileScopeFlag below reconciles it against whatever <scope>_id_* flag(s) already exist for
+  // the usage IN THIS SCOPE -- the SAME rule recurring is PRESERVED as-is (a curator's ACCEPTED
+  // review of a still-firing <scope>_id_missing survives a re-run instead of being reset to OPEN),
+  // mirroring ValidationService.revalidateUsage's reopen/updateFinding reconcile rather than an
+  // unconditional deleteScopeFlags-then-insert. A missing usage (deleted concurrently, or a stale
+  // id) is treated as UNMATCHED with no flag reconcile at all, since there is no entity left to
+  // flag.
   @Transactional
-  public ColOutcome matchOne(int projectId, int usageId, int userId) {
+  public ColOutcome matchOneScope(int projectId, int usageId, IdentifierScope scope, int userId) {
     NameUsage u = usages.findByIdInProject(projectId, usageId);
     if (u == null) {
       return ColOutcome.UNMATCHED;
     }
-    String stored = ColMatchService.colIdFrom(u.getAlternativeId());
+    String stored = ColMatchService.scopedIdFrom(u.getAlternativeId(), scope.scope());
     Project project = projects.findById(projectId);
     // Project.nomCode is the NomCode enum (see ProjectService.parseNomCode); its name() is already
     // upper-case (ZOOLOGICAL, BOTANICAL, ...) which the CLB `code` param parses tolerantly -- same
@@ -181,12 +182,14 @@ public class ColMatchJobService {
     String code = project == null || project.getNomCode() == null ? null : project.getNomCode().name();
     String rank = u.getRank() == null ? null : u.getRank().toLowerCase(Locale.ROOT);
     List<RankName> classification = usages.findClassification(projectId, usageId);
-    // TODO(Task 3): matches against the configured COL default dataset for every project, regardless
-    // of the project's own match-scope config -- fine for now since there's only ever the one COL
-    // scope; will be replaced with the project's per-scope dataset key.
-    JsonNode root = clb.match(clb.defaultColDataset(), u.getScientificName(), u.getAuthorship(), rank,
+    JsonNode root = clb.match(scope.datasetKey(), u.getScientificName(), u.getAuthorship(), rank,
         code, classification);
     String matched = bestColId(root);
+
+    String scopeKey = scope.scope();
+    String addedRule = scopeKey + "_id_added";
+    String updatedRule = scopeKey + "_id_updated";
+    String missingRule = scopeKey + "_id_missing";
 
     ColOutcome outcome;
     String newRule = null;
@@ -194,50 +197,54 @@ public class ColMatchJobService {
     String message = null;
 
     if (matched == null) {
-      newRule = RULE_MISSING;
+      newRule = missingRule;
       severity = "WARNING";
-      message = "No COL match for " + u.getScientificName();
+      message = "No " + scopeKey + " match for " + u.getScientificName();
       outcome = ColOutcome.UNMATCHED;
     } else if (matched.equals(stored)) {
       outcome = ColOutcome.VERIFIED;
     } else {
-      // Add or update the id -- CAS on the version just read above (matchOne runs standalone, not
-      // behind a lock, so a concurrent edit of this same usage loses the race here exactly like any
-      // other optimistic-concurrency write in this app).
-      List<String> merged = NameUsageService.mergeColId(u.getAlternativeId(), matched);
+      // Add or update the id -- CAS on the version just read above (matchOneScope runs standalone,
+      // not behind a lock, so a concurrent edit of this same usage loses the race here exactly like
+      // any other optimistic-concurrency write in this app).
+      List<String> merged = NameUsageService.mergeScopedId(u.getAlternativeId(), scopeKey, matched);
       int rows = usages.updateAlternativeId(projectId, usageId, merged, userId, u.getVersion());
       if (rows == 0) {
         // Lost the optimistic-lock race: the usage was edited concurrently during the CLB round-trip
-        // (u.getVersion() no longer matches the row). Make no claim this run -- insert no col flag
-        // and report VERIFIED (a no-op this run); the next run re-reads the now-changed row and
+        // (u.getVersion() no longer matches the row). Make no claim this run -- insert no flag and
+        // report VERIFIED (a no-op this run); the next run re-reads the now-changed row and
         // reconciles then.
         outcome = ColOutcome.VERIFIED;
       } else if (stored == null) {
-        newRule = RULE_ADDED;
+        newRule = addedRule;
         severity = "INFO";
-        message = "Added col:" + matched;
+        message = "Added " + scopeKey + ":" + matched;
         outcome = ColOutcome.ADDED;
       } else {
-        newRule = RULE_UPDATED;
+        newRule = updatedRule;
         severity = "INFO";
-        message = "COL id changed col:" + stored + " -> col:" + matched;
+        message = scopeKey + " id changed " + scopeKey + ":" + stored + " -> " + scopeKey + ":" + matched;
         outcome = ColOutcome.UPDATED;
       }
     }
 
-    reconcileColFlag(projectId, usageId, newRule, severity, message);
+    reconcileScopeFlag(projectId, usageId, scope, newRule, severity, message);
     return outcome;
   }
 
-  // Reconciles the usage's existing col_* flag(s) (normally 0 or 1, via IssueMapper.findColFlags)
-  // against this run's target flag (newRule==null means "no flag warranted" -- VERIFIED, both the
-  // stored==matched path and the CAS-miss path). The SAME rule recurring is kept untouched (its
-  // review status, e.g. ACCEPTED, survives); anything else found (resolved, a different rule, or a
-  // stray duplicate) is deleted; a genuinely new rule is inserted OPEN. This is the status-preserving
-  // counterpart to ValidationService.revalidateUsage's reopen/updateFinding reconcile, scoped to the
-  // three col_* rule keys that method deliberately ignores (see its `ruleKeys` guard).
-  private void reconcileColFlag(int projectId, int usageId, String newRule, String severity, String message) {
-    List<Issue> existing = issues.findColFlags(projectId, ENTITY, usageId);
+  // Reconciles the usage's existing <scope>_id_* flag(s) (normally 0 or 1, via
+  // IssueMapper.findScopeFlags scoped to THIS scope's three rule keys) against this run's target
+  // flag (newRule==null means "no flag warranted" -- VERIFIED, both the stored==matched path and
+  // the CAS-miss path). The SAME rule recurring is kept untouched (its review status, e.g.
+  // ACCEPTED, survives); anything else found (resolved, a different rule, or a stray duplicate) is
+  // deleted; a genuinely new rule is inserted OPEN. This is the status-preserving counterpart to
+  // ValidationService.revalidateUsage's reopen/updateFinding reconcile, scoped to the three
+  // <scope>_id_* rule keys that method deliberately ignores (see its `ruleKeys` guard).
+  private void reconcileScopeFlag(int projectId, int usageId, IdentifierScope scope, String newRule,
+      String severity, String message) {
+    String scopeKey = scope.scope();
+    List<Issue> existing = issues.findScopeFlags(projectId, ENTITY, usageId,
+        scopeKey + "_id_added", scopeKey + "_id_updated", scopeKey + "_id_missing");
     boolean keptMatching = false;
     for (Issue e : existing) {
       if (newRule != null && e.getRule().equals(newRule) && !keptMatching) {
@@ -251,37 +258,57 @@ public class ColMatchJobService {
     }
   }
 
-  // Iterates every usage in the project (findAllIds, id order), running matchOne for each and
-  // tallying processed + the matching per-outcome counter into the col_match_run row. Calls through
-  // `self` (the Spring proxy), not `this` -- exactly like ValidationService.revalidateProject's
-  // self.revalidateUsage -- so each iteration's matchOne actually runs under its OWN @Transactional
-  // proxy invocation (a plain `this.matchOne(...)` call bypasses the proxy entirely, and the whole
-  // project's worth of reconcileColFlag+updateAlternativeId+insertColFlag would silently collapse into
-  // ONE outer transaction for the whole run instead of one per usage). runSync itself must NOT be
-  // @Transactional for the same reason. A usage whose matchOne throws (e.g. ClbMatchClient surfacing
-  // a 502; a lost CAS race no longer throws -- see matchOne's rows==0 branch) is counted as
-  // UNMATCHED here, but matchOne itself is @Transactional, so the exception rolls back that whole
-  // matchOne invocation -- including its reconcileColFlag deletes/inserts -- for that usage. The
-  // usage's prior col_* flag (and prior col:<id>, if any) is therefore RETAINED, not deleted: a
+  // Iterates every usage in the project (findAllIds, id order) x every matchable scope (the
+  // project's configured identifierScopes filtered to a non-blank datasetKey), running
+  // matchOneScope for each usage x scope pair and tallying processed + the matching per-outcome
+  // counter into the col_match_run row (total = usages x matchableScopes; a project with no
+  // matchable scope finishes immediately with total 0, the nested loop simply never running). Calls
+  // through `self` (the Spring proxy), not `this` -- exactly like ValidationService.revalidateProject's
+  // self.revalidateUsage -- so each iteration's matchOneScope actually runs under its OWN
+  // @Transactional proxy invocation (a plain `this.matchOneScope(...)` call bypasses the proxy
+  // entirely, and the whole project's worth of reconcileScopeFlag+updateAlternativeId+insertColFlag
+  // would silently collapse into ONE outer transaction for the whole run instead of one per usage x
+  // scope). runSync itself must NOT be @Transactional for the same reason. A usage x scope pair
+  // whose matchOneScope throws (e.g. ClbMatchClient surfacing a 502; a lost CAS race no longer
+  // throws -- see matchOneScope's rows==0 branch) is counted as UNMATCHED here, but matchOneScope
+  // itself is @Transactional, so the exception rolls back that whole matchOneScope invocation --
+  // including its reconcileScopeFlag deletes/inserts -- for that usage x scope pair. The usage's
+  // prior <scope>_id_* flag (and prior <scope>:<id>, if any) is therefore RETAINED, not deleted: a
   // transient failure (e.g. a CLB 502) never wipes a previously-good match. This does mean the run's
   // UNMATCHED counter and that usage's actual flag/id can disagree for this run (still showing its
   // unchanged, still-valid prior match) -- a benign counter/flag mismatch, not data loss.
   public void runSync(int projectId, long runId, int userId) {
+    Project project = projects.findById(projectId);
+    List<IdentifierScope> matchable = matchableScopes(project);
     List<Integer> ids = usages.findAllIds(projectId);
-    runs.setTotal(runId, ids.size());
+    runs.setTotal(runId, ids.size() * matchable.size());
     for (int id : ids) {
-      ColOutcome outcome;
-      try {
-        outcome = self.matchOne(projectId, id, userId);
-      } catch (RuntimeException e) {
-        outcome = ColOutcome.UNMATCHED;
+      for (IdentifierScope scope : matchable) {
+        ColOutcome outcome;
+        try {
+          outcome = self.matchOneScope(projectId, id, scope, userId);
+        } catch (RuntimeException e) {
+          outcome = ColOutcome.UNMATCHED;
+        }
+        runs.tick(runId, outcome.name());
       }
-      runs.tick(runId, outcome.name());
     }
     runs.finish(runId);
   }
 
-  // The matched COL id: root.path("usage").path("id") as text, but only when the response's overall
+  // A scope is matchable iff its datasetKey is non-blank (see IdentifierScope's javadoc); a project
+  // with no identifierScopes configured at all (null, the default for a freshly created project)
+  // has none.
+  private static List<IdentifierScope> matchableScopes(Project project) {
+    if (project == null || project.getIdentifierScopes() == null) {
+      return List.of();
+    }
+    return project.getIdentifierScopes().stream()
+        .filter(s -> s.datasetKey() != null && !s.datasetKey().isBlank())
+        .toList();
+  }
+
+  // The matched id: root.path("usage").path("id") as text, but only when the response's overall
   // `type` isn't NONE and the usage node is actually present (mirrors ColMatchService.addCandidate's
   // same two guards on the CLB /match/nameusage response shape) -- else null (no match).
   private static String bestColId(JsonNode root) {

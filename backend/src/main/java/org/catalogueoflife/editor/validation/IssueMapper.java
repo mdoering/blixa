@@ -169,12 +169,14 @@ public interface IssueMapper {
   // IssueSummaryResponse for the shape the API returns).
   record StatusSeverityCount(String status, String severity, long count) {}
 
-  // -- col/ColMatchJobService: per-usage flag helpers for the bulk COL-match job. Distinct from
-  // insert() above (which populates context/expects Issue's full shape via reflection): these three
-  // rule keys (col_id_added, col_id_updated, col_match_missing) carry no context. matchOne reconciles
-  // against findColFlags below: the SAME rule recurring is PRESERVED as-is (status untouched, e.g. an
-  // ACCEPTED col_match_missing survives a re-run), while a resolved/different-rule flag is deleted and,
-  // if the new outcome still warrants a flag, a fresh one is inserted OPEN via insertColFlag.
+  // -- col/ColMatchJobService: per-usage flag helpers for the bulk multi-scope match job. Distinct
+  // from insert() above (which populates context/expects Issue's full shape via reflection): these
+  // rule keys (<scope>_id_added, <scope>_id_updated, <scope>_id_missing -- one triple per configured
+  // matchable IdentifierScope, e.g. col_id_added/ipni_id_added) carry no context. matchOneScope
+  // reconciles against findScopeFlags below: the SAME rule recurring is PRESERVED as-is (status
+  // untouched, e.g. an ACCEPTED col_id_missing survives a re-run), while a resolved/different-rule
+  // flag is deleted and, if the new outcome still warrants a flag, a fresh one is inserted OPEN via
+  // insertColFlag.
 
   @Insert("""
       INSERT INTO issue (project_id, entity_type, entity_id, rule, severity, message, status, created_at, updated_at)
@@ -184,14 +186,18 @@ public interface IssueMapper {
       @Param("entityId") int entityId, @Param("rule") String rule,
       @Param("severity") String severity, @Param("message") String message);
 
-  // The entity's existing col_* flag(s) (normally 0 or 1) -- ColMatchJobService.matchOne reconciles
-  // against these instead of the old unconditional delete+reinsert, so a still-firing flag (e.g. a
-  // recurring col_match_missing) can be PRESERVED with its reviewer status intact rather than being
-  // dropped and reborn OPEN, mirroring ValidationService.revalidateUsage's status-preserving reconcile.
-  // Same auto-map style as findByEntity above (plain SELECT *, no LOWER()/alias dance -- that's only
-  // for the API-facing IssueResponse queries further down).
+  // The entity's existing flag(s) (normally 0 or 1) for ONE scope's three rule keys --
+  // ColMatchJobService.reconcileScopeFlag reconciles against these instead of an unconditional
+  // delete+reinsert, so a still-firing flag (e.g. a recurring <scope>_id_missing) can be PRESERVED
+  // with its reviewer status intact rather than being dropped and reborn OPEN, mirroring
+  // ValidationService.revalidateUsage's status-preserving reconcile. The three rule strings are
+  // passed explicitly (added/updated/missing, one call per scope) rather than built from a dynamic
+  // IN-list: this is a plain annotation mapper, not a <script> mapper, and three fixed params keep
+  // it that way. Same auto-map style as findByEntity above (plain SELECT *, no LOWER()/alias dance
+  // -- that's only for the API-facing IssueResponse queries further down).
   @Select("SELECT * FROM issue WHERE project_id=#{projectId} AND entity_type=#{entityType} AND entity_id=#{entityId} "
-      + "AND rule IN ('col_id_added','col_id_updated','col_match_missing')")
-  List<Issue> findColFlags(@Param("projectId") int projectId, @Param("entityType") String entityType,
-      @Param("entityId") int entityId);
+      + "AND rule IN (#{added},#{updated},#{missing})")
+  List<Issue> findScopeFlags(@Param("projectId") int projectId, @Param("entityType") String entityType,
+      @Param("entityId") int entityId, @Param("added") String added, @Param("updated") String updated,
+      @Param("missing") String missing);
 }

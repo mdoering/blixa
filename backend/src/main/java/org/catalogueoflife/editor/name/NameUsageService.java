@@ -388,8 +388,9 @@ public class NameUsageService {
 
   // Replaces any existing col: entry (case-insensitive on the prefix) in `ids` with `colId`
   // (stored as the full CURIE col:<colId>), preserving every other scope untouched. `colId` blank
-  // or null just drops the col: entry. Used by the (later) bulk-match write path together with
-  // setIdentifiers above.
+  // or null just drops the col: entry. Kept for the single-taxon "Match to COL" path
+  // (setIdentifiers above / ColMatchService); the bulk multi-scope match job uses the
+  // scope-parameterized mergeScopedId below instead.
   public static List<String> mergeColId(List<String> ids, String colId) {
     var out = new java.util.ArrayList<String>();
     if (ids != null) {
@@ -398,6 +399,23 @@ public class NameUsageService {
     }
     if (colId != null && !colId.isBlank()) {
       out.add("col:" + colId);
+    }
+    return out;
+  }
+
+  // Sibling of mergeColId, generalized to any configured identifier scope: replaces any existing
+  // <scope>: entry (case-insensitive on the prefix) with scope:<id>, preserving every other scope
+  // untouched. `id` blank or null just drops the scope's entry. Used by the bulk multi-scope match
+  // job (ColMatchJobService.matchOneScope), once per project-configured matchable IdentifierScope.
+  public static List<String> mergeScopedId(List<String> ids, String scope, String id) {
+    String prefix = scope.toLowerCase(Locale.ROOT) + ":";
+    var out = new java.util.ArrayList<String>();
+    if (ids != null) {
+      ids.stream().filter(s -> s != null && !s.toLowerCase(Locale.ROOT).startsWith(prefix))
+          .forEach(out::add);
+    }
+    if (id != null && !id.isBlank()) {
+      out.add(scope.toLowerCase(Locale.ROOT) + ":" + id);
     }
     return out;
   }

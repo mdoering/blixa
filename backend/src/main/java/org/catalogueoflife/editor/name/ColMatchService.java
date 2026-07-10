@@ -87,9 +87,10 @@ public class ColMatchService {
   }
 
   // Bare COL id from a name_usage.alternative_id list (e.g. "col:6W3C4" -> "6W3C4"), or null if no
-  // entry carries the (case-insensitive) "col:" prefix. Reused by a later bulk-match write path;
-  // deliberately independent of NameUsageService.mergeColId (same idea, kept un-shared per the
-  // task's isolation of this feature behind ClbMatchClient/ColMatchService).
+  // entry carries the (case-insensitive) "col:" prefix. Kept for the single-taxon "Match to COL"
+  // modal (ColMatchService.match above) and the GBIF map (MapDataService), which both stay
+  // COL-only; deliberately independent of NameUsageService.mergeColId (same idea, kept un-shared
+  // per the task's isolation of this feature behind ClbMatchClient/ColMatchService).
   public static String colIdFrom(List<String> alternativeId) {
     if (alternativeId == null) {
       return null;
@@ -97,6 +98,23 @@ public class ColMatchService {
     for (String s : alternativeId) {
       if (s != null && s.toLowerCase(Locale.ROOT).startsWith("col:")) {
         return s.substring("col:".length());
+      }
+    }
+    return null;
+  }
+
+  // Sibling of colIdFrom, generalized to any configured identifier scope (e.g. "ipni" ->
+  // "ipni:12345" -> "12345"), case-insensitive on the scope prefix; null if no entry carries it.
+  // Used by the bulk multi-scope match job (ColMatchJobService.matchOneScope), one call per
+  // project-configured matchable IdentifierScope rather than the single hardcoded "col:" prefix.
+  public static String scopedIdFrom(List<String> alternativeId, String scope) {
+    if (alternativeId == null || scope == null) {
+      return null;
+    }
+    String prefix = scope.toLowerCase(Locale.ROOT) + ":";
+    for (String s : alternativeId) {
+      if (s != null && s.toLowerCase(Locale.ROOT).startsWith(prefix)) {
+        return s.substring(prefix.length());
       }
     }
     return null;

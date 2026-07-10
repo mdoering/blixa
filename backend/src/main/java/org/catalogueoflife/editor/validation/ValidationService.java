@@ -78,9 +78,10 @@ public class ValidationService {
         .flatMap(Optional::stream)
         .toList();
     List<Issue> existing = issues.findByEntity(projectId, ENTITY_NAME_USAGE, usageId);
-    // Non-rule flags (e.g. the bulk COL-match job's col_id_added / col_id_updated / col_match_missing,
-    // stamped straight onto issue.rule) are owned elsewhere and must never be swept by the stale loop
-    // below -- only rows whose rule is a registered ValidationRule.key() are this method's business.
+    // Non-rule flags (e.g. the bulk multi-scope match job's <scope>_id_added / <scope>_id_updated /
+    // <scope>_id_missing, stamped straight onto issue.rule -- see ColMatchJobService.matchOneScope)
+    // are owned elsewhere and must never be swept by the stale loop below -- only rows whose rule
+    // is a registered ValidationRule.key() are this method's business.
     Set<String> ruleKeys = rules.stream().map(ValidationRule::key).collect(Collectors.toSet());
 
     // for f in current: insert / reopen / updateFinding (see IssueMapper for exactly what each

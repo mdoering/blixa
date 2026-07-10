@@ -172,12 +172,15 @@ class ValidationReconcileIT extends AbstractPostgresIT {
     assertThat(issueMapper.findByEntity((int) pid, "name_usage", (int) synId)).isEmpty();
   }
 
-  // Task 1 regression: col_id_added / col_id_updated / col_match_missing are flags the (later) bulk
-  // COL-match job stamps directly onto issue.rule -- they are NOT produced by any ValidationRule.
-  // Before the fix, revalidateUsage's stale-handling loop treated "rule not in this run's current
-  // findings" as "sweep it" for ANY existing issue, so a plain edit-triggered revalidate would delete
-  // a col_match_missing flag outright (OPEN -> deleteById, see the loop above). The fix scopes that
-  // loop to rows whose rule is a registered ValidationRule.key(), leaving non-rule flags alone.
+  // Task 1 regression: col_id_added / col_id_updated / col_match_missing (now generalized to
+  // <scope>_id_added / _updated / _missing per configured scope, e.g. col_id_missing/ipni_id_missing
+  // -- see ColMatchJobService.matchOneScope) are flags the bulk match job stamps directly onto
+  // issue.rule -- they are NOT produced by any ValidationRule. Before the fix, revalidateUsage's
+  // stale-handling loop treated "rule not in this run's current findings" as "sweep it" for ANY
+  // existing issue, so a plain edit-triggered revalidate would delete such a flag outright (OPEN ->
+  // deleteById, see the loop above). The fix scopes that loop to rows whose rule is a registered
+  // ValidationRule.key(), leaving non-rule flags (any rule string, "col_match_missing" here is just
+  // an arbitrary example) alone.
   @Test
   @WithMockUser(username = "colFlagOwner")
   void revalidateUsageLeavesNonRuleFlagsAlone() throws Exception {

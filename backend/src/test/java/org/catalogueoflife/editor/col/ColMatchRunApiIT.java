@@ -64,6 +64,19 @@ class ColMatchRunApiIT extends AbstractPostgresIT {
     return json.readTree(body).get("id").asLong();
   }
 
+  // A freshly created project has NO identifierScopes at all (see Project.identifierScopes /
+  // ColMatchJobService.matchableScopes) -- since Task 3, that means "nothing to match" (total 0,
+  // no flags), not "match against the COL default". Tests that actually want the bulk job to do
+  // work configure a matchable col scope explicitly via the same Project settings save path the
+  // frontend uses (PUT .../metadata), mirroring how ColMatchJobIT seeds its projects.
+  private void configureColScope(long pid, String title) throws Exception {
+    mvc.perform(put("/api/projects/" + pid + "/metadata").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"" + title + "\",\"identifierScopes\":"
+                + "[{\"scope\":\"col\",\"datasetKey\":\"3LXR\"}]}"))
+        .andExpect(status().isOk());
+  }
+
   private void addMember(long pid, String username, String role) throws Exception {
     mvc.perform(put("/api/projects/" + pid + "/members").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
@@ -124,6 +137,7 @@ class ColMatchRunApiIT extends AbstractPostgresIT {
   void startsAndCompletesAProjectWideMatchRun() throws Exception {
     ensureUser("colMatchRunOwner");
     long pid = createProject("colmatchrunproj");
+    configureColScope(pid, "colmatchrunproj");
     createUsage(pid, "Panthera leo");
     createUsage(pid, "Panthera onca");
 
@@ -153,6 +167,7 @@ class ColMatchRunApiIT extends AbstractPostgresIT {
   void unmatchedUsagesGetAColMatchMissingFlag() throws Exception {
     ensureUser("colMatchRunNoMatchOwner");
     long pid = createProject("colmatchrunnomatchproj");
+    configureColScope(pid, "colmatchrunnomatchproj");
     createUsage(pid, "Nonexistantus bogusii");
 
     when(clb.match(any(), anyString(), any(), any(), any(), anyList()))
@@ -168,7 +183,9 @@ class ColMatchRunApiIT extends AbstractPostgresIT {
     assertThat(done.get("unmatched").asInt()).isEqualTo(1);
 
     JsonNode issues = listIssues(pid);
-    assertThat(hasRule(issues, "col_match_missing")).isTrue();
+    // Renamed from the single-scope job's col_match_missing -- now uniformly "<scope>_id_missing"
+    // (see ColMatchJobService.matchOneScope / IssueMapper.findScopeFlags).
+    assertThat(hasRule(issues, "col_id_missing")).isTrue();
   }
 
   @Test
