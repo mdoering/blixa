@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -79,7 +80,18 @@ public class ColMatchJobService {
     ColMatchRun run = new ColMatchRun();
     run.setProjectId(projectId);
     runs.insertRunning(run);
-    self.run(projectId, run.getId(), userId);
+    try {
+      self.run(projectId, run.getId(), userId);
+    } catch (TaskRejectedException e) {
+      // The single-thread, bounded-queue (queueCapacity(50)) executor is full: self.run(...) throws
+      // synchronously at this call site, before run()'s own try/catch (which maps failures to
+      // runs.fail) ever gets a chance to run. Without this catch the just-inserted RUNNING row would
+      // be stuck forever (nothing left to process it) and the caller would see an unhandled 500
+      // instead of a clean, retryable 503.
+      runs.fail(run.getId(), "match service busy — try again later");
+      throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+          "COL match service busy, try again later");
+    }
     return ColMatchRunResponse.of(runs.findById(run.getId()));
   }
 
