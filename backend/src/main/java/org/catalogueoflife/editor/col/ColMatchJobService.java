@@ -181,7 +181,11 @@ public class ColMatchJobService {
     String code = project == null || project.getNomCode() == null ? null : project.getNomCode().name();
     String rank = u.getRank() == null ? null : u.getRank().toLowerCase(Locale.ROOT);
     List<RankName> classification = usages.findClassification(projectId, usageId);
-    JsonNode root = clb.match(u.getScientificName(), u.getAuthorship(), rank, code, classification);
+    // TODO(Task 3): matches against the configured COL default dataset for every project, regardless
+    // of the project's own match-scope config -- fine for now since there's only ever the one COL
+    // scope; will be replaced with the project's per-scope dataset key.
+    JsonNode root = clb.match(clb.defaultColDataset(), u.getScientificName(), u.getAuthorship(), rank,
+        code, classification);
     String matched = bestColId(root);
 
     ColOutcome outcome;

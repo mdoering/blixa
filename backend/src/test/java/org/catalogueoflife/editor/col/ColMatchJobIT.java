@@ -98,10 +98,10 @@ class ColMatchJobIT extends AbstractPostgresIT {
     NameUsage c = createUsage(pid, "Panthera tigris", List.of("col:KEEP"), userId);
     NameUsage d = createUsage(pid, "Nonexistantus bogusii", null, userId);
 
-    when(clb.match(eq("Panthera leo"), any(), any(), any(), anyList())).thenReturn(matched("NEW"));
-    when(clb.match(eq("Panthera onca"), any(), any(), any(), anyList())).thenReturn(matched("B1"));
-    when(clb.match(eq("Panthera tigris"), any(), any(), any(), anyList())).thenReturn(matched("KEEP"));
-    when(clb.match(eq("Nonexistantus bogusii"), any(), any(), any(), anyList())).thenReturn(noMatch());
+    when(clb.match(any(), eq("Panthera leo"), any(), any(), any(), anyList())).thenReturn(matched("NEW"));
+    when(clb.match(any(), eq("Panthera onca"), any(), any(), any(), anyList())).thenReturn(matched("B1"));
+    when(clb.match(any(), eq("Panthera tigris"), any(), any(), any(), anyList())).thenReturn(matched("KEEP"));
+    when(clb.match(any(), eq("Nonexistantus bogusii"), any(), any(), any(), anyList())).thenReturn(noMatch());
 
     // A: had col:OLD, COL now resolves to NEW -> UPDATED.
     assertThat(service.matchOne(pid, a.getId(), userId)).isEqualTo(ColOutcome.UPDATED);
@@ -154,7 +154,7 @@ class ColMatchJobIT extends AbstractPostgresIT {
     int pid = createProject("col-match-job-preserve");
 
     NameUsage d = createUsage(pid, "Nonexistantus preservus", null, userId);
-    when(clb.match(eq("Nonexistantus preservus"), any(), any(), any(), anyList())).thenReturn(noMatch());
+    when(clb.match(any(), eq("Nonexistantus preservus"), any(), any(), any(), anyList())).thenReturn(noMatch());
 
     // First run: no COL match -> a fresh OPEN col_match_missing flag.
     assertThat(service.matchOne(pid, d.getId(), userId)).isEqualTo(ColOutcome.UNMATCHED);
@@ -189,14 +189,14 @@ class ColMatchJobIT extends AbstractPostgresIT {
 
     NameUsage u = createUsage(pid, "Nonexistantus laterus", List.of("col:KEEP"), userId);
 
-    when(clb.match(eq("Nonexistantus laterus"), any(), any(), any(), anyList())).thenReturn(noMatch());
+    when(clb.match(any(), eq("Nonexistantus laterus"), any(), any(), any(), anyList())).thenReturn(noMatch());
     assertThat(service.matchOne(pid, u.getId(), userId)).isEqualTo(ColOutcome.UNMATCHED);
     List<Issue> uIssues = colIssues(pid, u.getId());
     assertThat(uIssues).hasSize(1);
     assertThat(uIssues.get(0).getRule()).isEqualTo("col_match_missing");
 
     // CLB now confirms the already-stored col:KEEP -> VERIFIED -> the missing flag is deleted.
-    when(clb.match(eq("Nonexistantus laterus"), any(), any(), any(), anyList())).thenReturn(matched("KEEP"));
+    when(clb.match(any(), eq("Nonexistantus laterus"), any(), any(), any(), anyList())).thenReturn(matched("KEEP"));
     assertThat(service.matchOne(pid, u.getId(), userId)).isEqualTo(ColOutcome.VERIFIED);
     assertThat(colIssues(pid, u.getId())).isEmpty();
   }
@@ -217,9 +217,9 @@ class ColMatchJobIT extends AbstractPostgresIT {
     NameUsage added = createUsage(pid, "Ursus arctos", null, userId);
     NameUsage unmatched = createUsage(pid, "Nonexistantus ursoides", null, userId);
 
-    when(clb.match(eq("Ailuropoda melanoleuca"), any(), any(), any(), anyList())).thenReturn(matched("PANDA"));
-    when(clb.match(eq("Ursus arctos"), any(), any(), any(), anyList())).thenReturn(matched("BEAR1"));
-    when(clb.match(eq("Nonexistantus ursoides"), any(), any(), any(), anyList())).thenReturn(noMatch());
+    when(clb.match(any(), eq("Ailuropoda melanoleuca"), any(), any(), any(), anyList())).thenReturn(matched("PANDA"));
+    when(clb.match(any(), eq("Ursus arctos"), any(), any(), any(), anyList())).thenReturn(matched("BEAR1"));
+    when(clb.match(any(), eq("Nonexistantus ursoides"), any(), any(), any(), anyList())).thenReturn(noMatch());
 
     ColMatchRun run = new ColMatchRun();
     run.setProjectId(pid);

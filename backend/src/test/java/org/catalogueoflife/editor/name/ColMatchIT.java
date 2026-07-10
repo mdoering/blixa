@@ -3,6 +3,8 @@ package org.catalogueoflife.editor.name;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -59,7 +61,8 @@ class ColMatchIT extends AbstractPostgresIT {
     long pid = createProject();
     long uid = createUsage(pid, "Panthera leo");
 
-    when(clb.match(anyString(), any(), any(), any(), anyList())).thenReturn(json.readTree("""
+    when(clb.defaultColDataset()).thenReturn("3LXR");
+    when(clb.match(anyString(), anyString(), any(), any(), any(), anyList())).thenReturn(json.readTree("""
         {
           "type": "EXACT",
           "usage": {
@@ -106,6 +109,10 @@ class ColMatchIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$[1].colId").value("6W3C5"))
         .andExpect(jsonPath("$[1].matchType").value("ALTERNATIVE"))
         .andExpect(jsonPath("$.length()").value(2));
+
+    // the single-taxon path always matches against the configured COL default dataset (3LXR), not
+    // some other/no dataset key.
+    verify(clb).match(eq("3LXR"), anyString(), any(), any(), any(), anyList());
   }
 
   @Test
@@ -114,7 +121,7 @@ class ColMatchIT extends AbstractPostgresIT {
     long pid = createProject();
     long uid = createUsage(pid, "Nonexistantus bogusii");
 
-    when(clb.match(anyString(), any(), any(), any(), anyList())).thenReturn(json.readTree("""
+    when(clb.match(any(), anyString(), any(), any(), any(), anyList())).thenReturn(json.readTree("""
         {
           "type": "NONE",
           "usage": null

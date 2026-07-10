@@ -127,7 +127,7 @@ class ColMatchRunApiIT extends AbstractPostgresIT {
     createUsage(pid, "Panthera leo");
     createUsage(pid, "Panthera onca");
 
-    when(clb.match(anyString(), any(), any(), any(), anyList()))
+    when(clb.match(any(), anyString(), any(), any(), any(), anyList()))
         .thenReturn(json.readTree("{\"type\":\"EXACT\",\"usage\":{\"id\":\"FIXEDCOL\"}}"));
 
     String startBody = mvc.perform(post("/api/projects/" + pid + "/col-match").with(csrf()))
@@ -155,7 +155,7 @@ class ColMatchRunApiIT extends AbstractPostgresIT {
     long pid = createProject("colmatchrunnomatchproj");
     createUsage(pid, "Nonexistantus bogusii");
 
-    when(clb.match(anyString(), any(), any(), any(), anyList()))
+    when(clb.match(any(), anyString(), any(), any(), any(), anyList()))
         .thenReturn(json.readTree("{\"type\":\"NONE\",\"usage\":null}"));
 
     String startBody = mvc.perform(post("/api/projects/" + pid + "/col-match").with(csrf()))
@@ -178,7 +178,7 @@ class ColMatchRunApiIT extends AbstractPostgresIT {
     long pid1 = createProject("colmatchruncrossproj1");
     long pid2 = createProject("colmatchruncrossproj2");
 
-    when(clb.match(anyString(), any(), any(), any(), anyList()))
+    when(clb.match(any(), anyString(), any(), any(), any(), anyList()))
         .thenReturn(json.readTree("{\"type\":\"NONE\",\"usage\":null}"));
 
     String startBody = mvc.perform(post("/api/projects/" + pid1 + "/col-match").with(csrf()))
@@ -225,7 +225,7 @@ class ColMatchRunApiIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + pid + "/col-match/latest"))
         .andExpect(status().isNoContent());
 
-    when(clb.match(anyString(), any(), any(), any(), anyList()))
+    when(clb.match(any(), anyString(), any(), any(), any(), anyList()))
         .thenReturn(json.readTree("{\"type\":\"EXACT\",\"usage\":{\"id\":\"FIXEDCOL\"}}"));
 
     String startBody = mvc.perform(post("/api/projects/" + pid + "/col-match").with(csrf()))

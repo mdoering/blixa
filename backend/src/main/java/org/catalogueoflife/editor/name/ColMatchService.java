@@ -41,7 +41,8 @@ public class ColMatchService {
     String code = project.getNomCode() == null ? null : project.getNomCode().name();
     String rank = u.getRank() == null ? null : u.getRank().toLowerCase(Locale.ROOT);
     List<RankName> classification = usages.findClassification(projectId, usageId);
-    JsonNode root = clb.match(u.getScientificName(), u.getAuthorship(), rank, code, classification);
+    JsonNode root = clb.match(clb.defaultColDataset(), u.getScientificName(), u.getAuthorship(), rank,
+        code, classification);
 
     List<ColMatchCandidate> out = new ArrayList<>();
     addCandidate(out, root.path("usage"), root.path("type").asString(null));
