@@ -12,9 +12,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Verifies {@link ColdpMetadata#write} / {@link ColdpMetadata#read} round-trip a {@code
- * metadata.yaml} using the seven ColDP metadata keys our {@code project} maps: {@code title},
- * {@code alias}, {@code description}, {@code code}, {@code license}, {@code geographicScope},
- * {@code taxonomicScope}.
+ * metadata.yaml} using the six ColDP metadata keys our {@code project} maps: {@code title},
+ * {@code alias}, {@code description}, {@code license}, {@code geographicScope}, {@code
+ * taxonomicScope}.
  */
 class ColdpMetadataTest {
 
@@ -22,13 +22,7 @@ class ColdpMetadataTest {
   void roundTripFullyPopulated(@TempDir Path dir) throws IOException {
     ColdpMetadataDto dto =
         new ColdpMetadataDto(
-            "Full Title",
-            "Alias",
-            "A multi word\ndescription.",
-            "zoological",
-            "CC0-1.0",
-            "global",
-            "Fishes");
+            "Full Title", "Alias", "A multi word\ndescription.", "CC0-1.0", "global", "Fishes");
 
     ColdpMetadata.write(dir, dto);
     ColdpMetadataDto read = ColdpMetadata.read(dir);
@@ -41,7 +35,6 @@ class ColdpMetadataTest {
     String yaml =
         """
         title: Minimal Title
-        code: zoological
         contact: foo
         """;
     Files.writeString(dir.resolve("metadata.yaml"), yaml, StandardCharsets.UTF_8);
@@ -49,7 +42,6 @@ class ColdpMetadataTest {
     ColdpMetadataDto read = ColdpMetadata.read(dir);
 
     assertThat(read.title()).isEqualTo("Minimal Title");
-    assertThat(read.code()).isEqualTo("zoological");
     assertThat(read.alias()).isNull();
     assertThat(read.description()).isNull();
     assertThat(read.license()).isNull();
@@ -60,7 +52,7 @@ class ColdpMetadataTest {
   @Test
   void writeOmitsNullValuedKeys(@TempDir Path dir) throws IOException {
     ColdpMetadataDto dto =
-        new ColdpMetadataDto("Only Title And License", null, null, null, "CC-BY-4.0", null, null);
+        new ColdpMetadataDto("Only Title And License", null, null, "CC-BY-4.0", null, null);
 
     ColdpMetadata.write(dir, dto);
 
@@ -69,7 +61,6 @@ class ColdpMetadataTest {
     assertThat(content)
         .doesNotContain("alias:")
         .doesNotContain("description:")
-        .doesNotContain("code:")
         .doesNotContain("geographicScope:")
         .doesNotContain("taxonomicScope:");
   }

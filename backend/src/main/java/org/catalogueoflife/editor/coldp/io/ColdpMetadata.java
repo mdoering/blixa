@@ -17,15 +17,9 @@ import org.yaml.snakeyaml.Yaml;
  *
  * <p>ColDP's {@code metadata.yaml} supports many more keys in the wild (contact, creator,
  * keywords, etc. -- see the {@code metadata.yaml}/{@code metadata.json} conventions in the {@code
- * coldp} spec repo). This class maps only the seven keys our {@code project} entity carries:
- * {@code title}, {@code alias}, {@code description}, {@code code}, {@code license}, {@code
- * geographicScope}, {@code taxonomicScope}. Of these, {@code title}, {@code alias}, {@code
- * description}, {@code license}, {@code geographicScope} and {@code taxonomicScope} are genuine
- * top-level ColDP metadata.yaml keys; {@code code} (our project's nomenclatural code) is not part
- * of the official top-level ColDP metadata schema (the spec only uses a nomenclatural {@code
- * code} nested under {@code Name} in the separate {@code default.yaml} defaults file) -- we still
- * read/write it as a plain top-level {@code code} key here since that's what our DTO maps, and
- * unknown keys are ignored/tolerated by both this reader and the wider ColDP tooling.
+ * coldp} spec repo). This class maps only the six keys our {@code project} entity carries: {@code
+ * title}, {@code alias}, {@code description}, {@code license}, {@code geographicScope}, {@code
+ * taxonomicScope} -- all genuine top-level ColDP metadata.yaml keys.
  *
  * <p>{@link #read(Path)} ignores any other keys present in the file (unknown-key tolerant).
  * {@link #write(Path, ColdpMetadataDto)} emits only non-null fields, in clean YAML block style.
@@ -37,13 +31,11 @@ public final class ColdpMetadata {
   private ColdpMetadata() {}
 
   /**
-   * The seven ColDP metadata fields our {@code project} entity maps.
+   * The six ColDP metadata fields our {@code project} entity maps.
    *
    * @param title full dataset title
    * @param alias short, hopefully unique name for the dataset
    * @param description multi paragraph description / abstract of the dataset
-   * @param code nomenclatural code of the project (not a standard top-level ColDP metadata.yaml
-   *     key, see class javadoc)
    * @param license dataset license, e.g. {@code CC0-1.0}
    * @param geographicScope description of the geographical scope of the dataset
    * @param taxonomicScope taxonomic scope of the dataset
@@ -52,7 +44,6 @@ public final class ColdpMetadata {
       String title,
       String alias,
       String description,
-      String code,
       String license,
       String geographicScope,
       String taxonomicScope) {}
@@ -69,7 +60,6 @@ public final class ColdpMetadata {
     putIfPresent(data, "title", md.title());
     putIfPresent(data, "alias", md.alias());
     putIfPresent(data, "description", md.description());
-    putIfPresent(data, "code", md.code());
     putIfPresent(data, "license", md.license());
     putIfPresent(data, "geographicScope", md.geographicScope());
     putIfPresent(data, "taxonomicScope", md.taxonomicScope());
@@ -114,7 +104,6 @@ public final class ColdpMetadata {
         str(data, "title"),
         str(data, "alias"),
         str(data, "description"),
-        str(data, "code"),
         str(data, "license"),
         str(data, "geographicScope"),
         str(data, "taxonomicScope"));
