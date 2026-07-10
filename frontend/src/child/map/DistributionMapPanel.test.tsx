@@ -41,9 +41,16 @@ function mockMap(colId: string | null) {
   );
 }
 
+function mockGbifCount(count: number) {
+  server.use(
+    http.get('https://api.gbif.org/v1/occurrence/search', () => HttpResponse.json({ count })),
+  );
+}
+
 test('renders the layer checkboxes with children layers unchecked by default', async () => {
   mockProject();
   mockMap('6W3C4');
+  mockGbifCount(1234);
   renderWithProviders(<DistributionMapPanel pid={4} usageId={10} canEdit />);
 
   const focal = await screen.findByLabelText('Distribution (focal)');
@@ -52,22 +59,44 @@ test('renders the layer checkboxes with children layers unchecked by default', a
   expect(screen.getByLabelText('Distribution (children)')).not.toBeChecked();
   expect(screen.getByLabelText('Type specimens (children)')).not.toBeChecked();
   // GBIF checkbox shows once matched to COL, and is checked by default (gbifOccurrenceLayer &&
-  // colId).
-  expect(screen.getByLabelText('GBIF occurrences')).toBeInTheDocument();
-  expect(screen.getByLabelText('GBIF occurrences')).toBeChecked();
+  // colId), and enabled since the preflight count confirms occurrences exist.
+  const gbif = await screen.findByLabelText('GBIF occurrences');
+  expect(gbif).toBeChecked();
+  expect(gbif).not.toBeDisabled();
   // The lazy MapView stub mounted.
   expect(await screen.findByTestId('map-view-stub')).toBeInTheDocument();
   // Free-text-only area listed as not mappable.
   expect(screen.getByText(/not mappable/i)).toBeInTheDocument();
 });
 
+test('greys out the GBIF checkbox when the preflight count confirms zero occurrences', async () => {
+  mockProject();
+  mockMap('6W3C4');
+  mockGbifCount(0);
+  renderWithProviders(<DistributionMapPanel pid={4} usageId={10} canEdit />);
+
+  await screen.findByLabelText('Distribution (focal)');
+  const gbif = await screen.findByLabelText('GBIF occurrences (none)');
+  expect(gbif).toBeDisabled();
+  expect(gbif).not.toBeChecked();
+  // No plain (enabled) "GBIF occurrences" checkbox alongside the disabled one.
+  expect(screen.queryByLabelText('GBIF occurrences')).not.toBeInTheDocument();
+  // Other layers unaffected.
+  expect(screen.getByLabelText('Distribution (focal)')).toBeChecked();
+  expect(screen.getByLabelText('Type specimens (focal)')).toBeChecked();
+});
+
 test('shows the Match to COL button when the usage has no colId', async () => {
   mockProject();
   mockMap(null);
+  // Deliberately no mockGbifCount(): the count query is `enabled: !!colId`, so with colId null it
+  // must never fire. The test server errors on unhandled requests (see test/setup.ts), so this
+  // test would fail on its own if the preflight query fired despite no colId.
   renderWithProviders(<DistributionMapPanel pid={4} usageId={10} canEdit />);
 
   await screen.findByText(/not matched to col yet/i);
   expect(screen.getByRole('button', { name: /match to col/i })).toBeInTheDocument();
   // No GBIF checkbox without a COL match.
   expect(screen.queryByLabelText('GBIF occurrences')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('GBIF occurrences (none)')).not.toBeInTheDocument();
 });

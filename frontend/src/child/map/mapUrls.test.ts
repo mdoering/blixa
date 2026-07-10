@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaGeojsonUrl, colIdFrom, gbifTileUrl, withColId } from './mapUrls';
+import { areaGeojsonUrl, colIdFrom, gbifCountUrl, gbifTileUrl, withColId } from './mapUrls';
 
 const UUID = '7ddf754f-d193-4cc9-b351-99906754a03b';
 
@@ -46,6 +46,20 @@ describe('gbifTileUrl', () => {
   });
   test('url-encodes the taxonKey value', () => {
     expect(gbifTileUrl('a b', UUID)).toContain('taxonKey=a%20b');
+  });
+});
+
+describe('gbifCountUrl', () => {
+  test('contains the count path, limit=0, and the checklistKey + taxonKey values', () => {
+    const url = gbifCountUrl('6W3C4', UUID);
+    expect(url).toContain('/v1/occurrence/search');
+    expect(url).toContain('limit=0');
+    expect(url).toContain(`checklistKey=${UUID}`);
+    expect(url).toContain('taxonKey=6W3C4');
+    expect(url.startsWith('https://api.gbif.org')).toBe(true);
+  });
+  test('url-encodes the taxonKey value', () => {
+    expect(gbifCountUrl('a b', UUID)).toContain('taxonKey=a%20b');
   });
 });
 

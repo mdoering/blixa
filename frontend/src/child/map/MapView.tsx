@@ -31,6 +31,7 @@ export interface MapViewProps {
   typeSpecimens: MapPointRecord[];
   layers: LayerVisibility;
   gbifEnabled: boolean;
+  gbifAvailable: boolean;
 }
 
 // Layer ids grouped so visibility can be toggled without rebuilding the map.
@@ -101,6 +102,7 @@ export default function MapView({
   typeSpecimens,
   layers,
   gbifEnabled,
+  gbifAvailable,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -190,8 +192,12 @@ export default function MapView({
       addPointGroup('type-focal', true, TYPE_FOCAL_COLOR);
       addPointGroup('type-children', false, TYPE_CHILDREN_COLOR);
 
-      // GBIF occurrence-density raster (only meaningful once matched to COL).
-      if (colId) {
+      // GBIF occurrence-density raster (only meaningful once matched to COL, and only when the
+      // preflight count hasn't confirmed zero occurrences — no point adding an empty raster).
+      // Gated on colId/gbifAvailable only (not gbifEnabled): this mirrors every other layer group
+      // above, which is added unconditionally and then shown/hidden by applyVisibility() below,
+      // so toggling the checkbox stays a cheap visibility flip and never needs a map rebuild.
+      if (colId && gbifAvailable) {
         map.addSource('gbif', {
           type: 'raster',
           tiles: [gbifTileUrl(colId, checklistKey)],
@@ -221,7 +227,7 @@ export default function MapView({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colId, checklistKey, distributions, typeSpecimens]);
+  }, [colId, checklistKey, distributions, typeSpecimens, gbifAvailable]);
 
   // Cheap visibility updates when a checkbox toggles (no rebuild / re-fetch).
   useEffect(() => {

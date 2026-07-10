@@ -1,6 +1,9 @@
 // Pure URL/id helpers for the distribution map. Kept free of maplibre-gl so they can be
 // unit-tested in jsdom (no WebGL) and reused by other views (e.g. Task 8 match-to-COL).
 
+// COL GBIF checklist UUID — matches backend `coldp.col.gbif-checklist-key`.
+export const GBIF_CHECKLIST_KEY = '7ddf754f-d193-4cc9-b351-99906754a03b';
+
 // Extract the COL id from a usage's alternativeId list by stripping a case-insensitive `col:`
 // prefix. Returns the first match, or null when none is present.
 export function colIdFrom(alternativeId: string[] | null | undefined): string | null {
@@ -35,6 +38,21 @@ export function gbifTileUrl(colId: string, checklistKey: string): string {
     `taxonKey=${encodeURIComponent(colId)}`,
   ].join('&');
   return `https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}@1x.png?${params}`;
+}
+
+// GBIF occurrence-search preflight: how many occurrences would the density raster (gbifTileUrl)
+// actually show for this COL id? `limit=0` skips the record payload — we only want `count`.
+// Mirrors gbifTileUrl's filters so the count reflects the same set of occurrences.
+export function gbifCountUrl(colId: string, checklistKey: string): string {
+  const params = [
+    `checklistKey=${encodeURIComponent(checklistKey)}`,
+    `taxonKey=${encodeURIComponent(colId)}`,
+    'hasCoordinate=true',
+    'hasGeospatialIssue=false',
+    'occurrenceStatus=PRESENT',
+    'limit=0',
+  ].join('&');
+  return `https://api.gbif.org/v1/occurrence/search?${params}`;
 }
 
 // ChecklistBank gazetteer area GeoJSON endpoint for a coded area (e.g. tdwg:AB). gazetteer/areaId

@@ -5,10 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getMapData } from '../../api/map';
 import { getProject } from '../../api/projects';
 import MatchColModal from './MatchColModal';
+import { GBIF_CHECKLIST_KEY, gbifCountUrl } from './mapUrls';
 import type { LayerVisibility } from './MapView';
-
-// COL GBIF checklist UUID — matches backend `coldp.col.gbif-checklist-key`.
-const COL_CHECKLIST_KEY = '7ddf754f-d193-4cc9-b351-99906754a03b';
 
 // maplibre-gl lives entirely inside MapView; lazy-load it so its ~230KB (gzip) bundle stays out
 // of the main entry chunk.
@@ -44,6 +42,20 @@ export default function DistributionMapPanel({ pid, usageId, canEdit }: Props) {
 
   const mapData = mapQuery.data;
   const colId = mapData?.colId ?? null;
+
+  // Preflight: does GBIF actually have any occurrences for this COL id? Loading or a failed
+  // count both resolve `data` to undefined, which we treat as "available" (optimistic) — a
+  // transient GBIF hiccup must not hide the layer. Only a CONFIRMED zero greys it out.
+  const countQuery = useQuery({
+    queryKey: ['gbifCount', colId],
+    enabled: !!colId,
+    queryFn: () =>
+      fetch(gbifCountUrl(colId as string, GBIF_CHECKLIST_KEY))
+        .then((r) => r.json())
+        .then((j) => j.count as number),
+  });
+  const gbifAvailable = countQuery.data === undefined ? true : countQuery.data > 0;
+
   const gbifDefault = !!(project?.gbifOccurrenceLayer && colId);
   const gbifOn = gbifOverride ?? gbifDefault;
 
@@ -93,7 +105,10 @@ export default function DistributionMapPanel({ pid, usageId, canEdit }: Props) {
               checked={layers.typeChildren}
               onChange={(e) => toggle('typeChildren')(e.currentTarget.checked)}
             />
-            {colId && (
+            {colId && !gbifAvailable && (
+              <Checkbox label="GBIF occurrences (none)" checked={false} disabled />
+            )}
+            {colId && gbifAvailable && (
               <Checkbox
                 label="GBIF occurrences"
                 checked={gbifOn}
@@ -127,11 +142,12 @@ export default function DistributionMapPanel({ pid, usageId, canEdit }: Props) {
         >
           <LazyMapView
             colId={colId}
-            checklistKey={COL_CHECKLIST_KEY}
+            checklistKey={GBIF_CHECKLIST_KEY}
             distributions={mapData.distributions}
             typeSpecimens={mapData.typeSpecimens}
             layers={layers}
             gbifEnabled={gbifOn && !!colId}
+            gbifAvailable={gbifAvailable}
           />
         </Suspense>
 
