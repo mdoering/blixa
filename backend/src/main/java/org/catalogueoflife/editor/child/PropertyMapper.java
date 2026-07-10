@@ -21,6 +21,9 @@ public interface PropertyMapper {
   @Select(SELECT + " WHERE project_id = #{projectId} AND usage_id = #{usageId} ORDER BY id")
   List<PropertyResponse> findByUsage(@Param("projectId") int projectId, @Param("usageId") int usageId);
 
+  @Select(SELECT + " WHERE project_id = #{projectId} ORDER BY id")
+  List<PropertyResponse> findByProject(@Param("projectId") int projectId);
+
   @Select(SELECT + " WHERE project_id = #{projectId} AND id = #{id}")
   PropertyResponse findById(@Param("projectId") int projectId, @Param("id") int id);
 

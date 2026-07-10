@@ -21,6 +21,9 @@ public interface MediaMapper {
   @Select(SELECT + " WHERE project_id = #{projectId} AND usage_id = #{usageId} ORDER BY id")
   List<MediaResponse> findByUsage(@Param("projectId") int projectId, @Param("usageId") int usageId);
 
+  @Select(SELECT + " WHERE project_id = #{projectId} ORDER BY id")
+  List<MediaResponse> findByProject(@Param("projectId") int projectId);
+
   @Select(SELECT + " WHERE project_id = #{projectId} AND id = #{id}")
   MediaResponse findById(@Param("projectId") int projectId, @Param("id") int id);
 

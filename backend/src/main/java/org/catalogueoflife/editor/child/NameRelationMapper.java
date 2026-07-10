@@ -23,6 +23,9 @@ public interface NameRelationMapper {
   @Select(SELECT + " WHERE nr.project_id = #{projectId} AND nr.usage_id = #{usageId} ORDER BY nr.id")
   List<NameRelationResponse> findByUsage(@Param("projectId") int projectId, @Param("usageId") int usageId);
 
+  @Select(SELECT + " WHERE nr.project_id = #{projectId} ORDER BY nr.id")
+  List<NameRelationResponse> findByProject(@Param("projectId") int projectId);
+
   @Select(SELECT + " WHERE nr.project_id = #{projectId} AND nr.id = #{id}")
   NameRelationResponse findById(@Param("projectId") int projectId, @Param("id") int id);
 

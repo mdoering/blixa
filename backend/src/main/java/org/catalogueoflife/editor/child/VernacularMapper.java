@@ -21,6 +21,9 @@ public interface VernacularMapper {
   @Select(SELECT + " WHERE project_id = #{projectId} AND usage_id = #{usageId} ORDER BY id")
   List<VernacularResponse> findByUsage(@Param("projectId") int projectId, @Param("usageId") int usageId);
 
+  @Select(SELECT + " WHERE project_id = #{projectId} ORDER BY id")
+  List<VernacularResponse> findByProject(@Param("projectId") int projectId);
+
   @Select(SELECT + " WHERE project_id = #{projectId} AND id = #{id}")
   VernacularResponse findById(@Param("projectId") int projectId, @Param("id") int id);
 

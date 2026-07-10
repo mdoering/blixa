@@ -18,10 +18,12 @@ import org.springframework.web.server.ResponseStatusException;
 // on ExportAsyncConfig.EXECUTOR_BEAN): builds a flat ColDP folder in a fresh temp dir, zips it to
 // targetZip (ColdpZip.zipFolder), and cleans the temp dir up. Writes metadata.yaml (the project's
 // own fields, via ColdpMetadata.write), the combined NameUsage.tsv (NameUsageColdpWriter),
-// Reference.tsv (ReferenceColdpWriter, always written) and Author.tsv (AuthorColdpWriter, written
-// only when the project has authors) -- later tasks add further entity files to this same method's
-// temp-dir population step, without touching the zip/cleanup shape or its
-// (int projectId, Path targetZip) signature.
+// Reference.tsv (ReferenceColdpWriter, always written), Author.tsv (AuthorColdpWriter, written
+// only when the project has authors) and the 7 taxon/name child-entity files -- TypeMaterial,
+// Distribution, VernacularName, Media, SpeciesEstimate, NameRelation, TaxonProperty
+// (ChildColdpWriter, each written only when its list is non-empty) -- later tasks add further
+// entity files to this same method's temp-dir population step, without touching the zip/cleanup
+// shape or its (int projectId, Path targetZip) signature.
 @Component
 public class ColdpWriter {
 
@@ -29,13 +31,16 @@ public class ColdpWriter {
   private final NameUsageColdpWriter nameUsageWriter;
   private final ReferenceColdpWriter referenceWriter;
   private final AuthorColdpWriter authorWriter;
+  private final ChildColdpWriter childWriter;
 
   public ColdpWriter(ProjectMapper projects, NameUsageColdpWriter nameUsageWriter,
-      ReferenceColdpWriter referenceWriter, AuthorColdpWriter authorWriter) {
+      ReferenceColdpWriter referenceWriter, AuthorColdpWriter authorWriter,
+      ChildColdpWriter childWriter) {
     this.projects = projects;
     this.nameUsageWriter = nameUsageWriter;
     this.referenceWriter = referenceWriter;
     this.authorWriter = authorWriter;
+    this.childWriter = childWriter;
   }
 
   // Per-entity tallies for the export_run row's *_count columns.
@@ -59,6 +64,7 @@ public class ColdpWriter {
       nameUsageCount = nameUsageWriter.write(tempDir, projectId, project.getNomCode());
       referenceCount = referenceWriter.write(tempDir, projectId);
       authorWriter.write(tempDir, projectId);
+      childWriter.write(tempDir, projectId);
       ColdpZip.zipFolder(tempDir, targetZip);
     } finally {
       deleteRecursively(tempDir);

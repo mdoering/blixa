@@ -24,6 +24,9 @@ public interface TypeMaterialMapper {
   @Select(SELECT + " WHERE project_id = #{projectId} AND usage_id = #{usageId} ORDER BY id")
   List<TypeMaterialResponse> findByUsage(@Param("projectId") int projectId, @Param("usageId") int usageId);
 
+  @Select(SELECT + " WHERE project_id = #{projectId} ORDER BY id")
+  List<TypeMaterialResponse> findByProject(@Param("projectId") int projectId);
+
   @Select(SELECT + " WHERE project_id = #{projectId} AND id = #{id}")
   TypeMaterialResponse findById(@Param("projectId") int projectId, @Param("id") int id);
 
