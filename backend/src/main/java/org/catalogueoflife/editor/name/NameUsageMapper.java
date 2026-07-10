@@ -161,9 +161,11 @@ public interface NameUsageMapper {
 
   // Full higher classification of a usage: every STRICT ancestor (depth > 0, self excluded),
   // root-first (ORDER BY depth DESC), skipping unranked ancestors -- fed to the COL name matcher
-  // as higher-classification query params (see Task 4 / the bulk-match plan). Unlike the other
-  // ancestor CTEs here this has no `anc.depth < 10000` cycle guard since the brief's query is used
-  // verbatim; parent_id cycles are already prevented at write time (TreeMapper.isDescendant).
+  // as higher-classification query params (see Task 4 / the bulk-match plan). Same
+  // `anc.depth < 10000` cycle guard as the other ancestor CTEs in this file (and
+  // TreeMapper.findPath): a defensive statement-timeout/DoS bound in case a cycle ever slips past
+  // the write-time guards (TreeMapper.isDescendant) -- it does not change behavior for any valid
+  // (acyclic) tree.
   @Select("""
       WITH RECURSIVE anc AS (
         SELECT parent_id, rank, scientific_name, 0 AS depth
@@ -171,6 +173,7 @@ public interface NameUsageMapper {
         UNION ALL
         SELECT p.parent_id, p.rank, p.scientific_name, anc.depth + 1
           FROM name_usage p JOIN anc ON p.project_id = #{projectId} AND p.id = anc.parent_id
+        WHERE anc.depth < 10000
       )
       SELECT rank, scientific_name AS name FROM anc
       WHERE depth > 0 AND rank IS NOT NULL
