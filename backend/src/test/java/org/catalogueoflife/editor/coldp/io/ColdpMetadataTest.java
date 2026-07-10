@@ -70,4 +70,16 @@ class ColdpMetadataTest {
     org.assertj.core.api.Assertions.assertThatThrownBy(() -> ColdpMetadata.read(dir))
         .isInstanceOf(IOException.class);
   }
+
+  @Test
+  void readRejectsMaliciousGlobalTag(@TempDir Path dir) throws IOException {
+    // A crafted metadata.yaml using a "!!<fqcn>" global tag to try to instantiate an arbitrary
+    // classpath class. With the unrestricted `new Yaml()` this would be resolvable and
+    // constructed; with SafeConstructor it must be rejected.
+    String yaml = "title: !!javax.script.ScriptEngineManager []\n";
+    Files.writeString(dir.resolve("metadata.yaml"), yaml, StandardCharsets.UTF_8);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> ColdpMetadata.read(dir))
+        .isInstanceOf(org.yaml.snakeyaml.error.YAMLException.class);
+  }
 }

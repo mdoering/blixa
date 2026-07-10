@@ -10,7 +10,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /**
  * Reads and writes a ColDP archive's project-level {@code metadata.yaml} using SnakeYAML.
@@ -93,7 +95,10 @@ public final class ColdpMetadata {
       throw new NoSuchFileException(file.toString());
     }
 
-    Yaml yaml = new Yaml();
+    // metadata.yaml originates from user-uploaded, untrusted ColDP archives (Import feature), so
+    // parse with a SafeConstructor: it rejects arbitrary "!!<fqcn>" type tags that would
+    // otherwise let a crafted file instantiate arbitrary classpath classes (gadget-chain RCE).
+    Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
     Map<String, Object> data;
     try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
       Object loaded = yaml.load(reader);
