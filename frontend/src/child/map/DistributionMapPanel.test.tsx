@@ -51,8 +51,10 @@ test('renders the layer checkboxes with children layers unchecked by default', a
   expect(screen.getByLabelText('Type specimens (focal)')).toBeChecked();
   expect(screen.getByLabelText('Distribution (children)')).not.toBeChecked();
   expect(screen.getByLabelText('Type specimens (children)')).not.toBeChecked();
-  // GBIF checkbox shows once matched to COL.
+  // GBIF checkbox shows once matched to COL, and is checked by default (gbifOccurrenceLayer &&
+  // colId).
   expect(screen.getByLabelText('GBIF occurrences')).toBeInTheDocument();
+  expect(screen.getByLabelText('GBIF occurrences')).toBeChecked();
   // The lazy MapView stub mounted.
   expect(await screen.findByTestId('map-view-stub')).toBeInTheDocument();
   // Free-text-only area listed as not mappable.

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Alert } from '@mantine/core';
-import type { Feature, FeatureCollection, GeoJSON as GeoJson, Geometry } from 'geojson';
+import type { Feature, FeatureCollection, GeoJSON as GeoJson } from 'geojson';
 import type { MapAreaRecord, MapPointRecord } from '../../api/map';
 import { areaGeojsonUrl, gbifTileUrl } from './mapUrls';
 
@@ -55,17 +55,23 @@ function pointsToFeatures(points: MapPointRecord[], focal: boolean): FeatureList
 }
 
 // Fetch one area's GeoJSON and normalise to a flat feature list (endpoint may return a
-// FeatureCollection, a single Feature, or a bare Geometry). Failures resolve to [].
+// FeatureCollection or a single Feature). Unrecognised shapes and failures resolve to [].
 async function fetchAreaFeatures(rec: MapAreaRecord): Promise<FeatureList> {
   if (!rec.gazetteer || !rec.areaId) return [];
   try {
-    const res = await fetch(areaGeojsonUrl(rec.gazetteer, rec.areaId));
+    const res = await fetch(areaGeojsonUrl(rec.gazetteer, rec.areaId), {
+      headers: { Accept: 'application/geo+json' },
+    });
     if (!res.ok) return [];
     const json = (await res.json()) as GeoJson;
-    let features: Feature[] = [];
+    // The gazetteer area endpoint content-negotiates between a plain vocab-term JSON and real
+    // GeoJSON on the same path. Only trust shapes we recognise as GeoJSON; anything else (e.g.
+    // a vocab object returned despite the Accept header) is skipped rather than wrapped into a
+    // malformed feature.
+    let features: Feature[];
     if (json.type === 'FeatureCollection') features = json.features;
     else if (json.type === 'Feature') features = [json];
-    else features = [{ type: 'Feature', geometry: json as Geometry, properties: {} }];
+    else return [];
     return features.map((f) => ({ ...f, properties: { ...f.properties, name: rec.name } }));
   } catch {
     return [];
@@ -117,13 +123,13 @@ export default function MapView({
         zoom: 1,
         attributionControl: { compact: true },
       });
+      map.addControl(new maplibregl.NavigationControl(), 'top-right');
     } catch {
       // WebGL unavailable / init failure: degrade to a notice, never crash the panel.
       setFailed(true);
       return;
     }
     mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
     const applyVisibility = () => {
       const { layers: l, gbifEnabled: g } = visRef.current;
