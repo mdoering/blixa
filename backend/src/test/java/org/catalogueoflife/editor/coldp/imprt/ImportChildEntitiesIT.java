@@ -66,7 +66,10 @@ import tools.jackson.databind.ObjectMapper;
 // endpoint. Neither usage carries a nameReferenceID, so MissingPublishedInRule fires for all three --
 // proof revalidateProject actually ran, not just that the load finished. A second Distribution row
 // with a dangling taxonID ("9999", never defined) proves a child row referencing an unknown usage is
-// skipped with an ImportIssue rather than failing the whole import.
+// skipped with an ImportIssue rather than failing the whole import. A third Distribution row with
+// taxonID "4" (the synonym) proves the 5 taxon-scoped loaders uphold the "ACCEPTED usages only"
+// invariant AbstractChildEntityService.requireAcceptedUsage enforces everywhere else in the app --
+// resolvable but non-accepted is skipped with its own ImportIssue too, same as a dangling reference.
 @AutoConfigureMockMvc
 class ImportChildEntitiesIT extends AbstractPostgresIT {
 
@@ -162,7 +165,15 @@ class ImportChildEntitiesIT extends AbstractPostgresIT {
     // fail the whole import.
     Map<ColdpTerm, String> danglingDistribution = row(
         ColdpTerm.taxonID, "9999", ColdpTerm.area, "Nowhere");
-    ColdpTsv.writeFile(dir, ColdpTerm.Distribution, List.of(distribution, danglingDistribution));
+    // Synonym taxonID: "4" (Felis domesticus) is a SYNONYM of "2", not accepted -- Distribution is
+    // one of the 5 taxon-scoped entities that only ever apply to accepted usages
+    // (AbstractChildEntityService.requireAcceptedUsage), so this row must be skipped with an
+    // ImportIssue too, exactly like the dangling-taxonID row above, rather than silently creating a
+    // distribution row against a synonym.
+    Map<ColdpTerm, String> synonymDistribution = row(
+        ColdpTerm.taxonID, "4", ColdpTerm.area, "Synonym Land");
+    ColdpTsv.writeFile(dir, ColdpTerm.Distribution,
+        List.of(distribution, danglingDistribution, synonymDistribution));
 
     Map<ColdpTerm, String> vernacular = row(
         ColdpTerm.taxonID, "2", ColdpTerm.name, "Domestic Cat", ColdpTerm.language, "eng",
@@ -220,6 +231,7 @@ class ImportChildEntitiesIT extends AbstractPostgresIT {
     List<NameUsage> allUsages = usages.findAllByProject(projectId);
     int felisCatusId = byName(allUsages, "Felis catus").getId();
     int felisSilvestrisId = byName(allUsages, "Felis silvestris").getId();
+    int felisDomesticusId = byName(allUsages, "Felis domesticus").getId();
 
     List<Reference> refs = references.findAllByProject(projectId);
     int typeRefId = refs.stream().filter(r -> "Type Reference 2020".equals(r.getCitation()))
@@ -246,8 +258,8 @@ class ImportChildEntitiesIT extends AbstractPostgresIT {
     assertThat(tm.remarks()).isEqualTo("a type specimen");
     assertThat(tm.occurrenceId()).isNull();
 
-    // Distribution: the valid row landed against the remapped usage; the dangling-taxonID row was
-    // skipped (project-wide list has exactly one row, not two).
+    // Distribution: the valid row landed against the remapped usage; the dangling-taxonID row and
+    // the synonym-taxonID row were both skipped (project-wide list has exactly one row, not three).
     List<DistributionResponse> dist = distributions.findByProject(projectId);
     assertThat(dist).hasSize(1);
     DistributionResponse d = dist.get(0);
@@ -260,17 +272,30 @@ class ImportChildEntitiesIT extends AbstractPostgresIT {
     assertThat(d.referenceId()).isEqualTo(typeRefId);
     assertThat(d.remarks()).isEqualTo("distribution remark");
 
+    // The synonym-taxonID row created no distribution row against Felis domesticus (a SYNONYM, not
+    // accepted) either -- same invariant as requireAcceptedUsage, upheld by import too.
+    assertThat(distributions.findByUsage(projectId, felisDomesticusId)).isEmpty();
+
     JsonNode runIssues = done.get("issues");
     assertThat(runIssues).isNotNull();
     assertThat(runIssues.isArray()).isTrue();
     boolean danglingIssueFound = false;
+    boolean notAcceptedIssueFound = false;
     for (JsonNode issue : runIssues) {
-      if ("distribution".equals(issue.get("entity").asString())
-          && issue.get("message").asString().contains("9999")) {
+      if (!"distribution".equals(issue.get("entity").asString())) {
+        continue;
+      }
+      String message = issue.get("message").asString();
+      if (message.contains("9999")) {
         danglingIssueFound = true;
+      }
+      if (message.contains("not accepted")) {
+        notAcceptedIssueFound = true;
       }
     }
     assertThat(danglingIssueFound).as("dangling taxonID distribution row surfaced as an issue").isTrue();
+    assertThat(notAcceptedIssueFound)
+        .as("synonym taxonID distribution row surfaced as a not-accepted issue").isTrue();
 
     // VernacularName.
     List<VernacularResponse> verns = vernaculars.findByUsage(projectId, felisCatusId);

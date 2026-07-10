@@ -544,7 +544,13 @@ public class ImportRunService {
   // a fresh id and calls the mapper's raw insert() directly, exactly like loadReferences/loadAuthors/
   // insertPrimaryUsage above. A row whose parent usage (taxonID/nameID) can't be resolved is skipped
   // with a ctx.issue rather than failing the whole import -- never fatal, matching every other
-  // dangling-reference case in this file.
+  // dangling-reference case in this file. The 5 taxon-scoped loaders additionally require the
+  // resolved taxonID to be ACCEPTED (ctx.acceptedUsageIds, populated in Task 4's Pass 1): this
+  // mirrors AbstractChildEntityService.requireAcceptedUsage, which every ordinary (non-import) write
+  // path for these 5 entities enforces, and NameUsageService.writeTaxonInfo's taxonChildren.dropAll
+  // on any status change away from ACCEPTED -- a synonym's taxonID must never be allowed to end up
+  // owning one of these 5 rows, import included. TypeMaterial + NameRelation key off nameID and apply
+  // to ANY usage status, so they deliberately do NOT consult acceptedUsageIds.
   private void loadChildEntities(ColdpReader reader, ImportContext ctx, int userId) {
     loadTypeMaterial(reader, ctx, userId);
     loadDistribution(reader, ctx, userId);
@@ -607,6 +613,11 @@ public class ImportRunService {
         ctx.issue(DISTRIBUTION_ENTITY, rowId, "taxon " + taxonSrc + " not found");
         return;
       }
+      if (!ctx.acceptedUsageIds.contains(usageId)) {
+        ctx.issue(DISTRIBUTION_ENTITY, rowId,
+            "taxon " + taxonSrc + " is not accepted — distribution skipped");
+        return;
+      }
       DistributionRequest r = new DistributionRequest(
           rec.get(ColdpTerm.area),
           rec.get(ColdpTerm.areaID),
@@ -635,6 +646,11 @@ public class ImportRunService {
       Integer usageId = ctx.usageIds.get(taxonSrc);
       if (usageId == null) {
         ctx.issue(VERNACULAR_ENTITY, rowId, "taxon " + taxonSrc + " not found");
+        return;
+      }
+      if (!ctx.acceptedUsageIds.contains(usageId)) {
+        ctx.issue(VERNACULAR_ENTITY, rowId,
+            "taxon " + taxonSrc + " is not accepted — vernacular skipped");
         return;
       }
       String preferredStr = rec.get(ColdpTerm.preferred);
@@ -666,6 +682,10 @@ public class ImportRunService {
         ctx.issue(MEDIA_ENTITY, rowId, "taxon " + taxonSrc + " not found");
         return;
       }
+      if (!ctx.acceptedUsageIds.contains(usageId)) {
+        ctx.issue(MEDIA_ENTITY, rowId, "taxon " + taxonSrc + " is not accepted — media skipped");
+        return;
+      }
       MediaRequest r = new MediaRequest(
           rec.get(ColdpTerm.url),
           rec.get(ColdpTerm.type),
@@ -692,6 +712,11 @@ public class ImportRunService {
       Integer usageId = ctx.usageIds.get(taxonSrc);
       if (usageId == null) {
         ctx.issue(ESTIMATE_ENTITY, rowId, "taxon " + taxonSrc + " not found");
+        return;
+      }
+      if (!ctx.acceptedUsageIds.contains(usageId)) {
+        ctx.issue(ESTIMATE_ENTITY, rowId,
+            "taxon " + taxonSrc + " is not accepted — estimate skipped");
         return;
       }
       EstimateRequest r = new EstimateRequest(
@@ -754,6 +779,11 @@ public class ImportRunService {
       Integer usageId = ctx.usageIds.get(taxonSrc);
       if (usageId == null) {
         ctx.issue(PROPERTY_ENTITY, rowId, "taxon " + taxonSrc + " not found");
+        return;
+      }
+      if (!ctx.acceptedUsageIds.contains(usageId)) {
+        ctx.issue(PROPERTY_ENTITY, rowId,
+            "taxon " + taxonSrc + " is not accepted — property skipped");
         return;
       }
       PropertyRequest r = new PropertyRequest(
@@ -914,6 +944,9 @@ public class ImportRunService {
           u.getTemporalRangeStart(), u.getTemporalRangeEnd());
     }
     ctx.usageIds.put(row.get(ColdpTerm.ID), u.getId());
+    if (u.getStatus() == Status.ACCEPTED) {
+      ctx.acceptedUsageIds.add(u.getId());
+    }
     ctx.nameUsageCount++;
     return u;
   }

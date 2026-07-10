@@ -2,8 +2,10 @@ package org.catalogueoflife.editor.coldp.imprt;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.catalogueoflife.editor.coldp.imprt.dto.ImportRunResponse;
 
 // Mutable holder threaded through the load phases of one import run: references + authors load
@@ -18,6 +20,13 @@ class ImportContext {
   final Map<String, Integer> refIds = new HashMap<>();     // sourceRefID -> our id
   final Map<String, Integer> authorIds = new HashMap<>();   // sourceAuthorID -> our id
   final Map<String, Integer> usageIds = new HashMap<>();    // filled by Task 4
+  // New (our) usage ids whose primary row's status is genuinely ACCEPTED (never SYNONYM/
+  // MISAPPLIED/UNASSESSED) -- filled alongside usageIds in Task 4's Pass 1 (insertPrimaryUsage).
+  // Consulted by the 5 taxon-scoped Task 5 child loaders (Distribution/VernacularName/Media/
+  // SpeciesEstimate/TaxonProperty) to uphold AbstractChildEntityService.requireAcceptedUsage's
+  // invariant that those 5 entities only ever apply to ACCEPTED usages -- TypeMaterial/NameRelation
+  // key off nameID and apply to any usage status, so they never consult this set.
+  final Set<Integer> acceptedUsageIds = new HashSet<>();
   int referenceCount;
   int authorCount;
   int nameUsageCount;
