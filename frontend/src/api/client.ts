@@ -26,6 +26,7 @@ export interface ApiOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   json?: unknown;
   form?: Record<string, string>;
+  formData?: FormData;
 }
 
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
@@ -39,7 +40,13 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     if (token) headers['X-XSRF-TOKEN'] = token;
   }
 
-  if (opts.form) {
+  if (opts.formData) {
+    // Multipart upload: the browser must set its own `Content-Type: multipart/form-data;
+    // boundary=...` header from the FormData body, so we deliberately don't set one here (setting
+    // any Content-Type manually would drop the boundary and break parsing server-side). The
+    // X-XSRF-TOKEN header above still applies -- that's unrelated to the body encoding.
+    init.body = opts.formData;
+  } else if (opts.form) {
     headers['Content-Type'] = 'application/x-www-form-urlencoded';
     init.body = new URLSearchParams(opts.form).toString();
   } else if (opts.json !== undefined) {

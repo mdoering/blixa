@@ -1,12 +1,15 @@
 import { Anchor, Badge, Button, Group, Loader, Paper, Stack, Text, Title } from '@mantine/core';
+import { IconFileImport } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { listProjects } from '../api/projects';
 import CreateProjectModal from './CreateProjectModal';
+import ImportProjectModal from './ImportProjectModal';
 
 export default function ProjectListPage() {
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const { data, isLoading } = useQuery({ queryKey: ['projects'], queryFn: listProjects });
 
   return (
@@ -15,7 +18,16 @@ export default function ProjectListPage() {
         <Title order={3} m={0}>
           My projects
         </Title>
-        <Button onClick={() => setCreating(true)}>New project</Button>
+        <Group gap="xs">
+          <Button
+            variant="default"
+            leftSection={<IconFileImport size={14} />}
+            onClick={() => setImporting(true)}
+          >
+            Import ColDP
+          </Button>
+          <Button onClick={() => setCreating(true)}>New project</Button>
+        </Group>
       </Group>
       {isLoading ? (
         <Loader />
@@ -36,6 +48,7 @@ export default function ProjectListPage() {
         </Stack>
       )}
       <CreateProjectModal open={creating} onClose={() => setCreating(false)} />
+      <ImportProjectModal opened={importing} onClose={() => setImporting(false)} />
     </div>
   );
 }

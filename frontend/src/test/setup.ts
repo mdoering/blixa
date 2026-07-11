@@ -1,7 +1,28 @@
+import { Blob, File } from 'node:buffer';
 import '@testing-library/jest-dom/vitest';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { server } from './server';
+
+// Vitest's jsdom test environment substitutes its own File/FormData/Blob/Headers
+// implementations for Node's (see vitest's populateGlobal), which Node's native
+// fetch/Request body-extraction algorithm doesn't recognize (it duck-types Blob/FormData
+// against the global Blob/FormData -- see undici's isBlobLike) -- a multipart FormData
+// upload built with `new FormData()` then silently loses its Content-Type header under
+// test (affects ImportProjectModal's file upload and any future multipart client code).
+// Re-point these globals at one consistent set: Node's own native Blob/File (unaffected
+// by jsdom's override, reached via node:buffer) plus the standalone `undici` package's
+// fetch/FormData/Headers/Request/Response, so `new FormData()` + `fetch()` behave the
+// same under test as they do in a real browser (where these were already consistent;
+// production code is unaffected by this file). Blob/File must land on globalThis BEFORE
+// `undici` is first imported below: its webidl layer captures the ambient Blob/File
+// classes once, at that module's own load time, to brand-check FormData/File values --
+// importing it any earlier (e.g. as a static top-of-file import, which ES modules
+// resolve before this file's own code runs) would have it capture jsdom's classes
+// instead, silently turning every uploaded File into an "[object File]" string field.
+Object.assign(globalThis, { Blob, File });
+const { fetch, FormData, Headers, Request, Response } = await import('undici');
+Object.assign(globalThis, { fetch, FormData, Headers, Request, Response });
 
 // Mantine (and other libs) call matchMedia; jsdom doesn't implement it.
 Object.defineProperty(window, 'matchMedia', {
