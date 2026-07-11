@@ -110,8 +110,17 @@ Order (mirrors import's references-before-names):
      name id-remap.
 3. **Validate** — revalidate the target project after apply (best-effort, post-commit), like import.
 
-The whole apply is **one transaction** (rollback on fatal error; the FAILED status write stays outside it,
-as in import); per-record non-fatal problems → `merge_run.issues`.
+**Transaction is configurable — the large-dataset safety valve.** By default the apply runs in **one
+transaction** (rollback on fatal error; the FAILED status write stays outside it, as in import), which is
+safest but memory- and lock-heavy. The apply request carries a `transactional` flag; when the plan is large
+(record count over a configured threshold) the UI **recommends turning it off and asks the user to confirm**.
+A **non-transactional** apply commits in batches (per entity type, then per N records) — a mid-apply failure
+leaves a partial but *valid* target (matched records keep their ids; the new records applied so far are added),
+records the failure point in `merge_run.issues`, and is **resumable by recomputing the plan and re-applying**:
+the matcher is deterministic, so already-applied new records now MATCH and are reconciled instead of
+duplicated — it converges without dupes. The **fast full-import path (all-NEW / empty target) is
+non-transactional by default** — it is purely additive, so a partial apply is safe and simply re-runnable.
+Per-record non-fatal problems → `merge_run.issues`.
 
 ## Data model & API
 
@@ -124,7 +133,8 @@ as in import); per-record non-fatal problems → `merge_run.issues`.
   - `GET /api/projects/{targetId}/merge/{runId}` → plan summary + metrics.
   - `GET …/merge/{runId}/mapping?entity=name|reference&category=…&page=…` → paged full mapping for review.
   - `PUT …/merge/{runId}/overrides` → save overrides (rejected before status PLANNED / after APPLYING).
-  - `POST …/merge/{runId}/apply` (body `{mode}`) → applies (async), APPLYING→DONE.
+  - `POST …/merge/{runId}/apply` (body `{mode, transactional}`) → applies (async), APPLYING→DONE.
+    `transactional` defaults true but is forced/recommended false for the full-import path and large plans.
   - `GET …/merge/latest` → latest run for the target.
 
 ## Reuse (designed-for follow-ons, not built here)
@@ -164,8 +174,10 @@ patterns from import/col-match.
 
 ## Caveats / future
 
-- Very large source projects: the plan JSONB + one-transaction apply are memory/lock-heavy; batching is a later
-  optimization (note the limit).
+- Very large source projects: the single-transaction apply is memory/lock-heavy, so it is a **configurable
+  safety valve** (above a threshold the UI recommends the non-transactional, batch-committed, re-runnable
+  apply; full imports skip the transaction entirely — see Apply). The plan JSONB itself can still be large;
+  streaming/paging the plan is a later optimization (note the limit).
 - Author-compatibility + citation normalization are heuristic (GBIF parser / string folding); borderline cases
   fall to POSSIBLE_* and are **reviewed**, never silently merged.
 - Cherry-pick (subtree selection) and a chosen **mount point** for unanchored new branches are deferred
