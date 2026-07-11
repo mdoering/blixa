@@ -41,6 +41,11 @@ server:
 coldp:
   clb:
     base-url: https://api.checklistbank.org
+  clb-import:
+    # ClbImportService's gathered-usage cap (TAXON_SUBTREE/CHILDREN_ONLY): a subtree bigger than
+    # this is rejected with a 400 rather than inserted, pointing the caller at the ColDP import
+    # instead -- see ClbImportService.gather.
+    max-usages: 500
   col:
     match-dataset: 3LXR
     gbif-checklist-key: 7ddf754f-d193-4cc9-b351-99906754a03b
