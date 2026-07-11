@@ -10,9 +10,18 @@ export function getIdScopes(): Promise<string[]> {
 // The enum vocabularies used to constrain the taxon editing form's dropdowns (backend
 // VocabController). Values are in the exact stored/returned form so they round-trip: `ranks` are
 // lower-case, the rest are the upper-case enum name.
+// Each nomenclatural-status option carries the enum-name `value` plus both code-specific labels;
+// the taxon form shows the one matching the project's nomenclatural code (zoological label for
+// zoological projects, botanical label otherwise -- bacteria follow botany).
+export interface NomStatusOption {
+  value: string;
+  botanical: string;
+  zoological: string;
+}
+
 export interface Vocab {
   ranks: string[];
-  nomStatus: string[];
+  nomStatus: NomStatusOption[];
   gender: string[];
   environment: string[];
 }

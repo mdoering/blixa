@@ -144,12 +144,19 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
     () => Array.from(new Set([...(vocab?.ranks ?? []), form.values.rank].filter(Boolean))),
     [vocab?.ranks, form.values.rank],
   );
+  // Nomenclatural-status labels are code-specific: the zoological label for a zoological project,
+  // the botanical label otherwise (botanical, bacterial -> botany, and as a sensible default when a
+  // project has no code set yet).
   const nomStatusData = useMemo(() => {
-    const opts = (vocab?.nomStatus ?? []).map((v) => ({ value: v, label: prettyEnum(v) }));
+    const zoo = project?.nomCode === 'zoological';
+    const opts = (vocab?.nomStatus ?? []).map((o) => ({
+      value: o.value,
+      label: zoo ? o.zoological : o.botanical,
+    }));
     const cur = form.values.nomStatus;
     if (cur && !opts.some((o) => o.value === cur)) opts.push({ value: cur, label: prettyEnum(cur) });
     return opts;
-  }, [vocab?.nomStatus, form.values.nomStatus]);
+  }, [vocab?.nomStatus, form.values.nomStatus, project?.nomCode]);
 
   const usageQuery = useQuery({
     queryKey: ['usage', pid, usageId],

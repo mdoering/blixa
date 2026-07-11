@@ -76,7 +76,10 @@ function mockCommon(usage = baseUsage(), role = 'owner') {
     http.get('/api/coldp/vocab', () =>
       HttpResponse.json({
         ranks: ['genus', 'species', 'subspecies'],
-        nomStatus: ['ESTABLISHED', 'REPLACEMENT_NAME'],
+        nomStatus: [
+          { value: 'ESTABLISHED', botanical: 'nomen validum', zoological: 'available' },
+          { value: 'REJECTED', botanical: 'nomen rejiciendum', zoological: 'rejected' },
+        ],
         gender: ['MASCULINE', 'FEMININE'],
         environment: ['MARINE', 'TERRESTRIAL'],
       }),

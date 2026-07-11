@@ -32,8 +32,11 @@ class VocabIT extends AbstractPostgresIT {
         // ranks are lower-cased (round-trip with NameUsage.rank's stored form)
         .andExpect(jsonPath("$.ranks", org.hamcrest.Matchers.hasItem("species")))
         .andExpect(jsonPath("$.ranks", org.hamcrest.Matchers.hasItem("genus")))
-        // nomStatus is the upper-case enum name (round-trip with NameUsageResponse's Enum.name())
+        // nomStatus entries carry the enum-name value plus both code-specific labels
         .andExpect(jsonPath("$.nomStatus").isArray())
+        .andExpect(jsonPath("$.nomStatus[0].value").exists())
+        .andExpect(jsonPath("$.nomStatus[0].botanical").exists())
+        .andExpect(jsonPath("$.nomStatus[0].zoological").exists())
         .andExpect(jsonPath("$.gender").isArray())
         .andExpect(jsonPath("$.environment").isArray())
         .andReturn().getResponse().getContentAsString();
@@ -41,9 +44,17 @@ class VocabIT extends AbstractPostgresIT {
     JsonNode root = json.readTree(body);
     assertThat(root.get("ranks").size()).isEqualTo(Rank.values().length);
     assertThat(root.get("nomStatus").size()).isEqualTo(NomStatus.values().length);
-    // rank values are lower-case, nomStatus values are the upper-case enum name
+    // rank values are lower-case; nomStatus values are the upper-case enum name
     assertThat(root.get("ranks").get(0).asString()).isEqualTo(root.get("ranks").get(0).asString().toLowerCase());
-    assertThat(root.get("nomStatus")).allMatch(n -> n.asString().equals(n.asString().toUpperCase()));
+    assertThat(root.get("nomStatus")).allMatch(n -> n.get("value").asString().equals(n.get("value").asString().toUpperCase()));
+    // botanical vs zoological labels genuinely differ (e.g. ESTABLISHED: "nomen validum" vs "available")
+    JsonNode established = null;
+    for (JsonNode n : root.get("nomStatus")) {
+      if (n.get("value").asString().equals("ESTABLISHED")) established = n;
+    }
+    assertThat(established).isNotNull();
+    assertThat(established.get("botanical").asString()).isEqualTo(NomStatus.ESTABLISHED.getBotanicalLabel());
+    assertThat(established.get("zoological").asString()).isEqualTo(NomStatus.ESTABLISHED.getZoologicalLabel());
   }
 
   @Test

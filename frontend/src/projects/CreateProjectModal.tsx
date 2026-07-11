@@ -7,7 +7,10 @@ import { createProject } from '../api/projects';
 import { messageFor } from '../api/client';
 import type { CreateProjectPayload } from '../api/types';
 
-export const NOM_CODES = ['zoological', 'botanical', 'virus', 'bacterial', 'cultivars', 'phytosociological'];
+// Only the codes Blixa supports for code-specific rendering (nomenclatural status labels, etc.).
+// Bacterial names follow the botanical code. Other codes (virus, cultivars, phytosociological) are
+// intentionally omitted.
+export const NOM_CODES = ['zoological', 'botanical', 'bacterial'];
 
 export default function CreateProjectModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const form = useForm<CreateProjectPayload>({

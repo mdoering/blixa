@@ -20,14 +20,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class VocabController {
 
-  public record VocabResponse(
-      List<String> ranks, List<String> nomStatus, List<String> gender, List<String> environment) {}
+  // A nomenclatural-status option carries both code-specific labels so the taxon form can render the
+  // one that fits the project's nomenclatural code -- the botanical label for botanical (and
+  // bacterial, which follows botany) projects, the zoological label for zoological ones. `value` is
+  // the enum name (the wire form NameUsageResponse/VocabParsing use).
+  public record NomStatusOption(String value, String botanical, String zoological) {}
+
+  public record VocabResponse(List<String> ranks, List<NomStatusOption> nomStatus,
+      List<String> gender, List<String> environment) {}
 
   @GetMapping("/api/coldp/vocab")
   public VocabResponse vocab() {
     return new VocabResponse(
         Arrays.stream(Rank.values()).map(r -> r.name().toLowerCase(Locale.ROOT)).toList(),
-        Arrays.stream(NomStatus.values()).map(Enum::name).toList(),
+        Arrays.stream(NomStatus.values())
+            .map(s -> new NomStatusOption(s.name(), s.getBotanicalLabel(), s.getZoologicalLabel()))
+            .toList(),
         Arrays.stream(Gender.values()).map(Enum::name).toList(),
         Arrays.stream(Environment.values()).map(Enum::name).toList());
   }
