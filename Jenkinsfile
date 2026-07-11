@@ -49,9 +49,10 @@ pipeline {
     }
 
     stage('Deploy') {
-      when { branch 'main' }
-      // No sshagent/credential: the Jenkins user's own SSH key is already authorized as
-      // jenkins-deploy on the VM (same setup the col-checklistbank job relies on).
+      // No branch guard: the job's SCM builds only main. NB `when { branch 'main' }` NEVER matches
+      // in a single-branch Pipeline job (BRANCH_NAME is set only for Multibranch), which silently
+      // skips the whole stage. No sshagent/credential either — the Jenkins user's own SSH key is
+      // authorized as jenkins-deploy on the VM (same setup col-checklistbank relies on).
       steps {
         sh '''
           set -eu
@@ -63,10 +64,7 @@ pipeline {
           SSHOPT="-o StrictHostKeyChecking=accept-new"
           SSH="ssh $SSHOPT ${DEPLOY_USER}@${HOST}"
 
-          echo "== Frontend -> ${HOST}:${APP_DOCROOT} =="
-          rsync -rt --delete -e "ssh $SSHOPT" \
-            frontend/dist/ ${DEPLOY_USER}@${HOST}:${APP_DOCROOT}/
-
+          # --- Backend first, so a frontend/docroot issue can't block the service update ---
           echo "== Backend jar -> staging =="
           rsync -t -e "ssh $SSHOPT" \
             backend/target/blixa-backend-*.jar \
@@ -78,9 +76,14 @@ pipeline {
           $SSH 'sudo -u col install -m 644 /tmp/blixa-backend.jar /home/col/bin/blixa/blixa-backend.jar && rm -f /tmp/blixa-backend.jar'
           $SSH sudo /usr/bin/systemctl restart col-blixa.service
 
-          echo "== Health check =="
+          echo "== Backend health check =="
           $SSH 'curl -fsS --retry 10 --retry-delay 3 --retry-connrefused \
                   http://127.0.0.1:8111/api/ping' && echo " OK"
+
+          # --- Frontend ---
+          echo "== Frontend -> ${HOST}:${APP_DOCROOT} =="
+          rsync -rt --delete -e "ssh $SSHOPT" \
+            frontend/dist/ ${DEPLOY_USER}@${HOST}:${APP_DOCROOT}/
         '''
       }
     }
