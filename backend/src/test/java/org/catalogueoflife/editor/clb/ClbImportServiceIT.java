@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +41,7 @@ import org.catalogueoflife.editor.project.dto.CreateProjectRequest;
 import org.catalogueoflife.editor.support.AbstractPostgresIT;
 import org.catalogueoflife.editor.user.AppUser;
 import org.catalogueoflife.editor.user.AppUserMapper;
+import org.catalogueoflife.editor.validation.IssueMapper;
 import org.gbif.nameparser.api.Rank;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +65,7 @@ class ClbImportServiceIT extends AbstractPostgresIT {
   @Autowired DistributionMapper distributions;
   @Autowired VernacularMapper vernaculars;
   @Autowired IdSeqMapper idSeq;
+  @Autowired IssueMapper issueMapper;
   @Autowired ClbImportService service;
 
   @MockitoBean ClbImportClient clb;
@@ -181,6 +184,19 @@ class ClbImportServiceIT extends AbstractPostgresIT {
     assertThat(sp1Dist).hasSize(1);
     assertThat(sp1Dist.get(0).area()).isEqualTo("Germany");
     assertThat(sp1Dist.get(0).referenceId()).isNotNull();
+
+    // Post-import validation ran (Fix 1): ClbImportService writes through the raw mappers, which
+    // carry no per-row ValidationEvent, so without a best-effort revalidateTouched pass at the end
+    // of importFromClb these usages would never show up in the Issues panel until an unrelated
+    // edit happened to trigger a revalidate. None of the fixtures set a publishedInReferenceId, so
+    // MissingPublishedInRule ("missing_published_in") fires for every one of them once revalidated
+    // -- for a newly-inserted usage (sp1)...
+    assertThat(issueMapper.findByEntity(pid, "name_usage", sp1.getId()))
+        .anyMatch(i -> "missing_published_in".equals(i.getRule()));
+    // ...and for the PRE-EXISTING focal usage too, proving the focal id (not just the newly
+    // inserted ones) is part of the revalidated `touched` set.
+    assertThat(issueMapper.findByEntity(pid, "name_usage", focalId))
+        .anyMatch(i -> "missing_published_in".equals(i.getRule()));
   }
 
   @Test
@@ -272,6 +288,36 @@ class ClbImportServiceIT extends AbstractPostgresIT {
         .hasMessageContaining("too large");
 
     verify(clb, never()).usageInfo(anyString(), anyString());
+  }
+
+  @Test
+  void diamondReachableChildIsGatheredAndInsertedOnlyOnce() {
+    int userId = createUser("clb-import-cycle");
+    int pid = createProject(userId, "clb-import-cycle-project");
+    int focalId = createFocalUsage(pid, userId);
+
+    // A malformed/cyclic-ish CLB response: GEN -> [SP1, SP2], and BOTH SP1 and SP2 list the SAME
+    // child DUP. Without gather()'s `visited` guard (Fix 3), DUP would be enqueued -- and
+    // therefore inserted -- twice, only ever caught (if at all) by the unrelated size cap.
+    String ds = "3LXR";
+    when(clb.childrenIds(ds, "GEN")).thenReturn(List.of("SP1", "SP2"));
+    when(clb.childrenIds(ds, "SP1")).thenReturn(List.of("DUP"));
+    when(clb.childrenIds(ds, "SP2")).thenReturn(List.of("DUP"));
+    when(clb.childrenIds(ds, "DUP")).thenReturn(List.of());
+    when(clb.usageInfo(ds, "GEN")).thenReturn(genusInfo("GEN", "Diamondus"));
+    when(clb.usageInfo(ds, "SP1")).thenReturn(genusInfo("SP1", "Diamondus sub1"));
+    when(clb.usageInfo(ds, "SP2")).thenReturn(genusInfo("SP2", "Diamondus sub2"));
+    when(clb.usageInfo(ds, "DUP")).thenReturn(genusInfo("DUP", "Diamondus dup"));
+
+    ClbImportSummary summary = service.importFromClb(userId, pid, focalId,
+        new ClbImportRequest(ds, "GEN", ImportMode.TAXON_SUBTREE, null));
+
+    // GEN, SP1, SP2, DUP -- DUP counted (and inserted) only once despite being reachable via both
+    // SP1 and SP2, instead of the 5 a double-insert would produce.
+    assertThat(summary.nameUsages()).isEqualTo(4);
+    verify(clb, times(1)).usageInfo(ds, "DUP");
+    assertThat(usages.findAllByProject(pid).stream()
+        .filter(u -> u.getScientificName().equals("Diamondus dup")).count()).isEqualTo(1);
   }
 
   @Test

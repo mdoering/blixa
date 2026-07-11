@@ -5,12 +5,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import life.catalogue.api.model.UsageInfo;
 import org.catalogueoflife.editor.child.DistributionMapper;
 import org.catalogueoflife.editor.child.EstimateMapper;
 import org.catalogueoflife.editor.child.MediaMapper;
@@ -50,6 +50,9 @@ import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectMapper;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
+import org.catalogueoflife.editor.validation.ValidationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -62,9 +65,12 @@ import org.springframework.web.server.ResponseStatusException;
 // ImportRunService): app-allocated ids via IdSeqMapper, raw mapper inserts (NameUsageMapper/
 // SynonymAcceptedMapper/TaxonInfoMapper/ReferenceMapper/the 7 child mappers) rather than going
 // through NameUsageService/AbstractChildEntityService (no audit trail, no per-row
-// ValidationEvent -- a CLB import is small and additive, not a bulk archive load that warrants a
-// full post-load revalidation pass), and NameParserService.parseInto as the same safety net that
-// (re-)derives the atomized name fields ImportRunService.insertPrimaryUsage relies on.
+// ValidationEvent as each row is inserted -- a CLB import is small and additive, not a bulk
+// archive load), and NameParserService.parseInto as the same safety net that (re-)derives the
+// atomized name fields ImportRunService.insertPrimaryUsage relies on. Same as ColDP import
+// though, a best-effort post-import validation pass DOES run at the end (see importFromClb's
+// final revalidateTouched call) so imported usages still show up in the Issues panel without
+// needing an unrelated edit to trigger a revalidate.
 //
 // The one structural difference from ColDP import: THIS insert is always top-down under an
 // existing parent, so a gathered usage's parent (either the focal usage itself, or an
@@ -83,6 +89,8 @@ import org.springframework.web.server.ResponseStatusException;
 // than rolling back -- exactly the "small, additive" contract calls for.
 @Service
 public class ClbImportService {
+
+  private static final Logger log = LoggerFactory.getLogger(ClbImportService.class);
 
   // id_seq entity strings -- MUST match NameUsageService.ENTITY / ReferenceService.ENTITY / each
   // AbstractChildEntityService subclass's own entity() (see ImportRunService's identical
@@ -129,6 +137,7 @@ public class ClbImportService {
   private final PropertyMapper properties;
   private final TypeMaterialMapper typeMaterials;
   private final NameRelationMapper nameRelations;
+  private final ValidationService validationService;
   private final int maxUsages;
   // Same configured key ClbMatchClient.defaultColDataset()/ColMatchService use for "the" COL
   // dataset (coldp.col.match-dataset, normally 3LXR) -- read independently here (rather than
@@ -142,7 +151,7 @@ public class ClbImportService {
       TaxonInfoMapper taxonInfo, ReferenceMapper references, NameParserService parser,
       DistributionMapper distributions, VernacularMapper vernaculars, MediaMapper media,
       EstimateMapper estimates, PropertyMapper properties, TypeMaterialMapper typeMaterials,
-      NameRelationMapper nameRelations,
+      NameRelationMapper nameRelations, ValidationService validationService,
       @Value("${coldp.clb-import.max-usages:500}") int maxUsages,
       @Value("${coldp.col.match-dataset:3LXR}") String colDataset) {
     this.client = client;
@@ -161,6 +170,7 @@ public class ClbImportService {
     this.properties = properties;
     this.typeMaterials = typeMaterials;
     this.nameRelations = nameRelations;
+    this.validationService = validationService;
     this.maxUsages = maxUsages;
     this.colDataset = colDataset;
   }
@@ -186,6 +196,13 @@ public class ClbImportService {
     Map<String, Integer> nameIdMap = new HashMap<>();
     Map<String, Integer> childCounts = new LinkedHashMap<>();
     CHILD_TYPES.forEach(t -> childCounts.put(t, 0));
+    // Every usage this import touches -- the focal usage itself (a mode-A/B import attaches new
+    // children to it, and mode C writes straight onto it) plus every newly-inserted usage
+    // (accepted AND synonym) -- collected so the best-effort revalidateTouched pass at the end of
+    // each branch below can give every one of them a fresh ValidationEvent (see this class's own
+    // header comment and revalidateTouched's javadoc for why: raw mapper inserts carry none).
+    Set<Integer> touched = new LinkedHashSet<>();
+    touched.add(focalUsageId);
 
     if (req.mode() == ImportMode.UPDATE_FOCAL) {
       MappedImport bundle = ClbUsageMapper.toCreateRequest(client.usageInfo(req.datasetKey(), req.sourceTaxonId()));
@@ -199,12 +216,13 @@ public class ClbImportService {
       int synonymCount = 0;
       if (included(req.entityTypes(), T_SYNONYMS, false)) {
         synonymCount = insertSynonyms(projectId, userId, project, scope, bundle, focalUsageId,
-            refIdMap, usageIdMap, nameIdMap);
+            refIdMap, usageIdMap, nameIdMap, touched);
       }
       // Mode C's target is always the focal usage, guaranteed ACCEPTED by the guard above, so the
       // 5 taxon-scoped child types are always eligible here (no accepted-only skip needed).
       insertChildEntities(projectId, userId, bundle, focalUsageId, true, usageIdMap, nameIdMap, refIdMap,
           req.entityTypes(), false, childCounts, issues);
+      revalidateTouched(projectId, touched);
       return new ClbImportSummary(0, synonymCount, refIdMap.size(), childCounts, issues);
     }
 
@@ -237,6 +255,7 @@ public class ClbImportService {
         u.setRank("unranked");
       }
       usages.insert(u);
+      touched.add(newId);
       if (u.getStatus() == Status.ACCEPTED && hasTaxonInfo(u)) {
         taxonInfo.upsert(projectId, newId, u.getExtinct(), u.getEnvironment(),
             u.getTemporalRangeStart(), u.getTemporalRangeEnd());
@@ -247,13 +266,35 @@ public class ClbImportService {
 
       if (includeSynonyms) {
         synonymCount += insertSynonyms(projectId, userId, project, scope, bundle, newId,
-            refIdMap, usageIdMap, nameIdMap);
+            refIdMap, usageIdMap, nameIdMap, touched);
       }
       insertChildEntities(projectId, userId, bundle, newId, u.getStatus() == Status.ACCEPTED,
           usageIdMap, nameIdMap, refIdMap, req.entityTypes(), true, childCounts, issues);
     }
 
+    revalidateTouched(projectId, touched);
     return new ClbImportSummary(nameUsageCount, synonymCount, refIdMap.size(), childCounts, issues);
+  }
+
+  // Best-effort post-import validation, the SAME "log-and-swallow, never fail the import" contract
+  // ImportRunService.run applies to its own post-commit validationService.revalidateProject call
+  // after a ColDP import (see that class's identical comment): a validation bug or transient
+  // failure must never turn an otherwise-successful CLB import into a failed one, so any exception
+  // here is caught, logged, and dropped rather than propagated out of importFromClb. Deliberately
+  // per-usage (revalidateUsage), not revalidateProject, since only `touched` -- the focal usage
+  // plus whatever this one call actually inserted -- needs a fresh ValidationEvent, not the whole
+  // project. revalidateUsage is @Transactional and manages its own transaction; importFromClb
+  // itself is deliberately NOT @Transactional (see this class's header comment), so calling it here
+  // (on the injected proxy, not `self`) does not nest inside anything.
+  private void revalidateTouched(int projectId, Set<Integer> touched) {
+    for (int usageId : touched) {
+      try {
+        validationService.revalidateUsage(projectId, usageId);
+      } catch (Exception e) {
+        log.warn("post-import revalidation failed for usage {} (project {}): {}",
+            usageId, projectId, e.getMessage(), e);
+      }
+    }
   }
 
   // --- gather (modes A/B) -----------------------------------------------------------------------
@@ -269,19 +310,30 @@ public class ClbImportService {
   // above needs to resolve u.setParentId(usageIdMap.get(clbParentId)) without a two-phase insert.
   // The size cap is enforced incrementally, right as each id is added, so a subtree that blows
   // the cap fails fast without walking (or fetching UsageInfo for) the rest of it.
+  //
+  // `visited` guards against a malformed CLB response where the same CLB id is reachable more than
+  // once (e.g. a diamond -- two different parents both listing the same child -- or an outright
+  // cycle): CLB data is untrusted upstream, and without this a repeated id would be enqueued (and
+  // later inserted) again each time it's reached, relying purely on the size cap above to eventually
+  // catch a cycle rather than being robust to one directly. First-seen wins: a later, redundant
+  // sighting of an already-visited id is simply dropped (not re-added to parentOf, not re-enqueued).
   private Gathered gather(String datasetKey, String sourceId, ImportMode mode) {
     List<String> ordered = new ArrayList<>();
     Map<String, String> parentOf = new HashMap<>();
     Set<String> roots = new LinkedHashSet<>();
+    Set<String> visited = new HashSet<>();
     Deque<String> queue = new ArrayDeque<>();
 
     if (mode == ImportMode.TAXON_SUBTREE) {
       queue.add(sourceId);
       roots.add(sourceId);
+      visited.add(sourceId);
     } else {
       for (String cid : client.childrenIds(datasetKey, sourceId)) {
-        queue.add(cid);
-        roots.add(cid);
+        if (visited.add(cid)) {
+          queue.add(cid);
+          roots.add(cid);
+        }
       }
     }
 
@@ -293,8 +345,10 @@ public class ClbImportService {
             "subtree too large (" + ordered.size() + " usages) — pick a smaller root or use ColDP import");
       }
       for (String cid : client.childrenIds(datasetKey, id)) {
-        parentOf.put(cid, id);
-        queue.add(cid);
+        if (visited.add(cid)) {
+          parentOf.put(cid, id);
+          queue.add(cid);
+        }
       }
     }
     return new Gathered(ordered, parentOf, roots);
@@ -335,7 +389,7 @@ public class ClbImportService {
   // insertChildEntities below. Returns the number of synonyms inserted.
   private int insertSynonyms(int projectId, int userId, Project project, String scope, MappedImport bundle,
       int acceptedNewId, Map<String, Integer> refIdMap, Map<String, Integer> usageIdMap,
-      Map<String, Integer> nameIdMap) {
+      Map<String, Integer> nameIdMap, Set<Integer> touched) {
     int ordinal = 0;
     for (MappedUsage syn : bundle.synonyms()) {
       NameUsage u = syn.usage();
@@ -353,6 +407,7 @@ public class ClbImportService {
         u.setRank("unranked");
       }
       usages.insert(u);
+      touched.add(newId);
       usageIdMap.put(syn.clbUsageId(), newId);
       nameIdMap.put(syn.clbNameId(), newId);
       synonymAccepted.link(projectId, newId, acceptedNewId, ordinal++);
