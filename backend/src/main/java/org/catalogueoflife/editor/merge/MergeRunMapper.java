@@ -41,9 +41,17 @@ public interface MergeRunMapper {
   int updatePlan(@Param("runId") long runId, @Param("plan") String plan);
 
   // Apply starts: the curator's chosen mode/transactional flag is recorded and the run moves
-  // PLANNED -> APPLYING.
+  // PLANNED -> APPLYING. This is the race-proof compare-and-swap for a double-submitted apply: the
+  // in-memory PLANNED pre-check in MergeApplyService.apply is only a friendly early 409 -- two
+  // concurrent apply requests for the same run both pass that check before either writes anything,
+  // so without "AND status = 'PLANNED'" here both would update the SAME row (merge_run_active_idx
+  // does not backstop this -- it's one row, not two) and both would go on to enqueue the async
+  // worker, applying the stored plan TWICE (every NEW reference/usage inserted twice). The WHERE
+  // guard means only the first caller's UPDATE actually matches a row (rowcount 1); the loser's
+  // UPDATE matches zero rows (rowcount 0) because by the time it runs the row is already APPLYING,
+  // not PLANNED -- MergeApplyService.apply must check this returned count and refuse to enqueue on 0.
   @Update("UPDATE merge_run SET status = 'APPLYING', mode = #{mode}, transactional = #{transactional} "
-      + "WHERE id = #{runId}")
+      + "WHERE id = #{runId} AND status = 'PLANNED'")
   int startApply(@Param("runId") long runId, @Param("mode") String mode,
       @Param("transactional") boolean transactional);
 

@@ -9,6 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import org.catalogueoflife.editor.merge.dto.Candidate;
+import org.catalogueoflife.editor.merge.dto.Category;
+import org.catalogueoflife.editor.merge.dto.MergePlan;
 import org.catalogueoflife.editor.name.IdSeqMapper;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
@@ -64,6 +67,7 @@ class MergeApplyNamesIT extends AbstractPostgresIT {
   @Autowired SynonymAcceptedMapper synonymAccepted;
   @Autowired IdSeqMapper idSeq;
   @Autowired NameParserService parser;
+  @Autowired MergeRunMapper runs;
 
   private void ensureUser(String username) {
     AppUser existing = users.requireByUsernameOrNull(username);
@@ -94,6 +98,25 @@ class MergeApplyNamesIT extends AbstractPostgresIT {
     u.setStatus(status);
     u.setParentId(parentId);
     u.setPublishedInReferenceId(publishedInReferenceId);
+    u.setModifiedBy(userId);
+    parser.parseInto(u, NomCode.ZOOLOGICAL);
+    u.setId(idSeq.allocate((int) projectId, ENTITY));
+    usages.insert(u);
+    return u;
+  }
+
+  // Same shape as newUsage above, extended with a referenceId[] list -- newUsage has no parameter
+  // for it since only this fix's referenceId[]-remap test needs to set it directly (every other
+  // fixture in this file only ever exercises publishedInReferenceId).
+  private NameUsage newUsageWithReferenceIds(long projectId, int userId, String scientificName,
+      String rank, Status status, Integer parentId, List<Integer> referenceIds) {
+    NameUsage u = new NameUsage();
+    u.setProjectId((int) projectId);
+    u.setScientificName(scientificName);
+    u.setRank(rank);
+    u.setStatus(status);
+    u.setParentId(parentId);
+    u.setReferenceId(referenceIds);
     u.setModifiedBy(userId);
     parser.parseInto(u, NomCode.ZOOLOGICAL);
     u.setId(idSeq.allocate((int) projectId, ENTITY));
@@ -251,5 +274,202 @@ class MergeApplyNamesIT extends AbstractPostgresIT {
         .filter(r -> r.getAlternativeId() != null && r.getAlternativeId().contains("src:" + srcNewRef.getId()))
         .findFirst().orElseThrow(() -> new AssertionError("new reference not found in target"));
     assertThat(targetOnca.getPublishedInReferenceId()).isEqualTo(targetNewRef.getId());
+  }
+
+  // Fix 3 (review): a NEW accepted usage whose SOURCE parent maps to nothing must not blow up the
+  // apply or leave a dangling parent_id -- it becomes a new ROOT (parent_id NULL) and the run's
+  // issues carry an "unanchored" entry naming it. A normally-computed plan can never itself produce
+  // this: every source usage is visited by applyNameUsages' Pass 1 and always ends up in usageIdMap
+  // (matched -> existing target id, or else -> freshly-inserted NEW id) -- the ONLY way for a
+  // parent's own srcId to be absent from usageIdMap is Fix 2's parseTargetId guard skipping it (a
+  // MATCHED candidate with a null/blank/non-numeric targetId). So the plan is hand-crafted here (via
+  // MergeRunMapper.updatePlan, bypassing PUT .../overrides' targetId-must-exist validation -- see
+  // MergeOverrideIT.matchedOverrideWithNonExistentTargetIdReturns400) to simulate exactly that stale/
+  // corrupted stored-plan row, forcing the parent's candidate to MATCHED with a null targetId.
+  @Test
+  @WithMockUser(username = "mergeApplyUnanchoredOwner")
+  void applyLeavesUnresolvableParentAsRootWithUnanchoredIssue() throws Exception {
+    ensureUser("mergeApplyUnanchoredOwner");
+    int userId = users.requireByUsernameOrNull("mergeApplyUnanchoredOwner").getId();
+
+    long targetId = createProject("mergeApplyUnanchoredTarget");
+    long sourceId = createProject("mergeApplyUnanchoredSource");
+
+    NameUsage srcParent = newUsage(sourceId, userId, "Bogus parentus", null, "genus", Status.ACCEPTED, null, null);
+    NameUsage srcChild = newUsage(sourceId, userId, "Bogus parentus childus", null, "species", Status.ACCEPTED,
+        srcParent.getId(), null);
+
+    String startBody = mvc.perform(post("/api/projects/" + targetId + "/merge")
+            .with(csrf()).param("source", String.valueOf(sourceId)))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    long runId = json.readTree(startBody).get("id").asLong();
+    JsonNode planned = pollUntilTerminal(targetId, runId);
+    assertThat(planned.get("status").asString()).isEqualTo("PLANNED");
+
+    // Overwrite the stored plan directly: srcParent is forced MATCHED with a null targetId
+    // (simulating a corrupted/stale plan row that Fix 2's guard must survive rather than
+    // NumberFormatException-crash the whole apply). srcChild is left out of the plan entirely --
+    // applyNameUsages already treats "no candidate at all" the same as NEW.
+    MergePlan corrupted = new MergePlan(List.of(),
+        List.of(new Candidate(String.valueOf(srcParent.getId()), Category.MATCHED, null, null)));
+    int updated = runs.updatePlan(runId, json.writeValueAsString(corrupted));
+    assertThat(updated).isEqualTo(1);
+
+    String applyBody = mvc.perform(post("/api/projects/" + targetId + "/merge/" + runId + "/apply")
+            .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"mode\":\"OVERWRITE\",\"transactional\":true}"))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    assertThat(json.readTree(applyBody).get("status").asString()).isNotEqualTo("FAILED");
+    JsonNode done = pollUntilTerminal(targetId, runId);
+    assertThat(done.get("status").asString()).isEqualTo("DONE");
+
+    List<NameUsage> targetUsages = usages.findAllByProject((int) targetId);
+    // srcParent was skipped (MATCHED, no valid target id) -- never inserted; only srcChild landed.
+    assertThat(targetUsages).hasSize(1);
+    NameUsage targetChild = targetUsages.get(0);
+    assertThat(targetChild.getScientificName()).isEqualTo("Bogus parentus childus");
+    assertThat(targetChild.getParentId()).isNull();
+
+    JsonNode issues = done.get("issues");
+    assertThat(issues).isNotNull();
+    assertThat(issues.isArray()).isTrue();
+    boolean hasUnanchoredIssue = false;
+    for (JsonNode issue : issues) {
+      if (issue.get("message").asString().startsWith("unanchored:")
+          && String.valueOf(srcChild.getId()).equals(issue.get("sourceId").asString())) {
+        hasUnanchoredIssue = true;
+      }
+    }
+    assertThat(hasUnanchoredIssue).as("unanchored issue for the orphaned child").isTrue();
+  }
+
+  // Fix 3 (review): a NEW usage's reference_id[] array (not just publishedInReferenceId) must remap
+  // every resolvable entry through refIdMap -- matched-or-new -- in order, and silently drop (with an
+  // issue) any entry that resolves to nothing, exactly like publishedInReferenceId's own handling a
+  // few lines above buildNewUsage.
+  @Test
+  @WithMockUser(username = "mergeApplyRefArrayOwner")
+  void applyRemapsReferenceIdArrayDroppingUnresolvedEntries() throws Exception {
+    ensureUser("mergeApplyRefArrayOwner");
+    int userId = users.requireByUsernameOrNull("mergeApplyRefArrayOwner").getId();
+
+    long targetId = createProject("mergeApplyRefArrayTarget");
+    long sourceId = createProject("mergeApplyRefArraySource");
+
+    Reference targetRefA = newReference(targetId, userId,
+        "Roe, R. 2021. A citation matched by DOI. Journal, 4, 5-6.", "10.4321/wxyz");
+
+    Reference srcRefA = newReference(sourceId, userId,
+        "Roe, R. 2021. An unrelated citation string that matches nothing by text.",
+        "https://doi.org/10.4321/WXYZ");
+    Reference srcRefB = newReference(sourceId, userId,
+        "Zed, Z. 2088. Something else entirely unrelated. Nowhere Press.", null);
+    int unresolvableRefId = 999999;
+
+    NameUsage srcUsage = newUsageWithReferenceIds(sourceId, userId, "Refarrayus testus", "species",
+        Status.ACCEPTED, null, List.of(srcRefA.getId(), srcRefB.getId(), unresolvableRefId));
+
+    String startBody = mvc.perform(post("/api/projects/" + targetId + "/merge")
+            .with(csrf()).param("source", String.valueOf(sourceId)))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    long runId = json.readTree(startBody).get("id").asLong();
+    JsonNode planned = pollUntilTerminal(targetId, runId);
+    assertThat(planned.get("status").asString()).isEqualTo("PLANNED");
+    assertThat(planned.get("metrics").get("references").get("matched").asInt()).isEqualTo(1);
+    assertThat(planned.get("metrics").get("references").get("new").asInt()).isEqualTo(1);
+
+    String applyBody = mvc.perform(post("/api/projects/" + targetId + "/merge/" + runId + "/apply")
+            .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"mode\":\"OVERWRITE\",\"transactional\":true}"))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    assertThat(json.readTree(applyBody).get("status").asString()).isNotEqualTo("FAILED");
+    JsonNode done = pollUntilTerminal(targetId, runId);
+    assertThat(done.get("status").asString()).isEqualTo("DONE");
+
+    List<Reference> targetRefs = references.findAllByProject((int) targetId);
+    assertThat(targetRefs).hasSize(2); // original DOI ref + the new one
+    Reference targetNewRefB = targetRefs.stream()
+        .filter(r -> r.getAlternativeId() != null && r.getAlternativeId().contains("src:" + srcRefB.getId()))
+        .findFirst().orElseThrow(() -> new AssertionError("new reference not found in target"));
+
+    NameUsage targetUsage = usages.findAllByProject((int) targetId).stream()
+        .filter(u -> "Refarrayus testus".equals(u.getScientificName()))
+        .findFirst().orElseThrow(() -> new AssertionError("Refarrayus testus not found in target"));
+    // Matched ref keeps its target id, new ref resolves to the freshly-inserted target row, the
+    // unresolvable id is dropped entirely -- order preserved, nothing padded/nulled in its place.
+    assertThat(targetUsage.getReferenceId()).containsExactly(targetRefA.getId(), targetNewRefB.getId());
+
+    JsonNode issues = done.get("issues");
+    assertThat(issues).isNotNull();
+    boolean hasUnresolvedIssue = false;
+    for (JsonNode issue : issues) {
+      if (issue.get("message").asString().contains("referenceID " + unresolvableRefId + " not resolved")) {
+        hasUnresolvedIssue = true;
+      }
+    }
+    assertThat(hasUnresolvedIssue).as("unresolved referenceID issue").isTrue();
+  }
+
+  // Fix 3 (review): a pro-parte NEW synonym -- one source usage with TWO synonym_accepted links (to
+  // two different accepted usages, one MATCHED and one NEW) -- must land with TWO target-side
+  // synonym_accepted links, not just the first/last one processed, and parent_id stays null (the
+  // status inverse, same as the single-link case in applyKeepsMatchedIdsAndClassifiesNewUsages).
+  @Test
+  @WithMockUser(username = "mergeApplyProParteOwner")
+  void applyCreatesBothLinksForAProParteNewSynonym() throws Exception {
+    ensureUser("mergeApplyProParteOwner");
+    int userId = users.requireByUsernameOrNull("mergeApplyProParteOwner").getId();
+
+    long targetId = createProject("mergeApplyProParteTarget");
+    long sourceId = createProject("mergeApplyProParteSource");
+
+    NameUsage targetGenus = newUsage(targetId, userId, "Proparte", null, "genus", Status.ACCEPTED, null, null);
+    NameUsage targetLeo = newUsage(targetId, userId, "Proparte leo", "(Linnaeus, 1758)", "species",
+        Status.ACCEPTED, targetGenus.getId(), null);
+
+    NameUsage srcGenus = newUsage(sourceId, userId, "Proparte", null, "genus", Status.ACCEPTED, null, null);
+    NameUsage srcLeo = newUsage(sourceId, userId, "Proparte leo", "(Linnaeus, 1758)", "species",
+        Status.ACCEPTED, srcGenus.getId(), null);
+    NameUsage srcOnca = newUsage(sourceId, userId, "Proparte onca", "Linnaeus, 1758", "species",
+        Status.ACCEPTED, srcGenus.getId(), null);
+    NameUsage srcSynonym = newUsage(sourceId, userId, "Proparte dubia", "Linnaeus, 1758", "species",
+        Status.SYNONYM, null, null);
+    synonymAccepted.link((int) sourceId, srcSynonym.getId(), srcLeo.getId(), 0);
+    synonymAccepted.link((int) sourceId, srcSynonym.getId(), srcOnca.getId(), 1);
+
+    String startBody = mvc.perform(post("/api/projects/" + targetId + "/merge")
+            .with(csrf()).param("source", String.valueOf(sourceId)))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    long runId = json.readTree(startBody).get("id").asLong();
+    JsonNode planned = pollUntilTerminal(targetId, runId);
+    assertThat(planned.get("status").asString()).isEqualTo("PLANNED");
+
+    String applyBody = mvc.perform(post("/api/projects/" + targetId + "/merge/" + runId + "/apply")
+            .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"mode\":\"OVERWRITE\",\"transactional\":true}"))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    assertThat(json.readTree(applyBody).get("status").asString()).isNotEqualTo("FAILED");
+    JsonNode done = pollUntilTerminal(targetId, runId);
+    assertThat(done.get("status").asString()).isEqualTo("DONE");
+
+    List<NameUsage> targetUsages = usages.findAllByProject((int) targetId);
+    NameUsage targetOnca = targetUsages.stream()
+        .filter(u -> "Proparte onca".equals(u.getScientificName()))
+        .findFirst().orElseThrow(() -> new AssertionError("Proparte onca not found in target"));
+    NameUsage targetSynonym = targetUsages.stream()
+        .filter(u -> "Proparte dubia".equals(u.getScientificName()))
+        .findFirst().orElseThrow(() -> new AssertionError("Proparte dubia not found in target"));
+    assertThat(targetSynonym.getParentId()).isNull();
+    assertThat(targetSynonym.getStatus()).isEqualTo(Status.SYNONYM);
+
+    List<Integer> acceptedOfSynonym =
+        synonymAccepted.findAcceptedFor((int) targetId, targetSynonym.getId());
+    assertThat(acceptedOfSynonym).containsExactlyInAnyOrder(targetLeo.getId(), targetOnca.getId());
   }
 }

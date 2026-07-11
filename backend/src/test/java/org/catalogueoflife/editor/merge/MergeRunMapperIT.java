@@ -153,6 +153,41 @@ class MergeRunMapperIT extends AbstractPostgresIT {
     assertThat(found.getTransactional()).isTrue();
   }
 
+  // Fix 1 (review, data corruption): startApply's "AND status = 'PLANNED'" WHERE guard is what
+  // makes PLANNED -> APPLYING an atomic compare-and-swap rather than a plain unconditional UPDATE.
+  // A double-submitted apply (two concurrent requests both passing MergeApplyService.apply's
+  // in-memory PLANNED pre-check before either has written anything) must not both succeed here --
+  // otherwise both would go on to enqueue the async worker and the stored plan would be applied
+  // TWICE (every NEW reference/usage inserted twice). This can't be reproduced with real concurrent
+  // threads deterministically in an IT, but the mapper-level guard itself is fully exercised by two
+  // sequential calls: the run is PLANNED once, so only the FIRST startApply can ever match a row.
+  @Test
+  void startApplyIsAnAtomicCasThatOnlyTheFirstCallerWins() {
+    int userId = newUser("mergeRunOwner4cas");
+    long sourceId = newProject("mergeSource4cas");
+    long targetId = newProject("mergeTarget4cas");
+    MergeRun run = newRunning(userId, sourceId, targetId);
+    runs.setPlanned(run.getId(), EMPTY_PLAN_JSON, EMPTY_METRICS_JSON);
+
+    // First caller: PLANNED -> APPLYING, wins the CAS (rowcount 1).
+    int firstCaller = runs.startApply(run.getId(), "OVERWRITE", true);
+    assertThat(firstCaller).isEqualTo(1);
+    assertThat(runs.findById(run.getId()).getStatus()).isEqualTo("APPLYING");
+
+    // Second caller (simulating a losing racer that also read PLANNED before the first UPDATE
+    // committed): the row is no longer PLANNED, so its UPDATE matches zero rows -- MergeApplyService
+    // must treat this 0 as "already claimed" and refuse to enqueue a second worker.
+    int secondCaller = runs.startApply(run.getId(), "FILL_GAPS", false);
+    assertThat(secondCaller).isEqualTo(0);
+
+    // The losing caller's mode/transactional must NOT have overwritten the winner's -- the row is
+    // untouched by the no-op UPDATE.
+    MergeRun found = runs.findById(run.getId());
+    assertThat(found.getStatus()).isEqualTo("APPLYING");
+    assertThat(found.getMode()).isEqualTo("OVERWRITE");
+    assertThat(found.getTransactional()).isTrue();
+  }
+
   @Test
   void finishSetsStatusDoneAndStoresIssuesAsRetrievableJson() throws Exception {
     int userId = newUser("mergeRunOwner5");

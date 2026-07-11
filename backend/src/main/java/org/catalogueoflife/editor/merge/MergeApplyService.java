@@ -122,6 +122,17 @@ public class MergeApplyService {
   // thread, bounded-queue executor is full, self.run(...) throws synchronously at this call site
   // (before run()'s own try/catch ever gets a chance to run), so the just-started APPLYING row must
   // be explicitly failed here instead of being left stuck forever.
+  //
+  // requirePlanned above is only a friendly early 409 for the common case -- it reads run's
+  // in-memory status, which two concurrent apply requests can BOTH observe as PLANNED before either
+  // has written anything (the async worker fires only after this method returns, and the single-
+  // thread executor then runs jobs sequentially, so nothing downstream would ever catch a double
+  // apply). runs.startApply's SQL now carries "AND status = 'PLANNED'" and returns the affected row
+  // count, making the PLANNED -> APPLYING transition an atomic compare-and-swap: only the first of
+  // two racing requests actually flips the row (count 1); the loser's UPDATE matches zero rows
+  // (count 0) because the row is already APPLYING by the time its UPDATE runs. On a 0 the plan must
+  // NOT be enqueued a second time -- that would insert every NEW reference/usage twice -- so this
+  // returns 409 instead, without ever calling self.run.
   public MergeRunResponse apply(int userId, int targetId, long runId, Mode mode, boolean transactional) {
     if (mode == null) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "mode is required");
@@ -129,7 +140,14 @@ public class MergeApplyService {
     requireOwnerOrEditor(projectService.requireRole(userId, targetId));
     MergeRun run = requireRunInTarget(targetId, runId);
     requirePlanned(run);
-    runs.startApply(runId, mode.name(), transactional);
+    int cas = runs.startApply(runId, mode.name(), transactional);
+    if (cas == 0) {
+      // Lost the race (or the row moved on between requireRunInTarget's read and this UPDATE for
+      // any other reason): someone else's apply already claimed this run. Refuse rather than enqueue
+      // a second worker against the same plan.
+      throw new ResponseStatusException(HttpStatus.CONFLICT,
+          "merge run is not in PLANNED state (already applying or applied)");
+    }
     int sourceId = run.getSourceProjectId().intValue();
     try {
       self.run(runId, sourceId, targetId, mode, transactional, userId);
@@ -194,7 +212,7 @@ public class MergeApplyService {
     Map<String, Integer> refIdMap = new HashMap<>();
     Map<String, Integer> usageIdMap = new HashMap<>();
 
-    applyReferences(sourceId, targetId, userId, refPlan, refIdMap);
+    applyReferences(sourceId, targetId, userId, refPlan, refIdMap, issues);
     applyNameUsages(sourceId, targetId, userId, targetNomCode, namePlan, refIdMap, usageIdMap, issues);
 
     return issues;
@@ -212,12 +230,22 @@ public class MergeApplyService {
   // never silently discarded or silently merged into a candidate the curator never confirmed --
   // see Mode's javadoc: "NEW records ... are always added").
   private void applyReferences(int sourceId, int targetId, int userId, Map<String, Candidate> refPlan,
-      Map<String, Integer> refIdMap) {
+      Map<String, Integer> refIdMap, List<MergeIssue> issues) {
     for (Reference src : references.findAllByProject(sourceId)) {
       String srcId = String.valueOf(src.getId());
       Candidate c = refPlan.get(srcId);
       if (c != null && c.category() == Category.MATCHED) {
-        int targetRefId = Integer.parseInt(c.targetId());
+        Integer targetRefId = parseTargetId(c);
+        if (targetRefId == null) {
+          // A stored plan is untrusted input by apply time (hand-edited via applyOverrides, or from
+          // an older/buggy compute-plan run): a MATCHED candidate with a null/blank/non-numeric
+          // targetId must not blow up the whole apply with an uncaught NumberFormatException. Skip
+          // this record entirely rather than falling back to NEW -- re-inserting a record the plan
+          // says already matched something would duplicate it in the target, which is worse than
+          // dropping it (surfaced here so the curator can see and fix it).
+          issues.add(new MergeIssue("reference", srcId, "matched candidate has no valid target id — skipped"));
+          continue;
+        }
         refIdMap.put(srcId, targetRefId);
         stampReferenceProvenance(targetId, targetRefId, srcId, userId);
       } else {
@@ -262,7 +290,13 @@ public class MergeApplyService {
       String srcId = String.valueOf(src.getId());
       Candidate c = namePlan.get(srcId);
       if (c != null && c.category() == Category.MATCHED) {
-        int targetUsageId = Integer.parseInt(c.targetId());
+        Integer targetUsageId = parseTargetId(c);
+        if (targetUsageId == null) {
+          // Same defensive guard as applyReferences' identical branch: skip (with an issue) rather
+          // than risk duplicating a record the plan claims is already matched.
+          issues.add(new MergeIssue("name_usage", srcId, "matched candidate has no valid target id — skipped"));
+          continue;
+        }
         usageIdMap.put(srcId, targetUsageId);
         stampUsageProvenance(targetId, targetUsageId, srcId, userId);
         // Mode-based scalar/relation reconciliation of a matched usage is Task 7 -- this task never
@@ -457,6 +491,22 @@ public class MergeApplyService {
     }
     List<String> merged = NameUsageService.mergeScopedId(target.getAlternativeId(), PROVENANCE_SCOPE, srcId);
     usages.updateAlternativeId(targetId, targetUsageId, merged, userId, target.getVersion());
+  }
+
+  // Defensive parse of a MATCHED candidate's targetId: null on a null/blank/non-numeric value
+  // instead of letting Integer.parseInt throw NumberFormatException and fail the whole apply over
+  // one bad row in a stored plan. See applyReferences'/applyNameUsages' call sites for why the
+  // caller skips (rather than re-inserts as NEW) on a null return.
+  private static Integer parseTargetId(Candidate c) {
+    String targetId = c.targetId();
+    if (targetId == null || targetId.isBlank()) {
+      return null;
+    }
+    try {
+      return Integer.parseInt(targetId.trim());
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   private static List<String> withProvenance(List<String> existing, String srcId) {
