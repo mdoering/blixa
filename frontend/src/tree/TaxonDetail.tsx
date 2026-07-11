@@ -14,10 +14,11 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
 import { getProject } from '../api/projects';
+import { getVocab } from '../api/coldp';
 import { getUsage, updateUsage } from '../api/usages';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import EntitySelect from '../child/EntitySelect';
@@ -41,6 +42,11 @@ const STATUS_OPTIONS = [
   { value: 'MISAPPLIED', label: 'Misapplied' },
   { value: 'UNASSESSED', label: 'Unassessed' },
 ];
+
+// enum name -> human label for a dropdown option, e.g. REPLACEMENT_NAME -> "replacement name".
+function prettyEnum(v: string): string {
+  return v.toLowerCase().replace(/_/g, ' ');
+}
 
 interface EditableFields {
   scientificName: string;
@@ -128,6 +134,22 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
   // changes, not on every render's fresh `?? []`/`.map(...)` array literal.
   const scopes = (project?.identifierScopes ?? []).map((s) => s.scope);
   const scopesKey = scopes.join(' ');
+
+  // Enum vocabularies backing the constrained, searchable Rank / Nomenclatural-status dropdowns.
+  // Static for the app's lifetime, so cache indefinitely. Each dropdown always includes the
+  // currently-saved value (even before the vocab resolves, or for a legacy value not in the current
+  // enum), so a loaded usage never shows a blank rank/nomStatus.
+  const { data: vocab } = useQuery({ queryKey: ['vocab'], queryFn: getVocab, staleTime: Infinity });
+  const rankData = useMemo(
+    () => Array.from(new Set([...(vocab?.ranks ?? []), form.values.rank].filter(Boolean))),
+    [vocab?.ranks, form.values.rank],
+  );
+  const nomStatusData = useMemo(() => {
+    const opts = (vocab?.nomStatus ?? []).map((v) => ({ value: v, label: prettyEnum(v) }));
+    const cur = form.values.nomStatus;
+    if (cur && !opts.some((o) => o.value === cur)) opts.push({ value: cur, label: prettyEnum(cur) });
+    return opts;
+  }, [vocab?.nomStatus, form.values.nomStatus]);
 
   const usageQuery = useQuery({
     queryKey: ['usage', pid, usageId],
@@ -261,7 +283,13 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                   <TextInput label="Authorship" {...form.getInputProps('authorship')} />
                 </SimpleGrid>
                 <SimpleGrid cols={2}>
-                  <TextInput label="Rank" {...form.getInputProps('rank')} />
+                  <Select
+                    label="Rank"
+                    searchable
+                    data={rankData}
+                    autoComplete="off"
+                    {...form.getInputProps('rank')}
+                  />
                   <Select label="Status" data={STATUS_OPTIONS} {...form.getInputProps('status')} />
                 </SimpleGrid>
                 <EntitySelect
@@ -293,7 +321,16 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                     {...form.getInputProps('publishedInPageLink')}
                   />
                 </SimpleGrid>
-                <TextInput label="Nomenclatural status" {...form.getInputProps('nomStatus')} />
+                <Select
+                  label="Nomenclatural status"
+                  searchable
+                  clearable
+                  data={nomStatusData}
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  {...form.getInputProps('nomStatus')}
+                />
                 {scopes.length > 0 && (
                   <SimpleGrid cols={Math.min(scopes.length, 3)}>
                     {scopes.map((scope) => (

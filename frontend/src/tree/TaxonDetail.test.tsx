@@ -72,6 +72,15 @@ function mockCommon(usage = baseUsage(), role = 'owner') {
     http.get('/api/projects/4/issues', () => HttpResponse.json([])),
     // The Details tab's published-in EntitySelect loads this unconditionally on mount.
     http.get('/api/projects/4/references', () => HttpResponse.json([])),
+    // The Rank / Nomenclatural-status dropdowns load their enum vocabularies on mount.
+    http.get('/api/coldp/vocab', () =>
+      HttpResponse.json({
+        ranks: ['genus', 'species', 'subspecies'],
+        nomStatus: ['ESTABLISHED', 'REPLACEMENT_NAME'],
+        gender: ['MASCULINE', 'FEMININE'],
+        environment: ['MARINE', 'TERRESTRIAL'],
+      }),
+    ),
   );
 }
 
@@ -83,7 +92,12 @@ test('loads a usage and prefills the form fields', async () => {
     expect(screen.getByLabelText('Scientific name')).toHaveValue('Panthera leo'),
   );
   expect(screen.getByLabelText('Authorship')).toHaveValue('Linnaeus, 1758');
-  expect(screen.getByLabelText('Rank')).toHaveValue('species');
+  // Rank is a searchable Select combobox now; its input carries the selected value's label.
+  // getByRole('textbox'), not getByLabelText — the combobox's hidden listbox shares the input's
+  // accessible name (see the reference-select assertion below), so getByLabelText is ambiguous.
+  await waitFor(() =>
+    expect(screen.getByRole('textbox', { name: 'Rank' })).toHaveValue('species'),
+  );
   expect(screen.getByLabelText('Published in year')).toHaveValue('1758');
 });
 
