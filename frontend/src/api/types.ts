@@ -187,6 +187,9 @@ export interface Reference {
   accessed: string | null;
   remarks: string | null;
   version: number;
+  // Public URL of the hosted PDF (coldp.pdf.base-url + filename), or null if none is attached --
+  // see attachReferencePdf/removeReferencePdf in api/references.ts.
+  pdfUrl: string | null;
 }
 
 // Mirrors backend CreateReferenceRequest (also the shape returned by resolve-doi as a preview).

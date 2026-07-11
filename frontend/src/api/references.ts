@@ -56,3 +56,18 @@ export function importRisReferences(pid: number, ris: string): Promise<Reference
     json: { ris },
   });
 }
+
+// POST /references/{id}/pdf — uploads (or replaces) this reference's hosted PDF; multipart, mirrors
+// the ColDP-import upload's use of the `formData` branch (see api/import.ts's startImport). Returns
+// the updated reference, whose pdfUrl now points at the publicly-served file.
+export function attachReferencePdf(pid: number, id: number, file: File): Promise<Reference> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return api<Reference>(`/api/projects/${pid}/references/${id}/pdf`, { method: 'POST', formData });
+}
+
+// DELETE /references/{id}/pdf — detaches (and deletes) the hosted PDF. Returns the updated
+// reference, whose pdfUrl is now null.
+export function removeReferencePdf(pid: number, id: number): Promise<Reference> {
+  return api<Reference>(`/api/projects/${pid}/references/${id}/pdf`, { method: 'DELETE' });
+}

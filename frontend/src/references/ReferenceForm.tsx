@@ -1,10 +1,10 @@
-import { Button, Group, Modal, SimpleGrid, Stack, Textarea, TextInput } from '@mantine/core';
+import { Anchor, Button, FileInput, Group, Modal, SimpleGrid, Stack, Text, Textarea, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
-import { createReference, updateReference } from '../api/references';
+import { attachReferencePdf, createReference, removeReferencePdf, updateReference } from '../api/references';
 import type { CreateRefPayload, Reference } from '../api/types';
 
 export interface ReferenceFormProps {
@@ -60,9 +60,19 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
   const queryClient = useQueryClient();
   const form = useForm<FormValues>({ initialValues: EMPTY });
 
+  // The PDF control's own state, separate from the form's text fields: pdfUrl mirrors the loaded
+  // reference but is updated locally on attach/remove success (rather than only via a parent
+  // refetch) so the View/Remove <-> FileInput swap happens immediately.
+  const [pdfUrl, setPdfUrl] = useState<string | null>(reference?.pdfUrl ?? null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
   useEffect(() => {
     if (opened) {
       form.setValues(reference ? toValues(reference) : initial ? toValues(initial) : EMPTY);
+      setPdfUrl(reference?.pdfUrl ?? null);
+      setPdfFile(null);
+      setPdfError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened, reference?.id, initial]);
@@ -86,6 +96,31 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
       }
       notifications.show({ color: 'red', message: messageFor(e, 'Could not save the reference') });
     },
+  });
+
+  // A PDF only makes sense for an already-persisted reference (it attaches to a reference id) --
+  // both mutations below are only reachable while `reference` is set (see the PDF section's guard).
+  const attachPdf = useMutation({
+    mutationFn: (file: File) => attachReferencePdf(pid, reference!.id, file),
+    onSuccess: async (updated) => {
+      setPdfUrl(updated.pdfUrl);
+      setPdfFile(null);
+      setPdfError(null);
+      await queryClient.invalidateQueries({ queryKey: ['references', pid] });
+      notifications.show({ message: 'PDF attached' });
+    },
+    onError: (e) => setPdfError(messageFor(e, 'Could not attach the PDF')),
+  });
+
+  const removePdf = useMutation({
+    mutationFn: () => removeReferencePdf(pid, reference!.id),
+    onSuccess: async (updated) => {
+      setPdfUrl(updated.pdfUrl);
+      setPdfError(null);
+      await queryClient.invalidateQueries({ queryKey: ['references', pid] });
+      notifications.show({ message: 'PDF removed' });
+    },
+    onError: (e) => setPdfError(messageFor(e, 'Could not remove the PDF')),
   });
 
   return (
@@ -122,6 +157,58 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
             <TextInput label="ISSN" {...form.getInputProps('issn')} />
             <TextInput label="Link" {...form.getInputProps('link')} />
           </SimpleGrid>
+          {/* PDF hosting: only meaningful for an already-saved reference -- a create form (no id
+              yet) hides the control entirely rather than showing a disabled one. */}
+          {reference && (
+            <div>
+              <Text size="sm" fw={500} mb={4}>
+                PDF
+              </Text>
+              {pdfUrl ? (
+                <Group gap="xs">
+                  <Anchor href={pdfUrl} target="_blank" rel="noreferrer">
+                    View PDF
+                  </Anchor>
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    color="red"
+                    onClick={() => removePdf.mutate()}
+                    loading={removePdf.isPending}
+                  >
+                    Remove
+                  </Button>
+                </Group>
+              ) : (
+                <Group align="flex-end" gap="xs">
+                  <FileInput
+                    placeholder="Select a PDF"
+                    accept="application/pdf"
+                    value={pdfFile}
+                    onChange={(f) => {
+                      setPdfFile(f);
+                      setPdfError(null);
+                    }}
+                    style={{ flex: 1 }}
+                    clearable
+                  />
+                  <Button
+                    size="xs"
+                    onClick={() => pdfFile && attachPdf.mutate(pdfFile)}
+                    disabled={!pdfFile}
+                    loading={attachPdf.isPending}
+                  >
+                    Attach
+                  </Button>
+                </Group>
+              )}
+              {pdfError && (
+                <Text c="red" size="sm">
+                  {pdfError}
+                </Text>
+              )}
+            </div>
+          )}
           <TextInput
             label="Accessed"
             placeholder="YYYY-MM-DD"
