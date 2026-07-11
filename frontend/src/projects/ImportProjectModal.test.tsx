@@ -157,6 +157,68 @@ test('toggling "Preserve source identifiers" reveals the scope field, hides it w
   expect(screen.queryByRole('textbox', { name: 'Identifier scope' })).not.toBeInTheDocument();
 });
 
+test('uploads a text-tree file with a title, forcing preserveIds off and hiding idScope', async () => {
+  let postedBody: FormData | null = null;
+  server.use(
+    http.post('/api/projects/import', async ({ request }) => {
+      postedBody = await request.formData();
+      return HttpResponse.json(
+        {
+          id: 45,
+          projectId: null,
+          status: 'RUNNING',
+          sourceName: 'cats.txtree',
+          preserveIds: false,
+          idScope: null,
+          nameUsageCount: 0,
+          referenceCount: 0,
+          authorCount: 0,
+          issues: [],
+          startedAt: '2026-07-11T00:00:00Z',
+          finishedAt: null,
+          error: null,
+        },
+        { status: 202 },
+      );
+    }),
+    http.get('/api/projects/import/45', () =>
+      HttpResponse.json({
+        id: 45,
+        projectId: null,
+        status: 'RUNNING',
+        sourceName: 'cats.txtree',
+        preserveIds: false,
+        idScope: null,
+        nameUsageCount: 0,
+        referenceCount: 0,
+        authorCount: 0,
+        issues: [],
+        startedAt: '2026-07-11T00:00:00Z',
+        finishedAt: null,
+        error: null,
+      }),
+    ),
+  );
+
+  renderWithProviders(<ImportProjectModal opened onClose={() => {}} />);
+
+  const file = new File(['Aus bus\nBus cus\n'], 'cats.txtree', { type: 'text/plain' });
+  await userEvent.upload(fileInput(), file);
+
+  // preserveIds doesn't apply to text-tree uploads -- the switch (and the scope field it reveals)
+  // is hidden rather than merely disabled.
+  expect(screen.queryByLabelText('Preserve source identifiers')).not.toBeInTheDocument();
+
+  await userEvent.type(screen.getByLabelText('Title'), 'Cats');
+  await userEvent.click(screen.getByRole('button', { name: 'Import' }));
+
+  await waitFor(() => expect(postedBody).not.toBeNull());
+  expect(postedBody!.get('preserveIds')).toBe('false');
+  expect(postedBody!.get('idScope')).toBeNull();
+  expect(postedBody!.get('title')).toBe('Cats');
+  expect((postedBody!.get('file') as File).name).toBe('cats.txtree');
+});
+
 test('a FAILED run renders the error alert', async () => {
   server.use(
     http.post('/api/projects/import', () =>

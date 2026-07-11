@@ -21,18 +21,22 @@ export interface ImportRun {
 }
 
 // Kicks off the import job (any authenticated user; they become OWNER of the newly-created
-// project) -- 202 with the freshly-inserted RUNNING row. Multipart upload: the .zip goes in the
-// `file` part, preserveIds/idScope as plain form fields (idScope only sent when set -- the
-// backend requires it iff preserveIds is true).
+// project) -- 202 with the freshly-inserted RUNNING row. Multipart upload: the file (ColDP .zip or
+// a text-tree file) goes in the `file` part, preserveIds/idScope/title as plain form fields
+// (idScope only sent when set -- the backend requires it iff preserveIds is true; title only sent
+// when non-blank -- the backend detects the format from the filename and, for a text-tree upload,
+// forces preserveIds off and uses title to name the new project).
 export function startImport(
   file: File,
   preserveIds: boolean,
   idScope?: string,
+  title?: string,
 ): Promise<ImportRun> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('preserveIds', String(preserveIds));
   if (idScope) formData.append('idScope', idScope);
+  if (title && title.trim()) formData.append('title', title.trim());
   return api<ImportRun>('/api/projects/import', { method: 'POST', formData });
 }
 

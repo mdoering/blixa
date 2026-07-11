@@ -12,6 +12,7 @@ import {
   Stack,
   Switch,
   Text,
+  TextInput,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useEffect, useState } from 'react';
@@ -30,15 +31,21 @@ export interface ImportProjectModalProps {
 // col-match polls on ProjectMetadataPage (see COL_MATCH_POLL_MS/EXPORT_POLL_MS there).
 const IMPORT_POLL_MS = 1500;
 
-// Upload a ColDP .zip -> the backend parses it into a brand-new project (async job) -> poll until
+// Upload a ColDP .zip or a text-tree file (.txtree/.tree/.txt/.tsv) -- the backend detects the
+// format from the filename and parses it into a brand-new project (async job) -> poll until
 // DONE/FAILED. Unlike export/col-match (which act on an existing project this modal isn't scoped
 // to one), so there's no "resume the latest run on mount" seeding here -- each open starts fresh.
 export default function ImportProjectModal({ opened, onClose }: ImportProjectModalProps) {
   const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
   const [preserveIds, setPreserveIds] = useState(false);
   const [idScope, setIdScope] = useState('');
   const [runId, setRunId] = useState<number | null>(null);
+
+  // preserveIds/idScope only make sense for a ColDP .zip -- the backend forces them off for a
+  // text-tree upload, so the fields are hidden entirely rather than merely disabled.
+  const isTxtTree = !!file && /\.(txtree|tree|txt|tsv)$/i.test(file.name);
 
   // Suggestions for the scope Autocomplete -- same vocab + free-text-custom-entry pattern as the
   // Project settings identifier-scopes row editor (ProjectMetadataPage).
@@ -47,6 +54,7 @@ export default function ImportProjectModal({ opened, onClose }: ImportProjectMod
   useEffect(() => {
     if (opened) {
       setFile(null);
+      setTitle('');
       setPreserveIds(false);
       setIdScope('');
       setRunId(null);
@@ -70,33 +78,47 @@ export default function ImportProjectModal({ opened, onClose }: ImportProjectMod
   }, [run?.status, run?.id]);
 
   const mutation = useMutation({
-    mutationFn: () => startImport(file as File, preserveIds, preserveIds ? idScope.trim() : undefined),
+    mutationFn: () =>
+      startImport(
+        file as File,
+        isTxtTree ? false : preserveIds,
+        isTxtTree ? undefined : preserveIds ? idScope.trim() : undefined,
+        title,
+      ),
     onSuccess: (started) => setRunId(started.id),
     onError: (e) =>
       notifications.show({ color: 'red', message: messageFor(e, 'Import failed to start') }),
   });
 
   const running = mutation.isPending || run?.status === 'RUNNING';
-  const scopeMissing = preserveIds && idScope.trim() === '';
+  const scopeMissing = !isTxtTree && preserveIds && idScope.trim() === '';
   const canSubmit = file != null && !scopeMissing && !running;
 
   return (
     <Modal opened={opened} onClose={onClose} title="Import ColDP">
       <Stack gap="md">
         <FileInput
-          label="ColDP file"
-          placeholder="Select a .zip file"
-          accept=".zip"
+          label="ColDP or text-tree file"
+          placeholder="Select a .zip or text-tree file"
+          accept=".zip,.txtree,.tree,.txt,.tsv"
           value={file}
           onChange={setFile}
           clearable
         />
-        <Switch
-          label="Preserve source identifiers"
-          checked={preserveIds}
-          onChange={(e) => setPreserveIds(e.currentTarget.checked)}
+        <TextInput
+          label="Title"
+          description="Used as the project title for text-tree imports."
+          value={title}
+          onChange={(e) => setTitle(e.currentTarget.value)}
         />
-        {preserveIds && (
+        {!isTxtTree && (
+          <Switch
+            label="Preserve source identifiers"
+            checked={preserveIds}
+            onChange={(e) => setPreserveIds(e.currentTarget.checked)}
+          />
+        )}
+        {!isTxtTree && preserveIds && (
           <Autocomplete
             label="Identifier scope"
             placeholder="e.g. col"
