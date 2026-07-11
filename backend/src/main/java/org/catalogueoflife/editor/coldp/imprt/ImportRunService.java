@@ -272,13 +272,31 @@ public class ImportRunService {
   // for the whole recompute. If loadTransactional throws, ctx is never assigned, this line never
   // runs, and the catch below marks the run FAILED -- exactly the "only revalidate on success"
   // contract; there is nothing to revalidate for a project whose load never committed.
+  //
+  // revalidateProject gets its OWN inner try/catch, deliberately NOT the outer one: by the time it
+  // runs, runs.finish has already committed DONE for a project whose data is already live in the DB
+  // (loadTransactional's transaction committed inside self.loadTransactional, before runs.finish even
+  // ran). revalidateProject walks untrusted, freshly-imported data through the full validation-rule
+  // set; if any rule throws, that must never be allowed to fall into the outer catch below and call
+  // runs.fail -- ImportRunMapper.fail also guards on status='RUNNING' now, so it would be a no-op
+  // against the already-DONE row in practice, but relying on that guard here would be misleading: the
+  // real fix is that a post-commit, best-effort step's failure was never a reason to report the whole
+  // import as FAILED in the first place (that hid the "open imported project" link and prompted a
+  // pointless duplicate re-import). So its exception is logged and swallowed instead -- the project
+  // stays DONE, simply without a fresh revalidation pass; a later edit or explicit re-validation will
+  // catch up.
   @Async(ImportAsyncConfig.EXECUTOR_BEAN)
   public void run(long runId, Path dir, int userId, boolean preserveIds, String idScope) {
     try {
       ImportContext ctx = self.loadTransactional(runId, dir, userId, preserveIds, idScope);
       runs.finish(runId, ctx.nameUsageCount, ctx.referenceCount, ctx.authorCount,
           ctx.issues.isEmpty() ? null : json.writeValueAsString(ctx.issues));
-      validationService.revalidateProject(ctx.projectId);
+      try {
+        validationService.revalidateProject(ctx.projectId);
+      } catch (Exception ve) {
+        log.warn("post-import revalidation failed for run {} (project {}); import stays DONE: {}",
+            runId, ctx.projectId, ve.getMessage(), ve);
+      }
     } catch (Exception e) {
       log.warn("import run {} failed for user {}: {}", runId, userId, e.getMessage(), e);
       runs.fail(runId, e.getMessage());
@@ -362,7 +380,15 @@ public class ImportRunService {
       r.setId(idSeq.allocate(ctx.projectId, REFERENCE_ENTITY));
       r.setModifiedBy(userId);
       references.insert(r);
-      ctx.refIds.put(rec.get(ColdpTerm.ID), r.getId());
+      String srcId = rec.get(ColdpTerm.ID);
+      // A source archive with two rows sharing the same ColDP ID would otherwise silently last-win
+      // this map -- the earlier row's own new id becomes unreachable by source id, so anything that
+      // cross-references it (e.g. a NameUsage's referenceID) mis-resolves to the later row instead.
+      // The row is still inserted either way; this only records the diagnostic.
+      if (srcId != null && ctx.refIds.containsKey(srcId)) {
+        ctx.issue(REFERENCE_ENTITY, srcId, "duplicate ID — later row shadows earlier in cross-references");
+      }
+      ctx.refIds.put(srcId, r.getId());
       ctx.referenceCount++;
     });
   }
@@ -394,7 +420,12 @@ public class ImportRunService {
       a.setId(idSeq.allocate(ctx.projectId, AUTHOR_ENTITY));
       a.setModifiedBy(userId);
       authors.insert(a);
-      ctx.authorIds.put(rec.get(ColdpTerm.ID), a.getId());
+      String srcId = rec.get(ColdpTerm.ID);
+      // See loadReferences' identical duplicate-ID diagnostic above.
+      if (srcId != null && ctx.authorIds.containsKey(srcId)) {
+        ctx.issue(AUTHOR_ENTITY, srcId, "duplicate ID — later row shadows earlier in cross-references");
+      }
+      ctx.authorIds.put(srcId, a.getId());
       ctx.authorCount++;
     });
   }
@@ -943,7 +974,14 @@ public class ImportRunService {
       taxonInfo.upsert(ctx.projectId, u.getId(), u.getExtinct(), u.getEnvironment(),
           u.getTemporalRangeStart(), u.getTemporalRangeEnd());
     }
-    ctx.usageIds.put(row.get(ColdpTerm.ID), u.getId());
+    String usageSrcId = row.get(ColdpTerm.ID);
+    // See loadReferences' identical duplicate-ID diagnostic; here a shadowed source id means any
+    // later parentID/basionymID/taxonID/nameID reference to the earlier row resolves to this one
+    // instead (Pass 2 and every Task 5 child loader consult ctx.usageIds the same way).
+    if (usageSrcId != null && ctx.usageIds.containsKey(usageSrcId)) {
+      ctx.issue("name_usage", usageSrcId, "duplicate ID — later row shadows earlier in cross-references");
+    }
+    ctx.usageIds.put(usageSrcId, u.getId());
     if (u.getStatus() == Status.ACCEPTED) {
       ctx.acceptedUsageIds.add(u.getId());
     }
@@ -1147,6 +1185,18 @@ public class ImportRunService {
   // NameUsage (or, in the Name+Taxon-file archive shape, Taxon) rows, and is expected to be
   // dataset-wide, so peeking the first data row's value is sufficient (later tasks that actually
   // walk every row don't need to re-derive this).
+  //
+  // Known, accepted leak: readFirstRow -> stream(...).findFirst() only pulls ONE row off the
+  // univocity-backed iterator (life.catalogue.csv.CsvReader.TermRecIterator), which opens the data
+  // file's InputStream in its constructor (nextFile) and only lets univocity close it once iteration
+  // is driven to EOF; findFirst() short-circuits after the first element, so that file handle is
+  // abandoned rather than closed. Neither CsvReader nor ColdpReader (org.catalogueoflife:reader
+  // 1.3.0-SNAPSHOT) implements Closeable/AutoCloseable or exposes any close()/shutdown method, so
+  // there is nothing to call here or wrap in try-with-resources -- the handle is only reclaimed when
+  // the abandoned parser/stream is GC'd (finalization / Cleaner-driven, JDK/platform dependent). This
+  // is one leaked FD per import run, on ImportAsyncConfig's single-thread executor, so imports can
+  // never pile these up concurrently; low impact, not an oversight. A real fix would need an
+  // upstream close() on CsvReader itself.
   private static NomCode peekNomCode(ColdpReader reader) {
     Optional<VerbatimRecord> row = reader.hasSchema(ColdpTerm.NameUsage)
         ? reader.readFirstRow(ColdpTerm.NameUsage)

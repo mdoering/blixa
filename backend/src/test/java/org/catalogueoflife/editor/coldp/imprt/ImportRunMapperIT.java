@@ -134,6 +134,30 @@ class ImportRunMapperIT extends AbstractPostgresIT {
     assertThat(found.getFinishedAt()).isNotNull();
   }
 
+  // Fix 1's belt-and-braces guard (AND status = 'RUNNING' on fail's UPDATE): once a run has been
+  // recorded DONE, a later fail() call -- e.g. from ImportRunService.run's post-commit
+  // revalidateProject swallow-path, were it ever to reach fail() at all -- must be a no-op rather
+  // than flipping the row back to FAILED and hiding a fully-successful import behind an error.
+  @Test
+  void failDoesNotClobberAnAlreadyDoneRun() {
+    int userId = newUser("importRunOwner7");
+    ImportRun run = newRunning(userId, "done.zip");
+
+    int finished = runs.finish(run.getId(), 5, 2, 1, null);
+    assertThat(finished).isEqualTo(1);
+    assertThat(runs.findById(run.getId()).getStatus()).isEqualTo("DONE");
+
+    int updated = runs.fail(run.getId(), "post-commit revalidation blew up");
+    assertThat(updated).isEqualTo(0);
+
+    ImportRun found = runs.findById(run.getId());
+    assertThat(found.getStatus()).isEqualTo("DONE");
+    assertThat(found.getError()).isNull();
+    assertThat(found.getNameUsageCount()).isEqualTo(5);
+    assertThat(found.getReferenceCount()).isEqualTo(2);
+    assertThat(found.getAuthorCount()).isEqualTo(1);
+  }
+
   @Test
   void findLatestByUserReturnsTheMostRecentRunForThatUser() {
     int userId = newUser("importRunOwner5");

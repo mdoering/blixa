@@ -221,4 +221,100 @@ class ImportRefAuthorIT extends AbstractPostgresIT {
     assertThat(a1.getRemarks()).isEqualTo("father of taxonomy");
     assertThat(a1.getAlternativeId()).containsExactlyInAnyOrder("wikidata:Q123456", "src:a1");
   }
+
+  // A minimal archive whose Reference.tsv has TWO rows sharing the same ColDP ID ("dup1", differing
+  // only in citation text) plus a one-row Author.tsv with a genuine duplicate ID too -- both a
+  // shadowed-earlier-row scenario for Fix 2's diagnostic. Reused NameUsage.tsv row just satisfies
+  // loadTransactional's "has usage data" precondition, same as buildArchive above.
+  private byte[] buildDuplicateIdArchive(Path dir) throws IOException {
+    ColdpMetadata.write(dir, new ColdpMetadataDto("Dup Checklist", null, null, null, null, null));
+
+    Map<ColdpTerm, String> usageRow = new LinkedHashMap<>();
+    usageRow.put(ColdpTerm.ID, "1");
+    usageRow.put(ColdpTerm.scientificName, "Abies alba");
+    usageRow.put(ColdpTerm.rank, "species");
+    usageRow.put(ColdpTerm.status, "accepted");
+    usageRow.put(ColdpTerm.code, "botanical");
+    ColdpTsv.writeFile(dir, ColdpTerm.NameUsage, List.of(usageRow));
+
+    Map<ColdpTerm, String> ref1 = new LinkedHashMap<>();
+    ref1.put(ColdpTerm.ID, "dup1");
+    ref1.put(ColdpTerm.citation, "First, A. (2020) Earlier row, same id.");
+    Map<ColdpTerm, String> ref2 = new LinkedHashMap<>();
+    ref2.put(ColdpTerm.ID, "dup1");
+    ref2.put(ColdpTerm.citation, "Second, B. (2021) Later row, same id.");
+    ColdpTsv.writeFile(dir, ColdpTerm.Reference, List.of(ref1, ref2));
+
+    Map<ColdpTerm, String> author1 = new LinkedHashMap<>();
+    author1.put(ColdpTerm.ID, "dupA");
+    author1.put(ColdpTerm.given, "First");
+    author1.put(ColdpTerm.family, "Author");
+    Map<ColdpTerm, String> author2 = new LinkedHashMap<>();
+    author2.put(ColdpTerm.ID, "dupA");
+    author2.put(ColdpTerm.given, "Second");
+    author2.put(ColdpTerm.family, "Author");
+    ColdpTsv.writeFile(dir, ColdpTerm.Author, List.of(author1, author2));
+
+    Path zip = dir.resolveSibling(dir.getFileName() + ".zip");
+    ColdpZip.zipFolder(dir, zip);
+    return Files.readAllBytes(zip);
+  }
+
+  // Fix 2: a duplicate source ColDP ID must not silently last-win the sourceId -> id map -- both
+  // rows are still inserted, but the run records a "duplicate ID" ImportIssue for the entity/sourceId
+  // pair so the shadowed-earlier-row problem is diagnosable instead of a silent mis-resolution.
+  @Test
+  @WithMockUser(username = "importDuplicateIdOwner")
+  void duplicateSourceIdsAreRecordedAsIssuesButBothRowsAreInserted(@TempDir Path tmp) throws Exception {
+    ensureUser("importDuplicateIdOwner");
+
+    Path dir = tmp.resolve("archive");
+    Files.createDirectories(dir);
+    byte[] zipBytes = buildDuplicateIdArchive(dir);
+    MockMultipartFile file = new MockMultipartFile("file", "dup.zip", "application/zip", zipBytes);
+
+    String startBody = mvc.perform(multipart("/api/projects/import").file(file).with(csrf()))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    long runId = json.readTree(startBody).get("id").asLong();
+
+    JsonNode done = pollUntilTerminal(runId);
+    assertThat(done.get("status").asString()).isEqualTo("DONE");
+    assertThat(done.get("error").isNull()).isTrue();
+    assertThat(done.get("referenceCount").asInt()).isEqualTo(2);
+    assertThat(done.get("authorCount").asInt()).isEqualTo(2);
+    int projectId = done.get("projectId").asInt();
+
+    JsonNode issues = done.get("issues");
+    assertThat(issues).isNotNull();
+    assertThat(issues.isArray()).isTrue();
+    boolean duplicateRefIssue = false;
+    boolean duplicateAuthorIssue = false;
+    for (JsonNode issue : issues) {
+      String entity = issue.get("entity").asString();
+      String sourceId = issue.get("sourceId").asString();
+      String message = issue.get("message").asString();
+      if ("reference".equals(entity) && "dup1".equals(sourceId)) {
+        assertThat(message).contains("duplicate ID");
+        duplicateRefIssue = true;
+      }
+      if ("author".equals(entity) && "dupA".equals(sourceId)) {
+        assertThat(message).contains("duplicate ID");
+        duplicateAuthorIssue = true;
+      }
+    }
+    assertThat(duplicateRefIssue).as("duplicate reference ID issue for dup1").isTrue();
+    assertThat(duplicateAuthorIssue).as("duplicate author ID issue for dupA").isTrue();
+
+    // Both rows physically exist despite sharing a source ID -- only the id MAP shadows, not the
+    // insert itself.
+    List<Reference> refs = references.findAllByProject(projectId);
+    assertThat(refs).hasSize(2);
+    assertThat(refs).extracting(Reference::getCitation).containsExactlyInAnyOrder(
+        "First, A. (2020) Earlier row, same id.", "Second, B. (2021) Later row, same id.");
+
+    List<Author> createdAuthors = authors.findByProject(projectId);
+    assertThat(createdAuthors).hasSize(2);
+    assertThat(createdAuthors).extracting(Author::getGiven).containsExactlyInAnyOrder("First", "Second");
+  }
 }

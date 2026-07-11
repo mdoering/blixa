@@ -34,7 +34,13 @@ public interface ImportRunMapper {
       @Param("referenceCount") int referenceCount, @Param("authorCount") int authorCount,
       @Param("issues") String issues);
 
-  @Update("UPDATE import_run SET status = 'FAILED', error = #{error}, finished_at = now() WHERE id = #{runId}")
+  // Belt-and-braces guard: AND status = 'RUNNING' means a stray post-DONE call (e.g. a post-commit
+  // validation failure -- see ImportRunService.run's javadoc) can never clobber an already-finished
+  // row. Every real caller (start()'s two pre-RUNNING-only failure paths, run()'s own catch) only
+  // ever calls this against a row it just inserted/observed RUNNING, so the guard is a no-op for
+  // them; failStaleRunning (the startup recovery sweep) is a separate method and unaffected.
+  @Update("UPDATE import_run SET status = 'FAILED', error = #{error}, finished_at = now() "
+      + "WHERE id = #{runId} AND status = 'RUNNING'")
   int fail(@Param("runId") long runId, @Param("error") String error);
 
   @Select("SELECT * FROM import_run WHERE id = #{runId}")
