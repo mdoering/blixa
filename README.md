@@ -12,7 +12,7 @@ A collaborative online editor for taxonomic checklists built around the
 
 | Tool | Version | Notes |
 |---|---|---|
-| **JDK** | **25** (Liberica) | The default `java` (21) will **not** compile. `backend/.sdkmanrc` pins it — install via [sdkman](https://sdkman.io/): `sdk install java 25.0.1-librca`. |
+| **JDK** | **25** (Liberica) | The default `java` (21) will **not** compile. `backend/.sdkmanrc` pins the exact build — install it via [sdkman](https://sdkman.io/): `cd backend && sdk env install` (reads `.sdkmanrc`), then `sdk env` selects it. Any JDK 25 works; Liberica is what `.sdkmanrc` pins. |
 | **Maven** | 3.9+ | Or use the system `mvn`. |
 | **Node.js** | 20+ | with `npm`. |
 | **Docker** | any recent | For the local Postgres below (and for the backend test suite, which uses Testcontainers). |
@@ -31,14 +31,14 @@ From the repo root:
 docker compose up -d
 ```
 
-This starts PostgreSQL 17 with database `coldp_editor` (user/password `coldp_editor`) on host port **5433**. Port 5433 (not the standard 5432) avoids clashing with a PostgreSQL you may already run on 5432 — e.g. the main ChecklistBank dev database. The backend's `dev` profile is preconfigured for this port, and Flyway runs the migrations automatically on startup, so there is **no manual schema step**.
+This starts PostgreSQL 17 with database `coldp_editor` (user/password `coldp_editor`) on host port **5433**. Port 5433 (not the standard 5432) avoids clashing with any PostgreSQL you may already run on 5432. The backend's `dev` profile is preconfigured for this port, and Flyway runs the migrations automatically on startup, so there is **no manual schema step**.
 
 ### 2. Run the backend
 
 ```bash
 cd backend
 sdk env                      # selects JDK 25 from .sdkmanrc
-                             # (or: export JAVA_HOME=~/.sdkman/candidates/java/25.0.1-librca)
+                             # (no sdkman? point JAVA_HOME at any JDK 25 install)
 mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
@@ -98,7 +98,7 @@ To point at your own PostgreSQL instead of Docker, create the `coldp_editor` dat
 
 ```bash
 # Backend (JDK 25; uses Testcontainers, so Docker must be running)
-cd backend && JAVA_HOME=~/.sdkman/candidates/java/25.0.1-librca mvn clean verify
+cd backend && sdk env && mvn clean verify   # sdk env selects JDK 25 from .sdkmanrc
 
 # Frontend
 cd frontend && npm test
