@@ -28,6 +28,7 @@ import { getColMatchRun, getLatestColMatch, startColMatch } from '../api/col';
 import { exportFileUrl, getExportRun, getLatestExport, startExport } from '../api/export';
 import { messageFor } from '../api/client';
 import type { UpdateMetadataPayload } from '../api/types';
+import MergeModal from '../merge/MergeModal';
 import { NOM_CODES } from './CreateProjectModal';
 
 // The CLB dataset key COL's own checklist is published under -- "col" conventionally aliases
@@ -216,6 +217,10 @@ export default function ProjectMetadataPage() {
   });
   const exportRunning = startExportMut.isPending || exportRun?.status === 'RUNNING';
 
+  // Supervised project merge (owner/editor only, same tier as "Match all identifiers"): opens
+  // MergeModal, which owns its own start/poll/apply state scoped to this project as the target.
+  const [merging, setMerging] = useState(false);
+
   return (
     <Stack style={{ maxWidth: 720 }} gap="xl">
       <Stack gap="xs">
@@ -326,6 +331,23 @@ export default function ProjectMetadataPage() {
               {matchRun.error ?? 'Unknown error'}
             </Alert>
           )}
+        </Stack>
+      )}
+
+      {canEdit && (
+        <Stack gap="xs">
+          <Group justify="space-between">
+            <Title order={4} m={0}>
+              Merge project
+            </Title>
+            <Button variant="default" onClick={() => setMerging(true)}>
+              Merge…
+            </Button>
+          </Group>
+          <Text size="sm" c="dimmed">
+            Merge another project&apos;s names and references into this one.
+          </Text>
+          <MergeModal opened={merging} onClose={() => setMerging(false)} targetId={id} />
         </Stack>
       )}
 
