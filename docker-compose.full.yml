@@ -6,18 +6,18 @@
 # This runs the backend under the `dev` profile, so it seeds the admin/admin login and a small sample
 # project — for local/demo use only, NEVER a real deployment. The plain `docker-compose.yml` in this
 # repo is different: it starts ONLY Postgres, for when you run the backend/frontend from source.
-name: coldp-editor
+name: blixa
 services:
   db:
     image: postgres:17
     environment:
-      POSTGRES_DB: coldp_editor
-      POSTGRES_USER: coldp_editor
-      POSTGRES_PASSWORD: coldp_editor
+      POSTGRES_DB: blixa
+      POSTGRES_USER: blixa
+      POSTGRES_PASSWORD: blixa
     volumes:
-      - coldp_editor_pg:/var/lib/postgresql/data
+      - blixa_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U coldp_editor -d coldp_editor"]
+      test: ["CMD-SHELL", "pg_isready -U blixa -d blixa"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -29,9 +29,9 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: dev              # seeds admin/admin + a sample project (demo only)
-      DB_URL: jdbc:postgresql://db:5432/coldp_editor
-      DB_USER: coldp_editor
-      DB_PASSWORD: coldp_editor
+      DB_URL: jdbc:postgresql://db:5432/blixa
+      DB_USER: blixa
+      DB_PASSWORD: blixa
       SERVER_FORWARD_HEADERS_STRATEGY: framework   # honor the frontend proxy's X-Forwarded-* headers
       # ORCID is optional here — admin/admin works without it. To enable, export these before `up`.
       ORCID_CLIENT_ID: ${ORCID_CLIENT_ID:-unconfigured}
@@ -46,4 +46,4 @@ services:
       - "8088:80"
 
 volumes:
-  coldp_editor_pg:
+  blixa_pg:

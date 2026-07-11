@@ -1,0 +1,22 @@
+# systemd unit for the Blixa backend (Spring Boot jar) on the GBIF dev VM.
+# Install to /etc/systemd/system/col-blixa.service, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now col-blixa
+# Secrets (DB password, ORCID) come from the EnvironmentFile — never hard-code them here.
+[Unit]
+Description=Blixa ColDP Editor backend (Spring Boot, JDK 25)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=col
+Group=col
+EnvironmentFile=/home/col/bin/blixa/blixa.env
+# JAVA_OPTS comes from the env file; the jar is deployed by deploy.sh (see README).
+ExecStart=/usr/bin/env java $JAVA_OPTS -jar /home/col/bin/blixa/blixa-backend.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+# Spring Boot listens on 127.0.0.1:8111 (Apache proxies to it); it is not exposed directly.
+
+[Install]
+WantedBy=multi-user.target

@@ -129,7 +129,7 @@ Two supported ways to run the whole stack — both documented in [`deploy/`](dep
   ```
   Runs the `dev` profile (seeds `admin`/`admin` + a sample project) — **local/demo only**. (This is different from the plain `docker compose up` above, which starts *only* Postgres.)
 
-- **Server deployment** (production-style, e.g. GBIF dev) — three separate components: native **PostgreSQL 17**, the **backend jar** under systemd, and the **Vite bundle served by Apache2**, which reverse-proxies `/api` to the backend (same-origin, so ORCID works). Deployed login is **ORCID**; the `dev` profile is not used. Ready-to-adapt templates (DB init, env file, systemd unit, Apache vhost) + step-by-step instructions are in [`deploy/`](deploy/README.md). Domains: `editor.dev.catalogueoflife.org` (dev) / `editor.catalogueoflife.org` (prod).
+- **Server deployment** (production-style, e.g. GBIF dev) — three separate components: native **PostgreSQL 17**, the **backend jar** under systemd, and the **Vite bundle served by Apache2**, which reverse-proxies `/api` to the backend (same-origin, so ORCID works). Deployed login is **ORCID**; the `dev` profile is not used. Ready-to-adapt templates (DB init, env file, systemd unit, Apache vhost) + step-by-step instructions are in [`deploy/`](deploy/README.md). Domains: `blixa.dev.catalogueoflife.org` (dev) / `blixa.catalogueoflife.org` (prod).
 
 The backend is a plain Spring Boot jar configured entirely through environment variables (see [Configuration](#configuration)), so any container or VM host works — the two setups above are just the supported defaults. `backend/Dockerfile` and `frontend/Dockerfile` build the two images.
 

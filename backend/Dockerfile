@@ -14,7 +14,7 @@ COPY mvnw pom.xml ./
 RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -ntp -DskipTests dependency:go-offline || true
 COPY src/ src/
 RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -ntp -DskipTests clean package \
-    && cp target/coldp-editor-backend-*.jar /build/app.jar
+    && cp target/blixa-backend-*.jar /build/app.jar
 
 # --- runtime ---
 FROM eclipse-temurin:25-jre
