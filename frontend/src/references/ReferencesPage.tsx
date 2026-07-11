@@ -23,12 +23,13 @@ import { deleteReference, listReferences } from '../api/references';
 import type { CreateRefPayload, Reference } from '../api/types';
 import ImportBibtexModal from './ImportBibtexModal';
 import ImportDoiModal from './ImportDoiModal';
+import ImportRisModal from './ImportRisModal';
 import ReferenceForm from './ReferenceForm';
 
 const PAGE = 25;
 
 // Project References editor: fuzzy citation search, a paged table, create/edit/delete, and DOI +
-// BibTeX import.
+// BibTeX + RIS import.
 export default function ReferencesPage() {
   const { projectId } = useParams();
   const pid = Number(projectId);
@@ -45,6 +46,7 @@ export default function ReferencesPage() {
   );
   const [importDoi, setImportDoi] = useState(false);
   const [importBib, setImportBib] = useState(false);
+  const [importRis, setImportRis] = useState(false);
 
   useEffect(() => {
     setPage(0);
@@ -97,6 +99,13 @@ export default function ReferencesPage() {
               onClick={() => setImportBib(true)}
             >
               Import BibTeX
+            </Button>
+            <Button
+              variant="default"
+              leftSection={<IconFileImport size={14} />}
+              onClick={() => setImportRis(true)}
+            >
+              Import RIS
             </Button>
             <Button leftSection={<IconPlus size={14} />} onClick={() => setForm({ reference: null })}>
               New reference
@@ -216,6 +225,7 @@ export default function ReferencesPage() {
         onResolved={(payload) => setForm({ reference: null, initial: payload })}
       />
       <ImportBibtexModal pid={pid} opened={importBib} onClose={() => setImportBib(false)} />
+      <ImportRisModal pid={pid} opened={importRis} onClose={() => setImportRis(false)} />
     </Stack>
   );
 }

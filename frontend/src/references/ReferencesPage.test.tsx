@@ -94,4 +94,24 @@ test('a viewer sees no editing controls', async () => {
   await screen.findByText('Systema Naturae');
   expect(screen.queryByRole('button', { name: 'New reference' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Import DOI' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Import BibTeX' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Import RIS' })).not.toBeInTheDocument();
+});
+
+test('Import RIS parses pasted text and refreshes the list', async () => {
+  mockProject();
+  server.use(
+    http.post('/api/projects/3/references/import-ris', async ({ request }) => {
+      const body = (await request.json()) as { ris: string };
+      expect(body.ris).toContain('TY  - JOUR');
+      return HttpResponse.json([{ id: 2 }]);
+    }),
+  );
+  renderPage();
+  await screen.findByText('Systema Naturae');
+  await userEvent.click(screen.getByRole('button', { name: 'Import RIS' }));
+  const dialog = await screen.findByRole('dialog');
+  await userEvent.type(within(dialog).getByLabelText('RIS'), 'TY  - JOUR\nTI  - T\nER  - ');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Import' }));
+  expect(await screen.findByText('Imported 1 reference')).toBeInTheDocument();
 });

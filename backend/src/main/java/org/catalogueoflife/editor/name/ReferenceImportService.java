@@ -45,4 +45,16 @@ public class ReferenceImportService {
     }
     return created;
   }
+
+  // Parse a RIS blob (Zotero/EndNote/Mendeley export format) and create every record atomically
+  // (all-or-nothing), same shape as importBibtex above.
+  @Transactional
+  public List<Reference> importRis(int userId, int projectId, String ris) {
+    List<CreateReferenceRequest> parsed = RefMapping.fromRis(ris);
+    List<Reference> created = new ArrayList<>();
+    for (CreateReferenceRequest req : parsed) {
+      created.add(references.create(userId, projectId, req));
+    }
+    return created;
+  }
 }

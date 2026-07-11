@@ -3,6 +3,7 @@ import { server, http, HttpResponse } from '../test/server';
 import {
   createReference,
   importBibtex,
+  importRisReferences,
   listReferences,
   resolveDoi,
   updateReference,
@@ -67,5 +68,18 @@ test('importBibtex POSTs the text and returns created refs', async () => {
   );
   const created = await importBibtex(3, '@article{k, title={T}}');
   expect(body).toEqual({ bibtex: '@article{k, title={T}}' });
+  expect(created).toHaveLength(2);
+});
+
+test('importRisReferences POSTs the text and returns created refs', async () => {
+  let body: unknown = null;
+  server.use(
+    http.post('/api/projects/3/references/import-ris', async ({ request }) => {
+      body = await request.json();
+      return HttpResponse.json([{ id: 1 }, { id: 2 }]);
+    }),
+  );
+  const created = await importRisReferences(3, 'TY  - JOUR\nTI  - T\nER  - ');
+  expect(body).toEqual({ ris: 'TY  - JOUR\nTI  - T\nER  - ' });
   expect(created).toHaveLength(2);
 });

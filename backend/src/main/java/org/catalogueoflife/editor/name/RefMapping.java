@@ -3,6 +3,8 @@ package org.catalogueoflife.editor.name;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.jbibtex.BibTeXDatabase;
 import org.jbibtex.BibTeXEntry;
@@ -150,6 +152,153 @@ public final class RefMapping {
       return null;
     }
     return String.join("; ", raw.split("(?i)\\s+and\\s+"));
+  }
+
+  // --- RIS (Zotero/EndNote/Mendeley export) ---
+
+  // A tagged RIS line: a 2-char tag, two spaces, a hyphen, a space, then the (possibly empty) value.
+  private static final Pattern RIS_LINE = Pattern.compile("^([A-Z0-9]{2})  - (.*)$");
+
+  public static List<CreateReferenceRequest> fromRis(String ris) {
+    if (ris == null || ris.isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "no RIS provided");
+    }
+    List<CreateReferenceRequest> out = new ArrayList<>();
+    // (tag, value) pairs in the order they appear in the record -- kept as a flat ordered list
+    // (rather than grouped per tag) so that e.g. a record mixing AU and A1 lines still joins its
+    // authors in document order rather than all-AU-then-all-A1.
+    List<String[]> record = null;
+    for (String line : ris.split("\r\n|\r|\n")) {
+      if (line.isBlank()) {
+        continue;
+      }
+      Matcher m = RIS_LINE.matcher(line);
+      if (!m.matches()) {
+        continue; // stray/unrecognized line outside the TY..ER shape: ignore
+      }
+      String tag = m.group(1);
+      String value = m.group(2).trim();
+      if (tag.equals("TY")) {
+        record = new ArrayList<>();
+        record.add(new String[] {tag, value});
+      } else if (tag.equals("ER")) {
+        if (record != null) {
+          out.add(risRecordToRequest(record));
+          record = null;
+        }
+      } else if (record != null) {
+        record.add(new String[] {tag, value});
+      } // a tag line before the first TY (no open record yet): ignore
+    }
+    if (out.isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "no RIS entries found");
+    }
+    return out;
+  }
+
+  private static CreateReferenceRequest risRecordToRequest(List<String[]> tags) {
+    String type = risType(risFirst(tags, "TY"));
+    String author = risJoin(tags, "AU", "A1");
+    String editor = risJoin(tags, "A2", "ED");
+    String title = risFirst(tags, "TI", "T1");
+    String container = risFirst(tags, "T2", "JO", "JF", "JA");
+    String year = risYear(risFirst(tags, "PY", "Y1"));
+    String volume = risFirst(tags, "VL");
+    String issue = risFirst(tags, "IS");
+    String page = risPage(risFirst(tags, "SP"), risFirst(tags, "EP"));
+    String doi = risFirst(tags, "DO");
+    String sn = risFirst(tags, "SN");
+    String isbn = isIsbn(sn) ? sn : null;
+    String issn = (sn != null && !isIsbn(sn)) ? sn : null;
+    String publisher = risFirst(tags, "PB");
+    String link = risFirst(tags, "UR", "L1");
+    // CreateReferenceRequest has no dedicated alternative-id slot (see NameUsage/Author's
+    // alternativeId for that concept elsewhere) and ReferenceService.create doesn't accept one
+    // either, so the RIS record id -- if present -- rides along in the one free-text field left:
+    // remarks, same as fromBibtex leaves remarks null when there's nothing to say.
+    String id = risFirst(tags, "ID");
+    String remarks = id == null ? null : "ris:" + id;
+    String citation = citation(author, year, title, container, volume, issue, page);
+    return new CreateReferenceRequest(citation, type, author, editor, title, container, year,
+        volume, issue, page, publisher, doi, isbn, issn, link, null, remarks);
+  }
+
+  private static String risType(String risCode) {
+    if (risCode == null) {
+      return "document";
+    }
+    return switch (risCode) {
+      case "JOUR" -> "article-journal";
+      case "BOOK" -> "book";
+      case "CHAP" -> "chapter";
+      case "CONF", "CPAPER" -> "paper-conference";
+      case "THES" -> "thesis";
+      case "RPRT" -> "report";
+      case "ELEC", "WEB" -> "webpage";
+      default -> "document";
+    };
+  }
+
+  // PY is plain "2020"; Y1 can be "2020/01/15/" (RIS's slash-delimited y/m/d/other-info date) --
+  // either way, take the leading year.
+  private static String risYear(String py) {
+    if (py == null) {
+      return null;
+    }
+    int slash = py.indexOf('/');
+    String year = slash >= 0 ? py.substring(0, slash) : py;
+    return year.isBlank() ? null : year;
+  }
+
+  private static String risPage(String sp, String ep) {
+    if (sp == null) {
+      return null;
+    }
+    return ep == null ? sp : sp + "-" + ep;
+  }
+
+  // SN is ambiguous in RIS (both books and journals use it): treat it as an ISBN when it looks
+  // like one (10 or 13 digits, optional hyphens/spaces, ISBN-10 may end in X), otherwise ISSN.
+  private static boolean isIsbn(String sn) {
+    if (sn == null) {
+      return false;
+    }
+    String stripped = sn.replaceAll("[-\\s]", "");
+    if (stripped.length() == 10) {
+      return stripped.substring(0, 9).matches("\\d+") && stripped.substring(9).matches("[\\dXx]");
+    }
+    return stripped.length() == 13 && stripped.matches("\\d{13}");
+  }
+
+  // First non-blank value among the given tag names, scanning the record in document order.
+  private static String risFirst(List<String[]> tags, String... tagNames) {
+    for (String[] pair : tags) {
+      if (contains(tagNames, pair[0]) && !pair[1].isBlank()) {
+        return pair[1];
+      }
+    }
+    return null;
+  }
+
+  // All values among the given tag names (e.g. AU and A1 both feed "author"), in document order,
+  // "; "-joined.
+  private static String risJoin(List<String[]> tags, String... tagNames) {
+    List<String> values = new ArrayList<>();
+    for (String[] pair : tags) {
+      if (contains(tagNames, pair[0])) {
+        values.add(pair[1]);
+      }
+    }
+    return values.isEmpty() ? null : String.join("; ", values);
+  }
+
+  private static boolean contains(String[] tagNames, String tag) {
+    for (String t : tagNames) {
+      if (t.equals(tag)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // --- shared ---

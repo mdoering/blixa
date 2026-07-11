@@ -7,6 +7,7 @@ import org.catalogueoflife.editor.name.dto.BibtexRequest;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.catalogueoflife.editor.name.dto.DoiRequest;
 import org.catalogueoflife.editor.name.dto.ReferenceResponse;
+import org.catalogueoflife.editor.name.dto.RisRequest;
 import org.catalogueoflife.editor.name.dto.UpdateReferenceRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -48,6 +49,14 @@ public class ReferenceController {
   public List<ReferenceResponse> importBibtex(@PathVariable int pid, @RequestBody BibtexRequest req) {
     int uid = currentUser.require().getId();
     return importService.importBibtex(uid, pid, req.bibtex()).stream().map(ReferenceResponse::of).toList();
+  }
+
+  // Parse + create every record in a RIS blob (Zotero/EndNote/Mendeley export format).
+  @PostMapping("/import-ris")
+  @ResponseStatus(HttpStatus.CREATED)
+  public List<ReferenceResponse> importRis(@PathVariable int pid, @RequestBody RisRequest req) {
+    int uid = currentUser.require().getId();
+    return importService.importRis(uid, pid, req.ris()).stream().map(ReferenceResponse::of).toList();
   }
 
   @GetMapping

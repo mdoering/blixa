@@ -47,3 +47,12 @@ export function importBibtex(pid: number, bibtex: string): Promise<Reference[]> 
     json: { bibtex },
   });
 }
+
+// POST /references/import-ris — parses a RIS blob (Zotero/EndNote/Mendeley export) and creates
+// every record, returns the created references. Mirrors importBibtex above.
+export function importRisReferences(pid: number, ris: string): Promise<Reference[]> {
+  return api<Reference[]>(`/api/projects/${pid}/references/import-ris`, {
+    method: 'POST',
+    json: { ris },
+  });
+}
