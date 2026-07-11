@@ -27,6 +27,7 @@ import {
 } from '../api/merge';
 import { listProjects } from '../api/projects';
 import { messageFor } from '../api/client';
+import MergeMappingTables from './MergeMappingTables';
 
 export interface MergeModalProps {
   opened: boolean;
@@ -77,16 +78,19 @@ const MODE_OPTIONS: { label: string; value: MergeMode }[] = [
 ];
 
 // Supervised project merge: pick a source project, start the compute-plan job, poll it to PLANNED,
-// review the impact metrics, pick a mode + transaction option, and apply -- poll again to DONE.
-// The full per-row mapping review (Names/References tabs with overrides) is Task 10; "Review
-// mapping" below is a placeholder button Task 10 wires up.
+// review the impact metrics, optionally open the per-row mapping review (Names/References tabs
+// with overrides, Task 10), pick a mode + transaction option, and apply -- poll again to DONE.
 export default function MergeModal({ opened, onClose, targetId }: MergeModalProps) {
   const queryClient = useQueryClient();
 
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [runId, setRunId] = useState<number | null>(null);
-  const [mode, setMode] = useState<MergeMode>('OVERWRITE');
+  // FILL_GAPS (never overwrites an existing curated value, still fills blanks + adds relations) is
+  // the safe default -- OVERWRITE (source clobbers target) is the most destructive option and
+  // shouldn't be what a curator applies by just not touching the control.
+  const [mode, setMode] = useState<MergeMode>('FILL_GAPS');
   const [transactional, setTransactional] = useState(true);
+  const [showMapping, setShowMapping] = useState(false);
 
   // Resets local UI state on close so a later reopen starts clean; runId itself is re-seeded from
   // getLatestMerge below (seededLatest guard), not reset here, so a reopen while a run from an
@@ -94,8 +98,9 @@ export default function MergeModal({ opened, onClose, targetId }: MergeModalProp
   useEffect(() => {
     if (!opened) {
       setSourceId(null);
-      setMode('OVERWRITE');
+      setMode('FILL_GAPS');
       setTransactional(true);
+      setShowMapping(false);
     }
   }, [opened]);
 
@@ -170,8 +175,9 @@ export default function MergeModal({ opened, onClose, targetId }: MergeModalProp
   function startNewMerge() {
     setRunId(null);
     setSourceId(null);
-    setMode('OVERWRITE');
+    setMode('FILL_GAPS');
     setTransactional(true);
+    setShowMapping(false);
   }
 
   const metrics = run?.status === 'PLANNED' ? run.metrics : null;
@@ -266,17 +272,24 @@ export default function MergeModal({ opened, onClose, targetId }: MergeModalProp
                   unanchored {metrics.unanchored}
                 </Badge>
               </Group>
-              {/* TODO(Task 10): wire onClick to open MergeMappingTables (Names/References tabs,
-                  per-row overrides) for this run instead of leaving this disabled. */}
-              <Button variant="default" size="xs" disabled style={{ alignSelf: 'flex-start' }}>
-                Review mapping
+              <Button
+                variant="default"
+                size="xs"
+                onClick={() => setShowMapping((v) => !v)}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                {showMapping ? 'Hide mapping' : 'Review mapping'}
               </Button>
             </Stack>
 
+            {showMapping && runId != null && (
+              <MergeMappingTables targetId={targetId} runId={runId} />
+            )}
+
             {possibleCount > 0 && (
               <Alert color="yellow" title="Unreviewed possible matches">
-                {possibleCount} possible match{possibleCount === 1 ? '' : 'es'} are unreviewed —
-                they will be added as NEW. Review the mapping first?
+                {possibleCount} possible {possibleCount === 1 ? 'match is' : 'matches are'}{' '}
+                unreviewed — they will be added as NEW. Review the mapping first?
               </Alert>
             )}
 

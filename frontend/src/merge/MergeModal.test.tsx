@@ -135,6 +135,11 @@ test(
       screen.queryByText(/large plan: applying without a single transaction/),
     ).not.toBeInTheDocument();
 
+    // FILL_GAPS (never overwrites an existing curated value) is the safe default mode, not the
+    // destructive OVERWRITE -- a curator applying without touching the control shouldn't clobber.
+    expect(screen.getByRole('radio', { name: 'Fill gaps' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Overwrite' })).not.toBeChecked();
+
     // 2 possibleHomonym + 1 possibleFuzzy + 1 possible = 4 unreviewed possible matches.
     expect(
       screen.getByText(/4 possible matches are unreviewed — they will be added as NEW/),
@@ -142,6 +147,40 @@ test(
   },
   10000,
 );
+
+// A single possibleHomonym (and nothing else possible) -- the unreviewed-possibles warning's copy
+// must singularize both the noun ("match" not "matches") and the verb ("is" not "are").
+const onePossibleMetrics = {
+  names: { new: 3, matched: 2, possibleHomonym: 1, possibleFuzzy: 0 },
+  references: { new: 1, matched: 1, possible: 0 },
+  newAccepted: 3,
+  newSynonyms: 0,
+  unanchored: 0,
+};
+
+test('the unreviewed-possibles warning singularizes its copy for exactly one possible match', async () => {
+  server.use(
+    projectsList,
+    noLatestMerge,
+    http.post('/api/projects/5/merge', () =>
+      HttpResponse.json(baseRun({ status: 'RUNNING' }), { status: 202 }),
+    ),
+    http.get('/api/projects/5/merge/100', () =>
+      HttpResponse.json(
+        baseRun({ status: 'PLANNED', metrics: onePossibleMetrics, plannedAt: '2026-07-11T00:00:05Z' }),
+      ),
+    ),
+  );
+
+  renderWithProviders(<MergeModal opened onClose={() => {}} targetId={5} />);
+  await pickSourceAndStart();
+
+  await waitFor(() =>
+    expect(
+      screen.getByText(/1 possible match is unreviewed — they will be added as NEW/),
+    ).toBeInTheDocument(),
+  );
+});
 
 test('the transaction Switch defaults OFF (locked) with the full-import hint for an all-NEW plan', async () => {
   server.use(
@@ -282,4 +321,32 @@ test('a FAILED run renders the error alert', async () => {
 
   expect(await screen.findByText('Merge failed')).toBeInTheDocument();
   expect(screen.getByText('source project has no name usages')).toBeInTheDocument();
+});
+
+test('"Review mapping" toggles the Names/References mapping tables (Task 10) into view', async () => {
+  server.use(
+    projectsList,
+    noLatestMerge,
+    http.post('/api/projects/5/merge', () =>
+      HttpResponse.json(baseRun({ status: 'RUNNING' }), { status: 202 }),
+    ),
+    http.get('/api/projects/5/merge/100', () =>
+      HttpResponse.json(
+        baseRun({ status: 'PLANNED', metrics: mixedMetrics, plannedAt: '2026-07-11T00:00:05Z' }),
+      ),
+    ),
+    http.get('/api/projects/5/merge/100/mapping', () => HttpResponse.json([])),
+  );
+
+  renderWithProviders(<MergeModal opened onClose={() => {}} targetId={5} />);
+  await pickSourceAndStart();
+  await waitFor(() => expect(screen.getByText('new 10')).toBeInTheDocument(), { timeout: 5000 });
+
+  expect(screen.queryByRole('tab', { name: 'Names' })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Review mapping' }));
+  expect(await screen.findByRole('tab', { name: 'Names' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'References' })).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Hide mapping' }));
+  expect(screen.queryByRole('tab', { name: 'Names' })).not.toBeInTheDocument();
 });
