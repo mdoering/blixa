@@ -49,7 +49,8 @@ test('an unrecognized pasted URL shows an inline error and Import stays disabled
   expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled();
 });
 
-test('search path: picking a dataset, then a taxon (with a rank filter), yields a source', async () => {
+test('search path: picking a dataset, then a taxon (with a rank filter), posts the picked IDs -- ' +
+  'not the display labels -- even when two taxa share the exact same label', async () => {
   server.use(
     http.get('/api/clb/datasets', () =>
       HttpResponse.json([{ key: '3LXR', title: 'Catalogue of Life', alias: 'COL' }]),
@@ -57,8 +58,35 @@ test('search path: picking a dataset, then a taxon (with a rank filter), yields 
     http.get('/api/clb/3LXR/usages', () =>
       HttpResponse.json([
         { id: '6W3C4', scientificName: 'Panthera leo', rank: 'species', status: 'accepted' },
+        // A homonym sharing the exact "name (rank)" label of the hit above. The pickers used to
+        // be Mantine Autocomplete, whose options are plain label strings mapped back to a hit via
+        // a Map<label, hit> -- two hits with the same label collapsed to one map entry, so
+        // selecting either one silently posted whichever hit happened to win the collision. Now
+        // that they're Select with id-keyed {value, label} options, the two stay distinguishable.
+        { id: '9ZZZ9', scientificName: 'Panthera leo', rank: 'species', status: 'accepted' },
       ]),
     ),
+  );
+  let postedBody: unknown = null;
+  server.use(
+    http.post('/api/projects/7/usages/42/clb-import', async ({ request }) => {
+      postedBody = await request.json();
+      return HttpResponse.json({
+        nameUsages: 1,
+        synonyms: 0,
+        references: 0,
+        children: {
+          vernacular: 0,
+          distribution: 0,
+          typeMaterial: 0,
+          media: 0,
+          estimate: 0,
+          property: 0,
+          nameRelation: 0,
+        },
+        issues: [],
+      });
+    }),
   );
   renderModal();
 
@@ -70,12 +98,20 @@ test('search path: picking a dataset, then a taxon (with a rank filter), yields 
   const taxonField = screen.getByRole('textbox', { name: 'Taxon' });
   expect(taxonField).toBeEnabled();
   await userEvent.type(taxonField, 'leo');
-  await userEvent.click(await screen.findByRole('option', { name: 'Panthera leo (species)' }));
+  const leoOptions = await screen.findAllByRole('option', { name: 'Panthera leo (species)' });
+  expect(leoOptions).toHaveLength(2);
+  // Pick the SECOND homonym: if selection were still keyed by label, it would be
+  // indistinguishable from the first, and there'd be no way to prove which id got posted.
+  await userEvent.click(leoOptions[1]);
 
   await userEvent.click(screen.getByRole('textbox', { name: 'Rank' }));
   await userEvent.click(await screen.findByRole('option', { name: 'species' }));
 
   expect(screen.getByRole('button', { name: 'Import' })).toBeEnabled();
+  await userEvent.click(screen.getByRole('button', { name: 'Import' }));
+
+  await waitFor(() => expect(postedBody).not.toBeNull());
+  expect(postedBody).toEqual({ datasetKey: '3LXR', sourceTaxonId: '9ZZZ9', mode: 'TAXON_SUBTREE' });
 });
 
 test('UPDATE_FOCAL reveals the entity-type checkboxes, all checked by default; unchecking one ' +

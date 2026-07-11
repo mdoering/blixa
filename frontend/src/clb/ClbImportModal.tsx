@@ -1,6 +1,5 @@
 import {
   Alert,
-  Autocomplete,
   Button,
   Checkbox,
   Divider,
@@ -112,34 +111,41 @@ export default function ClbImportModal({ projectId, focalUsage, opened, onClose 
   } = useQuery({
     queryKey: ['clbResolve', parsedUrl?.datasetKey, parsedUrl?.taxonId],
     queryFn: () => resolveClbTaxon(parsedUrl!.datasetKey, parsedUrl!.taxonId),
-    enabled: parsedUrl != null,
+    enabled: parsedUrl != null && sourceTab === 'url',
   });
 
   // --- search path --------------------------------------------------------------------------
+  // Both pickers are Mantine Select (not Autocomplete): the option `data` is {value, label}
+  // with value = the record's id/key, so selecting posts an unambiguous id even when two hits
+  // share the same display label (homonyms, same-titled datasets) -- see ClbImportModal review
+  // notes. `searchValue`/`onSearchChange` are controlled by the same debounced query state that
+  // used to double as the Autocomplete's own value.
   const [datasetQuery, setDatasetQuery] = useState('');
   const [debouncedDatasetQuery] = useDebouncedValue(datasetQuery, 300);
-  const [selectedDataset, setSelectedDataset] = useState<ClbDatasetHit | null>(null);
+  const [datasetKey, setDatasetKey] = useState<string | null>(null);
   const { data: datasetHits } = useQuery({
     queryKey: ['clbDatasets', debouncedDatasetQuery],
     queryFn: () => searchClbDatasets(debouncedDatasetQuery),
     enabled: sourceTab === 'search' && debouncedDatasetQuery.trim().length > 0,
   });
-  const datasetByLabel = useMemo(
-    () => new Map((datasetHits ?? []).map((d) => [datasetLabel(d), d])),
+  const datasetOptions = useMemo(
+    () => (datasetHits ?? []).map((d) => ({ value: d.key, label: datasetLabel(d) })),
     [datasetHits],
   );
 
   const [taxonQuery, setTaxonQuery] = useState('');
   const [debouncedTaxonQuery] = useDebouncedValue(taxonQuery, 300);
   const [rankFilter, setRankFilter] = useState<string | null>(null);
-  const [selectedUsage, setSelectedUsage] = useState<ClbUsageHit | null>(null);
+  const [sourceTaxonId, setSourceTaxonId] = useState<string | null>(null);
   const { data: usageHits } = useQuery({
-    queryKey: ['clbUsages', selectedDataset?.key, debouncedTaxonQuery, rankFilter],
-    queryFn: () => searchClbUsages(selectedDataset!.key, debouncedTaxonQuery, rankFilter ?? undefined),
-    enabled: sourceTab === 'search' && selectedDataset != null && debouncedTaxonQuery.trim().length > 0,
+    queryKey: ['clbUsages', datasetKey, debouncedTaxonQuery, rankFilter],
+    queryFn: () => searchClbUsages(datasetKey!, debouncedTaxonQuery, rankFilter ?? undefined),
+    enabled: sourceTab === 'search' && datasetKey != null && debouncedTaxonQuery.trim().length > 0,
   });
-  const usageByLabel = useMemo(
-    () => new Map((usageHits ?? []).map((u) => [usageLabel(u), u])),
+  // ClbUsageHit doesn't carry authorship, so the label can't be disambiguated further than
+  // "name (rank)" -- harmless now that selection posts the id (u.id), not this label.
+  const usageOptions = useMemo(
+    () => (usageHits ?? []).map((u) => ({ value: u.id, label: usageLabel(u) })),
     [usageHits],
   );
 
@@ -148,8 +154,8 @@ export default function ClbImportModal({ projectId, focalUsage, opened, onClose 
       ? resolved
         ? { datasetKey: resolved.datasetKey, sourceTaxonId: resolved.taxonId }
         : null
-      : selectedDataset && selectedUsage
-        ? { datasetKey: selectedDataset.key, sourceTaxonId: selectedUsage.id }
+      : datasetKey && sourceTaxonId
+        ? { datasetKey, sourceTaxonId }
         : null;
 
   // --- mode + entity types --------------------------------------------------------------------
@@ -169,10 +175,22 @@ export default function ClbImportModal({ projectId, focalUsage, opened, onClose 
       });
     },
     onSuccess: async () => {
+      // Modes A/B (TAXON_SUBTREE/CHILDREN_ONLY) add new usages under the focal, so the tree and
+      // search views need invalidating explicitly -- they're not keyed to the focal usage itself.
       await queryClient.invalidateQueries({ queryKey: ['treeChildren', projectId] });
       await queryClient.invalidateQueries({ queryKey: ['treeRoots', projectId] });
       await queryClient.invalidateQueries({ queryKey: ['usageSearch', projectId] });
-      await queryClient.invalidateQueries({ queryKey: ['usage', projectId, focalUsage.id] });
+      // UPDATE_FOCAL attaches synonyms + child entities onto the EXISTING focal usage. Those live
+      // under a variety of query keys (['usage', pid, id], ['usageSynonyms', pid, id], and each
+      // ChildEntityTab's [<entity>, pid, id]) that all share the (projectId, focalUsage.id) pair --
+      // invalidate every one of them by predicate rather than hard-coding the entity list, so the
+      // just-imported synonymy/child data shows up on the open tab without switching away and back.
+      await queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) &&
+          q.queryKey.includes(projectId) &&
+          q.queryKey.includes(focalUsage.id),
+      });
     },
   });
 
@@ -243,30 +261,36 @@ export default function ClbImportModal({ projectId, focalUsage, opened, onClose 
 
             {sourceTab === 'search' && (
               <Stack gap="xs">
-                <Autocomplete
+                <Select
                   label="Dataset"
                   placeholder="Search datasets…"
-                  value={datasetQuery}
+                  searchable
+                  clearable
+                  searchValue={datasetQuery}
+                  onSearchChange={setDatasetQuery}
+                  value={datasetKey}
                   onChange={(value) => {
-                    setDatasetQuery(value);
-                    const hit = datasetByLabel.get(value) ?? null;
-                    setSelectedDataset(hit);
-                    setSelectedUsage(null);
+                    setDatasetKey(value);
+                    setSourceTaxonId(null);
+                    setTaxonQuery('');
                   }}
-                  data={[...datasetByLabel.keys()]}
+                  data={datasetOptions}
+                  nothingFoundMessage={debouncedDatasetQuery.trim() ? 'No matches' : undefined}
                 />
                 <Group align="flex-end" gap="xs">
-                  <Autocomplete
+                  <Select
                     style={{ flex: 1 }}
                     label="Taxon"
-                    placeholder={selectedDataset ? 'Search taxa…' : 'Pick a dataset first'}
-                    disabled={!selectedDataset}
-                    value={taxonQuery}
-                    onChange={(value) => {
-                      setTaxonQuery(value);
-                      setSelectedUsage(usageByLabel.get(value) ?? null);
-                    }}
-                    data={[...usageByLabel.keys()]}
+                    placeholder={datasetKey ? 'Search taxa…' : 'Pick a dataset first'}
+                    disabled={!datasetKey}
+                    searchable
+                    clearable
+                    searchValue={taxonQuery}
+                    onSearchChange={setTaxonQuery}
+                    value={sourceTaxonId}
+                    onChange={setSourceTaxonId}
+                    data={usageOptions}
+                    nothingFoundMessage={debouncedTaxonQuery.trim() ? 'No matches' : undefined}
                   />
                   <Select
                     label="Rank"
