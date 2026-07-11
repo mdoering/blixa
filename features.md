@@ -54,6 +54,6 @@ select a taxon and group the species/infraspecies homotypicly - see CLB backend
 ## reference PDFs (upload & host)
 Allow uploading & storing a PDF for a reference. PDFs are **not** shared in ColDP (no binaries in the format);
 instead the editor stores the file and serves it at a stable URL, which populates the `Reference.link` field.
- - storage like the export artifacts: a configured dir / object storage, shared across instances (blue-green), size cap
- - a download/serve endpoint (auth as appropriate) that `Reference.link` points at
+ - **Agreed config (deploy already provisions it):** storage dir = **`coldp.pdf.dir`** (env **`COLDP_PDF_DIR`**), like the export/import dirs; on a server deploy Apache serves that dir read-only at **`/pdf`** (an `Alias`, see `deploy/apache-coldp-editor.conf`), so `Reference.link` = `https://<host>/pdf/<file>`. Shared storage across instances (blue-green); size cap.
+ - the upload endpoint writes the file into `coldp.pdf.dir` and returns/sets the `/pdf/<file>` URL. (Static Apache serving = public read; switch to a backend serve endpoint if auth is ever needed.)
  - on ColDP export, `link` carries that URL (the binary itself is never exported)
