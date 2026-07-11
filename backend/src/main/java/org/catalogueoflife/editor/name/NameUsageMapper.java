@@ -11,6 +11,7 @@ import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.catalogueoflife.editor.name.dto.RankName;
+import org.catalogueoflife.editor.name.dto.ScoredId;
 
 @Mapper
 public interface NameUsageMapper {
@@ -122,6 +123,21 @@ public interface NameUsageMapper {
       """)
   long countMatches(@Param("projectId") int projectId, @Param("q") String q,
       @Param("rank") String rank, @Param("status") String status);
+
+  // Best trigram-similar usage in targetProjectId for a source name that had no exact
+  // canonical-key candidate -- merge.NameMatcher's POSSIBLE_FUZZY fallback (see NameMatcher.match).
+  // `%` is pg_trgm's similarity operator (uses name_usage_sciname_trgm, the same GIN index
+  // searchItems' q filter relies on); the explicit similarity(...) >= threshold clause makes the
+  // cutoff self-contained in the query rather than depending on a session-level
+  // pg_trgm.similarity_threshold GUC. Null when nothing clears the threshold.
+  @Select("""
+      SELECT id, similarity(scientific_name, #{name}) AS score FROM name_usage
+      WHERE project_id = #{projectId} AND scientific_name % #{name}
+        AND similarity(scientific_name, #{name}) >= #{threshold}
+      ORDER BY score DESC LIMIT 1
+      """)
+  ScoredId findFuzzyCandidate(@Param("projectId") int projectId, @Param("name") String name,
+      @Param("threshold") double threshold);
 
   @Delete("DELETE FROM name_usage WHERE project_id = #{projectId} AND id = #{id}")
   int delete(@Param("projectId") int projectId, @Param("id") int id);

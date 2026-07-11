@@ -50,3 +50,5 @@ coldp:
   import:
     dir: ${java.io.tmpdir}/coldp-imports
     max-bytes: 104857600
+  merge:
+    name-similarity: 0.85
