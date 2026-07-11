@@ -188,6 +188,95 @@ class MergeRunMapperIT extends AbstractPostgresIT {
     assertThat(found.getTransactional()).isTrue();
   }
 
+  // Fix 1 (final-review, data corruption via TOCTOU): updatePlanAndMetrics is the status-guarded
+  // write MergeService.applyOverrides uses instead of the unconditional setPlanned. Same "prove the
+  // CAS via sequential calls" discipline as startApplyIsAnAtomicCasThatOnlyTheFirstCallerWins above:
+  // once the run has left PLANNED (APPLYING here), the guarded UPDATE's "AND status = 'PLANNED'"
+  // WHERE clause must match zero rows and must NOT have written the new plan/metrics -- an override
+  // that read the row while it was still PLANNED and only now (post-fetch) discovers a concurrent
+  // apply worker has since claimed it must lose cleanly, not silently reset APPLYING back to PLANNED
+  // and overwrite the in-flight plan.
+  @Test
+  void updatePlanAndMetricsRefusesToWriteAnApplyingRun() {
+    int userId = newUser("mergeRunOwner4pm");
+    long sourceId = newProject("mergeSource4pm");
+    long targetId = newProject("mergeTarget4pm");
+    MergeRun run = newRunning(userId, sourceId, targetId);
+    runs.setPlanned(run.getId(), EMPTY_PLAN_JSON, EMPTY_METRICS_JSON);
+
+    int cas = runs.startApply(run.getId(), "OVERWRITE", true);
+    assertThat(cas).isEqualTo(1);
+    // Captured AFTER the round trip through the jsonb column (Postgres reformats/reorders JSON text
+    // on storage -- e.g. key order becomes shortest-key-first -- so comparing against the original
+    // literal constants would spuriously fail; compare DB-stored value to DB-stored value instead,
+    // same discipline updatePlanOverwritesStoredPlan's .contains(...) assertion below sidesteps).
+    MergeRun beforeAttempt = runs.findById(run.getId());
+    assertThat(beforeAttempt.getStatus()).isEqualTo("APPLYING");
+
+    String overriddenPlan = "{\"references\":[],\"names\":[{\"sourceId\":\"s1\",\"category\":\"MATCHED\","
+        + "\"targetId\":\"t1\",\"score\":1.0}]}";
+    String overriddenMetrics = "{\"names\":{\"new\":0,\"matched\":1,\"possibleHomonym\":0,\"possibleFuzzy\":0},"
+        + "\"references\":{\"new\":0,\"matched\":0,\"possible\":0},"
+        + "\"newAccepted\":0,\"newSynonyms\":0,\"unanchored\":0}";
+    int updated = runs.updatePlanAndMetrics(run.getId(), overriddenPlan, overriddenMetrics);
+    assertThat(updated).isEqualTo(0);
+
+    // Neither the status nor the plan/metrics were touched by the losing write.
+    MergeRun found = runs.findById(run.getId());
+    assertThat(found.getStatus()).isEqualTo("APPLYING");
+    assertThat(found.getPlan()).isEqualTo(beforeAttempt.getPlan());
+    assertThat(found.getMetrics()).isEqualTo(beforeAttempt.getMetrics());
+  }
+
+  // Same CAS, terminal DONE side: a stray override arriving after the apply already finished must
+  // not resurrect/rewrite the row either.
+  @Test
+  void updatePlanAndMetricsRefusesToWriteADoneRun() {
+    int userId = newUser("mergeRunOwner4pmDone");
+    long sourceId = newProject("mergeSource4pmDone");
+    long targetId = newProject("mergeTarget4pmDone");
+    MergeRun run = newRunning(userId, sourceId, targetId);
+    runs.setPlanned(run.getId(), EMPTY_PLAN_JSON, EMPTY_METRICS_JSON);
+    runs.startApply(run.getId(), "OVERWRITE", true);
+    runs.finish(run.getId(), null);
+    MergeRun beforeAttempt = runs.findById(run.getId());
+    assertThat(beforeAttempt.getStatus()).isEqualTo("DONE");
+
+    int updated = runs.updatePlanAndMetrics(run.getId(),
+        "{\"references\":[],\"names\":[]}", EMPTY_METRICS_JSON);
+    assertThat(updated).isEqualTo(0);
+    assertThat(runs.findById(run.getId()).getPlan()).isEqualTo(beforeAttempt.getPlan());
+  }
+
+  // The success path: while still PLANNED, the guarded write DOES apply the new plan/metrics, and
+  // (unlike setPlanned) leaves status and planned_at completely untouched -- it's a narrower write by
+  // design, see the mapper's javadoc.
+  @Test
+  void updatePlanAndMetricsSucceedsWhilePlannedAndLeavesStatusAndPlannedAtUntouched() {
+    int userId = newUser("mergeRunOwner4pmOk");
+    long sourceId = newProject("mergeSource4pmOk");
+    long targetId = newProject("mergeTarget4pmOk");
+    MergeRun run = newRunning(userId, sourceId, targetId);
+    runs.setPlanned(run.getId(), EMPTY_PLAN_JSON, EMPTY_METRICS_JSON);
+    var plannedAtBefore = runs.findById(run.getId()).getPlannedAt();
+
+    String overriddenPlan = "{\"references\":[],\"names\":[{\"sourceId\":\"s1\",\"category\":\"MATCHED\","
+        + "\"targetId\":\"t1\",\"score\":1.0}]}";
+    String overriddenMetrics = "{\"names\":{\"new\":0,\"matched\":1,\"possibleHomonym\":0,\"possibleFuzzy\":0},"
+        + "\"references\":{\"new\":0,\"matched\":0,\"possible\":0},"
+        + "\"newAccepted\":0,\"newSynonyms\":0,\"unanchored\":0}";
+    int updated = runs.updatePlanAndMetrics(run.getId(), overriddenPlan, overriddenMetrics);
+    assertThat(updated).isEqualTo(1);
+
+    MergeRun found = runs.findById(run.getId());
+    assertThat(found.getStatus()).isEqualTo("PLANNED");
+    assertThat(found.getPlannedAt()).isEqualTo(plannedAtBefore);
+    assertThat(found.getPlan()).contains("MATCHED").contains("t1");
+    // jsonb reformats on storage (e.g. a space after ':') -- match loosely rather than assume the
+    // exact byte layout of the literal that was written, same as the plan assertion above.
+    assertThat(found.getMetrics()).contains("matched").contains("1");
+  }
+
   @Test
   void finishSetsStatusDoneAndStoresIssuesAsRetrievableJson() throws Exception {
     int userId = newUser("mergeRunOwner5");

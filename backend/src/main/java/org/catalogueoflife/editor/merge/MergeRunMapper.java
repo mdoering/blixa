@@ -22,7 +22,10 @@ public interface MergeRunMapper {
   void insertRunning(MergeRun run);
 
   // Compute-plan finishes: the plan + its impact metrics are stored together and the run moves
-  // RUNNING -> PLANNED, ready for the curator to review/override before apply.
+  // RUNNING -> PLANNED, ready for the curator to review/override before apply. Only ever called by
+  // computePlan's RUNNING -> PLANNED transition (that direction is always correct) -- applyOverrides
+  // uses the narrower, status-guarded updatePlanAndMetrics below instead (Fix 1, final review; see
+  // its own javadoc for why an unconditional status='PLANNED' write here would be unsafe there).
   @Update("""
       UPDATE merge_run
       SET status = 'PLANNED', plan = #{plan,jdbcType=OTHER}::jsonb,
@@ -31,12 +34,26 @@ public interface MergeRunMapper {
       """)
   int setPlanned(@Param("runId") long runId, @Param("plan") String plan, @Param("metrics") String metrics);
 
-  // A narrow plan-only replace: status/planned_at/metrics are left as-is. MergeService.applyOverrides
-  // (Task 5) does NOT use this -- an override always changes the impact metrics too, so it reuses
-  // setPlanned to store the mutated plan and the recomputed metrics together in one UPDATE (a no-op
-  // on status/planned_at there, since the run is already PLANNED when overrides are legal). This
-  // method is kept for a plan-only write with no metrics change and is exercised directly by
-  // MergeRunMapperIT.
+  // Fix 1 (final-review, data corruption via TOCTOU): the status-guarded plan+metrics write
+  // MergeService.applyOverrides uses. Deliberately does NOT touch status or planned_at -- the run is
+  // already PLANNED when overrides are legal (applyOverrides' requirePlanned pre-check is only a
+  // friendly early 409 off a possibly-stale in-memory read; THIS "AND status = 'PLANNED'" WHERE
+  // clause is the race-proof gate). Without it, a concurrent applyOverrides that read the row while
+  // it was still PLANNED could persist via the old unconditional setPlanned AFTER an apply worker
+  // had already moved the same row PLANNED -> APPLYING (MergeRunMapper.startApply) -- resetting it
+  // back to PLANNED, silently overwriting the in-flight plan, and dropping merge_run_active_idx's
+  // lock so a SECOND apply's startApply CAS could then also succeed, applying the plan twice (every
+  // NEW reference/usage inserted twice). Returns the affected row count (0 if the run is no longer
+  // PLANNED); the caller must treat 0 as a 409, not a silent no-op.
+  @Update("UPDATE merge_run SET plan = #{plan,jdbcType=OTHER}::jsonb, "
+      + "metrics = #{metrics,jdbcType=OTHER}::jsonb WHERE id = #{runId} AND status = 'PLANNED'")
+  int updatePlanAndMetrics(@Param("runId") long runId, @Param("plan") String plan,
+      @Param("metrics") String metrics);
+
+  // A narrow plan-only replace: status/planned_at/metrics are left as-is. Not used by
+  // MergeService.applyOverrides (which needs the status-guarded, metrics-updating
+  // updatePlanAndMetrics above) -- kept for a plan-only write with no metrics change and exercised
+  // directly by MergeRunMapperIT.
   @Update("UPDATE merge_run SET plan = #{plan,jdbcType=OTHER}::jsonb WHERE id = #{runId}")
   int updatePlan(@Param("runId") long runId, @Param("plan") String plan);
 

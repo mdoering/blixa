@@ -311,10 +311,14 @@ class MergeApplyNamesIT extends AbstractPostgresIT {
 
     // Overwrite the stored plan directly: srcParent is forced MATCHED with a null targetId
     // (simulating a corrupted/stale plan row that Fix 2's guard must survive rather than
-    // NumberFormatException-crash the whole apply). srcChild is left out of the plan entirely --
-    // applyNameUsages already treats "no candidate at all" the same as NEW.
+    // NumberFormatException-crash the whole apply). srcChild is given an explicit NEW plan entry --
+    // since the final-review's Fix 3, a source row with NO plan entry AT ALL is issue+skipped rather
+    // than treated as NEW (see applyOneUsagePass1), so srcChild must be listed here to keep
+    // exercising THIS test's own target: an unresolvable parent (skipped, not merely unplanned)
+    // leaving its NEW child unanchored at root rather than crashing.
     MergePlan corrupted = new MergePlan(List.of(),
-        List.of(new Candidate(String.valueOf(srcParent.getId()), Category.MATCHED, null, null)));
+        List.of(new Candidate(String.valueOf(srcParent.getId()), Category.MATCHED, null, null),
+            new Candidate(String.valueOf(srcChild.getId()), Category.NEW, null, null)));
     int updated = runs.updatePlan(runId, json.writeValueAsString(corrupted));
     assertThat(updated).isEqualTo(1);
 
@@ -414,6 +418,121 @@ class MergeApplyNamesIT extends AbstractPostgresIT {
       }
     }
     assertThat(hasUnresolvedIssue).as("unresolved referenceID issue").isTrue();
+  }
+
+  // Fix 3 (final-review): apply must only ever commit what the curator actually reviewed. A source
+  // usage added to the SOURCE project AFTER compute-plan ran has no entry in the stored plan at all
+  // (the plan is a point-in-time JSON snapshot) -- it must be issue+skipped, never silently inserted
+  // as an unreviewed NEW record, which would let apply diverge from the reviewed plan.
+  @Test
+  @WithMockUser(username = "mergeApplyUnplannedOwner")
+  void applySkipsALiveSourceUsageAddedAfterThePlanWasComputed() throws Exception {
+    ensureUser("mergeApplyUnplannedOwner");
+    int userId = users.requireByUsernameOrNull("mergeApplyUnplannedOwner").getId();
+
+    long targetId = createProject("mergeApplyUnplannedTarget");
+    long sourceId = createProject("mergeApplyUnplannedSource");
+
+    newUsage(targetId, userId, "Panthera", null, "genus", Status.ACCEPTED, null, null);
+    NameUsage srcPlanned = newUsage(sourceId, userId, "Panthera onca", "Linnaeus, 1758", "species",
+        Status.ACCEPTED, null, null);
+
+    String startBody = mvc.perform(post("/api/projects/" + targetId + "/merge")
+            .with(csrf()).param("source", String.valueOf(sourceId)))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    long runId = json.readTree(startBody).get("id").asLong();
+    JsonNode planned = pollUntilTerminal(targetId, runId);
+    assertThat(planned.get("status").asString()).isEqualTo("PLANNED");
+    assertThat(planned.get("metrics").get("names").get("new").asInt()).isEqualTo(1);
+
+    // Added to the LIVE source project after compute-plan already ran -- absent from the plan JSON
+    // that was serialized and stored before this insert.
+    NameUsage srcAddedLate = newUsage(sourceId, userId, "Panthera tigris", "Linnaeus, 1758", "species",
+        Status.ACCEPTED, null, null);
+
+    String applyBody = mvc.perform(post("/api/projects/" + targetId + "/merge/" + runId + "/apply")
+            .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"mode\":\"OVERWRITE\",\"transactional\":true}"))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    assertThat(json.readTree(applyBody).get("status").asString()).isNotEqualTo("FAILED");
+    JsonNode done = pollUntilTerminal(targetId, runId);
+    assertThat(done.get("status").asString()).isEqualTo("DONE");
+
+    List<NameUsage> targetUsages = usages.findAllByProject((int) targetId);
+    // The originally-planned NEW usage lands; the late addition never does.
+    assertThat(targetUsages).noneMatch(u -> "Panthera tigris".equals(u.getScientificName()));
+    assertThat(targetUsages).anyMatch(u -> "Panthera onca".equals(u.getScientificName()));
+
+    JsonNode issues = done.get("issues");
+    assertThat(issues).isNotNull();
+    boolean hasSkippedIssue = false;
+    for (JsonNode issue : issues) {
+      if ("name_usage".equals(issue.get("entity").asString())
+          && String.valueOf(srcAddedLate.getId()).equals(issue.get("sourceId").asString())
+          && issue.get("message").asString().contains("not in reviewed plan")) {
+        hasSkippedIssue = true;
+      }
+      // The originally-planned usage must NOT be flagged by the same guard.
+      assertThat(issue.get("sourceId").asString()).isNotEqualTo(String.valueOf(srcPlanned.getId()));
+    }
+    assertThat(hasSkippedIssue).as("issue recording the unplanned source usage was skipped").isTrue();
+  }
+
+  // Fix 3 (final-review), reference side: same guard, exercised via MergeApplyService.applyOneReference
+  // instead of applyOneUsagePass1 -- a source reference added after compute-plan ran must be
+  // issue+skipped, not silently inserted as an unreviewed NEW reference.
+  @Test
+  @WithMockUser(username = "mergeApplyUnplannedRefOwner")
+  void applySkipsALiveSourceReferenceAddedAfterThePlanWasComputed() throws Exception {
+    ensureUser("mergeApplyUnplannedRefOwner");
+    int userId = users.requireByUsernameOrNull("mergeApplyUnplannedRefOwner").getId();
+
+    long targetId = createProject("mergeApplyUnplannedRefTarget");
+    long sourceId = createProject("mergeApplyUnplannedRefSource");
+
+    // At least one usage on each side so the run isn't a trivially-empty full import; irrelevant to
+    // the reference guard being exercised.
+    newUsage(targetId, userId, "Panthera", null, "genus", Status.ACCEPTED, null, null);
+    newUsage(sourceId, userId, "Panthera", null, "genus", Status.ACCEPTED, null, null);
+
+    String startBody = mvc.perform(post("/api/projects/" + targetId + "/merge")
+            .with(csrf()).param("source", String.valueOf(sourceId)))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    long runId = json.readTree(startBody).get("id").asLong();
+    JsonNode planned = pollUntilTerminal(targetId, runId);
+    assertThat(planned.get("status").asString()).isEqualTo("PLANNED");
+    assertThat(planned.get("metrics").get("references").get("new").asInt()).isEqualTo(0);
+
+    // Added to the LIVE source project after compute-plan already ran.
+    Reference srcAddedLate = newReference(sourceId, userId,
+        "Late, L. 2050. Added after the plan was computed. Journal, 9, 9-9.", null);
+
+    String applyBody = mvc.perform(post("/api/projects/" + targetId + "/merge/" + runId + "/apply")
+            .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"mode\":\"OVERWRITE\",\"transactional\":true}"))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    assertThat(json.readTree(applyBody).get("status").asString()).isNotEqualTo("FAILED");
+    JsonNode done = pollUntilTerminal(targetId, runId);
+    assertThat(done.get("status").asString()).isEqualTo("DONE");
+
+    List<Reference> targetRefs = references.findAllByProject((int) targetId);
+    assertThat(targetRefs).isEmpty();
+
+    JsonNode issues = done.get("issues");
+    assertThat(issues).isNotNull();
+    boolean hasSkippedIssue = false;
+    for (JsonNode issue : issues) {
+      if ("reference".equals(issue.get("entity").asString())
+          && String.valueOf(srcAddedLate.getId()).equals(issue.get("sourceId").asString())
+          && issue.get("message").asString().contains("not in reviewed plan")) {
+        hasSkippedIssue = true;
+      }
+    }
+    assertThat(hasSkippedIssue).as("issue recording the unplanned source reference was skipped").isTrue();
   }
 
   // Fix 3 (review): a pro-parte NEW synonym -- one source usage with TWO synonym_accepted links (to

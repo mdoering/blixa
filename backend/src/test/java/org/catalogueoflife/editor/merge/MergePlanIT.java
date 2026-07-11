@@ -2,8 +2,10 @@ package org.catalogueoflife.editor.merge;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Duration;
@@ -78,6 +80,14 @@ class MergePlanIT extends AbstractPostgresIT {
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     return json.readTree(body).get("id").asLong();
+  }
+
+  // Same PUT .../members shape as ColMatchRunApiIT.addMember.
+  private void addMember(long pid, String username, String role) throws Exception {
+    mvc.perform(put("/api/projects/" + pid + "/members").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"username\":\"" + username + "\",\"role\":\"" + role + "\"}"))
+        .andExpect(status().isOk());
   }
 
   // Same parse-then-allocate-then-insert sequence as NameMatcherIT.newUsage, so the atomized
@@ -339,5 +349,45 @@ class MergePlanIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + ownTargetId + "/merge/" + otherRunId + "/mapping")
             .param("entity", "name"))
         .andExpect(status().isNotFound());
+  }
+
+  // Fix 2 (final-review, source-data leak): GET .../mapping returns SOURCE-project name/authorship/
+  // citation strings, so it must be gated at the same owner/editor tier as the merge WRITE workflow
+  // (start/overrides/apply), not the "any member may read" tier get()/latest() use -- a target-only
+  // VIEWER could otherwise enumerate the source project's contents merely by polling this endpoint.
+  // Same "addMember + .with(user(...))" pattern as ColMatchRunApiIT.viewerCannotStartAMatchRunButOwnerCan.
+  @Test
+  @WithMockUser(username = "mergePlanMappingPermOwner")
+  void viewerCannotReadTheMappingButOwnerCan() throws Exception {
+    ensureUser("mergePlanMappingPermOwner");
+    ensureUser("mergePlanMappingPermViewer");
+    int userId = users.requireByUsernameOrNull("mergePlanMappingPermOwner").getId();
+    long targetId = createProject("mergePlanMappingPermTarget");
+    long sourceId = createProject("mergePlanMappingPermSource");
+    addMember(targetId, "mergePlanMappingPermViewer", "viewer");
+
+    newUsage(targetId, userId, "Panthera", null, "genus", Status.ACCEPTED);
+    newUsage(sourceId, userId, "Panthera onca", "Linnaeus, 1758", "species", Status.ACCEPTED);
+
+    String startBody = mvc.perform(post("/api/projects/" + targetId + "/merge")
+            .with(csrf()).param("source", String.valueOf(sourceId)))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    long runId = json.readTree(startBody).get("id").asLong();
+    JsonNode planned = pollUntilTerminal(targetId, runId);
+    assertThat(planned.get("status").asString()).isEqualTo("PLANNED");
+
+    // A target VIEWER may still poll the run's metrics (get()/latest() stay any-member) but not read
+    // the mapping's source-project display labels.
+    mvc.perform(get("/api/projects/" + targetId + "/merge/" + runId).with(user("mergePlanMappingPermViewer")))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/projects/" + targetId + "/merge/" + runId + "/mapping")
+            .param("entity", "name").with(user("mergePlanMappingPermViewer")))
+        .andExpect(status().isForbidden());
+
+    // The owner (who started the run) can still read it, proving the gate isn't over-broad.
+    mvc.perform(get("/api/projects/" + targetId + "/merge/" + runId + "/mapping")
+            .param("entity", "name"))
+        .andExpect(status().isOk());
   }
 }

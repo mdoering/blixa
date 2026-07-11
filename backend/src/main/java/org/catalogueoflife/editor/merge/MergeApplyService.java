@@ -391,14 +391,26 @@ public class MergeApplyService {
     }
   }
 
-  // A source reference absent from the plan, or any category OTHER than MATCHED (a curator-
-  // unreviewed POSSIBLE_HOMONYM/POSSIBLE_FUZZY/POSSIBLE left in the plan at apply time), is added as
-  // NEW -- see Mode's javadoc: "NEW records ... are always added" in every mode.
+  // A source reference IN the plan under any category OTHER than MATCHED (a curator-unreviewed
+  // POSSIBLE_HOMONYM/POSSIBLE_FUZZY/POSSIBLE left in the plan at apply time, or a curator-confirmed/
+  // rejected NEW) is added as NEW -- see Mode's javadoc: "NEW records ... are always added" in every
+  // mode. A source reference with NO plan entry at all (Fix 3, final-review) is different: it wasn't
+  // part of what the curator reviewed/approved at all -- e.g. added to the source project after
+  // compute-plan ran, or after applyOverrides last recomputed the plan -- so it must NOT be silently
+  // inserted as NEW (that would apply beyond the reviewed plan). Issue+skip instead. (A source row
+  // that existed at plan time and was since DELETED is a different case, already handled: it simply
+  // never reaches this loop at all, since applyOneReference is only ever called for LIVE source rows
+  // -- see applyReferences/applyNonTransactional's references.findAllByProject(sourceId).)
   private void applyOneReference(int targetId, int userId, Mode mode, Map<String, Candidate> refPlan,
       Map<String, Integer> refIdMap, List<MergeIssue> issues, Reference src) {
     String srcId = String.valueOf(src.getId());
     Candidate c = refPlan.get(srcId);
-    if (c != null && c.category() == Category.MATCHED) {
+    if (c == null) {
+      issues.add(new MergeIssue("reference", srcId,
+          "source changed since planning — not in reviewed plan, skipped"));
+      return;
+    }
+    if (c.category() == Category.MATCHED) {
       Integer targetRefId = parseTargetId(c);
       if (targetRefId == null) {
         // A stored plan is untrusted input by apply time -- see parseTargetId's javadoc. Skip this
@@ -562,16 +574,25 @@ public class MergeApplyService {
   }
 
   // Pass 1 for one source usage: MATCHED -> maps to the EXISTING target id (no insert) and, for
-  // mode != NEW_ONLY, reconciles its scalars/provenance via reconcileMatchedUsage; anything else
-  // (NEW, or an un-reviewed POSSIBLE_*) -> inserted with parent_id/basionym_id left NULL (Pass 2
-  // resolves them once usageIdMap is complete for every source usage), returned as a Pending for
-  // Pass 2. Returns null for a MATCHED row (nothing left to do in Pass 2 for it) or a skipped row.
+  // mode != NEW_ONLY, reconciles its scalars/provenance via reconcileMatchedUsage; anything else IN
+  // THE PLAN (NEW, or an un-reviewed POSSIBLE_*) -> inserted with parent_id/basionym_id left NULL
+  // (Pass 2 resolves them once usageIdMap is complete for every source usage), returned as a Pending
+  // for Pass 2. Returns null for a MATCHED row (nothing left to do in Pass 2 for it) or a skipped
+  // row. A source usage with NO plan entry at all (Fix 3, final-review -- see applyOneReference's
+  // identical comment) is issue+skipped rather than silently inserted as an unreviewed NEW: it has
+  // no usageIdMap entry either, so anything downstream that references it as a parent/basionym/
+  // synonym-accepted target naturally falls back to its own "not resolved"/"unanchored" issue.
   private Pending applyOneUsagePass1(int targetId, int userId, Mode mode, NomCode targetNomCode,
       Map<String, Candidate> namePlan, Map<String, Integer> refIdMap, Map<String, Integer> usageIdMap,
       Set<String> matchedSrcIds, Set<Integer> acceptedTargetIds, List<MergeIssue> issues, NameUsage src) {
     String srcId = String.valueOf(src.getId());
     Candidate c = namePlan.get(srcId);
-    if (c != null && c.category() == Category.MATCHED) {
+    if (c == null) {
+      issues.add(new MergeIssue("name_usage", srcId,
+          "source changed since planning — not in reviewed plan, skipped"));
+      return null;
+    }
+    if (c.category() == Category.MATCHED) {
       Integer targetUsageId = parseTargetId(c);
       if (targetUsageId == null) {
         issues.add(new MergeIssue("name_usage", srcId, "matched candidate has no valid target id — skipped"));

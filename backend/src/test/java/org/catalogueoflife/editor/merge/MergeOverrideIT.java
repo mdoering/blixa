@@ -223,6 +223,59 @@ class MergeOverrideIT extends AbstractPostgresIT {
     assertThat(after.get("metrics").get("names").get("matched").asInt()).isEqualTo(0);
   }
 
+  // Fix 1 (final-review, data corruption via TOCTOU): a curator's override request against a run
+  // that has since been claimed by an apply worker (PLANNED -> APPLYING, MergeRunMapper.startApply)
+  // must 409 -- and, critically, the persisted plan and status must be left completely untouched.
+  // Before the fix, MergeService.applyOverrides persisted via the unconditional
+  // MergeRunMapper.setPlanned, which unconditionally forces status back to 'PLANNED' and overwrites
+  // plan/metrics with no regard for what the row's CURRENT status is; a concurrent override racing a
+  // startApply CAS could silently reset an in-flight APPLYING run back to PLANNED, dropping
+  // merge_run_active_idx's lock and letting a SECOND apply pass its own CAS -- applying the plan
+  // twice. Drives a real compute-plan through to PLANNED, then simulates an apply worker having
+  // already claimed the run (the exact race window the fix closes) by calling startApply directly
+  // via the mapper -- same "prove the guard via a mapper-level state transition" shortcut
+  // MergePlanIT/MergeOverrideIT already use elsewhere for RUNNING/APPLYING/409 scenarios.
+  @Test
+  @WithMockUser(username = "mergeOverrideApplyingOwner")
+  void overridingAnApplyingRunReturns409AndLeavesThePlanUnchanged() throws Exception {
+    ensureUser("mergeOverrideApplyingOwner");
+    int userId = users.requireByUsernameOrNull("mergeOverrideApplyingOwner").getId();
+    long targetId = createProject("mergeOverrideApplyingTarget");
+    long sourceId = createProject("mergeOverrideApplyingSource");
+
+    newUsage(targetId, userId, "Panthera", null, "genus", Status.ACCEPTED);
+    NameUsage srcNew = newUsage(sourceId, userId, "Panthera onca", "Linnaeus, 1758", "species", Status.ACCEPTED);
+
+    String startBody = mvc.perform(post("/api/projects/" + targetId + "/merge")
+            .with(csrf()).param("source", String.valueOf(sourceId)))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    long runId = json.readTree(startBody).get("id").asLong();
+    JsonNode planned = pollUntilTerminal(targetId, runId);
+    assertThat(planned.get("status").asString()).isEqualTo("PLANNED");
+    String planBeforeAttempt = runs.findById(runId).getPlan();
+    assertThat(planBeforeAttempt).isNotNull();
+
+    // Simulate the race: an apply worker claims the run (PLANNED -> APPLYING) after the plan was
+    // computed but before this override request is handled.
+    int cas = runs.startApply(runId, "FILL_GAPS", true);
+    assertThat(cas).isEqualTo(1);
+
+    List<MergeOverride> overrides = List.of(
+        new MergeOverride("name", String.valueOf(srcNew.getId()), Category.NEW, null));
+
+    mvc.perform(put("/api/projects/" + targetId + "/merge/" + runId + "/overrides")
+            .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(overrides)))
+        .andExpect(status().isConflict());
+
+    // Status must still be APPLYING (not reverted to PLANNED -- which would drop
+    // merge_run_active_idx's lock) and the stored plan must be byte-for-byte unchanged: the guarded
+    // updatePlanAndMetrics WHERE clause matched zero rows, so nothing was written.
+    MergeRun after = runs.findById(runId);
+    assertThat(after.getStatus()).isEqualTo("APPLYING");
+    assertThat(after.getPlan()).isEqualTo(planBeforeAttempt);
+  }
+
   // merge_run_active_idx (V19__merge_run.sql) allows a RUNNING/APPLYING row to be inserted directly
   // via the mapper for a target with no prior run -- same shortcut MergePlanIT's conflict test uses
   // -- so overriding a plan that was never computed (still RUNNING, no plan JSON at all) 409s

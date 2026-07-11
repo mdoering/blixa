@@ -229,9 +229,17 @@ public class MergeService {
   // its own. Returns an empty list (not 404/400) for a run that hasn't reached PLANNED yet (plan is
   // still null) -- the caller is expected to poll get()/latest() for status and only request the
   // mapping once PLANNED.
+  //
+  // Fix 2 (final-review, source-data leak): owner/editor on the TARGET, same tier as start()/
+  // applyOverrides()/apply() -- NOT the "any member may read" tier get()/latest() use. Every row
+  // here carries SOURCE-project name/authorship/citation strings; a target-only VIEWER (read role,
+  // cannot start/override/apply, and possibly not even a member of the source project at all) would
+  // otherwise be able to enumerate the source project's contents merely by polling this endpoint.
+  // The entire merge WRITE workflow (start/overrides/apply) is already owner/editor-gated and the
+  // frontend's Merge action is owner/editor-only, so no legitimate viewer ever needs this read.
   public List<MappingRow> getMapping(int userId, int targetId, long runId, String entity,
       String category, int page, int size) {
-    projectService.requireRole(userId, targetId);
+    requireOwnerOrEditor(projectService.requireRole(userId, targetId));
     // Validated up front, before the not-ready early return below, so a bad `entity` always 400s
     // regardless of run state -- otherwise a RUNNING run (plan==null) would silently swallow an
     // invalid entity into an empty-list response while the same bad request 400s once PLANNED,
@@ -292,13 +300,14 @@ public class MergeService {
   // override in the batch is validated (unknown sourceId, non-MATCHED/NEW category, or a MATCHED
   // pointing at a targetId that doesn't exist in the target project all 400) as it's applied to the
   // in-memory copy of the plan's lists, but that copy is only ever written back via
-  // runs.setPlanned at the very end, once the whole batch has passed -- so a batch with one bad
-  // override throws before the loop reaches setPlanned and the run's persisted plan/metrics are
+  // runs.updatePlanAndMetrics at the very end, once the whole batch has passed -- so a batch with one
+  // bad override throws before the loop reaches that write and the run's persisted plan/metrics are
   // left exactly as they were (see MergeOverrideIT.matchedOverrideWithNonExistentTargetIdReturns400,
   // which asserts the row is untouched after a rejected batch). Metrics are recomputed from the
-  // mutated plan and stored alongside it via setPlanned, same one-row update computePlan itself
-  // uses; status stays PLANNED (setPlanned's status='PLANNED' write is a no-op here since
-  // requirePlanned above already guarantees that).
+  // mutated plan and stored alongside it via updatePlanAndMetrics, a status-guarded UPDATE (Fix 1,
+  // final review) that leaves status/planned_at untouched and returns 0 -- mapped to a 409 -- if the
+  // run left PLANNED between requirePlanned's fetch and this write (e.g. a concurrent apply worker
+  // just claimed it), rather than clobbering an in-flight APPLYING row back to PLANNED.
   public MergeRunResponse applyOverrides(int userId, int targetId, long runId, List<MergeOverride> overrides) {
     requireOwnerOrEditor(projectService.requireRole(userId, targetId));
     MergeRun run = requireRunInTarget(targetId, runId);
@@ -356,7 +365,19 @@ public class MergeService {
 
     int sourceId = run.getSourceProjectId().intValue();
     MergeMetrics metrics = buildMetrics(sourceId, refs, names);
-    runs.setPlanned(runId, json.writeValueAsString(new MergePlan(refs, names)), json.writeValueAsString(metrics));
+    // Fix 1 (final-review, data corruption via TOCTOU): requirePlanned above only checked the
+    // ALREADY-FETCHED `run` -- a friendly early 409 for the common case, but no protection against a
+    // concurrent apply worker moving this same row PLANNED -> APPLYING (MergeRunMapper.startApply)
+    // in between that fetch and this write. updatePlanAndMetrics's "AND status = 'PLANNED'" WHERE
+    // clause is the race-proof gate: a 0 here means the run left PLANNED after we fetched it, so the
+    // mutated plan/metrics must be discarded rather than persisted -- persisting them would silently
+    // reset an in-flight APPLYING run back to PLANNED and let a second apply double-apply the plan.
+    // See MergeRunMapper.updatePlanAndMetrics's own javadoc for the full failure mode.
+    String planJson = json.writeValueAsString(new MergePlan(refs, names));
+    String metricsJson = json.writeValueAsString(metrics);
+    if (runs.updatePlanAndMetrics(runId, planJson, metricsJson) == 0) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "merge run is no longer in PLANNED state");
+    }
     return MergeRunResponse.of(runs.findById(runId), json);
   }
 
