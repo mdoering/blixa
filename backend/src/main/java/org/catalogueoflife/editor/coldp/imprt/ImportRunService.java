@@ -1,7 +1,6 @@
 package org.catalogueoflife.editor.coldp.imprt;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,7 +37,6 @@ import org.catalogueoflife.editor.child.dto.VernacularRequest;
 import org.catalogueoflife.editor.coldp.imprt.dto.ImportRunResponse;
 import org.catalogueoflife.editor.coldp.io.ColdpMetadata;
 import org.catalogueoflife.editor.coldp.io.ColdpMetadata.ColdpMetadataDto;
-import org.catalogueoflife.editor.coldp.io.ColdpZip;
 import org.catalogueoflife.editor.name.Author;
 import org.catalogueoflife.editor.name.AuthorMapper;
 import org.catalogueoflife.editor.name.IdSeqMapper;
@@ -137,6 +135,10 @@ public class ImportRunService {
   private final NameRelationMapper nameRelations;
   private final PropertyMapper properties;
   private final ValidationService validationService;
+  // Format -> adapter, indexed once in the constructor from the injected List<SourceFormatAdapter>
+  // (one bean per SourceFormat -- see SourceFormat's javadoc for how a new format is added). start()
+  // looks the right one up by SourceFormat.detect(filename) instead of hardcoding ColdpZip.
+  private final Map<SourceFormat, SourceFormatAdapter> adapters;
 
   // Self-reference through the Spring proxy so run()'s @Async and loadTransactional's @Transactional
   // actually go through their proxied annotations -- see ExportRunService's identical `self` field
@@ -152,7 +154,7 @@ public class ImportRunService {
       SynonymAcceptedMapper synonymAccepted, TaxonInfoMapper taxonInfo, NameParserService parser,
       TypeMaterialMapper typeMaterials, DistributionMapper distributions, VernacularMapper vernaculars,
       MediaMapper media, EstimateMapper estimates, NameRelationMapper nameRelations,
-      PropertyMapper properties, ValidationService validationService,
+      PropertyMapper properties, ValidationService validationService, List<SourceFormatAdapter> adapterList,
       @Value("${coldp.import.dir:${java.io.tmpdir}/coldp-imports}") String importDir,
       @Value("${coldp.import.max-bytes:104857600}") long maxBytes) {
     this.runs = runs;
@@ -173,6 +175,8 @@ public class ImportRunService {
     this.nameRelations = nameRelations;
     this.properties = properties;
     this.validationService = validationService;
+    this.adapters = adapterList.stream()
+        .collect(java.util.stream.Collectors.toMap(SourceFormatAdapter::format, a -> a));
     this.importDir = Path.of(importDir);
     this.maxBytes = maxBytes;
     try {
@@ -183,15 +187,23 @@ public class ImportRunService {
   }
 
   // Validates the upload, inserts the RUNNING import_run row synchronously (so the 202 response
-  // always has a real id to poll), then extracts the archive ON THE REQUEST THREAD -- unlike the
-  // rest of the job, extraction is deliberately NOT async, so a malformed zip or one that trips the
-  // decompressed-byte/entry cap (ColdpZip.extractToTemp's zip-bomb guard) fails the request fast
-  // with a clear 400 instead of silently failing a background job the caller has to go poll for.
-  // Only once extraction succeeds does the (possibly long) archive walk move to the background via
-  // self.run.
-  public ImportRunResponse start(int userId, MultipartFile file, boolean preserveIds, String idScope) {
+  // always has a real id to poll), then materializes it into a ColDP-readable dir ON THE REQUEST
+  // THREAD via the format-detected adapter -- unlike the rest of the job, this is deliberately NOT
+  // async, so a malformed zip (ColdpArchiveAdapter, whose ColdpZip.extractToTemp is zip-bomb-guarded)
+  // or an unparsable text-tree (TxtTreeAdapter) fails the request fast with a clear 400 instead of
+  // silently failing a background job the caller has to go poll for. Only once materialization
+  // succeeds does the (possibly long) archive walk move to the background via self.run.
+  public ImportRunResponse start(int userId, MultipartFile file, boolean preserveIds, String idScope,
+      String title) {
     if (file == null || file.isEmpty()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file is required");
+    }
+    SourceFormat format = SourceFormat.detect(file.getOriginalFilename());
+    // Preserve-ids/id-scope only make sense for a ColDP archive with real source ids; a text-tree's
+    // synthetic line ids must never be kept as identifiers.
+    if (format == SourceFormat.TXTREE) {
+      preserveIds = false;
+      idScope = null;
     }
     if (preserveIds && (idScope == null || idScope.isBlank())) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -199,7 +211,7 @@ public class ImportRunService {
     }
     if (file.getSize() > maxBytes) {
       throw new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE,
-          "archive exceeds " + maxBytes + " bytes");
+          "file exceeds " + maxBytes + " bytes");
     }
 
     ImportRun run = new ImportRun();
@@ -211,12 +223,13 @@ public class ImportRunService {
     long runId = run.getId();
 
     Path dir = importDir.resolve(String.valueOf(runId));
-    try (InputStream in = file.getInputStream()) {
-      ColdpZip.extractToTemp(in, dir, maxBytes);
-    } catch (IOException e) {
+    try {
+      adapters.get(format).materialize(file, dir, title, maxBytes);
+    } catch (IOException | IllegalArgumentException e) {
       runs.fail(runId, e.getMessage());
       deleteQuietly(dir);
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid archive: " + e.getMessage());
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "invalid " + format.name().toLowerCase(java.util.Locale.ROOT) + ": " + e.getMessage());
     }
 
     try {

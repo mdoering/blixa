@@ -41,9 +41,10 @@ public class ImportRunController {
   @ResponseStatus(HttpStatus.ACCEPTED)
   public ImportRunResponse start(@RequestPart("file") MultipartFile file,
       @RequestParam(defaultValue = "false") boolean preserveIds,
-      @RequestParam(required = false) String idScope) {
+      @RequestParam(required = false) String idScope,
+      @RequestParam(required = false) String title) {
     int uid = currentUser.require().getId();
-    return service.start(uid, file, preserveIds, idScope);
+    return service.start(uid, file, preserveIds, idScope, title);
   }
 
   @GetMapping("/latest")
