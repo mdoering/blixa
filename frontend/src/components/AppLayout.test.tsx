@@ -27,9 +27,10 @@ function renderShell(route: string) {
 
 test('renders brand, current project name, footer, and the project section nav', async () => {
   renderShell('/projects/3/tree');
-  expect(await screen.findByText('Blixa')).toBeInTheDocument();
+  // Brand mark in the header (and the footer icon) — both render the accessible Blixa logo.
+  expect((await screen.findAllByRole('img', { name: 'Blixa' })).length).toBeGreaterThanOrEqual(1);
   expect(await screen.findByText('Felidae')).toBeInTheDocument(); // current project (read-only)
-  expect(screen.getByText(/Blixa · v/)).toBeInTheDocument(); // footer
+  expect(screen.getByText(new RegExp(`v${__APP_VERSION__}`))).toBeInTheDocument(); // footer
   expect(screen.getByText('TREE PAGE')).toBeInTheDocument(); // Outlet
   expect(screen.getByText('Names')).toBeInTheDocument(); // sidebar section
 });

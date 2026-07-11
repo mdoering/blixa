@@ -23,6 +23,18 @@ Reviewed issues should be accepted or rejected and the reviewer & datetime track
 
 
 
+# landing page & onboarding (NEXT)
+Redesign the app entry point (currently the login page IS the landing page):
+ - a proper **landing page**: short description of Blixa + a **list of released projects** (public), and a **join / login** call to action.
+ - **new-user approval**: a signup/join flow where a new user (ORCID or local) is registered but **cannot log in or create projects until confirmed by an admin**. Needs a user state (e.g. pending → active → disabled) and an admin review UI.
+ - depends on the user/role management work below.
+
+# user & role management (SOON)
+ - a global **admin** role (distinct from per-project owner/editor/viewer) who can approve/disable users.
+ - user states: pending (awaiting approval), active, disabled.
+ - admin screens to list users, approve pending ones, and set the global admin flag.
+ - per-project roles already exist (owner/editor/viewer); this adds the account-level layer above them.
+
 # tools
 
 ## bulk name inserts

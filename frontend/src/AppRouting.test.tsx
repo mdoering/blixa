@@ -7,7 +7,7 @@ import App from './App';
 test('unauthenticated user is redirected to the login page', async () => {
   // default /api/me handler returns 401
   renderWithProviders(<App />, { route: '/' });
-  expect(await screen.findByText(/sign in to blixa/i)).toBeInTheDocument();
+  expect(await screen.findByRole('link', { name: /sign in with orcid/i })).toBeInTheDocument();
 });
 
 test('authenticated user sees the project list inside the app layout', async () => {

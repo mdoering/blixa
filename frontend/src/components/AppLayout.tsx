@@ -1,6 +1,6 @@
 import { Anchor, AppShell, Burger, Group, Menu, UnstyledButton } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
-import { IconBook2, IconLogout } from '@tabler/icons-react';
+import { IconLogout } from '@tabler/icons-react';
 import { Link, Outlet, useMatch, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMe } from '../auth/useMe';
@@ -8,6 +8,7 @@ import { logout } from '../api/auth';
 import CurrentProjectName from './CurrentProjectName';
 import AppSidebar from './AppSidebar';
 import AppFooter from './AppFooter';
+import BlixaLogo from './BlixaLogo';
 import ColorSchemeToggle from './ColorSchemeToggle';
 
 export default function AppLayout() {
@@ -57,12 +58,9 @@ export default function AppLayout() {
             size="sm"
             aria-label="Collapse navigation"
           />
-          {/* Brand slot (upper-left) — IconBook2 is a placeholder for a future SVG logo. */}
+          {/* Brand slot (upper-left) — the full Blixa lockup, masked to inherit the header colour. */}
           <Anchor component={Link} to="/" underline="never" c="inherit">
-            <Group gap={6} wrap="nowrap">
-              <IconBook2 size={20} />
-              <span style={{ fontWeight: 700 }}>Blixa</span>
-            </Group>
+            <BlixaLogo variant="header" height={28} />
           </Anchor>
           {/* Read-only current-project context; picking a project happens on the Projects list. */}
           <CurrentProjectName projectId={projectId} />

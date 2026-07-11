@@ -1,5 +1,6 @@
-import { Alert, Button, Card, Divider, PasswordInput, Stack, Text, TextInput } from '@mantine/core';
+import { Alert, Button, Card, Divider, PasswordInput, Stack, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import BlixaLogo from '../components/BlixaLogo';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -37,9 +38,7 @@ export default function LoginPage() {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
       <Card withBorder style={{ width: 380 }}>
-        <Text fw={700} size="lg" mb="md">
-          Sign in to Blixa
-        </Text>
+        <BlixaLogo variant="header" height={40} style={{ display: 'block', margin: '4px auto 20px' }} />
         <Stack gap="md">
           <Button fullWidth component="a" href={orcidLoginUrl()}>
             Sign in with ORCID
