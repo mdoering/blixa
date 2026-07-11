@@ -70,9 +70,10 @@ function overrideKey(entity: Entity, sourceId: string): string {
 // The per-row correction surface for one PLANNED run's mapping (Task 10): two peer tabs (Names,
 // References), each a mantine-react-table fed by getMergeMapping, filterable by category chip.
 // Confirm/Reject/Re-point queue local PendingOverride entries (shared across both tabs, since one
-// putMergeOverrides PUT can carry both entities' corrections); "Save overrides" flushes the batch
-// and invalidates both the mapping queries and the ['mergeRun', targetId, runId] query MergeModal
-// polls, so the Impact metrics reflect the correction without a manual reopen.
+// putMergeOverrides PUT can carry both entities' corrections); "Save overrides" flushes the batch,
+// invalidates the mapping queries (rows changed) and seeds the ['mergeRun', targetId, runId] query
+// MergeModal polls with the PUT response's already-recomputed metrics, so the Impact metrics
+// reflect the correction without a manual reopen or an extra GET.
 export default function MergeMappingTables({ targetId, runId }: MergeMappingTablesProps) {
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<Record<string, PendingOverride>>({});
@@ -98,10 +99,14 @@ export default function MergeMappingTables({ targetId, runId }: MergeMappingTabl
         // wire MergeOverride shape, so it's stripped before the PUT.
         Object.values(pending).map(({ targetLabel: _targetLabel, ...o }) => o),
       ),
-    onSuccess: () => {
+    onSuccess: (updatedRun) => {
       setPending({});
       queryClient.invalidateQueries({ queryKey: ['mergeMapping', targetId, runId] });
-      queryClient.invalidateQueries({ queryKey: ['mergeRun', targetId, runId] });
+      // The PUT response already carries the recomputed metrics -- seed the poll query's cache with
+      // it directly (same pattern as MergeModal's applyMut.onSuccess) instead of invalidating and
+      // triggering an extra GET for a run that isn't RUNNING/APPLYING (so refetchInterval won't get
+      // it for free either).
+      queryClient.setQueryData(['mergeRun', targetId, runId], updatedRun);
       notifications.show({ color: 'green', message: 'Overrides saved' });
     },
     onError: (e) =>

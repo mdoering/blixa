@@ -88,11 +88,13 @@ export interface MappingRow extends Candidate {
 // Mirrors dto.MergeOverride -- one curator-submitted correction to a Candidate already sitting in a
 // PLANNED run's stored plan (Task 10). targetId is required (and validated server-side) when
 // category is MATCHED, ignored/forced null when category is NEW -- POSSIBLE_* are not valid
-// override categories, only a curator's confirm/reject decisions are (see MergeOverride.java).
+// override categories (the backend 400s on them), only a curator's confirm/reject/re-point
+// decisions are (see MergeOverride.java), hence the narrower category type here vs. the full
+// MergeCategory used by Candidate/MappingRow.
 export interface MergeOverride {
   entity: 'name' | 'reference';
   sourceId: string;
-  category: MergeCategory;
+  category: 'MATCHED' | 'NEW';
   targetId: string | null;
 }
 

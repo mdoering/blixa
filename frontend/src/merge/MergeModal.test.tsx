@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test } from 'vitest';
 import { renderWithProviders } from '../test/utils';
@@ -349,4 +349,63 @@ test('"Review mapping" toggles the Names/References mapping tables (Task 10) int
 
   await userEvent.click(screen.getByRole('button', { name: 'Hide mapping' }));
   expect(screen.queryByRole('tab', { name: 'Names' })).not.toBeInTheDocument();
+});
+
+// Fix for Task 10 review: the brief requires "rejecting a MATCHED name posts an override AND the
+// metrics update" -- MergeMappingTables.test.tsx only ever asserted the PUT payload, never that the
+// Impact panel (which lives in this component, not MergeMappingTables) picks up the PUT response's
+// recomputed metrics. This exercises the full save -> setQueryData(['mergeRun', ...]) wiring: if
+// MergeMappingTables.tsx's saveMut.onSuccess regressed back to invalidateQueries (an extra GET that
+// this test's handler doesn't special-case, so it would keep serving the pre-save mixedMetrics) or
+// dropped the cache write entirely, the "matched 4"/"new 11" assertions below would fail.
+test('rejecting a MATCHED name in the mapping table refreshes the Impact metrics from the override response', async () => {
+  const matchedNameRow = {
+    sourceId: 'n1',
+    category: 'MATCHED',
+    targetId: 't1',
+    score: 1.0,
+    sourceLabel: 'Aus bus Linnaeus, 1758 (species)',
+    targetLabel: 'Aus bus (L.) (species)',
+  };
+  // matched -1, new +1 vs. mixedMetrics.names -- a different shape than the pre-save metrics so a
+  // stale/unrefreshed panel is unambiguously distinguishable from a refreshed one.
+  const postOverrideMetrics = {
+    ...mixedMetrics,
+    names: { ...mixedMetrics.names, matched: mixedMetrics.names.matched - 1, new: mixedMetrics.names.new + 1 },
+  };
+
+  server.use(
+    projectsList,
+    noLatestMerge,
+    http.post('/api/projects/5/merge', () =>
+      HttpResponse.json(baseRun({ status: 'RUNNING' }), { status: 202 }),
+    ),
+    http.get('/api/projects/5/merge/100', () =>
+      HttpResponse.json(
+        baseRun({ status: 'PLANNED', metrics: mixedMetrics, plannedAt: '2026-07-11T00:00:05Z' }),
+      ),
+    ),
+    http.get('/api/projects/5/merge/100/mapping', ({ request }) => {
+      const entity = new URL(request.url).searchParams.get('entity');
+      return HttpResponse.json(entity === 'name' ? [matchedNameRow] : []);
+    }),
+    http.put('/api/projects/5/merge/100/overrides', () =>
+      HttpResponse.json(
+        baseRun({ status: 'PLANNED', metrics: postOverrideMetrics, plannedAt: '2026-07-11T00:00:05Z' }),
+      ),
+    ),
+  );
+
+  renderWithProviders(<MergeModal opened onClose={() => {}} targetId={5} />);
+  await pickSourceAndStart();
+  await waitFor(() => expect(screen.getByText('matched 5')).toBeInTheDocument(), { timeout: 5000 });
+
+  await userEvent.click(screen.getByRole('button', { name: 'Review mapping' }));
+  const matchedRow = (await screen.findByText('Aus bus Linnaeus, 1758 (species)')).closest('tr');
+  expect(matchedRow).not.toBeNull();
+  await userEvent.click(within(matchedRow as HTMLElement).getByRole('button', { name: 'Reject' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Save overrides' }));
+
+  await waitFor(() => expect(screen.getByText('matched 4')).toBeInTheDocument());
+  expect(screen.getByText('new 11')).toBeInTheDocument();
 });
