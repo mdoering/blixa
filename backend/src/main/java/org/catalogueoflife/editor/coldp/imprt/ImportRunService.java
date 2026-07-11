@@ -1196,7 +1196,8 @@ public class ImportRunService {
   // the abandoned parser/stream is GC'd (finalization / Cleaner-driven, JDK/platform dependent). This
   // is one leaked FD per import run, on ImportAsyncConfig's single-thread executor, so imports can
   // never pile these up concurrently; low impact, not an oversight. A real fix would need an
-  // upstream close() on CsvReader itself.
+  // upstream close() on CsvReader itself -- tracked in CatalogueOfLife/backend#1547; once the reader
+  // is AutoCloseable, wrap ColdpReader.from(dir) in try-with-resources in loadTransactional.
   private static NomCode peekNomCode(ColdpReader reader) {
     Optional<VerbatimRecord> row = reader.hasSchema(ColdpTerm.NameUsage)
         ? reader.readFirstRow(ColdpTerm.NameUsage)
