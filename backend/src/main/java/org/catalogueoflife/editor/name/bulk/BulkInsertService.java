@@ -13,18 +13,23 @@ import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.NameUsageService;
 import org.catalogueoflife.editor.name.Status;
 import org.catalogueoflife.editor.name.bulk.dto.BulkInsertRequest;
+import org.catalogueoflife.editor.name.bulk.dto.BulkInsertResult;
 import org.catalogueoflife.editor.name.bulk.dto.BulkPreviewResponse;
 import org.catalogueoflife.editor.name.bulk.dto.BulkPreviewResponse.PreviewNode;
+import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
+import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.parse.NameParserService;
 import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectMapper;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
+import org.catalogueoflife.editor.tree.TreeMapper;
 import org.gbif.nameparser.api.NomCode;
 import org.gbif.txtree.SimpleTreeNode;
 import org.gbif.txtree.Tree;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -37,14 +42,17 @@ public class BulkInsertService {
   private final ProjectService projects;
   private final ProjectMapper projectMapper;
   private final NameParserService parser;
+  private final TreeMapper tree;
 
   public BulkInsertService(NameUsageService usageService, NameUsageMapper usages,
-      ProjectService projects, ProjectMapper projectMapper, NameParserService parser) {
+      ProjectService projects, ProjectMapper projectMapper, NameParserService parser,
+      TreeMapper tree) {
     this.usageService = usageService;
     this.usages = usages;
     this.projects = projects;
     this.projectMapper = projectMapper;
     this.parser = parser;
+    this.tree = tree;
   }
 
   public BulkPreviewResponse preview(int userId, int projectId, BulkInsertRequest req) {
@@ -80,6 +88,84 @@ public class BulkInsertService {
         : previewChildren(roots, nomCode, existingKeys, counts, true);
     return new BulkPreviewResponse(true, null, counts[0] + counts[1],
         counts[0], counts[1], counts[2], nodes);
+  }
+
+  // All-or-nothing bulk insert. Reuses NameUsageService.create (parse, id-seq, insert, taxon-info,
+  // audit, validation event) and linkSynonym, so this stays DRY with single-add. The whole run is
+  // one transaction: create() is @Transactional REQUIRED, so each call joins THIS transaction and
+  // any failure rolls the entire batch back. The project tree is advisory-locked once up front
+  // (create() re-locks reentrantly for each parented child).
+  @Transactional
+  public BulkInsertResult insert(int userId, int projectId, BulkInsertRequest req) {
+    requireEditor(userId, projectId);
+    Project project = requireProject(projectId);
+    NameUsage target = resolveTarget(projectId, req.targetId());
+    BulkMode mode = parseMode(req.mode());
+    tree.lockProject(projectId);
+
+    List<SimpleTreeNode> roots;
+    try {
+      roots = Tree.simple(new StringReader(req.text())).getRoot();
+    } catch (IllegalArgumentException | IOException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+    if (roots.isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No names found in the input");
+    }
+    if (mode == BulkMode.SYNONYMS && !isFlat(roots)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "Synonymy mode requires a flat list of names (no indentation)");
+    }
+    int total = countNodes(roots, mode);
+    if (total > MAX_NAMES) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "This list is too large for a direct insert (" + total + " > " + MAX_NAMES
+              + "). Import it as a new dataset instead.");
+    }
+
+    NomCode nomCode = project.getNomCode();
+    int[] counts = new int[2]; // created, linked
+    if (mode == BulkMode.SYNONYMS) {
+      for (SimpleTreeNode n : roots) {
+        int synId = createUsage(userId, projectId, n, "SYNONYM", null, nomCode);
+        usageService.linkSynonym(userId, projectId, synId, target.getId());
+        counts[0]++;
+        counts[1]++;
+      }
+    } else {
+      insertChildren(userId, projectId, roots, target.getId(), nomCode, counts);
+    }
+    return new BulkInsertResult(counts[0], counts[1], target.getId());
+  }
+
+  private void insertChildren(int userId, int projectId, List<SimpleTreeNode> nodes,
+      Integer parentId, NomCode nomCode, int[] counts) {
+    for (SimpleTreeNode n : nodes) {
+      int id = createUsage(userId, projectId, n, "ACCEPTED", parentId, nomCode);
+      counts[0]++;
+      for (SimpleTreeNode s : n.synonyms) {
+        int synId = createUsage(userId, projectId, s, "SYNONYM", null, nomCode);
+        usageService.linkSynonym(userId, projectId, synId, id);
+        counts[0]++;
+        counts[1]++;
+      }
+      insertChildren(userId, projectId, n.children, id, nomCode, counts);
+    }
+  }
+
+  // Builds a CreateNameUsageRequest and delegates to NameUsageService.create. Rank is pre-resolved
+  // to a non-blank value (create requires @NotBlank rank): the [rank] suffix if present, else the
+  // parser-inferred rank, else "unranked".
+  private int createUsage(int userId, int projectId, SimpleTreeNode node, String status,
+      Integer parentId, NomCode nomCode) {
+    String rank = effectiveRank(node, nomCode);
+    CreateNameUsageRequest r = new CreateNameUsageRequest(
+        node.name, null, rank, status, parentId,
+        null, null, null, null, null, null, null,
+        node.extinct ? Boolean.TRUE : null,
+        null, null, null, null);
+    NameUsageResponse created = usageService.create(userId, projectId, r);
+    return created.id();
   }
 
   // --- shared helpers (reused by insert() in Task 3) ---

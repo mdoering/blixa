@@ -3,6 +3,7 @@ package org.catalogueoflife.editor.name.bulk;
 import jakarta.validation.Valid;
 import org.catalogueoflife.editor.auth.CurrentUser;
 import org.catalogueoflife.editor.name.bulk.dto.BulkInsertRequest;
+import org.catalogueoflife.editor.name.bulk.dto.BulkInsertResult;
 import org.catalogueoflife.editor.name.bulk.dto.BulkPreviewResponse;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,5 +27,11 @@ public class BulkInsertController {
   public BulkPreviewResponse preview(@PathVariable int pid, @Valid @RequestBody BulkInsertRequest req) {
     int uid = currentUser.require().getId();
     return service.preview(uid, pid, req);
+  }
+
+  @PostMapping
+  public BulkInsertResult insert(@PathVariable int pid, @Valid @RequestBody BulkInsertRequest req) {
+    int uid = currentUser.require().getId();
+    return service.insert(uid, pid, req);
   }
 }
