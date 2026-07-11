@@ -67,6 +67,19 @@ class PdfServiceTest {
   }
 
   @Test
+  void rejectsNonPdfBytesEvenWithDeclaredPdfContentType(@TempDir Path tmp) {
+    PdfService service = new PdfService(tmp.toString(), 1_000_000);
+    // A declared Content-Type is advisory only -- a client can lie and label arbitrary bytes
+    // application/pdf. The %PDF- magic check must still reject this regardless.
+    MockMultipartFile file = new MockMultipartFile("file", "not-really.pdf", "application/pdf",
+        "just some text, definitely not a pdf".getBytes(StandardCharsets.UTF_8));
+
+    assertThatThrownBy(() -> service.store(1, 1, file))
+        .isInstanceOfSatisfying(ResponseStatusException.class,
+            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+  }
+
+  @Test
   void acceptsPdfMagicEvenWithWrongContentType(@TempDir Path tmp) {
     PdfService service = new PdfService(tmp.toString(), 1_000_000);
     // Some browsers/clients send application/octet-stream (or nothing at all) for a raw file input

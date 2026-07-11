@@ -21,11 +21,11 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class PdfService {
 
-  // %PDF- is the canonical PDF file-header magic (PDF spec section 7.5.2); checked as a fallback
-  // when the multipart part's declared Content-Type isn't (or lies about being) application/pdf --
-  // browsers/clients are inconsistent about setting it for a raw file input.
+  // %PDF- is the canonical PDF file-header magic (PDF spec section 7.5.2); required unconditionally,
+  // regardless of what the multipart part's declared Content-Type says. Content-Type is advisory
+  // only -- a client can declare application/pdf on arbitrary bytes -- so trusting it alone would
+  // let that lie through; the magic bytes are the only thing actually checked.
   private static final byte[] PDF_MAGIC = "%PDF-".getBytes(StandardCharsets.US_ASCII);
-  private static final String APPLICATION_PDF = "application/pdf";
 
   private final Path dir;
   private final long maxBytes;
@@ -58,9 +58,7 @@ public class PdfService {
     } catch (IOException e) {
       throw new UncheckedIOException("failed to read uploaded pdf", e);
     }
-    boolean declaredPdf = APPLICATION_PDF.equals(file.getContentType());
-    boolean magicPdf = startsWithPdfMagic(bytes);
-    if (!declaredPdf && !magicPdf) {
+    if (!startsWithPdfMagic(bytes)) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file is not a PDF");
     }
     String filename = "p" + projectId + "-r" + refId + "-" + shortUuid() + ".pdf";

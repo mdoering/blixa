@@ -41,6 +41,11 @@ public class PdfController {
     return ResponseEntity.ok()
         .contentType(APPLICATION_PDF)
         .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+        // Defense-in-depth for a public, same-origin, unauthenticated file endpoint: tells the
+        // browser to trust the declared Content-Type rather than sniffing the body, so a malicious
+        // upload that slipped past PdfService.store's %PDF- magic check can't get MIME-sniffed and
+        // rendered/executed as something else (e.g. HTML/JS) in this origin's context.
+        .header("X-Content-Type-Options", "nosniff")
         .contentLength(resolved.toFile().length())
         .body(resource);
   }

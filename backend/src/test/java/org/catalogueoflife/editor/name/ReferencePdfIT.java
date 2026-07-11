@@ -1,12 +1,14 @@
 package org.catalogueoflife.editor.name;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.io.InputStream;
@@ -20,15 +22,9 @@ import life.catalogue.csv.ColdpReader;
 import org.catalogueoflife.editor.coldp.export.ColdpWriter;
 import org.catalogueoflife.editor.coldp.io.ColdpZip;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
-import org.catalogueoflife.editor.project.Project;
-import org.catalogueoflife.editor.project.ProjectMapper;
-import org.catalogueoflife.editor.project.ProjectMember;
-import org.catalogueoflife.editor.project.ProjectMemberMapper;
-import org.catalogueoflife.editor.project.Role;
 import org.catalogueoflife.editor.support.AbstractPostgresIT;
 import org.catalogueoflife.editor.user.AppUser;
 import org.catalogueoflife.editor.user.AppUserService;
-import org.gbif.nameparser.api.NomCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,8 +51,6 @@ class ReferencePdfIT extends AbstractPostgresIT {
   @Autowired MockMvc mvc;
   @Autowired AppUserService users;
   @Autowired ObjectMapper json;
-  @Autowired ProjectMemberMapper members;
-  @Autowired ProjectMapper projects;
   @Autowired ReferenceService referenceService;
   @Autowired ColdpWriter writer;
 
@@ -97,16 +91,22 @@ class ReferencePdfIT extends AbstractPostgresIT {
         .andReturn().getResponse().getContentAsString();
     JsonNode attached = json.readTree(attachBody);
     assertThat(attached.get("pdfUrl").isNull()).as("attach sets pdfUrl").isFalse();
-    String pdfUrl = attached.get("pdfUrl").asText();
+    String pdfUrl = attached.get("pdfUrl").asString();
     assertThat(pdfUrl).startsWith("/pdf/").endsWith(".pdf");
     String filename = pdfUrl.substring("/pdf/".length());
 
-    // Public download: no @WithMockUser context established for this request, no csrf() needed
-    // (GET) -- proves SecurityConfig's /pdf/** permitAll actually applies.
-    mvc.perform(get("/pdf/" + filename))
+    // Public download: the whole test method runs as @WithMockUser("pdfOwner"), so a plain
+    // mvc.perform(get(...)) here would silently inherit that principal and pass whether /pdf/** is
+    // permitAll OR authenticated -- it would prove nothing about SecurityConfig. .with(anonymous())
+    // forces THIS request's SecurityContext to an AnonymousAuthenticationToken, overriding the
+    // method-level @WithMockUser for just this call, so a 200 here is a genuine proof that
+    // SecurityConfig's /pdf/** permitAll applies: were it authenticated() instead, this request
+    // would 401.
+    mvc.perform(get("/pdf/" + filename).with(anonymous()))
         .andExpect(status().isOk())
         .andExpect(content().contentType("application/pdf"))
-        .andExpect(content().bytes(VALID_PDF));
+        .andExpect(content().bytes(VALID_PDF))
+        .andExpect(header().string("X-Content-Type-Options", "nosniff"));
 
     String removeBody = mvc.perform(
             delete("/api/projects/" + pid + "/references/" + refId + "/pdf").with(csrf()))
@@ -114,8 +114,8 @@ class ReferencePdfIT extends AbstractPostgresIT {
         .andReturn().getResponse().getContentAsString();
     assertThat(json.readTree(removeBody).get("pdfUrl").isNull()).as("delete clears pdfUrl").isTrue();
 
-    // The file itself is gone once removed from the reference.
-    mvc.perform(get("/pdf/" + filename)).andExpect(status().isNotFound());
+    // The file itself is gone once removed from the reference -- same anonymous proof as above.
+    mvc.perform(get("/pdf/" + filename).with(anonymous())).andExpect(status().isNotFound());
   }
 
   @Test

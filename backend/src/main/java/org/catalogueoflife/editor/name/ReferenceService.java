@@ -14,6 +14,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
@@ -188,9 +190,14 @@ public class ReferenceService {
 
   // Attaches (or replaces) the reference's hosted PDF. `link` is never touched -- pdf is a fully
   // separate column (see ReferenceMapper.updatePdf's javadoc) -- so this never risks clobbering a
-  // user-set citable link. A replace's old file is deleted only AFTER the CAS write succeeds; the
-  // freshly-stored file is deleted instead if the write loses the race (stale version), so a failed
-  // attach never leaves either an orphaned new file or a prematurely-deleted old one on disk.
+  // user-set citable link. A replace's old file is deleted only AFTER this transaction actually
+  // COMMITS (see deleteAfterCommit): deleting it right after the CAS write, while still inside the
+  // transaction, would leave a DB row pointing at a now-missing file if something later in this same
+  // method (audit.record, the ValidationEvent publishes) throws and the transaction rolls back --
+  // the CAS write itself would be undone, reverting `pdf` back to oldPdf, but the file would already
+  // be gone. The freshly-stored file, by contrast, is deleted immediately (not deferred) when the
+  // write loses the CAS race: nothing in the DB ever pointed at it, so there is no rollback to race
+  // against.
   @Transactional
   public Reference attachPdf(int userId, int projectId, int id, MultipartFile file) {
     requireEditor(userId, projectId);
@@ -203,7 +210,7 @@ public class ReferenceService {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
     }
     if (oldPdf != null) {
-      pdfService.delete(oldPdf);
+      deleteAfterCommit(oldPdf);
     }
     Reference after = requireInProject(projectId, id);
     audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
@@ -230,13 +237,32 @@ public class ReferenceService {
     if (updated == 0) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
     }
-    pdfService.delete(oldPdf);
+    deleteAfterCommit(oldPdf);
     Reference after = requireInProject(projectId, id);
     audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
     for (int usageId : usages.findIdsByPublishedInReference(projectId, id)) {
       events.publishEvent(ValidationEvent.forUsage(projectId, usageId));
     }
     return after;
+  }
+
+  // Deletes `filename` from disk only once this method's enclosing transaction commits, never on a
+  // rollback -- see attachPdf's javadoc for why deleting eagerly (while a DB write it depends on
+  // could still be undone) risks a committed `pdf` column pointing at a file that is already gone.
+  // Falls back to an immediate delete if there is, for whatever reason, no active transaction to
+  // hook -- both attachPdf and removePdf are @Transactional so that fallback is not expected to be
+  // exercised in practice, but a plain delete is still strictly safer than silently dropping it.
+  private void deleteAfterCommit(String filename) {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      pdfService.delete(filename);
+      return;
+    }
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCommit() {
+        pdfService.delete(filename);
+      }
+    });
   }
 
   private Reference requireInProject(int projectId, int id) {
