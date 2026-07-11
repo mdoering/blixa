@@ -1,13 +1,16 @@
 package org.catalogueoflife.editor.merge;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.catalogueoflife.editor.merge.dto.Candidate;
 import org.catalogueoflife.editor.merge.dto.Category;
 import org.catalogueoflife.editor.merge.dto.MappingRow;
+import org.catalogueoflife.editor.merge.dto.MergeOverride;
 import org.catalogueoflife.editor.merge.dto.MergePlan;
 import org.catalogueoflife.editor.merge.dto.MergeRunResponse;
 import org.catalogueoflife.editor.merge.dto.MergeRunResponse.MergeMetrics;
@@ -276,6 +279,115 @@ public class MergeService {
         .map(c -> new MappingRow(c.sourceId(), c.category(), c.targetId(), c.score(),
             referenceLabel(bySource.get(c.sourceId())), referenceLabel(byTarget.get(c.targetId()))))
         .toList();
+  }
+
+  // The curator's overrides on a computed-but-not-yet-applied plan (PUT .../{runId}/overrides,
+  // Task 5): confirm a POSSIBLE_* -> MATCHED, reject a MATCHED -> NEW, or re-point an existing
+  // MATCHED to a different targetId. Same owner/editor authorization tier as start() (a
+  // write-adjacent action -- overrides mutate the stored plan, even though nothing is written into
+  // the target project itself yet). Only legal while the run is PLANNED: RUNNING/APPLYING have no
+  // plan yet (or one that's actively being applied and would race with an in-flight apply),
+  // FAILED/DONE are terminal -- a 409 covers all of those in one guard, mirroring
+  // ColMatchJobService/ImportRunService's "wrong phase" 409s elsewhere in this codebase. Each
+  // override in the batch is validated (unknown sourceId, non-MATCHED/NEW category, or a MATCHED
+  // pointing at a targetId that doesn't exist in the target project all 400) as it's applied to the
+  // in-memory copy of the plan's lists, but that copy is only ever written back via
+  // runs.setPlanned at the very end, once the whole batch has passed -- so a batch with one bad
+  // override throws before the loop reaches setPlanned and the run's persisted plan/metrics are
+  // left exactly as they were (see MergeOverrideIT.matchedOverrideWithNonExistentTargetIdReturns400,
+  // which asserts the row is untouched after a rejected batch). Metrics are recomputed from the
+  // mutated plan and stored alongside it via setPlanned, same one-row update computePlan itself
+  // uses; status stays PLANNED (setPlanned's status='PLANNED' write is a no-op here since
+  // requirePlanned above already guarantees that).
+  public MergeRunResponse applyOverrides(int userId, int targetId, long runId, List<MergeOverride> overrides) {
+    requireOwnerOrEditor(projectService.requireRole(userId, targetId));
+    MergeRun run = requireRunInTarget(targetId, runId);
+    requirePlanned(run);
+
+    MergePlan plan = json.readValue(run.getPlan(), MergePlan.class);
+    List<Candidate> names = new ArrayList<>(plan.names());
+    List<Candidate> refs = new ArrayList<>(plan.references());
+
+    // Lazily built, at most once each, and only if an override actually needs it -- a batch of
+    // NEW-only (reject) overrides never touches the target project at all.
+    Set<String> targetNameIds = null;
+    Set<String> targetRefIds = null;
+
+    for (MergeOverride o : overrides) {
+      boolean isName = isNameEntity(o.entity());
+      List<Candidate> list = isName ? names : refs;
+      int idx = indexOfSource(list, o.sourceId());
+      if (idx < 0) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "no " + o.entity() + " candidate with sourceId " + o.sourceId() + " in the plan");
+      }
+      if (o.category() != Category.MATCHED && o.category() != Category.NEW) {
+        // POSSIBLE_HOMONYM/POSSIBLE_FUZZY/POSSIBLE are matcher-produced review states, not curator
+        // decisions -- an override always resolves a candidate to one of the two, never sets it
+        // back to "still needs review".
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "override category must be MATCHED or NEW, got " + o.category());
+      }
+
+      String resolvedTargetId;
+      Double score;
+      if (o.category() == Category.NEW) {
+        resolvedTargetId = null; // a rejected match carries no target -- forced regardless of what was submitted.
+        score = null;
+      } else {
+        if (o.targetId() == null || o.targetId().isBlank()) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+              "targetId is required for a MATCHED override (sourceId " + o.sourceId() + ")");
+        }
+        Set<String> existing = isName
+            ? (targetNameIds != null ? targetNameIds
+                : (targetNameIds = idSet(usages.findAllByProject(targetId), u -> String.valueOf(u.getId()))))
+            : (targetRefIds != null ? targetRefIds
+                : (targetRefIds = idSet(references.findAllByProject(targetId), r -> String.valueOf(r.getId()))));
+        if (!existing.contains(o.targetId())) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+              "targetId " + o.targetId() + " does not exist in the target project (" + o.entity() + ")");
+        }
+        resolvedTargetId = o.targetId();
+        score = 1.0; // curator-confirmed match reported at full confidence, same as an auto-MATCHED candidate.
+      }
+      list.set(idx, new Candidate(o.sourceId(), o.category(), resolvedTargetId, score));
+    }
+
+    int sourceId = run.getSourceProjectId().intValue();
+    MergeMetrics metrics = buildMetrics(sourceId, refs, names);
+    runs.setPlanned(runId, json.writeValueAsString(new MergePlan(refs, names)), json.writeValueAsString(metrics));
+    return MergeRunResponse.of(runs.findById(runId), json);
+  }
+
+  private static boolean isNameEntity(String entity) {
+    if ("name".equalsIgnoreCase(entity)) {
+      return true;
+    }
+    if ("reference".equalsIgnoreCase(entity)) {
+      return false;
+    }
+    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "entity must be 'name' or 'reference': " + entity);
+  }
+
+  private static int indexOfSource(List<Candidate> list, String sourceId) {
+    for (int i = 0; i < list.size(); i++) {
+      if (list.get(i).sourceId().equals(sourceId)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  private static <T> Set<String> idSet(List<T> rows, Function<T, String> idOf) {
+    return rows.stream().map(idOf).collect(Collectors.toSet());
+  }
+
+  private static void requirePlanned(MergeRun run) {
+    if (!"PLANNED".equals(run.getStatus())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT,
+          "merge run must be PLANNED to accept overrides (was " + run.getStatus() + ")");
+    }
   }
 
   private MergeRun requireRunInTarget(int targetId, long runId) {

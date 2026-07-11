@@ -31,10 +31,12 @@ public interface MergeRunMapper {
       """)
   int setPlanned(@Param("runId") long runId, @Param("plan") String plan, @Param("metrics") String metrics);
 
-  // Overrides save (MergeService.applyOverrides, a later task): replaces the plan JSON in place --
-  // status/planned_at/metrics are left as-is here; the caller re-stores recomputed metrics itself
-  // via a second call if it needs to (kept as two narrow updates rather than one wide one so a
-  // metrics-only or plan-only caller never has to re-supply the other).
+  // A narrow plan-only replace: status/planned_at/metrics are left as-is. MergeService.applyOverrides
+  // (Task 5) does NOT use this -- an override always changes the impact metrics too, so it reuses
+  // setPlanned to store the mutated plan and the recomputed metrics together in one UPDATE (a no-op
+  // on status/planned_at there, since the run is already PLANNED when overrides are legal). This
+  // method is kept for a plan-only write with no metrics change and is exercised directly by
+  // MergeRunMapperIT.
   @Update("UPDATE merge_run SET plan = #{plan,jdbcType=OTHER}::jsonb WHERE id = #{runId}")
   int updatePlan(@Param("runId") long runId, @Param("plan") String plan);
 
