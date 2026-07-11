@@ -260,13 +260,15 @@ class MergeApplyNamesIT extends AbstractPostgresIT {
         synonymAccepted.findAcceptedFor((int) targetId, targetFelisLeo.getId());
     assertThat(acceptedOfFelisLeo).containsExactly(targetLeo.getId());
 
-    // (e) refIdMap remap: the matched reference keeps its target id + gains provenance (scalars
-    // untouched), and the NEW usage's publishedInReferenceId resolves to the NEW target reference
-    // (never the source's own reference id, which is meaningless in the target project).
+    // (e) refIdMap remap: the matched reference keeps its target id + gains provenance, and (Task 7:
+    // mode OVERWRITE reconciles a matched record's scalars -- see MergeApplyService.reconcileMatchedRef)
+    // its citation is now the SOURCE's citation, since the two differ and OVERWRITE is source-wins.
+    // The NEW usage's publishedInReferenceId resolves to the NEW target reference (never the
+    // source's own reference id, which is meaningless in the target project).
     Reference updatedTargetRef = references.findByIdInProject((int) targetId, targetRef.getId());
     assertThat(updatedTargetRef).isNotNull();
     assertThat(updatedTargetRef.getAlternativeId()).contains("src:" + srcMatchedRef.getId());
-    assertThat(updatedTargetRef.getCitation()).isEqualTo(targetRef.getCitation());
+    assertThat(updatedTargetRef.getCitation()).isEqualTo(srcMatchedRef.getCitation());
 
     List<Reference> targetRefs = references.findAllByProject((int) targetId);
     assertThat(targetRefs).hasSize(2); // original DOI ref + the new one

@@ -87,14 +87,15 @@ public class MergeController {
     return service.applyOverrides(uid, targetId, runId, overrides);
   }
 
-  // transactional defaults to true when the field is omitted/null (ApplyMergeRequest's javadoc);
-  // mode is required -- MergeApplyService.apply 400s on a null mode.
+  // transactional is passed through as the raw nullable flag -- MergeApplyService.apply resolves
+  // it (null/omitted -> true, EXCEPT a full-import plan with no MATCHED/POSSIBLE_* candidate at
+  // all, which forces false regardless -- see its javadoc). mode is required -- apply 400s on null.
   @PostMapping("/{runId}/apply")
   @ResponseStatus(HttpStatus.ACCEPTED)
   public MergeRunResponse apply(@PathVariable int targetId, @PathVariable long runId,
       @RequestBody ApplyMergeRequest req) {
     int uid = currentUser.require().getId();
-    boolean transactional = req == null || req.transactional() == null || req.transactional();
-    return applyService.apply(uid, targetId, runId, req == null ? null : req.mode(), transactional);
+    return applyService.apply(uid, targetId, runId, req == null ? null : req.mode(),
+        req == null ? null : req.transactional());
   }
 }

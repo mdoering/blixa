@@ -59,3 +59,7 @@ coldp:
     # pg_trgm similarity threshold for ReferenceMatcher's POSSIBLE fuzzy-citation fallback
     # (review-only, mirrors name-similarity's rationale above).
     citation-similarity: 0.9
+    # Non-transactional apply's commit chunk size (MergeApplyService.applyNonTransactional): each
+    # phase (references, name-usage Pass 1, Pass 2, matched-synonym-links, children) commits in
+    # TransactionTemplate-wrapped batches of this many records rather than one commit per row.
+    apply-batch: 500
