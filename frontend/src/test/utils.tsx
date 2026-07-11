@@ -28,3 +28,13 @@ export function renderWithProviders(
   );
   return render(ui, { wrapper });
 }
+
+// Alias for newer tests that import `render` directly (mirrors RTL's own naming) rather than the
+// more explicit `renderWithProviders` used throughout the existing suite -- both point at the
+// same implementation so existing tests are unaffected.
+export { renderWithProviders as render };
+
+// Re-exported so newer tests can pull `screen`/`waitFor` from this one module alongside `render`
+// instead of a separate `@testing-library/react` import -- existing tests importing them directly
+// from `@testing-library/react` are unaffected.
+export { screen, waitFor } from '@testing-library/react';

@@ -8,6 +8,7 @@ import LinkAcceptedModal from '../tree/LinkAcceptedModal';
 import CreateNameModal from './CreateNameModal';
 import { useNameActions } from './useNameActions';
 import ClbImportModal from '../clb/ClbImportModal';
+import BulkAddModal from './BulkAddModal';
 
 const STATUS_OPTIONS = [
   { value: 'ACCEPTED', label: 'Accepted' },
@@ -124,6 +125,12 @@ export default function NameActionMenu({
               >
                 Import from ChecklistBank…
               </Menu.Item>
+              <Menu.Item
+                leftSection={<IconPlus size={14} />}
+                onClick={() => actions.startBulk(usage)}
+              >
+                Bulk add…
+              </Menu.Item>
             </>
           )}
           {(usage.status === 'SYNONYM' || usage.status === 'MISAPPLIED') && (
@@ -200,6 +207,15 @@ export default function NameActionMenu({
           focalUsage={actions.clbImportTarget}
           opened
           onClose={actions.closeClbImport}
+        />
+      )}
+      {actions.bulkTarget && (
+        <BulkAddModal
+          pid={pid}
+          target={actions.bulkTarget}
+          opened
+          onClose={actions.closeBulk}
+          onDone={() => onSelect(actions.bulkTarget!.id)}
         />
       )}
     </>

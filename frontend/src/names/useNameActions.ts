@@ -68,6 +68,7 @@ export function useNameActions(pid: number) {
   const [promoteTarget, setPromoteTarget] = useState<MoveModalTarget | null>(null);
   const [linkAcceptedTarget, setLinkAcceptedTarget] = useState<MoveModalTarget | null>(null);
   const [clbImportTarget, setClbImportTarget] = useState<MoveModalTarget | null>(null);
+  const [bulkTarget, setBulkTarget] = useState<{ id: number; scientificName: string | null } | null>(null);
 
   // `id` is the affected usage: also invalidate its own detail query and path so a currently-open
   // TaxonDetail (reads ['usage', pid, id]) and Breadcrumb (reads ['treePath', pid, id]) refresh
@@ -141,6 +142,12 @@ export function useNameActions(pid: number) {
     clbImportTarget,
     startClbImport: (usage: MoveModalTarget) => setClbImportTarget(usage),
     closeClbImport: () => setClbImportTarget(null),
+    // "Bulk add…" modal, opened on an accepted usage (the target children/synonyms are inserted
+    // under/onto) -- the flow itself lives in BulkAddModal.
+    bulkTarget,
+    startBulk: (usage: { id: number; scientificName: string | null }) =>
+      setBulkTarget({ id: usage.id, scientificName: usage.scientificName }),
+    closeBulk: () => setBulkTarget(null),
     changeStatus: (usage: ActionableUsage, status: string) =>
       changeStatusMutation.mutate({ usage, status }),
     // `onSuccess` here (rather than baked into removeMutation above) lets callers react to a
