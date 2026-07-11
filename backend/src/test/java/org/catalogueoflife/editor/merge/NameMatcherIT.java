@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.assertj.core.data.Offset;
 import org.catalogueoflife.editor.merge.dto.Candidate;
 import org.catalogueoflife.editor.merge.dto.Category;
 import org.catalogueoflife.editor.name.IdSeqMapper;
@@ -21,26 +20,22 @@ import org.catalogueoflife.editor.user.AppUserMapper;
 import org.gbif.nameparser.api.NomCode;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 
 // Spring IT against the real testcontainers Postgres (see AbstractPostgresIT): seeds one target
 // project with a small real classification (Panthera / Panthera leo (Linnaeus, 1758)) and one
-// source project with four usages, one per Category NameMatcher.match can produce, and asserts
-// the full source->target mapping in one call -- the trigram fuzzy path (POSSIBLE_FUZZY) needs the
-// real name_usage_sciname_trgm GIN index (V3__name_core.sql), which a mapper-mocking unit test
-// can't exercise; see NameMatcherTest for the pure canonicalKey/authorCompatible unit coverage.
+// source project with four usages, one per Category NameMatcher.match can produce (a fifth test
+// method below covers the remaining category, POSSIBLE), and asserts the full source->target
+// mapping in one call -- the trigram fuzzy path (POSSIBLE_FUZZY) needs the real
+// name_usage_sciname_trgm GIN index (V3__name_core.sql), which a mapper-mocking unit test can't
+// exercise; see NameMatcherTest for the pure canonicalKey/authorCompatible/notho unit coverage.
 //
-// Overrides coldp.merge.name-similarity down to 0.75 (production default stays 0.85, see
-// application.yml / NameMatcher's @Value default) purely so the single-character misspelling
-// below is deterministic against REAL pg_trgm output: `similarity('Panthera leo','Panthera leoo')`
-// is 0.8 (verified against a live Postgres 17) -- under the production 0.85 default it would
-// (correctly, conservatively) fall through to NEW instead of POSSIBLE_FUZZY, which would defeat
-// the point of this scenario. 0.75 still leaves a clear margin below the "Panthera onca" NEW
-// case's best candidate (bare genus "Panthera", similarity ~0.64), so that assertion stays valid
-// too. This class-level override replaces (not merges with) AbstractPostgresIT's bare
-// @SpringBootTest per Spring's closest-in-hierarchy annotation resolution; @ActiveProfiles("test")
-// is a separate annotation and is unaffected, still picked up from the superclass.
-@SpringBootTest(properties = "coldp.merge.name-similarity=0.75")
+// Runs against the production coldp.merge.name-similarity default (0.7, see application.yml /
+// NameMatcher's @Value default) -- no per-test override needed: `similarity('Panthera leo',
+// 'Panthera leoo')` is 0.8 (verified against a live Postgres 17), comfortably above 0.7, so the
+// misspelling below deterministically clears the threshold (POSSIBLE_FUZZY). The "Panthera onca"
+// NEW case's best rank-filtered candidate (species-rank "Panthera leo" -- the fuzzy query is now
+// rank-qualified, so the genus-rank "Panthera" row is never even considered) sits at similarity
+// 0.5, comfortably below 0.7, so that assertion stays NEW too.
 class NameMatcherIT extends AbstractPostgresIT {
 
   private static final String ENTITY = "name_usage";
@@ -125,5 +120,40 @@ class NameMatcherIT extends AbstractPostgresIT {
     assertThat(brandNew.category()).isEqualTo(Category.NEW);
     assertThat(brandNew.targetId()).isNull();
     assertThat(brandNew.score()).isNull();
+  }
+
+  @Test
+  void matchAssignsPossibleWhenMultipleTargetCandidatesAreAuthorCompatible() {
+    // The remaining Category not covered by matchAssignsExpectedCategoryPerSourceUsage above:
+    // POSSIBLE fires when >= 2 same-canonical-key target usages are each author-compatible with
+    // the source (see NameMatcher.matchOne) -- i.e. the target itself already has an ambiguous,
+    // curator-facing duplicate. Seeded here as two literally identical target usages ("Panthera
+    // leo" (Linnaeus, 1758) twice) -- name_usage has no uniqueness constraint on
+    // (scientific_name, authorship) that would block this (its only UNIQUE was (project_id,
+    // coldp_id), and that whole column was dropped in V14__drop_coldp_id.sql), so this is a
+    // realistic "genuine intra-target duplicate" scenario, not a schema workaround.
+    AppUser u = new AppUser();
+    u.setUsername("name-matcher-it-possible");
+    users.insert(u);
+    int userId = u.getId();
+
+    int targetProjectId = newProject("mergeTargetPossible");
+    int sourceProjectId = newProject("mergeSourcePossible");
+
+    NameUsage target1 = newUsage(targetProjectId, userId, "Panthera leo", "(Linnaeus, 1758)", "species");
+    NameUsage target2 = newUsage(targetProjectId, userId, "Panthera leo", "(Linnaeus, 1758)", "species");
+
+    NameUsage src = newUsage(sourceProjectId, userId, "Panthera leo", "(Linnaeus, 1758)", "species");
+
+    List<Candidate> result = matcher.match(sourceProjectId, targetProjectId);
+    assertThat(result).hasSize(1);
+
+    Candidate possible = result.get(0);
+    assertThat(possible.sourceId()).isEqualTo(String.valueOf(src.getId()));
+    assertThat(possible.category()).isEqualTo(Category.POSSIBLE);
+    // A suggestion only (the lowest-id compatible candidate) -- either target is a valid pick.
+    assertThat(possible.targetId())
+        .isIn(String.valueOf(target1.getId()), String.valueOf(target2.getId()));
+    assertThat(possible.score()).isNull();
   }
 }

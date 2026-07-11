@@ -26,7 +26,8 @@ import org.springframework.stereotype.Service;
 //      category among those candidates -- see match()'s javadoc for the exact partition.
 //   2. Trigram fuzzy fallback: only when NO target usage shares the source's canonicalKey at all
 //      (an empty candidate set) -- NameUsageMapper.findFuzzyCandidate's pg_trgm `%`/similarity()
-//      query against target.scientificName, gated by coldp.merge.name-similarity (default 0.85).
+//      query against target.scientificName, rank-qualified (same rank as the source, like the
+//      exact-key path) and gated by coldp.merge.name-similarity (default 0.7).
 //
 // Deliberately conservative: a canonical-key match with an incompatible/ambiguous author is never
 // silently treated as MATCHED (see POSSIBLE_HOMONYM/POSSIBLE below) -- false merges are far more
@@ -37,8 +38,14 @@ public class NameMatcher {
   private final NameUsageMapper usages;
   private final double threshold;
 
+  // POSSIBLE_FUZZY is review-only -- it's never auto-merged (see Category / this class's javadoc
+  // below) -- so a generous threshold is safe, and actually desirable: the goal is to help a
+  // curator SPOT near-duplicates, not to auto-decide for them. 0.7 is verified against real
+  // Postgres 17 pg_trgm output: single-character typos of a binomial score 0.65-0.80 similarity,
+  // while congeneric-but-different-species noise (e.g. "Panthera leo" vs "Panthera onca") stays
+  // <= 0.50 -- 0.7 catches the former while staying comfortably clear of the latter.
   public NameMatcher(NameUsageMapper usages,
-      @Value("${coldp.merge.name-similarity:0.85}") double threshold) {
+      @Value("${coldp.merge.name-similarity:0.7}") double threshold) {
     this.usages = usages;
     this.threshold = threshold;
   }
@@ -95,7 +102,7 @@ public class NameMatcher {
       }
       return new Candidate(sourceId, Category.POSSIBLE_HOMONYM, String.valueOf(candidates.get(0).getId()), null);
     }
-    ScoredId fuzzy = usages.findFuzzyCandidate(targetProjectId, src.getScientificName(), threshold);
+    ScoredId fuzzy = usages.findFuzzyCandidate(targetProjectId, src.getScientificName(), src.getRank(), threshold);
     if (fuzzy != null) {
       return new Candidate(sourceId, Category.POSSIBLE_FUZZY, String.valueOf(fuzzy.id()), fuzzy.score());
     }
@@ -104,7 +111,9 @@ public class NameMatcher {
 
   // author-stripped structural key: reconstruct from atomized fields (parseInto populated them),
   // fall back to the raw scientificName for unparsed names; rank-qualified so a genus != a species
-  // of the same spelling.
+  // of the same spelling, and notho-qualified so a nothotaxon (hybrid marker, e.g. "Genus xspecies")
+  // never collapses onto the same key as the plain (non-hybrid) name of otherwise identical spelling
+  // -- they are different names, not merge candidates.
   static String canonicalKey(NameUsage u) {
     String core;
     if (notBlank(u.getUninomial())) core = u.getUninomial();
@@ -112,7 +121,7 @@ public class NameMatcher {
         s(u.getGenus()), s(u.getInfragenericEpithet()), s(u.getSpecificEpithet()),
         s(u.getInfraspecificEpithet()), s(u.getCultivarEpithet()));
     else core = s(u.getScientificName());
-    return norm(core) + "|" + norm(u.getRank());
+    return norm(core) + "|" + norm(u.getRank()) + "|" + (u.getNotho() == null ? "" : u.getNotho().name());
   }
 
   private static boolean notBlank(String x) { return x != null && !x.isBlank(); }

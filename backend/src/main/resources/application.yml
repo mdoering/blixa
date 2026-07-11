@@ -51,4 +51,8 @@ coldp:
     dir: ${java.io.tmpdir}/coldp-imports
     max-bytes: 104857600
   merge:
-    name-similarity: 0.85
+    # pg_trgm similarity threshold for NameMatcher's POSSIBLE_FUZZY fallback (review-only, never
+    # auto-merged -- see NameMatcher's @Value javadoc for the rationale). 0.7 catches single-char
+    # typos (0.65-0.80 similarity on real Postgres 17 data) while staying above congeneric
+    # different-species noise (<= 0.50).
+    name-similarity: 0.7

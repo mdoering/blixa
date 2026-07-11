@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.catalogueoflife.editor.name.NameUsage;
+import org.gbif.nameparser.api.NamePart;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -63,7 +64,27 @@ class NameMatcherTest {
     b.setRank("unranked");
 
     assertEquals(NameMatcher.canonicalKey(a), NameMatcher.canonicalKey(b));
-    assertEquals("bold:aaa0001|unranked", NameMatcher.canonicalKey(a));
+    // Trailing "|" is the (empty, since notho is null here) notho segment -- see canonicalKey.
+    assertEquals("bold:aaa0001|unranked|", NameMatcher.canonicalKey(a));
+  }
+
+  @Test
+  void nothotaxonAndPlainNameOfSameSpellingProduceDifferentKeys() {
+    // Same genus+epithet+rank, but one is a nothotaxon (hybrid marker, e.g. "Genus xspecies") and
+    // the other is the plain (non-hybrid) name -- these are different names and must NOT collapse
+    // onto the same canonicalKey (see the brief's motivating notho case).
+    NameUsage plain = new NameUsage();
+    plain.setGenus("Panthera");
+    plain.setSpecificEpithet("leo");
+    plain.setRank("species");
+
+    NameUsage hybrid = new NameUsage();
+    hybrid.setGenus("Panthera");
+    hybrid.setSpecificEpithet("leo");
+    hybrid.setRank("species");
+    hybrid.setNotho(NamePart.SPECIFIC);
+
+    assertNotEquals(NameMatcher.canonicalKey(plain), NameMatcher.canonicalKey(hybrid));
   }
 
   @Test
