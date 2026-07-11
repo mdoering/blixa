@@ -52,6 +52,17 @@ public class ProjectService {
     return projects.findById(projectId);
   }
 
+  // Owner-only project deletion. Every project-scoped FK is ON DELETE CASCADE (V2+), so deleting the
+  // project row drops all of its data (name-usages, references, runs, members, audit, ...).
+  @Transactional
+  public void delete(int userId, int projectId) {
+    String role = requireRole(userId, projectId);
+    if (!role.equals(Role.OWNER.dbValue())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner required to delete a project");
+    }
+    projects.delete(projectId);
+  }
+
   @Transactional
   public Project updateMetadata(int userId, int projectId, UpdateProjectMetadataRequest req) {
     String role = requireRole(userId, projectId);

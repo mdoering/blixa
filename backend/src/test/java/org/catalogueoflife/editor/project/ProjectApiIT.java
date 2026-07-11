@@ -3,6 +3,7 @@ package org.catalogueoflife.editor.project;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -192,5 +193,55 @@ class ProjectApiIT extends AbstractPostgresIT {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"title\":\"Reptiles Updated\"}"))
        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(username = "deleteOwner")
+  void ownerCanDeleteProject() throws Exception {
+    ensureUser("deleteOwner");
+
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Trash me\",\"nomCode\":\"zoological\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    long projectId = json.readTree(body).get("id").asLong();
+
+    mvc.perform(delete("/api/projects/" + projectId).with(csrf()))
+       .andExpect(status().isOk());
+
+    // Gone: the owner can no longer fetch it (404), and it drops out of their project list -- the
+    // membership row went with it via ON DELETE CASCADE.
+    mvc.perform(get("/api/projects/" + projectId))
+       .andExpect(status().isNotFound());
+    mvc.perform(get("/api/projects"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
+  @WithMockUser(username = "deleteOwner2")
+  void deleteForbiddenForEditor() throws Exception {
+    ensureUser("deleteOwner2");
+    ensureUser("deleteEditor");
+
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Keep me\",\"nomCode\":\"zoological\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    int projectId = json.readTree(body).get("id").asInt();
+
+    AppUser editor = users.requireByUsernameOrNull("deleteEditor");
+    members.upsert(new ProjectMember(projectId, editor.getId(), Role.EDITOR.dbValue()));
+
+    // An editor may edit metadata but not delete the whole project -- that is owner-only.
+    mvc.perform(delete("/api/projects/" + projectId).with(csrf()).with(user("deleteEditor")))
+       .andExpect(status().isForbidden());
+
+    // And it is still there for the owner afterwards.
+    mvc.perform(get("/api/projects/" + projectId).with(user("deleteOwner2")))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.title").value("Keep me"));
   }
 }

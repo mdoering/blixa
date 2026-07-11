@@ -22,3 +22,6 @@ export function setMember(id: number, username: string, role: Role): Promise<voi
 export function removeMember(id: number, userId: number): Promise<void> {
   return api<void>(`/api/projects/${id}/members/${userId}`, { method: 'DELETE' });
 }
+export function deleteProject(id: number): Promise<void> {
+  return api<void>(`/api/projects/${id}`, { method: 'DELETE' });
+}

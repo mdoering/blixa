@@ -17,12 +17,13 @@ import {
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
-import { getProject, updateMetadata } from '../api/projects';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { deleteProject, getProject, updateMetadata } from '../api/projects';
 import { getIdScopes } from '../api/coldp';
 import { getColMatchRun, getLatestColMatch, startColMatch } from '../api/col';
 import { exportFileUrl, getExportRun, getLatestExport, startExport } from '../api/export';
@@ -58,6 +59,7 @@ export default function ProjectMetadataPage() {
   const { projectId } = useParams();
   const id = Number(projectId);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const form = useForm<UpdateMetadataPayload>({
     initialValues: {
@@ -78,6 +80,9 @@ export default function ProjectMetadataPage() {
 
   const { data } = useQuery({ queryKey: ['project', id], queryFn: () => getProject(id) });
   const canEdit = data ? ['owner', 'editor'].includes(data.role) : false;
+  // Deleting a project is owner-only (backend ProjectService.delete enforces it too); it cascades
+  // to every project-scoped row, so it lives behind a typed confirmation in the Danger zone below.
+  const isOwner = data?.role === 'owner';
 
   // Seeds each scope row's Autocomplete suggestion list -- the project's own already-configured
   // scopes still populate their row even if they're not in this vocab (e.g. a legacy custom
@@ -220,6 +225,32 @@ export default function ProjectMetadataPage() {
   // Supervised project merge (owner/editor only, same tier as "Match all identifiers"): opens
   // MergeModal, which owns its own start/poll/apply state scoped to this project as the target.
   const [merging, setMerging] = useState(false);
+
+  const deleteMut = useMutation({
+    mutationFn: () => deleteProject(id),
+    onSuccess: async () => {
+      // Drop the now-deleted project from the sidebar/list cache, then leave the (now 404ing)
+      // project layout for the project list.
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
+      notifications.show({ message: 'Project deleted' });
+      navigate('/');
+    },
+    onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Delete failed') }),
+  });
+
+  const confirmDelete = () =>
+    modals.openConfirmModal({
+      title: 'Delete project',
+      children: (
+        <Text size="sm">
+          Permanently delete <b>{data?.title}</b> and all of its names, references, and history?
+          This cannot be undone.
+        </Text>
+      ),
+      labels: { confirm: 'Delete project', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => deleteMut.mutate(),
+    });
 
   return (
     <Stack style={{ maxWidth: 720 }} gap="xl">
@@ -458,6 +489,35 @@ export default function ProjectMetadataPage() {
           </Stack>
         </fieldset>
       </form>
+
+      {isOwner && (
+        <Stack
+          gap="xs"
+          style={{
+            borderTop: '1px solid var(--mantine-color-red-4)',
+            paddingTop: 'var(--mantine-spacing-md)',
+          }}
+        >
+          <Group justify="space-between">
+            <Title order={4} m={0} c="red">
+              Danger zone
+            </Title>
+            <Button
+              color="red"
+              variant="outline"
+              leftSection={<IconTrash size={16} />}
+              loading={deleteMut.isPending}
+              onClick={confirmDelete}
+            >
+              Delete project
+            </Button>
+          </Group>
+          <Text size="sm" c="dimmed">
+            Permanently deletes this project and all of its names, references, and history. This
+            cannot be undone.
+          </Text>
+        </Stack>
+      )}
     </Stack>
   );
 }

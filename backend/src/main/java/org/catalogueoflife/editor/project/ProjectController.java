@@ -79,4 +79,10 @@ public class ProjectController {
     int uid = currentUser.require().getId();
     service.removeMember(uid, id, userId);
   }
+
+  @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+  public void delete(@PathVariable int id) {
+    int uid = currentUser.require().getId();
+    service.delete(uid, id);
+  }
 }
