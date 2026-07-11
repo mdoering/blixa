@@ -1,12 +1,13 @@
 import { ActionIcon, Menu } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconArrowsMove, IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconArrowsMove, IconCloudDownload, IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
 import MoveNameModal from '../tree/MoveNameModal';
 import DemoteModal from '../tree/DemoteModal';
 import PromoteModal from '../tree/PromoteModal';
 import LinkAcceptedModal from '../tree/LinkAcceptedModal';
 import CreateNameModal from './CreateNameModal';
 import { useNameActions } from './useNameActions';
+import ClbImportModal from '../clb/ClbImportModal';
 
 const STATUS_OPTIONS = [
   { value: 'ACCEPTED', label: 'Accepted' },
@@ -117,6 +118,12 @@ export default function NameActionMenu({
               >
                 Move…
               </Menu.Item>
+              <Menu.Item
+                leftSection={<IconCloudDownload size={14} />}
+                onClick={() => actions.startClbImport(usage)}
+              >
+                Import from ChecklistBank…
+              </Menu.Item>
             </>
           )}
           {(usage.status === 'SYNONYM' || usage.status === 'MISAPPLIED') && (
@@ -185,6 +192,14 @@ export default function NameActionMenu({
           usage={actions.linkAcceptedTarget}
           opened
           onClose={actions.closeLinkAccepted}
+        />
+      )}
+      {actions.clbImportTarget && (
+        <ClbImportModal
+          projectId={pid}
+          focalUsage={actions.clbImportTarget}
+          opened
+          onClose={actions.closeClbImport}
         />
       )}
     </>

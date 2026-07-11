@@ -67,6 +67,7 @@ export function useNameActions(pid: number) {
   const [demoteTarget, setDemoteTarget] = useState<DemoteModalTarget | null>(null);
   const [promoteTarget, setPromoteTarget] = useState<MoveModalTarget | null>(null);
   const [linkAcceptedTarget, setLinkAcceptedTarget] = useState<MoveModalTarget | null>(null);
+  const [clbImportTarget, setClbImportTarget] = useState<MoveModalTarget | null>(null);
 
   // `id` is the affected usage: also invalidate its own detail query and path so a currently-open
   // TaxonDetail (reads ['usage', pid, id]) and Breadcrumb (reads ['treePath', pid, id]) refresh
@@ -135,6 +136,11 @@ export function useNameActions(pid: number) {
     linkAcceptedTarget,
     startLinkAccepted: (usage: MoveModalTarget) => setLinkAcceptedTarget(usage),
     closeLinkAccepted: () => setLinkAcceptedTarget(null),
+    // "Import from ChecklistBank" modal, opened on an accepted usage (the focal target the
+    // picked CLB taxon is imported under/onto) -- the flow itself lives in ClbImportModal.
+    clbImportTarget,
+    startClbImport: (usage: MoveModalTarget) => setClbImportTarget(usage),
+    closeClbImport: () => setClbImportTarget(null),
     changeStatus: (usage: ActionableUsage, status: string) =>
       changeStatusMutation.mutate({ usage, status }),
     // `onSuccess` here (rather than baked into removeMutation above) lets callers react to a
