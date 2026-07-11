@@ -109,4 +109,16 @@ public interface ReferenceMapper {
   int updateAlternativeId(@Param("projectId") int projectId, @Param("id") int id,
       @Param("alternativeId") List<String> alternativeId,
       @Param("modifiedBy") int modifiedBy, @Param("version") Integer version);
+
+  // Narrow CAS write of just pdf -- sibling of updateAlternativeId above. Deliberately never touches
+  // `link`: PdfService/ReferenceService.attachPdf/removePdf own the pdf column exclusively, so a
+  // hosted PDF never clobbers (or is clobbered by) the reference's own citable link. 0 rows updated
+  // -> caller treats as a stale-version conflict, same convention as every other CAS write here.
+  @Update("""
+      UPDATE reference SET pdf = #{pdf},
+          modified = now(), modified_by = #{modifiedBy}, version = version + 1
+      WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}
+      """)
+  int updatePdf(@Param("projectId") int projectId, @Param("id") int id, @Param("pdf") String pdf,
+      @Param("modifiedBy") int modifiedBy, @Param("version") Integer version);
 }

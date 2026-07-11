@@ -9,6 +9,7 @@ import life.catalogue.coldp.ColdpTerm;
 import org.catalogueoflife.editor.coldp.io.ColdpTsv;
 import org.catalogueoflife.editor.name.Reference;
 import org.catalogueoflife.editor.name.ReferenceMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 // Builds Reference.tsv: one row per reference, in ReferenceMapper.findAllByProject's ID order.
@@ -19,20 +20,25 @@ import org.springframework.stereotype.Component;
 public class ReferenceColdpWriter {
 
   private final ReferenceMapper references;
+  // coldp.pdf.base-url -- same key ReferenceController/PdfController use to build pdfUrl, so an
+  // exported archive's `link` (when synthesized from a hosted PDF, see row() below) resolves to the
+  // very same URL the app itself would have served.
+  private final String pdfBaseUrl;
 
-  public ReferenceColdpWriter(ReferenceMapper references) {
+  public ReferenceColdpWriter(ReferenceMapper references, @Value("${coldp.pdf.base-url}") String pdfBaseUrl) {
     this.references = references;
+    this.pdfBaseUrl = pdfBaseUrl;
   }
 
   /** Writes {@code dir/Reference.tsv} and returns the number of rows written. */
   public int write(Path dir, int projectId) throws IOException {
     List<Map<ColdpTerm, String>> rows =
-        references.findAllByProject(projectId).stream().map(ReferenceColdpWriter::row).toList();
+        references.findAllByProject(projectId).stream().map(this::row).toList();
     ColdpTsv.writeFile(dir, ColdpTerm.Reference, rows);
     return rows.size();
   }
 
-  private static Map<ColdpTerm, String> row(Reference r) {
+  private Map<ColdpTerm, String> row(Reference r) {
     Map<ColdpTerm, String> row = new LinkedHashMap<>();
     row.put(ColdpTerm.ID, String.valueOf(r.getId()));
     row.put(ColdpTerm.alternativeID, join(r.getAlternativeId()));
@@ -50,10 +56,21 @@ public class ReferenceColdpWriter {
     row.put(ColdpTerm.doi, r.getDoi());
     row.put(ColdpTerm.isbn, r.getIsbn());
     row.put(ColdpTerm.issn, r.getIssn());
-    row.put(ColdpTerm.link, r.getLink());
+    row.put(ColdpTerm.link, effectiveLink(r));
     row.put(ColdpTerm.accessed, r.getAccessed());
     row.put(ColdpTerm.remarks, r.getRemarks());
     return row;
+  }
+
+  // A hosted PDF is only ever used to FILL a blank link, never to override one the user set
+  // explicitly -- see PdfService/ReferenceService.attachPdf's javadoc: `link` and `pdf` are
+  // deliberately independent columns, and this is the one place they're reconciled into ColDP's
+  // single `link` term.
+  private String effectiveLink(Reference r) {
+    if (r.getPdf() != null && (r.getLink() == null || r.getLink().isBlank())) {
+      return pdfBaseUrl + "/" + r.getPdf();
+    }
+    return r.getLink();
   }
 
   private static String join(List<String> values) {

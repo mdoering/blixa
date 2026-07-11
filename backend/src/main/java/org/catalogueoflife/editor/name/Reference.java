@@ -24,6 +24,10 @@ public class Reference {
   private String isbn;
   private String issn;
   private String link;
+  // Filename of a hosted PDF (see name/PdfService), NOT a URL -- ReferenceResponse.pdfUrl and
+  // ReferenceColdpWriter build the public URL from this + coldp.pdf.base-url. Deliberately separate
+  // from `link`, which stays whatever the user set (see ReferenceMapper.updatePdf's javadoc).
+  private String pdf;
   // When the cited online resource was last accessed (free-text, e.g. an ISO date). CSL "accessed"
   // / BibTeX "urldate" (see RefMapping).
   private String accessed;
@@ -68,6 +72,8 @@ public class Reference {
   public void setIssn(String issn) { this.issn = issn; }
   public String getLink() { return link; }
   public void setLink(String link) { this.link = link; }
+  public String getPdf() { return pdf; }
+  public void setPdf(String pdf) { this.pdf = pdf; }
   public String getAccessed() { return accessed; }
   public void setAccessed(String accessed) { this.accessed = accessed; }
   public String getRemarks() { return remarks; }

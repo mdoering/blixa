@@ -25,6 +25,10 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/ping").permitAll()
             .requestMatchers("/api/auth/login", "/login/**", "/oauth2/**").permitAll()
+            // Public reference-PDF download (name/PdfController) -- hosted PDFs must be citable
+            // without auth, same as GET /pdf/{filename} itself is a public read, unlike the
+            // authenticated POST/DELETE .../references/{id}/pdf under /api/**.
+            .requestMatchers("/pdf/**").permitAll()
             .anyRequest().authenticated())
         .csrf(csrf -> csrf
             .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())

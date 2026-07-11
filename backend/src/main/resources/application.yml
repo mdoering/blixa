@@ -55,6 +55,16 @@ coldp:
   import:
     dir: ${java.io.tmpdir}/coldp-imports
     max-bytes: 104857600
+  pdf:
+    # Reference PDF hosting (Task 2): one file per reference, written by name/PdfService and served
+    # publicly (SecurityConfig permits /pdf/**) by name/PdfController. base-url is prepended to the
+    # stored filename to build ReferenceResponse.pdfUrl and (when the reference has no link of its
+    # own) ReferenceColdpWriter's exported `link` -- set it to an absolute URL in production so the
+    # value is correct outside the app's own origin (e.g. behind Apache/Varnish); "/pdf" (relative)
+    # is fine for local dev, where the SPA and API share an origin.
+    dir: ${COLDP_PDF_DIR:${java.io.tmpdir}/coldp-pdfs}
+    max-bytes: 33554432
+    base-url: ${COLDP_PDF_BASE_URL:/pdf}
   merge:
     # pg_trgm similarity threshold for NameMatcher's POSSIBLE_FUZZY fallback (review-only, never
     # auto-merged -- see NameMatcher's @Value javadoc for the rationale). 0.7 catches single-char

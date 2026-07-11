@@ -14,6 +14,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -30,10 +31,11 @@ public class ReferenceService {
   private final NameUsageMapper usages;
   private final ApplicationEventPublisher events;
   private final IssueMapper issues;
+  private final PdfService pdfService;
 
   public ReferenceService(ReferenceMapper references, IdSeqMapper idSeq, ProjectService projects,
       AuditService audit, ObjectMapper objectMapper, NameUsageMapper usages, ApplicationEventPublisher events,
-      IssueMapper issues) {
+      IssueMapper issues, PdfService pdfService) {
     this.references = references;
     this.idSeq = idSeq;
     this.projects = projects;
@@ -42,6 +44,7 @@ public class ReferenceService {
     this.usages = usages;
     this.events = events;
     this.issues = issues;
+    this.pdfService = pdfService;
   }
 
   public List<Reference> list(int userId, int projectId, int limit, int offset) {
@@ -181,6 +184,59 @@ public class ReferenceService {
         events.publishEvent(ValidationEvent.forUsage(projectId, usageId));
       }
     }
+  }
+
+  // Attaches (or replaces) the reference's hosted PDF. `link` is never touched -- pdf is a fully
+  // separate column (see ReferenceMapper.updatePdf's javadoc) -- so this never risks clobbering a
+  // user-set citable link. A replace's old file is deleted only AFTER the CAS write succeeds; the
+  // freshly-stored file is deleted instead if the write loses the race (stale version), so a failed
+  // attach never leaves either an orphaned new file or a prematurely-deleted old one on disk.
+  @Transactional
+  public Reference attachPdf(int userId, int projectId, int id, MultipartFile file) {
+    requireEditor(userId, projectId);
+    Reference before = requireInProject(projectId, id);
+    String oldPdf = before.getPdf();
+    String filename = pdfService.store(projectId, id, file);
+    int updated = references.updatePdf(projectId, id, filename, userId, before.getVersion());
+    if (updated == 0) {
+      pdfService.delete(filename);
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
+    }
+    if (oldPdf != null) {
+      pdfService.delete(oldPdf);
+    }
+    Reference after = requireInProject(projectId, id);
+    audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
+    // Mirrors update()'s per-citing-usage revalidation publish: no validation rule reads pdf today,
+    // but keeps every reference write path notifying the same way rather than special-casing this
+    // one as silent.
+    for (int usageId : usages.findIdsByPublishedInReference(projectId, id)) {
+      events.publishEvent(ValidationEvent.forUsage(projectId, usageId));
+    }
+    return after;
+  }
+
+  // Clears the reference's hosted PDF, if any. A no-op (no version bump, no audit row) when the
+  // reference has no pdf to begin with -- DELETE is idempotent, and there is no change to record.
+  @Transactional
+  public Reference removePdf(int userId, int projectId, int id) {
+    requireEditor(userId, projectId);
+    Reference before = requireInProject(projectId, id);
+    String oldPdf = before.getPdf();
+    if (oldPdf == null) {
+      return before;
+    }
+    int updated = references.updatePdf(projectId, id, null, userId, before.getVersion());
+    if (updated == 0) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
+    }
+    pdfService.delete(oldPdf);
+    Reference after = requireInProject(projectId, id);
+    audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
+    for (int usageId : usages.findIdsByPublishedInReference(projectId, id)) {
+      events.publishEvent(ValidationEvent.forUsage(projectId, usageId));
+    }
+    return after;
   }
 
   private Reference requireInProject(int projectId, int id) {
