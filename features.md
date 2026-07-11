@@ -26,9 +26,17 @@ Reviewed issues should be accepted or rejected and the reviewer & datetime track
 # tools
 
 ## bulk name inserts
-upload a tsv/csv file with names into a selected, existing taxon
- a) plain names per line: parse the names and add them as accepted children to the insert taxon. Allow all names to be treated as synonyms of the target taxon
- b) texttree upload to a parent. includes both accepted and syns
+Insert a list of names into a selected, existing taxon, either as accepted children or as a synonymy of the target.
+Input via a **text-field (paste)** OR a **plain-text / TSV / TextTree file upload** — same parsing either way:
+ a) plain names per line: parse the names and add them as accepted children to the insert taxon. Allow all names to be treated as synonyms of the target taxon instead.
+ b) texttree (indented) input to a parent: includes both accepted and syns, preserving the hierarchy.
+ c) the paste text-field is the low-friction path (no file needed); the file upload is for larger sets.
+
+## direct CLB import (selected taxa)
+Pull selected taxa straight from ChecklistBank into a project via the CLB API (no ColDP file, no whole-dataset import):
+ - a whole genus with all its species and synonyms (the subtree)
+ - a single species with all its associated info: synonyms, vernacular names, distributions, type material, references, etc.
+Insert under a chosen target taxon. Should reuse the ColDP import/merge machinery for id handling, name-matching and the supervised-merge review (so a re-pull reconciles rather than duplicates). CLB source ids carried as `col:`/`<scope>:` CURIEs.
 
 ## homotypic grouping
 select a taxon and group the species/infraspecies homotypicly - see CLB backend

@@ -93,7 +93,7 @@ Generalizes the COL-only bulk match to **every configured matchable scope**. 4 t
 - [ ] **Status business-rules + acc↔syn workflow**: only accepted names in tree/carry taxon info; synonyms → ≥1 accepted; no synonym chaining; misapplied = synonym; acc→syn demotion picks a new accepted + migrates taxon info (ask user).
 - [ ] **More validation rules**: rank-vs-parent, genus-token-vs-parent, infraspecific-part-vs-parent, genus-year ≤ species-year, synonym→non-accepted, dangling pointers.
 - [x] **Supporting entities**: vernacular / distribution / properties / estimates / media + name relations / type material — DONE (see "Name & taxon child entities" above). Environments/geo-range beyond distribution not yet modelled.
-- [ ] **Tools**: bulk name insert (TSV / texttree), homotypic grouping, reference import (DOI/Crossref, BibTeX, CSL-JSON) + DOI consolidation.
+- [ ] **Tools** (see `features.md#tools`): bulk name insert — a list of names as **accepted children OR a synonymy**, via a **paste text-field** or plain-text/TSV/**TextTree** upload; **direct CLB import of selected taxa** (a whole genus + its species/synonyms, or one species with all its info — syns/vernacular/distributions/etc. — via the CLB API, reusing the import/merge machinery so re-pulls reconcile); homotypic grouping; reference import (DOI/Crossref, BibTeX, CSL-JSON) + DOI consolidation.
 - [ ] **ColDP import/export** (phase 2/3) — where the deferred **Release** entity (version + issued + changelog) gets built.
 
 ## Known minor follow-ups (recorded in the ledger, non-blocking)
