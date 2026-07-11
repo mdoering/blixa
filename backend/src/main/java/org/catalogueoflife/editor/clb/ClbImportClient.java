@@ -89,6 +89,12 @@ public class ClbImportClient {
 
   public record ClbUsageHit(String id, String scientificName, String rank, String status) {}
 
+  /** GET /dataset/{key}, returning its title (null if unavailable) — for showing what a pasted URL points at. */
+  public String datasetTitle(String key) {
+    JsonNode ds = getPage(UriComponentsBuilder.fromPath("/dataset/{ds}"), key);
+    return text(ds, "title");
+  }
+
   /** GET /dataset?q={q}&limit=20, parsing the ResultPage's {@code .result[]} into hits. */
   public List<ClbDatasetHit> searchDatasets(String q) {
     JsonNode page = getPage(UriComponentsBuilder.fromPath("/dataset")

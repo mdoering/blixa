@@ -239,7 +239,7 @@ test('an accepted usage with two synonyms renders both', async () => {
   expect(screen.getByText('Panthera leo persica')).toBeInTheDocument();
 });
 
-test('the Names tab lists a basionym relation with the joined related name', async () => {
+test('the Relations tab lists a basionym relation with the joined related name', async () => {
   mockCommon();
   server.use(
     http.get('/api/projects/4/usages/10/relations', () =>
@@ -261,7 +261,7 @@ test('the Names tab lists a basionym relation with the joined related name', asy
   renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
 
   await screen.findByLabelText('Scientific name');
-  await userEvent.click(screen.getByRole('tab', { name: /names/i }));
+  await userEvent.click(screen.getByRole('tab', { name: /relations/i }));
   await screen.findByText('basionym');
   expect(screen.getByText('Felis leo Linnaeus, 1758')).toBeInTheDocument();
   expect(screen.getByText('42')).toBeInTheDocument();
@@ -492,8 +492,8 @@ test('a synonym usage hides the taxon-level tabs', async () => {
   expect(screen.queryByRole('tab', { name: /vernaculars/i })).not.toBeInTheDocument();
   expect(screen.queryByRole('tab', { name: /distribution/i })).not.toBeInTheDocument();
   expect(screen.queryByRole('tab', { name: /estimates/i })).not.toBeInTheDocument();
-  // Names + Types still apply to any usage.
-  expect(screen.getByRole('tab', { name: /names/i })).toBeInTheDocument();
+  // Relations + Types still apply to any usage.
+  expect(screen.getByRole('tab', { name: /relations/i })).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: /types/i })).toBeInTheDocument();
 });
 

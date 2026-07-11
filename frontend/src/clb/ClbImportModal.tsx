@@ -253,7 +253,15 @@ export default function ClbImportModal({ projectId, focalUsage, opened, onClose 
                     <Text span fw={600} fs="italic" inherit>
                       {resolved.scientificName ?? resolved.taxonId}
                     </Text>
-                    {resolved.rank ? ` (${resolved.rank})` : ''} — dataset {resolved.datasetKey}
+                    {resolved.rank ? ` (${resolved.rank})` : ''}
+                    {' — '}
+                    <Text span inherit c="dimmed" title={resolved.datasetTitle ?? undefined}>
+                      {resolved.datasetTitle
+                        ? resolved.datasetTitle.length > 60
+                          ? `${resolved.datasetTitle.slice(0, 57)}…`
+                          : resolved.datasetTitle
+                        : `dataset ${resolved.datasetKey}`}
+                    </Text>
                   </Text>
                 )}
               </Stack>

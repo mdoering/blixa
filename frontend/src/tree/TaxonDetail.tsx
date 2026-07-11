@@ -240,16 +240,16 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
       <Tabs defaultValue="details" keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="details">Details</Tabs.Tab>
-          <Tabs.Tab value="names">Names</Tabs.Tab>
+          <Tabs.Tab value="synonyms">Synonyms</Tabs.Tab>
+          <Tabs.Tab value="names">Relations</Tabs.Tab>
           <Tabs.Tab value="types">Types</Tabs.Tab>
-          <Tabs.Tab value="references">References</Tabs.Tab>
           {isAccepted && <Tabs.Tab value="vernaculars">Vernaculars</Tabs.Tab>}
           {isAccepted && <Tabs.Tab value="distribution">Distribution</Tabs.Tab>}
           {isAccepted && <Tabs.Tab value="media">Media</Tabs.Tab>}
           {isAccepted && <Tabs.Tab value="estimates">Estimates</Tabs.Tab>}
           {isAccepted && <Tabs.Tab value="properties">Properties</Tabs.Tab>}
-          <Tabs.Tab value="synonyms">Synonyms</Tabs.Tab>
           <Tabs.Tab value="issues">Issues</Tabs.Tab>
+          <Tabs.Tab value="references">References</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="details" pt="md">

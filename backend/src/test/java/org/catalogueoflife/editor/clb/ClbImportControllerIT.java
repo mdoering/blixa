@@ -85,13 +85,15 @@ class ClbImportControllerIT extends AbstractPostgresIT {
     t.setId("6W3C4");
     t.setStatus(TaxonomicStatus.ACCEPTED);
     when(clb.usageInfo(eq("3LXR"), eq("6W3C4"))).thenReturn(new UsageInfo(t));
+    when(clb.datasetTitle(eq("3LXR"))).thenReturn("Catalogue of Life");
 
     mvc.perform(get("/api/clb/3LXR/resolve/6W3C4"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.datasetKey").value("3LXR"))
         .andExpect(jsonPath("$.taxonId").value("6W3C4"))
         .andExpect(jsonPath("$.scientificName").value("Panthera leo"))
-        .andExpect(jsonPath("$.rank").value("species"));
+        .andExpect(jsonPath("$.rank").value("species"))
+        .andExpect(jsonPath("$.datasetTitle").value("Catalogue of Life"));
   }
 
   @Test

@@ -55,6 +55,7 @@ export interface ClbResolvedTaxon {
   taxonId: string;
   scientificName: string | null;
   rank: string | null;
+  datasetTitle: string | null;
 }
 
 export function searchClbDatasets(q: string): Promise<ClbDatasetHit[]> {

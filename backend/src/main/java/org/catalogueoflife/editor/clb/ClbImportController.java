@@ -73,6 +73,13 @@ public class ClbImportController {
     NameUsageBase usage = info.getUsage();
     Name name = usage.getName();
     String rank = name.getRank() == null ? null : name.getRank().name().toLowerCase(Locale.ROOT);
-    return new ClbResolvedTaxon(datasetKey, taxonId, name.getScientificName(), rank);
+    // Best-effort: a title-lookup failure must not break resolving the taxon (the important part).
+    String datasetTitle;
+    try {
+      datasetTitle = client.datasetTitle(datasetKey);
+    } catch (RuntimeException e) {
+      datasetTitle = null;
+    }
+    return new ClbResolvedTaxon(datasetKey, taxonId, name.getScientificName(), rank, datasetTitle);
   }
 }
