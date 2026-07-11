@@ -2,7 +2,6 @@ package org.catalogueoflife.editor.clb;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -203,25 +202,35 @@ public class ClbImportService {
     // header comment and revalidateTouched's javadoc for why: raw mapper inserts carry none).
     Set<Integer> touched = new LinkedHashSet<>();
     touched.add(focalUsageId);
+    // Fix 1: name relations collected here (by insertChildEntities) instead of inserted inline --
+    // see insertPendingNameRelations' own javadoc for why relatedUsageId specifically needs to wait
+    // for the WHOLE import's usageIdMap, not just this one bundle's.
+    List<PendingNameRelation> pendingNameRelations = new ArrayList<>();
 
     if (req.mode() == ImportMode.UPDATE_FOCAL) {
       MappedImport bundle = ClbUsageMapper.toCreateRequest(client.usageInfo(req.datasetKey(), req.sourceTaxonId()));
-      insertReferences(projectId, userId, scope, List.of(bundle), refIdMap);
-      // The source's own usage/name CLB ids now stand in for the FOCAL usage: any TypeMaterial/
-      // NameRelation entry the bundle carries against them (see insertChildEntities) must attach
-      // to the focal usage, not a new one -- there is no new "accepted usage" insert in this mode.
-      usageIdMap.put(bundle.usage().clbUsageId(), focalUsageId);
-      nameIdMap.put(bundle.usage().clbNameId(), focalUsageId);
+      RefResolver refResolver = new RefResolver(projectId, userId, scope, bundle.references(), refIdMap);
+      MappedUsage mu = bundle.usage();
+      if (mu.usage() == null) {
+        issues.add(new ClbImportIssue(NAME_USAGE_ENTITY, mu.clbUsageId(), "CLB usage has no name — skipped"));
+      } else {
+        // The source's own usage/name CLB ids now stand in for the FOCAL usage: any TypeMaterial/
+        // NameRelation entry the bundle carries against them (see insertChildEntities) must attach
+        // to the focal usage, not a new one -- there is no new "accepted usage" insert in this mode.
+        usageIdMap.put(mu.clbUsageId(), focalUsageId);
+        nameIdMap.put(mu.clbNameId(), focalUsageId);
+      }
 
       int synonymCount = 0;
       if (included(req.entityTypes(), T_SYNONYMS, false)) {
         synonymCount = insertSynonyms(projectId, userId, project, scope, bundle, focalUsageId,
-            refIdMap, usageIdMap, nameIdMap, touched);
+            refResolver, usageIdMap, nameIdMap, touched, issues);
       }
       // Mode C's target is always the focal usage, guaranteed ACCEPTED by the guard above, so the
       // 5 taxon-scoped child types are always eligible here (no accepted-only skip needed).
-      insertChildEntities(projectId, userId, bundle, focalUsageId, true, usageIdMap, nameIdMap, refIdMap,
-          req.entityTypes(), false, childCounts, issues);
+      insertChildEntities(projectId, userId, bundle, focalUsageId, true, usageIdMap, nameIdMap, refResolver,
+          req.entityTypes(), false, childCounts, issues, pendingNameRelations);
+      insertPendingNameRelations(projectId, userId, pendingNameRelations, usageIdMap, childCounts, issues);
       revalidateTouched(projectId, touched);
       return new ClbImportSummary(0, synonymCount, refIdMap.size(), childCounts, issues);
     }
@@ -232,7 +241,14 @@ public class ClbImportService {
     for (String id : gathered.orderedIds()) {
       bundleByClbId.put(id, ClbUsageMapper.toCreateRequest(client.usageInfo(req.datasetKey(), id)));
     }
-    insertReferences(projectId, userId, scope, bundleByClbId.values(), refIdMap);
+    // Fix 2: no upfront insert here -- refsById is just the merged CLB-id -> Reference LOOKUP the
+    // on-demand RefResolver below draws from (first-seen wins on a shared id across bundles, same as
+    // the old eager insertReferences pass used, just deferred instead of inserted immediately).
+    Map<String, Reference> refsById = new LinkedHashMap<>();
+    for (MappedImport b : bundleByClbId.values()) {
+      b.references().forEach(refsById::putIfAbsent);
+    }
+    RefResolver refResolver = new RefResolver(projectId, userId, scope, refsById, refIdMap);
 
     int nameUsageCount = 0;
     int synonymCount = 0;
@@ -240,6 +256,14 @@ public class ClbImportService {
     for (String id : gathered.orderedIds()) {
       MappedImport bundle = bundleByClbId.get(id);
       MappedUsage mu = bundle.usage();
+      if (mu.usage() == null) {
+        // Fix 3: malformed CLB record (no Name at all) -- skip this usage entirely (no insert, no
+        // usageIdMap/nameIdMap entry, no synonyms/child entities processed) rather than NPE'ing two
+        // lines below. Any usage elsewhere in this import that lists `id` as its parent falls back
+        // to a null parent_id (nullable column, see V3__name_core.sql) -- orphaned but not fatal.
+        issues.add(new ClbImportIssue(NAME_USAGE_ENTITY, id, "CLB usage has no name — skipped"));
+        continue;
+      }
       NameUsage u = mu.usage();
       u.setProjectId(projectId);
       u.setModifiedBy(userId);
@@ -247,8 +271,8 @@ public class ClbImportService {
       u.setId(newId);
       String clbParentId = gathered.rootIds().contains(id) ? null : gathered.parentOf().get(id);
       u.setParentId(clbParentId == null ? focalUsageId : usageIdMap.get(clbParentId));
-      u.setPublishedInReferenceId(resolveRef(refIdMap, mu.clbPublishedInReferenceId()));
-      u.setReferenceId(resolveRefList(refIdMap, mu.clbReferenceIds()));
+      u.setPublishedInReferenceId(refResolver.resolve(mu.clbPublishedInReferenceId()));
+      u.setReferenceId(refResolver.resolveList(mu.clbReferenceIds()));
       u.setAlternativeId(NameUsageService.mergeScopedId(null, scope, id));
       parser.parseInto(u, project.getNomCode());
       if (u.getRank() == null || u.getRank().isBlank()) {
@@ -266,12 +290,16 @@ public class ClbImportService {
 
       if (includeSynonyms) {
         synonymCount += insertSynonyms(projectId, userId, project, scope, bundle, newId,
-            refIdMap, usageIdMap, nameIdMap, touched);
+            refResolver, usageIdMap, nameIdMap, touched, issues);
       }
       insertChildEntities(projectId, userId, bundle, newId, u.getStatus() == Status.ACCEPTED,
-          usageIdMap, nameIdMap, refIdMap, req.entityTypes(), true, childCounts, issues);
+          usageIdMap, nameIdMap, refResolver, req.entityTypes(), true, childCounts, issues,
+          pendingNameRelations);
     }
 
+    // Fix 1's final pass: usageIdMap is now complete for the whole gathered import, so a
+    // relatedUsageId that pointed at a usage inserted LATER in the loop above resolves correctly.
+    insertPendingNameRelations(projectId, userId, pendingNameRelations, usageIdMap, childCounts, issues);
     revalidateTouched(projectId, touched);
     return new ClbImportSummary(nameUsageCount, synonymCount, refIdMap.size(), childCounts, issues);
   }
@@ -329,6 +357,11 @@ public class ClbImportService {
       roots.add(sourceId);
       visited.add(sourceId);
     } else {
+      // Fix 4: mirror TAXON_SUBTREE's own visited.add(sourceId) even though sourceId itself is
+      // never enqueued here (CHILDREN_ONLY never inserts the source usage, see ImportMode's own
+      // javadoc) -- without this, a malformed/cyclic CLB response where some descendant lists the
+      // source as its own child would re-import the source, violating "source skipped".
+      visited.add(sourceId);
       for (String cid : client.childrenIds(datasetKey, sourceId)) {
         if (visited.add(cid)) {
           queue.add(cid);
@@ -354,27 +387,75 @@ public class ClbImportService {
     return new Gathered(ordered, parentOf, roots);
   }
 
-  // --- references ---------------------------------------------------------------------------------
+  // --- references (Fix 2: on-demand, memoized) ----------------------------------------------------
 
-  // Merges every gathered bundle's UsageInfo.getReferences() into one clbRefId -> Reference map
-  // (first-seen wins on a shared id -- see ClbImportRequest's own "duplicates against existing
-  // target refs are allowed, no matching" contract: this only dedups WITHIN this one import call),
-  // then inserts each exactly once, filling refIdMap for every later referenceID/publishedInId/
-  // child referenceId remap in this same call.
-  private void insertReferences(int projectId, int userId, String scope, Collection<MappedImport> bundles,
-      Map<String, Integer> refIdMap) {
-    Map<String, Reference> merged = new LinkedHashMap<>();
-    for (MappedImport b : bundles) {
-      b.references().forEach(merged::putIfAbsent);
+  // Resolves (and, on first use, inserts) a single CLB reference by clbRefId -- replaces the old
+  // eager insertReferences pass, which pre-inserted EVERY reference in the source bundle(s) whether
+  // or not anything selected by the caller's entityTypes actually cited it (in mode C especially,
+  // with most entity types unchecked, that meant orphan `reference` rows nothing in the project
+  // points at, plus an inflated ClbImportSummary.references() count). Now a reference is inserted
+  // only the FIRST time something that actually cites it (a name-usage's referenceId/
+  // publishedInReferenceId, a synonym's, or a child entity's -- see every resolve()/resolveList()
+  // call site below) resolves it; every later lookup of the same clbRefId in the same import just
+  // returns the cached id from refIdMap. `refsById` is the CLB-id -> mapped-Reference LOOKUP this
+  // draws from -- importFromClb builds one per branch: mode C's own single bundle, or modes A/B's
+  // merge across every gathered bundle (first-seen wins on a shared id, same as the old eager pass
+  // used to do -- see ClbImportRequest's own "duplicates against existing target refs are allowed,
+  // no matching" contract, which this still honours, just deferred instead of upfront). A non-static
+  // inner class (not a standalone helper) purely so it can reach this service's own idSeq/references
+  // mapper fields directly, without threading them through as extra parameters on top of the
+  // per-call projectId/userId/scope/refsById/refIdMap state every call site would otherwise repeat.
+  private final class RefResolver {
+    private final int projectId;
+    private final int userId;
+    private final String scope;
+    private final Map<String, Reference> refsById;
+    private final Map<String, Integer> refIdMap;
+
+    RefResolver(int projectId, int userId, String scope, Map<String, Reference> refsById,
+        Map<String, Integer> refIdMap) {
+      this.projectId = projectId;
+      this.userId = userId;
+      this.scope = scope;
+      this.refsById = refsById;
+      this.refIdMap = refIdMap;
     }
-    for (var e : merged.entrySet()) {
-      Reference r = e.getValue();
+
+    Integer resolve(String clbRefId) {
+      if (clbRefId == null) {
+        return null;
+      }
+      Integer existing = refIdMap.get(clbRefId);
+      if (existing != null) {
+        return existing;
+      }
+      Reference r = refsById.get(clbRefId);
+      if (r == null) {
+        // cited but its definition was never present in any gathered bundle -- silently unresolved,
+        // exactly like the old eager pass's refIdMap.get(...) miss would have left it.
+        return null;
+      }
       r.setProjectId(projectId);
       r.setModifiedBy(userId);
-      r.setAlternativeId(NameUsageService.mergeScopedId(null, scope, e.getKey()));
+      r.setAlternativeId(NameUsageService.mergeScopedId(null, scope, clbRefId));
       r.setId(idSeq.allocate(projectId, REFERENCE_ENTITY));
       references.insert(r);
-      refIdMap.put(e.getKey(), r.getId());
+      refIdMap.put(clbRefId, r.getId());
+      return r.getId();
+    }
+
+    List<Integer> resolveList(List<String> clbRefIds) {
+      if (clbRefIds == null || clbRefIds.isEmpty()) {
+        return null;
+      }
+      List<Integer> out = new ArrayList<>();
+      for (String id : clbRefIds) {
+        Integer rid = resolve(id);
+        if (rid != null) {
+          out.add(rid);
+        }
+      }
+      return out.isEmpty() ? null : out;
     }
   }
 
@@ -386,12 +467,19 @@ public class ClbImportService {
   // mapper to preserve, see ClbUsageMapper.toSynonyms' javadoc, so a plain increasing ordinal is
   // sufficient). Populates usageIdMap/nameIdMap for each synonym too, so a TypeMaterial/
   // NameRelation entry owned by a SYNONYM's name (not just the accepted taxon's) still resolves in
-  // insertChildEntities below. Returns the number of synonyms inserted.
+  // insertChildEntities below. Returns the number of synonyms actually inserted (Fix 3: a synonym
+  // whose own Name is null -- see ClbUsageMapper.toMappedUsage's null-name branch -- is skipped with
+  // an issue and does not count).
   private int insertSynonyms(int projectId, int userId, Project project, String scope, MappedImport bundle,
-      int acceptedNewId, Map<String, Integer> refIdMap, Map<String, Integer> usageIdMap,
-      Map<String, Integer> nameIdMap, Set<Integer> touched) {
+      int acceptedNewId, RefResolver refResolver, Map<String, Integer> usageIdMap,
+      Map<String, Integer> nameIdMap, Set<Integer> touched, List<ClbImportIssue> issues) {
     int ordinal = 0;
+    int inserted = 0;
     for (MappedUsage syn : bundle.synonyms()) {
+      if (syn.usage() == null) {
+        issues.add(new ClbImportIssue(NAME_USAGE_ENTITY, syn.clbUsageId(), "CLB usage has no name — skipped"));
+        continue;
+      }
       NameUsage u = syn.usage();
       u.setProjectId(projectId);
       u.setModifiedBy(userId);
@@ -399,8 +487,8 @@ public class ClbImportService {
       u.setId(newId);
       // parentId stays null: synonyms link via synonym_accepted, never the classification
       // parent_id (see NameUsage's own class doc / ImportRunService's identical Pass-2 split).
-      u.setPublishedInReferenceId(resolveRef(refIdMap, syn.clbPublishedInReferenceId()));
-      u.setReferenceId(resolveRefList(refIdMap, syn.clbReferenceIds()));
+      u.setPublishedInReferenceId(refResolver.resolve(syn.clbPublishedInReferenceId()));
+      u.setReferenceId(refResolver.resolveList(syn.clbReferenceIds()));
       u.setAlternativeId(NameUsageService.mergeScopedId(null, scope, syn.clbUsageId()));
       parser.parseInto(u, project.getNomCode());
       if (u.getRank() == null || u.getRank().isBlank()) {
@@ -411,8 +499,9 @@ public class ClbImportService {
       usageIdMap.put(syn.clbUsageId(), newId);
       nameIdMap.put(syn.clbNameId(), newId);
       synonymAccepted.link(projectId, newId, acceptedNewId, ordinal++);
+      inserted++;
     }
-    return bundle.synonyms().size();
+    return inserted;
   }
 
   // --- child entities ---------------------------------------------------------------------------
@@ -430,15 +519,16 @@ public class ClbImportService {
   // to ANY usage status, so they never consult `ownerAccepted`.
   private void insertChildEntities(int projectId, int userId, MappedImport bundle, int taxonOwnerId,
       boolean ownerAccepted, Map<String, Integer> usageIdMap, Map<String, Integer> nameIdMap,
-      Map<String, Integer> refIdMap, Set<String> entityTypes, boolean defaultAll,
-      Map<String, Integer> childCounts, List<ClbImportIssue> issues) {
+      RefResolver refResolver, Set<String> entityTypes, boolean defaultAll,
+      Map<String, Integer> childCounts, List<ClbImportIssue> issues,
+      List<PendingNameRelation> pendingNameRelations) {
 
     if (included(entityTypes, T_DISTRIBUTION, defaultAll)) {
       if (ownerAccepted) {
         for (MappedDistribution d : bundle.distributions()) {
           DistributionRequest src = d.request();
           DistributionRequest r = new DistributionRequest(src.area(), src.areaId(), src.gazetteer(),
-              src.establishmentMeans(), src.threatStatus(), resolveRef(refIdMap, d.clbReferenceId()),
+              src.establishmentMeans(), src.threatStatus(), refResolver.resolve(d.clbReferenceId()),
               src.remarks(), null);
           int id = idSeq.allocate(projectId, DISTRIBUTION_ENTITY);
           distributions.insert(projectId, id, taxonOwnerId, r, userId);
@@ -455,7 +545,7 @@ public class ClbImportService {
         for (MappedVernacular vn : bundle.vernaculars()) {
           VernacularRequest src = vn.request();
           VernacularRequest r = new VernacularRequest(src.name(), src.language(), src.country(), src.sex(),
-              src.preferred(), resolveRef(refIdMap, vn.clbReferenceId()), src.remarks(), null);
+              src.preferred(), refResolver.resolve(vn.clbReferenceId()), src.remarks(), null);
           int id = idSeq.allocate(projectId, VERNACULAR_ENTITY);
           vernaculars.insert(projectId, id, taxonOwnerId, r, userId);
           childCounts.merge(T_VERNACULAR, 1, Integer::sum);
@@ -484,7 +574,7 @@ public class ClbImportService {
         for (MappedEstimate est : bundle.estimates()) {
           EstimateRequest src = est.request();
           EstimateRequest r = new EstimateRequest(src.estimate(), src.type(),
-              resolveRef(refIdMap, est.clbReferenceId()), src.remarks(), null);
+              refResolver.resolve(est.clbReferenceId()), src.remarks(), null);
           int id = idSeq.allocate(projectId, ESTIMATE_ENTITY);
           estimates.insert(projectId, id, taxonOwnerId, r, userId);
           childCounts.merge(T_ESTIMATE, 1, Integer::sum);
@@ -500,7 +590,7 @@ public class ClbImportService {
         for (MappedProperty prop : bundle.properties()) {
           PropertyRequest src = prop.request();
           PropertyRequest r = new PropertyRequest(src.property(), src.value(), src.page(),
-              resolveRef(refIdMap, prop.clbReferenceId()), src.remarks(), null);
+              refResolver.resolve(prop.clbReferenceId()), src.remarks(), null);
           int id = idSeq.allocate(projectId, PROPERTY_ENTITY);
           properties.insert(projectId, id, taxonOwnerId, r, userId);
           childCounts.merge(T_PROPERTY, 1, Integer::sum);
@@ -522,7 +612,7 @@ public class ClbImportService {
           TypeMaterialRequest src = tm.request();
           TypeMaterialRequest r = new TypeMaterialRequest(src.citation(), src.status(), src.institutionCode(),
               src.catalogNumber(), src.occurrenceId(), src.locality(), src.country(), src.collector(),
-              src.date(), src.sex(), resolveRef(refIdMap, tm.clbReferenceId()), src.link(), src.remarks(),
+              src.date(), src.sex(), refResolver.resolve(tm.clbReferenceId()), src.link(), src.remarks(),
               src.latitude(), src.longitude(), null);
           int id = idSeq.allocate(projectId, TYPE_MATERIAL_ENTITY);
           typeMaterials.insert(projectId, id, ownerId, r, userId);
@@ -531,22 +621,56 @@ public class ClbImportService {
       }
     }
 
+    // Fix 1: name relations are collected here, NOT inserted -- ownerId resolves inline (always
+    // safe: the owner is this bundle's own accepted usage or one of its own synonyms, both already
+    // in usageIdMap by the time this method runs -- see insertSynonyms' call ordering ahead of this
+    // one in both importFromClb branches). relatedUsageId, though, may point at ANOTHER usage
+    // elsewhere in this SAME gathered import that simply hasn't been inserted yet (a forward
+    // reference, e.g. an early usage's basionym relation pointing at a later sibling) -- resolving
+    // it here, before usageIdMap is complete for the whole import, is exactly the bug this defers
+    // around. See importFromClb's insertPendingNameRelations call for the final pass that resolves
+    // it once usageIdMap is complete.
     if (included(entityTypes, T_NAME_RELATION, defaultAll)) {
       for (MappedNameRelation rel : bundle.nameRelations()) {
         Integer ownerId = usageIdMap.get(rel.clbUsageId());
-        Integer relatedId = usageIdMap.get(rel.clbRelatedUsageId());
-        if (ownerId == null || relatedId == null) {
-          issues.add(new ClbImportIssue(NAME_RELATION_ENTITY, rel.clbUsageId(),
-              "owning or related usage not found"));
+        if (ownerId == null) {
+          issues.add(new ClbImportIssue(NAME_RELATION_ENTITY, rel.clbUsageId(), "owning usage not found"));
           continue;
         }
         NameRelationRequest src = rel.request();
-        NameRelationRequest r = new NameRelationRequest(relatedId, src.type(),
-            resolveRef(refIdMap, rel.clbReferenceId()), src.page(), src.remarks(), null);
-        int id = idSeq.allocate(projectId, NAME_RELATION_ENTITY);
-        nameRelations.insert(projectId, id, ownerId, r, userId);
-        childCounts.merge(T_NAME_RELATION, 1, Integer::sum);
+        pendingNameRelations.add(new PendingNameRelation(ownerId, rel.clbRelatedUsageId(), src.type(),
+            refResolver.resolve(rel.clbReferenceId()), src.page(), src.remarks(), rel.clbUsageId()));
       }
+    }
+  }
+
+  // --- name relations: Fix 1's deferred final pass ------------------------------------------------
+
+  // What insertChildEntities collects instead of inserting directly, above: ownerId is already a
+  // real new usage id by construction (see that method's own comment), clbRelatedUsageId is the one
+  // field that needed the WHOLE import's usageIdMap to be complete before it could be looked up.
+  // sourceIdForIssues is the owning CLB usage id, reused as the issue's own sourceId if
+  // clbRelatedUsageId still doesn't resolve below (mirrors the old inline check's identical wording,
+  // just split across the two now-separate "owner not found" / "related not found" cases).
+  private record PendingNameRelation(
+      int ownerId, String clbRelatedUsageId, String type, Integer referenceId, String page, String remarks,
+      String sourceIdForIssues) {}
+
+  private void insertPendingNameRelations(int projectId, int userId, List<PendingNameRelation> pending,
+      Map<String, Integer> usageIdMap, Map<String, Integer> childCounts, List<ClbImportIssue> issues) {
+    for (PendingNameRelation p : pending) {
+      Integer relatedId = usageIdMap.get(p.clbRelatedUsageId());
+      if (relatedId == null) {
+        // Genuinely not part of this import (or itself skipped, e.g. Fix 3's null-name guard) --
+        // not a forward-reference timing issue, since usageIdMap is complete at this point.
+        issues.add(new ClbImportIssue(NAME_RELATION_ENTITY, p.sourceIdForIssues(), "related usage not found"));
+        continue;
+      }
+      NameRelationRequest r = new NameRelationRequest(relatedId, p.type(), p.referenceId(), p.page(),
+          p.remarks(), null);
+      int id = idSeq.allocate(projectId, NAME_RELATION_ENTITY);
+      nameRelations.insert(projectId, id, p.ownerId(), r, userId);
+      childCounts.merge(T_NAME_RELATION, 1, Integer::sum);
     }
   }
 
@@ -556,24 +680,6 @@ public class ClbImportService {
   // ClbImportRequest's javadoc); otherwise an exact membership check against the caller's choice.
   private static boolean included(Set<String> entityTypes, String type, boolean defaultAll) {
     return (entityTypes == null || entityTypes.isEmpty()) ? defaultAll : entityTypes.contains(type);
-  }
-
-  private static Integer resolveRef(Map<String, Integer> refIdMap, String clbRefId) {
-    return clbRefId == null ? null : refIdMap.get(clbRefId);
-  }
-
-  private static List<Integer> resolveRefList(Map<String, Integer> refIdMap, List<String> clbRefIds) {
-    if (clbRefIds == null || clbRefIds.isEmpty()) {
-      return null;
-    }
-    List<Integer> out = new ArrayList<>();
-    for (String id : clbRefIds) {
-      Integer rid = refIdMap.get(id);
-      if (rid != null) {
-        out.add(rid);
-      }
-    }
-    return out.isEmpty() ? null : out;
   }
 
   private static boolean hasTaxonInfo(NameUsage u) {

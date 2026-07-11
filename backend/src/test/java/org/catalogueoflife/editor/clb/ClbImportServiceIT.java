@@ -15,17 +15,21 @@ import java.util.Set;
 import java.util.stream.IntStream;
 import life.catalogue.api.model.Distribution;
 import life.catalogue.api.model.Name;
+import life.catalogue.api.model.NameUsageRelation;
 import life.catalogue.api.model.Synonym;
 import life.catalogue.api.model.Synonymy;
 import life.catalogue.api.model.Taxon;
 import life.catalogue.api.model.UsageInfo;
 import life.catalogue.api.model.VernacularName;
+import life.catalogue.api.vocab.NomRelType;
 import life.catalogue.api.vocab.TaxonomicStatus;
 import life.catalogue.api.vocab.area.Gazetteer;
 import life.catalogue.api.vocab.area.GenericArea;
 import org.catalogueoflife.editor.child.DistributionMapper;
+import org.catalogueoflife.editor.child.NameRelationMapper;
 import org.catalogueoflife.editor.child.VernacularMapper;
 import org.catalogueoflife.editor.child.dto.DistributionResponse;
+import org.catalogueoflife.editor.child.dto.NameRelationResponse;
 import org.catalogueoflife.editor.child.dto.VernacularResponse;
 import org.catalogueoflife.editor.clb.dto.ClbImportRequest;
 import org.catalogueoflife.editor.clb.dto.ClbImportSummary;
@@ -64,6 +68,7 @@ class ClbImportServiceIT extends AbstractPostgresIT {
   @Autowired ReferenceMapper references;
   @Autowired DistributionMapper distributions;
   @Autowired VernacularMapper vernaculars;
+  @Autowired NameRelationMapper nameRelationMapper;
   @Autowired IdSeqMapper idSeq;
   @Autowired IssueMapper issueMapper;
   @Autowired ClbImportService service;
@@ -349,5 +354,182 @@ class ClbImportServiceIT extends AbstractPostgresIT {
     // the synonym itself is unaffected by the guard (only the 5 taxon-scoped kinds are gated).
     assertThat(usages.findAllByProject(pid).stream()
         .anyMatch(u -> u.getScientificName().equals("Guardus unus somenymus"))).isTrue();
+  }
+
+  // Fix 1: name-relation inserts are deferred to a final pass after the whole gathered import is in
+  // usageIdMap -- without that, S1's relation to S2 (inserted LATER in the same TAXON_SUBTREE walk)
+  // would wrongly resolve relatedUsageId to null and be dropped/reported as "not found", even though
+  // both endpoints are part of THIS import. A second relation, to a usage genuinely outside the
+  // import, must still be reported as an issue -- proving the final pass distinguishes "not yet
+  // inserted" (fixed) from "actually not part of this import" (still an issue).
+  @Test
+  void forwardNameRelationBetweenTwoImportedUsagesResolvesInFinalPass() {
+    int userId = createUser("clb-import-relfwd");
+    int pid = createProject(userId, "clb-import-relfwd-project");
+    int focalId = createFocalUsage(pid, userId);
+
+    String ds = "3LXR";
+    when(clb.childrenIds(ds, "GEN")).thenReturn(List.of("S1", "S2"));
+    when(clb.childrenIds(ds, "S1")).thenReturn(List.of());
+    when(clb.childrenIds(ds, "S2")).thenReturn(List.of());
+
+    Taxon s1 = new Taxon(name("S1-N", "Relgenus unus", "L.", Rank.SPECIES));
+    s1.setId("S1");
+    s1.setStatus(TaxonomicStatus.ACCEPTED);
+    UsageInfo s1Info = new UsageInfo(s1);
+    // A forward reference (S1 -> S2, S2 inserted only AFTER S1 in this same TAXON_SUBTREE walk)...
+    NameUsageRelation forward = new NameUsageRelation();
+    forward.setType(NomRelType.BASIONYM);
+    forward.setUsageId("S1");
+    forward.setRelatedUsageId("S2");
+    // ...plus a relation to a usage genuinely outside this import.
+    NameUsageRelation outside = new NameUsageRelation();
+    outside.setType(NomRelType.BASIONYM);
+    outside.setUsageId("S1");
+    outside.setRelatedUsageId("NOT-IN-IMPORT");
+    s1Info.setNameRelations(List.of(forward, outside));
+
+    Taxon s2 = new Taxon(name("S2-N", "Relgenus duo", "L.", Rank.SPECIES));
+    s2.setId("S2");
+    s2.setStatus(TaxonomicStatus.ACCEPTED);
+    UsageInfo s2Info = new UsageInfo(s2);
+
+    when(clb.usageInfo(ds, "GEN")).thenReturn(genusInfo("GEN", "Relgenus"));
+    when(clb.usageInfo(ds, "S1")).thenReturn(s1Info);
+    when(clb.usageInfo(ds, "S2")).thenReturn(s2Info);
+
+    ClbImportSummary summary = service.importFromClb(userId, pid, focalId,
+        new ClbImportRequest(ds, "GEN", ImportMode.TAXON_SUBTREE, null));
+
+    assertThat(summary.nameUsages()).isEqualTo(3);
+    // only the forward relation actually landed -- the outside one is an issue, not an insert.
+    assertThat(summary.children().get("nameRelation")).isEqualTo(1);
+    assertThat(summary.issues()).anySatisfy(i -> assertThat(i.message()).contains("related usage not found"));
+
+    NameUsage s1u = findByName(pid, "Relgenus unus");
+    NameUsage s2u = findByName(pid, "Relgenus duo");
+    List<NameRelationResponse> rels = nameRelationMapper.findByUsage(pid, s1u.getId());
+    assertThat(rels).hasSize(1);
+    assertThat(rels.get(0).relatedUsageId()).isEqualTo(s2u.getId());
+    assertThat(rels.get(0).type()).isEqualTo("basionym");
+  }
+
+  // Fix 2: mode C with a narrow entityTypes selection must insert only the references its OWN
+  // attached entities cite -- not every reference present in the source bundle. The vernacular name
+  // here is present on the source but NOT selected, so its own (distinct) reference must never be
+  // inserted, even though the distribution's reference is.
+  @Test
+  void updateFocalWithNarrowSelectionInsertsOnlyCitedReferences() {
+    int userId = createUser("clb-import-refs");
+    int pid = createProject(userId, "clb-import-refs-project");
+    int focalId = createFocalUsage(pid, userId);
+
+    String ds = "3LXR";
+    Taxon t = new Taxon(name("SRC2-N", "Selectus refsus", "L.", Rank.SPECIES));
+    t.setId("SRC2");
+    t.setStatus(TaxonomicStatus.ACCEPTED);
+    UsageInfo src = new UsageInfo(t);
+
+    Distribution d = new Distribution();
+    d.setArea(new GenericArea(Gazetteer.ISO, "DE", "Germany"));
+    d.setReferenceId("SRC2-DIST-REF");
+    src.setDistributions(List.of(d));
+
+    VernacularName vn = new VernacularName();
+    vn.setName("Should Not Count");
+    vn.setLanguage("eng");
+    vn.setReferenceId("SRC2-VERN-REF");
+    src.setVernacularNames(List.of(vn));
+
+    life.catalogue.api.model.Reference distRef = new life.catalogue.api.model.Reference();
+    distRef.setId("SRC2-DIST-REF");
+    distRef.setCitation("distribution ref");
+    life.catalogue.api.model.Reference vernRef = new life.catalogue.api.model.Reference();
+    vernRef.setId("SRC2-VERN-REF");
+    vernRef.setCitation("vernacular ref");
+    src.setReferences(Map.of("SRC2-DIST-REF", distRef, "SRC2-VERN-REF", vernRef));
+
+    when(clb.usageInfo(ds, "SRC2")).thenReturn(src);
+
+    ClbImportSummary summary = service.importFromClb(userId, pid, focalId,
+        new ClbImportRequest(ds, "SRC2", ImportMode.UPDATE_FOCAL, Set.of("distribution")));
+
+    assertThat(summary.children().get("distribution")).isEqualTo(1);
+    assertThat(summary.children().get("vernacular")).isEqualTo(0);
+    // exactly one reference inserted -- the distribution's own, not the unselected vernacular's.
+    assertThat(summary.references()).isEqualTo(1);
+
+    List<DistributionResponse> focalDist = distributions.findByUsage(pid, focalId);
+    assertThat(focalDist).hasSize(1);
+    assertThat(focalDist.get(0).referenceId()).isNotNull();
+    assertThat(vernaculars.findByUsage(pid, focalId)).isEmpty();
+  }
+
+  // Fix 3: a malformed CLB record (usage or synonym with no Name at all) must degrade to a skipped
+  // record + issue, not NPE the whole import into a 500. BAD (top-level, null name) is skipped
+  // entirely; GOOD imports normally except for its own null-name synonym, which is likewise skipped
+  // while GOOD's other, valid synonym still imports.
+  @Test
+  void gatheredUsageOrSynonymWithNullNameIsSkippedWithIssueRatherThanFailing() {
+    int userId = createUser("clb-import-nullname");
+    int pid = createProject(userId, "clb-import-nullname-project");
+    int focalId = createFocalUsage(pid, userId);
+
+    String ds = "3LXR";
+    when(clb.childrenIds(ds, "GEN")).thenReturn(List.of("BAD", "GOOD"));
+    when(clb.childrenIds(ds, "BAD")).thenReturn(List.of());
+    when(clb.childrenIds(ds, "GOOD")).thenReturn(List.of());
+
+    Taxon bad = new Taxon();
+    bad.setId("BAD");
+    bad.setStatus(TaxonomicStatus.ACCEPTED);
+    UsageInfo badInfo = new UsageInfo(bad);
+
+    UsageInfo goodInfo = speciesInfo("GOOD", "Goodus testus", TaxonomicStatus.ACCEPTED);
+    Synonym badSyn = new Synonym();
+    badSyn.setId("GOOD-BADSYN");
+    goodInfo.getSynonyms().getHomotypic().add(badSyn);
+
+    when(clb.usageInfo(ds, "BAD")).thenReturn(badInfo);
+    when(clb.usageInfo(ds, "GOOD")).thenReturn(goodInfo);
+
+    ClbImportSummary summary = service.importFromClb(userId, pid, focalId,
+        new ClbImportRequest(ds, "GEN", ImportMode.CHILDREN_ONLY, null));
+
+    // BAD skipped entirely -- only GOOD counted.
+    assertThat(summary.nameUsages()).isEqualTo(1);
+    // GOOD's one valid synonym still imports; its null-name synonym is skipped.
+    assertThat(summary.synonyms()).isEqualTo(1);
+    assertThat(summary.issues().stream().filter(i -> i.message().contains("has no name")).count())
+        .isEqualTo(2);
+
+    // exactly 3 rows total: the pre-existing focal usage, GOOD itself, and GOOD's 1 valid synonym --
+    // proving neither BAD nor its null-name synonym landed in the project.
+    assertThat(usages.findAllByProject(pid)).hasSize(3);
+    assertThat(findByName(pid, "Goodus testus").getParentId()).isEqualTo(focalId);
+  }
+
+  // Fix 4: gather()'s CHILDREN_ONLY branch must mark the source itself visited too, mirroring
+  // TAXON_SUBTREE -- otherwise a malformed CLB response where a child lists the source as its own
+  // child would re-import the source, violating "the source itself is never inserted in this mode".
+  @Test
+  void childrenOnlyGatherMarksSourceVisitedAgainstACyclicChildListing() {
+    int userId = createUser("clb-import-cyclesrc");
+    int pid = createProject(userId, "clb-import-cyclesrc-project");
+    int focalId = createFocalUsage(pid, userId);
+
+    String ds = "3LXR";
+    // GEN's own children list includes "GEN" itself (malformed/cyclic).
+    when(clb.childrenIds(ds, "GEN")).thenReturn(List.of("GEN", "SP1"));
+    when(clb.childrenIds(ds, "SP1")).thenReturn(List.of());
+    when(clb.usageInfo(ds, "SP1")).thenReturn(speciesInfo("SP1", "Cyclus unus", TaxonomicStatus.ACCEPTED));
+
+    ClbImportSummary summary = service.importFromClb(userId, pid, focalId,
+        new ClbImportRequest(ds, "GEN", ImportMode.CHILDREN_ONLY, null));
+
+    assertThat(summary.nameUsages()).isEqualTo(1);
+    verify(clb, never()).usageInfo(ds, "GEN");
+    assertThat(usages.findAllByProject(pid).stream()
+        .anyMatch(u -> u.getScientificName().equals("Cyclus unus"))).isTrue();
   }
 }

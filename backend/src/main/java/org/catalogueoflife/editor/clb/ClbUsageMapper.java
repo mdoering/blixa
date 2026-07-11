@@ -69,6 +69,12 @@ public final class ClbUsageMapper {
    * exactly like ColDP import -- see ImportRunService.insertPrimaryUsage) re-derives the atomized
    * name fields, so this mapper only carries the handful the brief calls out explicitly, not a full
    * breakdown of combinationAuthorship/basionymAuthorship.
+   *
+   * <p>{@code usage} is {@code null} when the source CLB {@code NameUsageBase} itself has no
+   * {@code Name} at all (a malformed/incomplete CLB record) -- {@code clbUsageId} is still populated
+   * in that case (it comes straight off the CLB usage, independent of its Name), everything else is
+   * {@code null}. Task 2 checks for this and skips the record with a {@code ClbImportIssue} instead
+   * of inserting it -- see {@code ClbImportService}'s own null-name guard.
    */
   public record MappedUsage(
       NameUsage usage,
@@ -115,6 +121,16 @@ public final class ClbUsageMapper {
   // form join, which pulls ColdpTerm.remarks from the Taxon/Synonym row, never the Name row.
   private static MappedUsage toMappedUsage(NameUsageBase usage, Status status) {
     Name n = usage.getName();
+    if (n == null) {
+      // Malformed/incomplete CLB record (a usage with no name at all) -- Task 2's own null-name
+      // guard (ClbImportService's insert loop / insertSynonyms) is what actually skips this with a
+      // ClbImportIssue rather than inserting it; returning a MappedUsage whose `usage` is null
+      // (instead of throwing here, which would NPE two lines below on n.getScientificName()) is
+      // simply how that signal travels back up to Task 2 -- clbUsageId is still populated (it comes
+      // straight off the CLB usage itself, independent of its Name) so the caller's issue message
+      // can still cite the offending CLB id.
+      return new MappedUsage(null, usage.getId(), null, null, usage.getReferenceIds());
+    }
     NameUsage u = new NameUsage();
     u.setStatus(status);
     u.setNamePhrase(usage.getNamePhrase());
