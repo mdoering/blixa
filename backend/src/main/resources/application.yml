@@ -56,3 +56,6 @@ coldp:
     # typos (0.65-0.80 similarity on real Postgres 17 data) while staying above congeneric
     # different-species noise (<= 0.50).
     name-similarity: 0.7
+    # pg_trgm similarity threshold for ReferenceMatcher's POSSIBLE fuzzy-citation fallback
+    # (review-only, mirrors name-similarity's rationale above).
+    citation-similarity: 0.9

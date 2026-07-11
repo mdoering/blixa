@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import org.catalogueoflife.editor.name.dto.ScoredId;
 
 @Mapper
 public interface ReferenceMapper {
@@ -64,6 +65,20 @@ public interface ReferenceMapper {
   @ResultMap("referenceResult")
   List<Reference> search(@Param("projectId") int projectId, @Param("q") String q,
       @Param("limit") int limit, @Param("offset") int offset);
+
+  // Best trigram-similar target reference by citation, for merge.ReferenceMatcher's POSSIBLE
+  // fuzzy-citation fallback (no exact DOI/citation match) -- uses the reference_citation_trgm GIN
+  // index (V3__name_core.sql). Caller must guard a null/blank citation before calling this: `%`
+  // against a null parameter never matches, but MyBatis would still round-trip a NULL bind.
+  // Null when nothing clears the threshold.
+  @Select("""
+      SELECT id, similarity(citation, #{citation}) AS score FROM reference
+      WHERE project_id = #{projectId} AND citation % #{citation}
+        AND similarity(citation, #{citation}) >= #{threshold}
+      ORDER BY score DESC LIMIT 1
+      """)
+  ScoredId findFuzzyCitation(@Param("projectId") int projectId, @Param("citation") String citation,
+      @Param("threshold") double threshold);
 
   @Delete("DELETE FROM reference WHERE project_id = #{projectId} AND id = #{id}")
   int delete(@Param("projectId") int projectId, @Param("id") int id);
