@@ -118,6 +118,23 @@ docker compose up -d        # fresh database
 
 ---
 
+## Deployment
+
+Two supported ways to run the whole stack — both documented in [`deploy/`](deploy/README.md):
+
+- **Full Docker stack** (quick / demo) — Postgres + backend + frontend, all in containers:
+  ```bash
+  docker compose -f docker-compose.full.yml up --build
+  # http://localhost:8088  ·  sign in with  admin / admin
+  ```
+  Runs the `dev` profile (seeds `admin`/`admin` + a sample project) — **local/demo only**. (This is different from the plain `docker compose up` above, which starts *only* Postgres.)
+
+- **Server deployment** (production-style, e.g. GBIF dev) — three separate components: native **PostgreSQL 17**, the **backend jar** under systemd, and the **Vite bundle served by Apache2**, which reverse-proxies `/api` to the backend (same-origin, so ORCID works). Deployed login is **ORCID**; the `dev` profile is not used. Ready-to-adapt templates (DB init, env file, systemd unit, Apache vhost) + step-by-step instructions are in [`deploy/`](deploy/README.md). Domains: `editor.dev.catalogueoflife.org` (dev) / `editor.catalogueoflife.org` (prod).
+
+The backend is a plain Spring Boot jar configured entirely through environment variables (see [Configuration](#configuration)), so any container or VM host works — the two setups above are just the supported defaults. `backend/Dockerfile` and `frontend/Dockerfile` build the two images.
+
+---
+
 ## Notes
 
 - **JDK 25 is required to build.** If `mvn` picks up Java 21 you'll get compile errors — run `sdk env` in `backend/` or set `JAVA_HOME` explicitly.
