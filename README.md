@@ -1,4 +1,4 @@
-# ColDP Editor
+# Blixa
 
 A collaborative online editor for taxonomic checklists built around the
 [ColDP](https://github.com/CatalogueOfLife/coldp) data format.

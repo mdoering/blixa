@@ -38,7 +38,7 @@ export default function LoginPage() {
     <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
       <Card withBorder style={{ width: 380 }}>
         <Text fw={700} size="lg" mb="md">
-          Sign in to ColDP Editor
+          Sign in to Blixa
         </Text>
         <Stack gap="md">
           <Button fullWidth component="a" href={orcidLoginUrl()}>

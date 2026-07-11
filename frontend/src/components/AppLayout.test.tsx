@@ -27,9 +27,9 @@ function renderShell(route: string) {
 
 test('renders brand, current project name, footer, and the project section nav', async () => {
   renderShell('/projects/3/tree');
-  expect(await screen.findByText('ColDP Editor')).toBeInTheDocument();
+  expect(await screen.findByText('Blixa')).toBeInTheDocument();
   expect(await screen.findByText('Felidae')).toBeInTheDocument(); // current project (read-only)
-  expect(screen.getByText(/ColDP Editor · v/)).toBeInTheDocument(); // footer
+  expect(screen.getByText(/Blixa · v/)).toBeInTheDocument(); // footer
   expect(screen.getByText('TREE PAGE')).toBeInTheDocument(); // Outlet
   expect(screen.getByText('Names')).toBeInTheDocument(); // sidebar section
 });

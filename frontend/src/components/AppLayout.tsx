@@ -61,7 +61,7 @@ export default function AppLayout() {
           <Anchor component={Link} to="/" underline="never" c="inherit">
             <Group gap={6} wrap="nowrap">
               <IconBook2 size={20} />
-              <span style={{ fontWeight: 700 }}>ColDP Editor</span>
+              <span style={{ fontWeight: 700 }}>Blixa</span>
             </Group>
           </Anchor>
           {/* Read-only current-project context; picking a project happens on the Projects list. */}
