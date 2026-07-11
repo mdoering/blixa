@@ -34,11 +34,13 @@ pipeline {
         }
         stage('Frontend SPA') {
           steps {
-            // npm in Docker, exactly like the col-checklistbank job.
+            // npm in Docker, like the col-checklistbank job. Do NOT set NODE_ENV=production:
+            // that makes `npm ci` skip devDependencies (typescript/vite), and the build needs
+            // `tsc`/`vite`. `vite build` still emits a production bundle regardless of NODE_ENV.
             sh '''
               docker run --rm --user "$(id -u)" \
                 -v "$PWD":/usr/src/app -w /usr/src/app/frontend \
-                -e npm_config_cache=/usr/src/app/frontend/.npm -e NODE_ENV=production \
+                -e npm_config_cache=/usr/src/app/frontend/.npm \
                 node:24 sh -c "npm ci && npm run build"
             '''
           }
