@@ -70,8 +70,11 @@ pipeline {
             backend/target/blixa-backend-*.jar \
             ${DEPLOY_USER}@${HOST}:/tmp/blixa-backend.jar
 
-          echo "== Activate backend (install + restart via sudo wrapper) =="
-          $SSH sudo /usr/local/sbin/blixa-activate
+          echo "== Install jar as col + restart service =="
+          # jenkins-deploy has `(col) NOPASSWD: ALL`, so install the jar as the col user;
+          # the systemctl restart is granted separately (jenkins-deploy-col-blixa sudoers).
+          $SSH 'sudo -u col install -m 644 /tmp/blixa-backend.jar /home/col/bin/blixa/blixa-backend.jar && rm -f /tmp/blixa-backend.jar'
+          $SSH sudo /usr/bin/systemctl restart col-blixa.service
 
           echo "== Health check =="
           $SSH 'curl -fsS --retry 10 --retry-delay 3 --retry-connrefused \
