@@ -124,7 +124,7 @@ Two supported ways to run the whole stack — both documented in [`deploy/`](dep
 
 - **Full Docker stack** (quick / demo) — Postgres + backend + frontend, all in containers:
   ```bash
-  docker compose -f docker-compose.full.yml up --build
+  docker compose up --build
   # http://localhost:8088  ·  sign in with  admin / admin
   ```
   Runs the `dev` profile (seeds `admin`/`admin` + a sample project) — **local/demo only**. (This is different from the plain `docker compose up` above, which starts *only* Postgres.)

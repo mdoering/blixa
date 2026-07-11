@@ -10,15 +10,14 @@ Two supported ways to run the whole stack. For local development from source, se
 Everything in containers — Postgres 17 + backend + frontend — for a one-command run:
 
 ```bash
-docker compose -f docker-compose.full.yml up --build      # from the repo root
+docker compose up --build      # from the repo root
 # open http://localhost:8088  and sign in with  admin / admin
 ```
 
 The backend runs under the `dev` profile here, so it seeds the `admin`/`admin` login and a small
 sample project. **Demo/local only — never a real deployment.** The frontend container (nginx) serves
 the SPA and proxies `/api`, `/login`, `/oauth2` to the backend, so it is same-origin on port 8088.
-Data persists in the `blixa_pg` volume; `docker compose -f docker-compose.full.yml down -v`
-wipes it.
+Data persists in the `blixa_pg` volume; `docker compose down -v` wipes it.
 
 To enable ORCID in the compose, export `ORCID_CLIENT_ID` / `ORCID_CLIENT_SECRET` before `up`.
 

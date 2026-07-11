@@ -1726,7 +1726,7 @@ git commit -m "feat(import): accept text-tree uploads (with title) in the import
 
 - [ ] Backend full suite: `cd backend && JAVA_HOME=~/.sdkman/candidates/java/current ./mvnw -q test` → all green.
 - [ ] Frontend gates: `cd frontend && npx tsc -b && npx vitest run` → clean typecheck + all tests.
-- [ ] Manual smoke (optional, via `docker-compose.full.yml`): open a taxon → "Bulk add…" → paste a small tree → Preview → Insert; and Project import → upload a `.txtree` with a title → poll to DONE → merge into a project.
+- [ ] Manual smoke (optional, via `docker compose up`): open a taxon → "Bulk add…" → paste a small tree → Preview → Insert; and Project import → upload a `.txtree` with a title → poll to DONE → merge into a project.
 
 ## Notes carried from the spec (not re-litigated here)
 
