@@ -10,7 +10,7 @@ import { getProject, listMembers, removeMember, setMember } from '../api/project
 import { messageFor } from '../api/client';
 import type { Member, Role } from '../api/types';
 
-const ROLES: Role[] = ['owner', 'editor', 'reviewer', 'viewer'];
+const ROLES: Role[] = ['owner', 'editor', 'viewer'];
 const ROLE_DATA = ROLES.map((r) => ({ value: r, label: r }));
 
 export default function MembersPage() {

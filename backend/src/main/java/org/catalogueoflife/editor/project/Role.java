@@ -3,7 +3,7 @@ package org.catalogueoflife.editor.project;
 import java.util.Locale;
 
 public enum Role {
-  OWNER, EDITOR, REVIEWER, VIEWER;
+  OWNER, EDITOR, VIEWER;
 
   public String dbValue() {
     return name().toLowerCase(Locale.ROOT);

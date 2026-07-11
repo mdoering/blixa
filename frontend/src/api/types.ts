@@ -1,4 +1,4 @@
-export type Role = 'owner' | 'editor' | 'reviewer' | 'viewer';
+export type Role = 'owner' | 'editor' | 'viewer';
 
 export interface Me {
   id: number;

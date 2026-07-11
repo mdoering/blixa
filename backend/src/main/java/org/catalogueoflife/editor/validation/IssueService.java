@@ -18,7 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 // The issue API's authz + orchestration layer (Task 2 of the validation-engine plan). Reads
 // (list/summary) are open to any project member, mirroring TaskService/ChangeController's
 // "requireRole -> 404 non-member, any role may read" convention; reviewing an issue additionally
-// requires being owner/editor/reviewer (a viewer may see problems but not triage them -> 403); an
+// requires being owner/editor (a viewer may see problems but not triage them -> 403); an
 // on-demand full revalidate is a heavier write-adjacent action gated to owner/editor, same tier as
 // ProjectService.updateMetadata.
 @Service
@@ -54,7 +54,7 @@ public class IssueService {
   @Transactional
   public IssueResponse review(int actorId, int projectId, int issueId, ReviewRequest req) {
     String role = projects.requireRole(actorId, projectId);
-    requireReviewerOrAbove(role);
+    requireEditorOrAbove(role);
     IssueResponse existing = issues.findById(projectId, issueId);
     if (existing == null) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "issue not found");
@@ -92,10 +92,9 @@ public class IssueService {
     return new IssueSummaryResponse(total, byStatus, bySeverity);
   }
 
-  private static void requireReviewerOrAbove(String role) {
-    if (!Role.OWNER.dbValue().equals(role) && !Role.EDITOR.dbValue().equals(role)
-        && !Role.REVIEWER.dbValue().equals(role)) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner, editor or reviewer required");
+  private static void requireEditorOrAbove(String role) {
+    if (!Role.OWNER.dbValue().equals(role) && !Role.EDITOR.dbValue().equals(role)) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner or editor required");
     }
   }
 
