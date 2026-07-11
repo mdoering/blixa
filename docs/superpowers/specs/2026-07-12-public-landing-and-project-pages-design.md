@@ -43,8 +43,10 @@ explicitly marked public are ever exposed.
 ## Data model
 
 ### `project.public`
-Add `public BOOLEAN NOT NULL DEFAULT false`. Owner-toggled. Only `public=true`
-projects appear in the public API/pages.
+Add a boolean flag, owner-toggled; only public projects appear in the public
+API/pages. **Column name `is_public`** (`public` is a reserved word in both
+Postgres and Java); the Java field is `isPublic`, which Jackson serializes as the
+JSON property `"public"` (what the frontend consumes).
 
 ### `release` table (new)
 An immutable, persisted ColDP snapshot of a project.
@@ -141,8 +143,8 @@ Everything else stays `authenticated()`.
 - `GET /api/public/projects/{idOrAlias}` → **404 unless `public=true`**:
   - metadata: `title, alias, description, license, nomCode, geographicScope,
     taxonomicScope`,
-  - `contributors`: owner/editor members only (**viewers excluded**), each
-    `{ name, orcid, role }` — never emails,
+  - `contributors`: all **non-viewer** members (owner/editor; **viewers
+    excluded**), each `{ name, orcid, role }` — never emails,
   - `metrics`: the latest READY release's snapshot if any (headline
     `nameUsageCount` + the JSONB fields); if no release, basic live counts
     (`nameUsageCount`, accepted, synonyms, references) with the rich breakdown
@@ -202,8 +204,8 @@ role); **Metrics** (headline counts + by-rank and child breakdowns when present)
 
 - `permitAll`: `/api/public/**`, `/api/config`. Everything else unchanged.
 - Non-public projects: every public endpoint returns 404 for them.
-- Contributors: owner/editor only; name + ORCID + role; never email/username-as-
-  email, never viewers.
+- Contributors: all non-viewer members (owner/editor); name + ORCID +
+  role; never email/username-as-email, never viewers.
 - Release downloads: public + READY only.
 
 ## Testing strategy
