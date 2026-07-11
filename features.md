@@ -45,6 +45,15 @@ select a taxon and group the species/infraspecies homotypicly - see CLB backend
  - by DOI: query crossref
  - bibtex import
  - csl-json import
+ - RIS import (the common interchange format) — covers exports from **Zotero, EndNote and Mendeley**
+ - reference-manager integrations: import from Zotero / EndNote / Mendeley (their exports are RIS/BibTeX/CSL-JSON; Zotero also has a web API for direct library pull)
 
  ## reference consolidation
  - find DOIs for existing references
+
+## reference PDFs (upload & host)
+Allow uploading & storing a PDF for a reference. PDFs are **not** shared in ColDP (no binaries in the format);
+instead the editor stores the file and serves it at a stable URL, which populates the `Reference.link` field.
+ - storage like the export artifacts: a configured dir / object storage, shared across instances (blue-green), size cap
+ - a download/serve endpoint (auth as appropriate) that `Reference.link` points at
+ - on ColDP export, `link` carries that URL (the binary itself is never exported)
