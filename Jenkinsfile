@@ -48,35 +48,35 @@ pipeline {
 
     stage('Deploy') {
       when { branch 'main' }
+      // No sshagent/credential: the Jenkins user's own SSH key is already authorized as
+      // jenkins-deploy on the VM (same setup the col-checklistbank job relies on).
       steps {
-        sshagent(credentials: ['blixa-jenkins-deploy']) {
-          sh '''
-            set -eu
-            case "$TARGET" in
-              dev)  HOST=apps.dev.checklistbank.org ;;
-              prod) HOST=apps.checklistbank.org ;;
-              *)    echo "Unknown TARGET: $TARGET"; exit 1 ;;
-            esac
-            SSHOPT="-o StrictHostKeyChecking=accept-new"
-            SSH="ssh $SSHOPT ${DEPLOY_USER}@${HOST}"
+        sh '''
+          set -eu
+          case "$TARGET" in
+            dev)  HOST=apps.dev.checklistbank.org ;;
+            prod) HOST=apps.checklistbank.org ;;
+            *)    echo "Unknown TARGET: $TARGET"; exit 1 ;;
+          esac
+          SSHOPT="-o StrictHostKeyChecking=accept-new"
+          SSH="ssh $SSHOPT ${DEPLOY_USER}@${HOST}"
 
-            echo "== Frontend -> ${HOST}:${APP_DOCROOT} =="
-            rsync -rt --delete -e "ssh $SSHOPT" \
-              frontend/dist/ ${DEPLOY_USER}@${HOST}:${APP_DOCROOT}/
+          echo "== Frontend -> ${HOST}:${APP_DOCROOT} =="
+          rsync -rt --delete -e "ssh $SSHOPT" \
+            frontend/dist/ ${DEPLOY_USER}@${HOST}:${APP_DOCROOT}/
 
-            echo "== Backend jar -> staging =="
-            rsync -t -e "ssh $SSHOPT" \
-              backend/target/blixa-backend-*.jar \
-              ${DEPLOY_USER}@${HOST}:/tmp/blixa-backend.jar
+          echo "== Backend jar -> staging =="
+          rsync -t -e "ssh $SSHOPT" \
+            backend/target/blixa-backend-*.jar \
+            ${DEPLOY_USER}@${HOST}:/tmp/blixa-backend.jar
 
-            echo "== Activate backend (install + restart via sudo wrapper) =="
-            $SSH sudo /usr/local/sbin/blixa-activate
+          echo "== Activate backend (install + restart via sudo wrapper) =="
+          $SSH sudo /usr/local/sbin/blixa-activate
 
-            echo "== Health check =="
-            $SSH 'curl -fsS --retry 10 --retry-delay 3 --retry-connrefused \
-                    http://127.0.0.1:8111/api/ping' && echo " OK"
-          '''
-        }
+          echo "== Health check =="
+          $SSH 'curl -fsS --retry 10 --retry-delay 3 --retry-connrefused \
+                  http://127.0.0.1:8111/api/ping' && echo " OK"
+        '''
       }
     }
   }
