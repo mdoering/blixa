@@ -11,8 +11,12 @@ pipeline {
 
   options { timestamps(); disableConcurrentBuilds() }
 
-  // Pin the toolchain if GBIF's Jenkins exposes managed installs (backend needs JDK 25, not 21):
-  // tools { jdk 'LibericaJDK25'; maven 'Maven3' }
+  // Managed tool names as registered in this Jenkins (same as the other CoL Java jobs).
+  // Puts mvn on PATH and pins the build to JDK 25 (Blixa does not compile on 21).
+  tools {
+    maven 'Maven 3.9.9'
+    jdk 'LibericaJDK25'
+  }
 
   environment {
     DEPLOY_USER = 'jenkins-deploy'
