@@ -1,8 +1,10 @@
 package org.catalogueoflife.editor.name.bulk;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -142,6 +144,77 @@ class BulkPreviewApiIT extends AbstractPostgresIT {
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.valid").value(true))
        .andExpect(jsonPath("$.duplicates").value(0))
+       .andExpect(jsonPath("$.nodes[0].duplicate").value(false));
+  }
+
+  // Regression test for the under-scoped join in NameUsageMapper.findSynonymsOfAccepted: id is
+  // app-allocated PER PROJECT (see IdSeqMapper), so nu.id alone is not globally unique. Without
+  // an explicit nu.project_id predicate, the join can pull in name_usage rows from an unrelated
+  // project that happen to share the numeric id, leaking them into synonym-mode duplicate
+  // detection. This forces a real cross-project id collision and asserts P2's usage is invisible
+  // to P1's preview.
+  @Test
+  void previewSynonymsModeIsolatedToOwningProject() throws Exception {
+    ensureUser("bulkPrev");
+
+    // --- Project P2 first: two throwaway usages, then a distinctively-named one at id 3. ---
+    String p2j = mvc.perform(post("/api/projects").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"BulkP2\",\"nomCode\":\"zoological\"}"))
+        .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    int p2 = json.readTree(p2j).get("id").asInt();
+
+    mvc.perform(post("/api/projects/" + p2 + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Aaa\",\"rank\":\"genus\",\"status\":\"ACCEPTED\"}"))
+        .andExpect(status().isCreated());
+    mvc.perform(post("/api/projects/" + p2 + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Bbb bbb\",\"rank\":\"species\",\"status\":\"ACCEPTED\"}"))
+        .andExpect(status().isCreated());
+    String zj = mvc.perform(post("/api/projects/" + p2 + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Zzz zzz\",\"rank\":\"species\",\"status\":\"ACCEPTED\"}"))
+        .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    int p2ZzzId = json.readTree(zj).get("id").asInt();
+
+    // --- Project P1: accepted genus (seed), accepted target under it, and a synonym linked to
+    // the target. Same number of prior creates (genus, target) as P2's (Aaa, Bbb bbb) means the
+    // synonym lands on P1's 3rd allocated id, same as P2's "Zzz zzz".
+    int[] s = seed();
+    int p1 = s[0];
+    int genusId = s[1];
+    String tj = mvc.perform(post("/api/projects/" + p1 + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Panthera onca\",\"rank\":\"species\","
+                + "\"status\":\"ACCEPTED\",\"parentId\":" + genusId + "}"))
+        .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    int targetId = json.readTree(tj).get("id").asInt();
+    String synJ = mvc.perform(post("/api/projects/" + p1 + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Felis leo\",\"rank\":\"species\",\"status\":\"SYNONYM\"}"))
+        .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    int p1SynonymId = json.readTree(synJ).get("id").asInt();
+    mvc.perform(put("/api/projects/" + p1 + "/usages/" + p1SynonymId + "/synonym-of/" + targetId)
+            .with(csrf()))
+        .andExpect(status().isNoContent());
+
+    // Self-verifying precondition: the cross-project id collision this test relies on is real.
+    assertThat(p1SynonymId).isEqualTo(p2ZzzId);
+
+    // Canonical match against P1's real synonym "Felis leo" -- authorship in the input is ignored.
+    mvc.perform(post("/api/projects/" + p1 + "/usages/bulk/preview").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body(targetId, "synonyms", "Felis leo (Linnaeus, 1758)\n")))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.duplicates").value(1))
+       .andExpect(jsonPath("$.nodes[0].duplicate").value(true));
+
+    // Isolation: P2's "Zzz zzz" shares P1's synonym id but lives in a different project -- it must
+    // NOT be treated as an existing synonym of P1's target.
+    mvc.perform(post("/api/projects/" + p1 + "/usages/bulk/preview").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body(targetId, "synonyms", "Zzz zzz\n")))
+       .andExpect(status().isOk())
        .andExpect(jsonPath("$.nodes[0].duplicate").value(false));
   }
 

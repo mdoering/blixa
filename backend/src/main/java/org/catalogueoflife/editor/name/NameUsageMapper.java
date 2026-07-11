@@ -220,6 +220,7 @@ public interface NameUsageMapper {
   @Select("""
       SELECT nu.* FROM name_usage nu JOIN synonym_accepted sa ON sa.synonym_id = nu.id
       WHERE sa.project_id = #{projectId} AND sa.accepted_id = #{acceptedId}
+        AND nu.project_id = #{projectId}
       """)
   @ResultMap("nameUsageResult")
   List<NameUsage> findSynonymsOfAccepted(@Param("projectId") int projectId,
