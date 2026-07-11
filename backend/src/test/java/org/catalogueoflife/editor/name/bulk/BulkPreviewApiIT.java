@@ -110,6 +110,42 @@ class BulkPreviewApiIT extends AbstractPostgresIT {
   }
 
   @Test
+  void previewChildrenFlagsCanonicalDuplicateDespiteAuthorship() throws Exception {
+    int[] s = seed();
+    // Seed an accepted child "Panthera leo" (no authorship stored) directly under the genus.
+    mvc.perform(post("/api/projects/" + s[0] + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Panthera leo\",\"rank\":\"species\","
+                + "\"status\":\"ACCEPTED\",\"parentId\":" + s[1] + "}"))
+        .andExpect(status().isCreated());
+    // The preview input carries authorship -- canonical matching must still flag it as a duplicate.
+    mvc.perform(post("/api/projects/" + s[0] + "/usages/bulk/preview").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body(s[1], "children", "Panthera leo (Linnaeus, 1758) [species]\n")))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.valid").value(true))
+       .andExpect(jsonPath("$.duplicates").value(1))
+       .andExpect(jsonPath("$.nodes[0].duplicate").value(true));
+  }
+
+  @Test
+  void previewChildrenDoesNotFlagDistinctName() throws Exception {
+    int[] s = seed();
+    mvc.perform(post("/api/projects/" + s[0] + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Panthera leo\",\"rank\":\"species\","
+                + "\"status\":\"ACCEPTED\",\"parentId\":" + s[1] + "}"))
+        .andExpect(status().isCreated());
+    mvc.perform(post("/api/projects/" + s[0] + "/usages/bulk/preview").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body(s[1], "children", "Panthera onca [species]\n")))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.valid").value(true))
+       .andExpect(jsonPath("$.duplicates").value(0))
+       .andExpect(jsonPath("$.nodes[0].duplicate").value(false));
+  }
+
+  @Test
   void previewWritesNothing() throws Exception {
     int[] s = seed();
     mvc.perform(post("/api/projects/" + s[0] + "/usages/bulk/preview").with(csrf())

@@ -205,11 +205,25 @@ public interface NameUsageMapper {
   @Select("SELECT id FROM name_usage WHERE project_id = #{projectId} AND parent_id = #{parentId}")
   List<Integer> findChildIds(@Param("projectId") int projectId, @Param("parentId") int parentId);
 
-  // Direct accepted children's names (for bulk-insert duplicate flagging). Parent links are only
-  // ever accepted->accepted, so this returns the target's accepted children.
-  @Select("SELECT scientific_name FROM name_usage WHERE project_id = #{projectId} AND parent_id = #{parentId}")
-  java.util.List<String> findChildScientificNames(@Param("projectId") int projectId,
+  // Direct accepted children of a usage, full row (same projection/mapping as findByIdInProject) --
+  // bulk-insert's (BulkInsertService, CHILDREN mode) source of existing usages to canonical-key
+  // against, so authorship on either side never masks a duplicate (see NameMatcher.canonicalKey).
+  // Parent links are only ever accepted->accepted, so this returns the target's accepted children.
+  @Select("SELECT * FROM name_usage WHERE project_id = #{projectId} AND parent_id = #{parentId}")
+  @ResultMap("nameUsageResult")
+  List<NameUsage> findChildrenByParent(@Param("projectId") int projectId,
       @Param("parentId") int parentId);
+
+  // Every synonym of an accepted usage, full row (same projection/mapping as findByIdInProject) --
+  // bulk-insert's (BulkInsertService, SYNONYMS mode) source of existing usages to canonical-key
+  // against, mirroring findChildrenByParent above for the CHILDREN-mode case.
+  @Select("""
+      SELECT nu.* FROM name_usage nu JOIN synonym_accepted sa ON sa.synonym_id = nu.id
+      WHERE sa.project_id = #{projectId} AND sa.accepted_id = #{acceptedId}
+      """)
+  @ResultMap("nameUsageResult")
+  List<NameUsage> findSynonymsOfAccepted(@Param("projectId") int projectId,
+      @Param("acceptedId") int acceptedId);
 
   // Scientific name of the nearest STRICT ancestor of rank genus (depth > 0 skips the node itself),
   // or null if there is none -- the classification genus that GenusMismatchRule compares a usage's

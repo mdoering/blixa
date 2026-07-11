@@ -114,7 +114,7 @@ public class NameMatcher {
   // of the same spelling, and notho-qualified so a nothotaxon (hybrid marker, e.g. "Genus xspecies")
   // never collapses onto the same key as the plain (non-hybrid) name of otherwise identical spelling
   // -- they are different names, not merge candidates.
-  static String canonicalKey(NameUsage u) {
+  public static String canonicalKey(NameUsage u) {
     String core;
     if (notBlank(u.getUninomial())) core = u.getUninomial();
     else if (notBlank(u.getGenus())) core = String.join(" ",

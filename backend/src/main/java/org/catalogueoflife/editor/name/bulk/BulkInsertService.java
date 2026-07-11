@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.catalogueoflife.editor.merge.NameMatcher;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.NameUsageService;
@@ -71,12 +72,12 @@ public class BulkInsertService {
           + " > " + MAX_NAMES + "). Import it as a new dataset instead.");
     }
 
-    Set<String> existing = existingNamesLower(userId, projectId, req.targetId(), mode);
+    Set<String> existingKeys = existingCanonicalKeys(projectId, req.targetId(), mode);
     NomCode nomCode = project.getNomCode();
     int[] counts = new int[3]; // accepted, synonyms, duplicates
     List<PreviewNode> nodes = mode == BulkMode.SYNONYMS
-        ? previewFlatSynonyms(roots, nomCode, existing, counts)
-        : previewChildren(roots, nomCode, existing, counts, true);
+        ? previewFlatSynonyms(roots, nomCode, existingKeys, counts)
+        : previewChildren(roots, nomCode, existingKeys, counts, true);
     return new BulkPreviewResponse(true, null, counts[0] + counts[1],
         counts[0], counts[1], counts[2], nodes);
   }
@@ -133,13 +134,16 @@ public class BulkInsertService {
     return n;
   }
 
-  private Set<String> existingNamesLower(int userId, int projectId, int targetId, BulkMode mode) {
-    List<String> names = mode == BulkMode.SYNONYMS
-        ? usageService.listSynonyms(userId, projectId, targetId).stream()
-            .map(r -> r.scientificName()).collect(Collectors.toList())
-        : usages.findChildScientificNames(projectId, targetId);
-    return names.stream().filter(s -> s != null)
-        .map(s -> s.trim().toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+  // Canonical (author-stripped) keys of the usages already sitting where this batch would land --
+  // CHILDREN mode against the target's existing accepted children, SYNONYMS mode against its
+  // existing synonyms. Keying both the DB rows here and the incoming nodes (see previewChildren/
+  // previewFlatSynonyms) through NameMatcher.canonicalKey means an input line carrying authorship
+  // (e.g. GBIF text-tree's "Panthera leo (Linnaeus, 1758)") still matches an authorship-free DB row.
+  private Set<String> existingCanonicalKeys(int projectId, int targetId, BulkMode mode) {
+    List<NameUsage> existing = mode == BulkMode.SYNONYMS
+        ? usages.findSynonymsOfAccepted(projectId, targetId)
+        : usages.findChildrenByParent(projectId, targetId);
+    return existing.stream().map(NameMatcher::canonicalKey).collect(Collectors.toSet());
   }
 
   // Runs the same parse the insert will, so the previewed rank/status match what gets stored. The
@@ -165,16 +169,14 @@ public class BulkInsertService {
     return toUsage(0, 0, node, Status.ACCEPTED, null, nomCode).getRank();
   }
 
-  private boolean isDup(SimpleTreeNode node, Set<String> existing) {
-    return existing.contains(node.name == null ? "" : node.name.trim().toLowerCase(Locale.ROOT));
-  }
-
   private List<PreviewNode> previewChildren(List<SimpleTreeNode> nodes, NomCode nomCode,
-      Set<String> existing, int[] counts, boolean topLevel) {
+      Set<String> existingKeys, int[] counts, boolean topLevel) {
     List<PreviewNode> out = new ArrayList<>();
     for (SimpleTreeNode n : nodes) {
       counts[0]++;
-      boolean dup = topLevel && isDup(n, existing);
+      // Same parsed usage backs both the previewed rank and the dup check -- parsed once per node.
+      NameUsage u = toUsage(0, 0, n, Status.ACCEPTED, null, nomCode);
+      boolean dup = topLevel && existingKeys.contains(NameMatcher.canonicalKey(u));
       if (dup) counts[2]++;
       List<PreviewNode> syns = new ArrayList<>();
       for (SimpleTreeNode s : n.synonyms) {
@@ -182,21 +184,23 @@ public class BulkInsertService {
         syns.add(new PreviewNode(s.name, effectiveRank(s, nomCode), "SYNONYM", false, false,
             List.of(), List.of()));
       }
-      List<PreviewNode> kids = previewChildren(n.children, nomCode, existing, counts, false);
-      out.add(new PreviewNode(n.name, effectiveRank(n, nomCode), "ACCEPTED", n.extinct, dup,
+      List<PreviewNode> kids = previewChildren(n.children, nomCode, existingKeys, counts, false);
+      out.add(new PreviewNode(n.name, u.getRank(), "ACCEPTED", n.extinct, dup,
           kids, syns));
     }
     return out;
   }
 
   private List<PreviewNode> previewFlatSynonyms(List<SimpleTreeNode> roots, NomCode nomCode,
-      Set<String> existing, int[] counts) {
+      Set<String> existingKeys, int[] counts) {
     List<PreviewNode> out = new ArrayList<>();
     for (SimpleTreeNode n : roots) {
       counts[1]++;
-      boolean dup = isDup(n, existing);
+      // Same parsed usage backs both the previewed rank and the dup check -- parsed once per node.
+      NameUsage u = toUsage(0, 0, n, Status.ACCEPTED, null, nomCode);
+      boolean dup = existingKeys.contains(NameMatcher.canonicalKey(u));
       if (dup) counts[2]++;
-      out.add(new PreviewNode(n.name, effectiveRank(n, nomCode), "SYNONYM", false, dup,
+      out.add(new PreviewNode(n.name, u.getRank(), "SYNONYM", false, dup,
           List.of(), List.of()));
     }
     return out;
