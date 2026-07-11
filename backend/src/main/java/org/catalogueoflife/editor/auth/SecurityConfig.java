@@ -39,7 +39,14 @@ public class SecurityConfig {
             .loginProcessingUrl("/api/auth/login")
             .successHandler((req, res, a) -> res.setStatus(HttpStatus.OK.value()))
             .failureHandler((req, res, e) -> res.setStatus(HttpStatus.UNAUTHORIZED.value())))
-        .oauth2Login(o -> o.userInfoEndpoint(u -> u.oidcUserService(orcidUserService)))
+        // After an ORCID login always land on the SPA root, NOT the saved request. Without this the
+        // default SavedRequestAwareAuthenticationSuccessHandler replays whatever request triggered
+        // auth -- typically the SPA's own unauthenticated GET /api/me (which the ExceptionTranslation
+        // filter still saves before the 401 entry point), sending the user to `/api/me?continue`
+        // (raw JSON) instead of the app. alwaysUse=true ignores the saved request.
+        .oauth2Login(o -> o
+            .userInfoEndpoint(u -> u.oidcUserService(orcidUserService))
+            .defaultSuccessUrl("/", true))
         .logout(out -> out.logoutUrl("/api/auth/logout")
             .logoutSuccessHandler((req, res, a) -> res.setStatus(HttpStatus.OK.value())))
         .exceptionHandling(ex -> ex
