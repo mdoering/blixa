@@ -32,6 +32,13 @@ Input via a **text-field (paste)** OR a **plain-text / TSV / TextTree file uploa
  b) texttree (indented) input to a parent: includes both accepted and syns, preserving the hierarchy.
  c) the paste text-field is the low-friction path (no file needed); the file upload is for larger sets.
 
+## staging import formats (multi-format staging → merge)
+The async "large import → staging project → supervised merge" path should be format-pluggable, not ColDP-only.
+Each input format is an adapter that materializes a staging import `dir` (or reader) consumed by the shared import `run()`:
+ - **ColDP archive** — native (current).
+ - **TextTree** — first adapter (converts to a ColDP NameUsage.tsv); see the bulk-name-insert spec, Path B.
+ - **Darwin Core Archive (DwC-A)** — *next*: map DwC terms → ColDP and feed the same staging path. Reuse GBIF `dwca-io` / CLB readers where possible.
+
 ## direct CLB import (selected taxa)
 Pull selected taxa straight from ChecklistBank into a project via the CLB API (no ColDP file, no whole-dataset import):
  - a whole genus with all its species and synonyms (the subtree)

@@ -192,13 +192,39 @@ machinery, no importer changes.
   identical to how a ColDP import is reconciled.
 - Path A remains the taxon-anchored, direct-insert route for small trees.
 
+### Format-adapter seam (built now, for DwC-A next)
+
+Path B must be **format-pluggable, not text-tree-specific**, because a third
+staging-import format — **Darwin Core Archive (DwC-A)** — is the very next
+feature after this one. So Phase 2 introduces a seam rather than a one-off
+branch:
+
+> A **source-format adapter** takes the uploaded input and **materializes a
+> staging import `dir` that `ColdpReader.from(dir)` can read**, which the shared
+> `ImportRunService.run()` then loads into a staging project. Everything
+> downstream of the `dir` (staging-project creation, recovery, poll UI, merge)
+> is format-agnostic and untouched per format.
+
+- **ColDP archive** — native: extract the zip to `dir` (current behaviour).
+- **Text-tree** — this spec's adapter: `TxtTreeToColdp` writes a ColDP
+  `NameUsage.tsv` into `dir`.
+- **DwC-A** — *next feature, not built here*: an adapter maps DwC terms → ColDP
+  into `dir` (reuse GBIF `dwca-io` / CLB readers where possible). It slots into
+  the same seam with no change to `run()` or the merge.
+
+The import controller/service **detects the format** (file extension / archive
+contents: ColDP `metadata.*`+data files, DwC-A `meta.xml`, or a bare text-tree
+file) and dispatches to the matching adapter.
+
 ### Components (Path B)
 
-- Backend: `coldp/imprt/TxtTreeToColdp` (converter); a text-tree entry on
-  `ImportRunService`/`ImportRunController` (route by file type → build `dir` →
-  reuse `run()`); reuse everything else.
-- Frontend: extend `ImportProjectModal` to offer text-tree upload (or a sibling
-  modal), reusing `api/import.ts` polling.
+- Backend: a small `SourceFormatAdapter` seam on
+  `ImportRunService`/`ImportRunController` (detect format → adapter builds
+  `dir` → reuse `run()`); the text-tree adapter `coldp/imprt/TxtTreeToColdp`;
+  reuse everything else. The existing ColDP path becomes the native adapter.
+- Frontend: extend `ImportProjectModal` to accept text-tree files alongside
+  ColDP archives (reusing `api/import.ts` polling); the same modal will later
+  accept DwC-A with no structural change.
 
 ## Shared foundation
 
@@ -260,6 +286,9 @@ match the input. Reuse the existing import ITs' harness.
   targets an existing taxon; project-root additions go via Path B or the
   single-add "Add accepted name".
 - References / vernaculars / distributions in the text-tree input (names only).
+- **Darwin Core Archive (DwC-A) staging import** — the *next* feature; it is
+  the reason Phase 2 builds the format-adapter seam above, but the DwC-A adapter
+  itself is out of scope for this spec.
 
 ## Decomposition / phasing
 
