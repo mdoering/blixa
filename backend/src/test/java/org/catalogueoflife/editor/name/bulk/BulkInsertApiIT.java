@@ -69,6 +69,36 @@ class BulkInsertApiIT extends AbstractPostgresIT {
             .param("rank", "species"))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.total").value(1));
+
+    // Verify wiring, not just counts: a bug that links every synonym/child to the top-level
+    // target genus instead of its own nested accepted/parent would still produce the same
+    // created/synonymsLinked counts above, so assert the actual hierarchy here.
+
+    // "Felis leo" must be linked as a synonym of "Panthera leo", NOT of the target genus.
+    String leoJson = mvc.perform(get("/api/projects/" + s[0] + "/usages").param("q", "Panthera leo")
+            .param("rank", "species"))
+       .andExpect(status().isOk())
+       .andReturn().getResponse().getContentAsString();
+    int leoId = json.readTree(leoJson).get("items").get(0).get("id").asInt();
+    mvc.perform(get("/api/projects/" + s[0] + "/usages/" + leoId + "/synonyms"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.length()").value(1))
+       .andExpect(jsonPath("$[0].scientificName").value("Felis leo"));
+
+    // "Uncia uncia" must be parented under "Uncia" (subgenus), NOT under the target genus.
+    String unciaJson = mvc.perform(get("/api/projects/" + s[0] + "/usages").param("q", "Uncia")
+            .param("rank", "subgenus"))
+       .andExpect(status().isOk())
+       .andReturn().getResponse().getContentAsString();
+    int unciaId = json.readTree(unciaJson).get("items").get(0).get("id").asInt();
+    String unciaUncicaJson = mvc.perform(get("/api/projects/" + s[0] + "/usages").param("q", "Uncia uncia")
+            .param("rank", "species"))
+       .andExpect(status().isOk())
+       .andReturn().getResponse().getContentAsString();
+    int unciaUncicaId = json.readTree(unciaUncicaJson).get("items").get(0).get("id").asInt();
+    mvc.perform(get("/api/projects/" + s[0] + "/usages/" + unciaUncicaId))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.parentId").value(unciaId));
   }
 
   @Test

@@ -99,9 +99,7 @@ public class BulkInsertService {
   public BulkInsertResult insert(int userId, int projectId, BulkInsertRequest req) {
     requireEditor(userId, projectId);
     Project project = requireProject(projectId);
-    NameUsage target = resolveTarget(projectId, req.targetId());
     BulkMode mode = parseMode(req.mode());
-    tree.lockProject(projectId);
 
     List<SimpleTreeNode> roots;
     try {
@@ -122,6 +120,14 @@ public class BulkInsertService {
           "This list is too large for a direct insert (" + total + " > " + MAX_NAMES
               + "). Import it as a new dataset instead.");
     }
+
+    // Lock the project tree BEFORE resolving/validating the target, so the target's ACCEPTED
+    // status is read under the lock (matches NameUsageService.demote/promote convention). This
+    // closes a TOCTOU window where a concurrent demote of the target between the status read and
+    // the lock could otherwise let a synonymy-mode insert link synonyms to a no-longer-accepted
+    // target (synonymy mode has no re-check under the lock).
+    tree.lockProject(projectId);
+    NameUsage target = resolveTarget(projectId, req.targetId());
 
     NomCode nomCode = project.getNomCode();
     int[] counts = new int[2]; // created, linked
