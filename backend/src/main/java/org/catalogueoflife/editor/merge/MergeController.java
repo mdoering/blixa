@@ -2,6 +2,7 @@ package org.catalogueoflife.editor.merge;
 
 import java.util.List;
 import org.catalogueoflife.editor.auth.CurrentUser;
+import org.catalogueoflife.editor.merge.dto.ApplyMergeRequest;
 import org.catalogueoflife.editor.merge.dto.MappingRow;
 import org.catalogueoflife.editor.merge.dto.MergeOverride;
 import org.catalogueoflife.editor.merge.dto.MergeRunResponse;
@@ -33,16 +34,21 @@ import org.springframework.web.bind.annotation.RestController;
 // authorization tier as POST, since it mutates the plan the apply will eventually act on. All
 // endpoints are nested under the TARGET project (source is a query param on POST only, or embedded
 // in the stored run thereafter) since the merge itself is scoped to (and eventually writes into)
-// the target.
+// the target. POST /{runId}/apply (Task 6) is the curator's go-ahead once a PLANNED run's mapping
+// has been reviewed/overridden: MergeApplyService.apply authorizes (same owner/editor tier),
+// requires PLANNED (else 409), and fires the @Async write job -- same 202-now/poll-for-DONE
+// contract as the initial POST.
 @RestController
 @RequestMapping("/api/projects/{targetId}/merge")
 public class MergeController {
 
   private final MergeService service;
+  private final MergeApplyService applyService;
   private final CurrentUser currentUser;
 
-  public MergeController(MergeService service, CurrentUser currentUser) {
+  public MergeController(MergeService service, MergeApplyService applyService, CurrentUser currentUser) {
     this.service = service;
+    this.applyService = applyService;
     this.currentUser = currentUser;
   }
 
@@ -79,5 +85,16 @@ public class MergeController {
       @RequestBody List<MergeOverride> overrides) {
     int uid = currentUser.require().getId();
     return service.applyOverrides(uid, targetId, runId, overrides);
+  }
+
+  // transactional defaults to true when the field is omitted/null (ApplyMergeRequest's javadoc);
+  // mode is required -- MergeApplyService.apply 400s on a null mode.
+  @PostMapping("/{runId}/apply")
+  @ResponseStatus(HttpStatus.ACCEPTED)
+  public MergeRunResponse apply(@PathVariable int targetId, @PathVariable long runId,
+      @RequestBody ApplyMergeRequest req) {
+    int uid = currentUser.require().getId();
+    boolean transactional = req == null || req.transactional() == null || req.transactional();
+    return applyService.apply(uid, targetId, runId, req == null ? null : req.mode(), transactional);
   }
 }

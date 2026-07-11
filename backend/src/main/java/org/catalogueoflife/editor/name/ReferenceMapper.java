@@ -95,4 +95,18 @@ public interface ReferenceMapper {
       WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}
       """)
   int update(Reference r);
+
+  // Narrow CAS write of just alternative_id -- sibling of NameUsageMapper.updateAlternativeId.
+  // MergeApplyService's provenance stamp uses this to add a src:<sourceRefId> CURIE onto a MATCHED
+  // reference (via NameUsageService.mergeScopedId) without touching any of its other scalar fields
+  // -- mode-based scalar reconciliation of a matched reference is Task 7. 0 rows updated -> caller
+  // treats as a stale-version conflict, same convention as every other CAS write in this file.
+  @Update("""
+      UPDATE reference SET alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
+          modified = now(), modified_by = #{modifiedBy}, version = version + 1
+      WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}
+      """)
+  int updateAlternativeId(@Param("projectId") int projectId, @Param("id") int id,
+      @Param("alternativeId") List<String> alternativeId,
+      @Param("modifiedBy") int modifiedBy, @Param("version") Integer version);
 }
