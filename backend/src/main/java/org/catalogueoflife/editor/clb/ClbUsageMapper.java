@@ -21,7 +21,6 @@ import life.catalogue.api.model.TaxonProperty;
 import life.catalogue.api.model.TypeMaterial;
 import life.catalogue.api.model.UsageInfo;
 import life.catalogue.api.model.VernacularName;
-import life.catalogue.api.vocab.Environment;
 import life.catalogue.api.vocab.TaxonomicStatus;
 import life.catalogue.api.vocab.area.GenericArea;
 import life.catalogue.common.date.FuzzyDate;
