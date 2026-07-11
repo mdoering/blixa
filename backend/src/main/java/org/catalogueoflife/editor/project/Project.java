@@ -20,6 +20,7 @@ public class Project {
   // ProjectMapper's @Results/UPDATE (both wire the JSONB typeHandler); see
   // ProjectResponse/UpdateProjectMetadataRequest for the wire-facing read/write shape.
   private List<IdentifierScope> identifierScopes;
+  private boolean isPublic;
 
   public Integer getId() { return id; }
   public void setId(Integer id) { this.id = id; }
@@ -43,4 +44,6 @@ public class Project {
   public void setGbifOccurrenceLayer(boolean gbifOccurrenceLayer) { this.gbifOccurrenceLayer = gbifOccurrenceLayer; }
   public List<IdentifierScope> getIdentifierScopes() { return identifierScopes; }
   public void setIdentifierScopes(List<IdentifierScope> identifierScopes) { this.identifierScopes = identifierScopes; }
+  public boolean isPublic() { return isPublic; }
+  public void setPublic(boolean isPublic) { this.isPublic = isPublic; }
 }

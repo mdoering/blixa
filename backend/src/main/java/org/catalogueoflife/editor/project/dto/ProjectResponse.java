@@ -1,5 +1,6 @@
 package org.catalogueoflife.editor.project.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Locale;
 import org.catalogueoflife.editor.project.IdentifierScope;
@@ -10,7 +11,10 @@ public record ProjectResponse(
     Integer id, String title, String alias, String description,
     String nomCode, String license,
     String geographicScope, String taxonomicScope, String role,
-    boolean gbifOccurrenceLayer, List<IdentifierScope> identifierScopes) {
+    boolean gbifOccurrenceLayer, List<IdentifierScope> identifierScopes,
+    // Named "isPublic" (not "public", a reserved word) on the wire as "public" via @JsonProperty,
+    // same reserved-word dodge as MergeRunResponse.MergeMetrics.NameCounts#newCount -> "new".
+    @JsonProperty("public") boolean isPublic) {
 
   public static ProjectResponse of(Project p, String role) {
     return new ProjectResponse(p.getId(), p.getTitle(), p.getAlias(), p.getDescription(),
@@ -19,6 +23,6 @@ public record ProjectResponse(
         p.getNomCode() == null ? null : p.getNomCode().name().toLowerCase(Locale.ROOT),
         Licenses.toWire(p.getLicense()),
         p.getGeographicScope(), p.getTaxonomicScope(), role, p.getGbifOccurrenceLayer(),
-        p.getIdentifierScopes());
+        p.getIdentifierScopes(), p.isPublic());
   }
 }

@@ -85,4 +85,12 @@ public class ProjectController {
     int uid = currentUser.require().getId();
     service.delete(uid, id);
   }
+
+  // Map<String,Boolean> (not a record) avoids a `public`-named record component -- the JSON key
+  // on the wire is "public".
+  @PutMapping("/{id}/public")
+  public void setPublic(@PathVariable int id, @RequestBody java.util.Map<String, Boolean> body) {
+    int uid = currentUser.require().getId();
+    service.setPublic(uid, id, Boolean.TRUE.equals(body.get("public")));
+  }
 }

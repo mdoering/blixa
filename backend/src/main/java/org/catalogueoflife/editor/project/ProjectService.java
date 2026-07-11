@@ -64,6 +64,15 @@ public class ProjectService {
   }
 
   @Transactional
+  public void setPublic(int userId, int projectId, boolean isPublic) {
+    String role = requireRole(userId, projectId);
+    if (!role.equals(Role.OWNER.dbValue())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner required");
+    }
+    projects.updatePublic(projectId, isPublic);
+  }
+
+  @Transactional
   public Project updateMetadata(int userId, int projectId, UpdateProjectMetadataRequest req) {
     String role = requireRole(userId, projectId);
     if (!role.equals(Role.OWNER.dbValue()) && !role.equals(Role.EDITOR.dbValue())) {

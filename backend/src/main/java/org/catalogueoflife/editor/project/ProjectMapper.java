@@ -55,4 +55,8 @@ public interface ProjectMapper {
 
   @Delete("DELETE FROM project WHERE id = #{id}")
   void delete(int id);
+
+  @Update("UPDATE project SET is_public = #{isPublic}, updated_at = now() WHERE id = #{id}")
+  void updatePublic(@org.apache.ibatis.annotations.Param("id") int id,
+      @org.apache.ibatis.annotations.Param("isPublic") boolean isPublic);
 }
