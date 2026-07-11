@@ -229,14 +229,17 @@ public class MergeService {
   public List<MappingRow> getMapping(int userId, int targetId, long runId, String entity,
       String category, int page, int size) {
     projectService.requireRole(userId, targetId);
-    MergeRun run = requireRunInTarget(targetId, runId);
-    if (run.getPlan() == null || run.getPlan().isBlank()) {
-      return List.of();
-    }
-
+    // Validated up front, before the not-ready early return below, so a bad `entity` always 400s
+    // regardless of run state -- otherwise a RUNNING run (plan==null) would silently swallow an
+    // invalid entity into an empty-list response while the same bad request 400s once PLANNED,
+    // an inconsistency depending on timing alone.
     boolean isName = "name".equalsIgnoreCase(entity);
     if (!isName && !"reference".equalsIgnoreCase(entity)) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "entity must be 'name' or 'reference'");
+    }
+    MergeRun run = requireRunInTarget(targetId, runId);
+    if (run.getPlan() == null || run.getPlan().isBlank()) {
+      return List.of();
     }
     Category cat = parseCategory(category);
 
@@ -244,9 +247,18 @@ public class MergeService {
     List<Candidate> all = isName ? plan.names() : plan.references();
     List<Candidate> filtered = cat == null ? all : all.stream().filter(c -> c.category() == cat).toList();
 
-    int pageSize = Math.max(size, 1);
-    int from = Math.min(Math.max(page, 0) * pageSize, filtered.size());
-    int to = Math.min(from + pageSize, filtered.size());
+    // Paging math done in `long` and clamped so a page past the end returns empty (not a
+    // subList IndexOutOfBoundsException -> uncaught 500), `size` is capped at 200 and floored at
+    // 1, and `page * size` can't overflow/go negative the way an unbounded `int` multiplication
+    // could for a large page number.
+    int p = Math.max(page, 0);
+    int sz = Math.min(Math.max(size, 1), 200);
+    long fromL = (long) p * sz;
+    if (fromL >= filtered.size()) {
+      return List.of();
+    }
+    int from = (int) fromL;
+    int to = (int) Math.min(fromL + sz, filtered.size());
     List<Candidate> pageSlice = filtered.subList(from, to);
 
     int sourceId = run.getSourceProjectId().intValue();

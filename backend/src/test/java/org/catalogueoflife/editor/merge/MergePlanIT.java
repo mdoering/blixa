@@ -152,7 +152,7 @@ class MergePlanIT extends AbstractPostgresIT {
     // (1) exact same canonical key + compatible author, ACCEPTED -> MATCHED.
     NameUsage srcMatched = newUsage(sourceId, userId, "Panthera leo", "(Linnaeus, 1758)", "species", Status.ACCEPTED);
     // (2) same canonical key, incompatible author -> POSSIBLE_HOMONYM.
-    NameUsage srcHomonym = newUsage(sourceId, userId, "Panthera leo", "Smith, 1900", "species", Status.ACCEPTED);
+    newUsage(sourceId, userId, "Panthera leo", "Smith, 1900", "species", Status.ACCEPTED);
     // (3) a genuinely new ACCEPTED name, no candidate at all -> NEW, counted under newAccepted.
     NameUsage srcNewAccepted = newUsage(sourceId, userId, "Panthera onca", "Linnaeus, 1758", "species", Status.ACCEPTED);
     // (4) a genuinely new SYNONYM, no candidate at all -> NEW, counted under newSynonyms.
@@ -275,5 +275,69 @@ class MergePlanIT extends AbstractPostgresIT {
     mvc.perform(post("/api/projects/" + targetId + "/merge")
             .with(csrf()).param("source", String.valueOf(sourceId)))
         .andExpect(status().isConflict());
+  }
+
+  // MergeService.getMapping's paging must be past-the-end-safe: page=100/size=50 on a plan with a
+  // handful of name candidates used to compute from=5000, well past filtered.size(), and
+  // List.subList(from, to) threw IndexOutOfBoundsException -- an uncaught 500 -- instead of the
+  // documented "page past the end -> empty" behaviour. Drives a real compute-plan through to
+  // PLANNED (one NEW name candidate is enough to make filtered.size() > 0, so the assertion
+  // actually exercises the past-the-end branch rather than the trivially-empty from==to==0 case).
+  @Test
+  @WithMockUser(username = "mergePlanPagingOwner")
+  void mappingPagePastTheEndReturnsEmptyNot500() throws Exception {
+    ensureUser("mergePlanPagingOwner");
+    int userId = users.requireByUsernameOrNull("mergePlanPagingOwner").getId();
+    long targetId = createProject("mergePlanPagingTarget");
+    long sourceId = createProject("mergePlanPagingSource");
+
+    newUsage(targetId, userId, "Panthera", null, "genus", Status.ACCEPTED);
+    newUsage(sourceId, userId, "Panthera onca", "Linnaeus, 1758", "species", Status.ACCEPTED);
+
+    String startBody = mvc.perform(post("/api/projects/" + targetId + "/merge")
+            .with(csrf()).param("source", String.valueOf(sourceId)))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    long runId = json.readTree(startBody).get("id").asLong();
+
+    JsonNode planned = pollUntilTerminal(targetId, runId);
+    assertThat(planned.get("status").asString()).isEqualTo("PLANNED");
+
+    String pastEndBody = mvc.perform(get("/api/projects/" + targetId + "/merge/" + runId + "/mapping")
+            .param("entity", "name").param("page", "100").param("size", "50"))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    JsonNode pastEndRows = json.readTree(pastEndBody);
+    assertThat(pastEndRows.isArray()).isTrue();
+    assertThat(pastEndRows).isEmpty();
+  }
+
+  // requireRunInTarget's 404 (runId exists but belongs to a DIFFERENT target project) must never
+  // leak that run's data through either GET endpoint -- get() and getMapping() both route through
+  // requireRunInTarget, so both are asserted here. A directly-inserted run (same shortcut as
+  // startReturns409WhileAMergeIsAlreadyInProgress above) is enough since this only exercises the
+  // target-ownership lookup, not the async compute-plan pipeline.
+  @Test
+  @WithMockUser(username = "mergePlanLeakOwner")
+  void getAndMappingReturn404ForRunBelongingToAnotherTarget() throws Exception {
+    ensureUser("mergePlanLeakOwner");
+    int userId = users.requireByUsernameOrNull("mergePlanLeakOwner").getId();
+    long ownTargetId = createProject("mergePlanLeakOwnTarget");
+    long otherTargetId = createProject("mergePlanLeakOtherTarget");
+    long otherSourceId = createProject("mergePlanLeakOtherSource");
+
+    MergeRun otherRun = new MergeRun();
+    otherRun.setUserId(userId);
+    otherRun.setSourceProjectId(otherSourceId);
+    otherRun.setTargetProjectId(otherTargetId);
+    runs.insertRunning(otherRun);
+    long otherRunId = otherRun.getId();
+
+    mvc.perform(get("/api/projects/" + ownTargetId + "/merge/" + otherRunId))
+        .andExpect(status().isNotFound());
+
+    mvc.perform(get("/api/projects/" + ownTargetId + "/merge/" + otherRunId + "/mapping")
+            .param("entity", "name"))
+        .andExpect(status().isNotFound());
   }
 }
