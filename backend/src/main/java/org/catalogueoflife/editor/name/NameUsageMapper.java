@@ -205,6 +205,12 @@ public interface NameUsageMapper {
   @Select("SELECT id FROM name_usage WHERE project_id = #{projectId} AND parent_id = #{parentId}")
   List<Integer> findChildIds(@Param("projectId") int projectId, @Param("parentId") int parentId);
 
+  // Direct accepted children's names (for bulk-insert duplicate flagging). Parent links are only
+  // ever accepted->accepted, so this returns the target's accepted children.
+  @Select("SELECT scientific_name FROM name_usage WHERE project_id = #{projectId} AND parent_id = #{parentId}")
+  java.util.List<String> findChildScientificNames(@Param("projectId") int projectId,
+      @Param("parentId") int parentId);
+
   // Scientific name of the nearest STRICT ancestor of rank genus (depth > 0 skips the node itself),
   // or null if there is none -- the classification genus that GenusMismatchRule compares a usage's
   // parsed genus token against. The depth bound is the same defensive cycle guard as TreeMapper's.
