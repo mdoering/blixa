@@ -123,7 +123,7 @@ class MergeOverrideIT extends AbstractPostgresIT {
     // the production 0.7 similarity threshold against "Panthera leo".
     NameUsage srcFuzzy = newUsage(sourceId, userId, "Panthera leoo", null, "species", Status.ACCEPTED);
     // (3) a genuinely new name, left untouched by any override.
-    NameUsage srcNew = newUsage(sourceId, userId, "Panthera onca", "Linnaeus, 1758", "species", Status.ACCEPTED);
+    newUsage(sourceId, userId, "Panthera onca", "Linnaeus, 1758", "species", Status.ACCEPTED);
 
     String startBody = mvc.perform(post("/api/projects/" + targetId + "/merge")
             .with(csrf()).param("source", String.valueOf(sourceId)))

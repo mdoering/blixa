@@ -156,7 +156,7 @@ class MergeApplyFullImportIT extends AbstractPostgresIT {
     NameUsage srcLeo = newUsage(sourceId, userId, "Panthera leo", "(Linnaeus, 1758)", "species",
         Status.ACCEPTED, srcGenus.getId(), srcRef.getId());
     // Deliberately orphaned: no synonym_accepted link at all -- the revalidation proof.
-    NameUsage srcFelisLeo = newUsage(sourceId, userId, "Felis leo", "Linnaeus, 1758", "species",
+    newUsage(sourceId, userId, "Felis leo", "Linnaeus, 1758", "species",
         Status.SYNONYM, null, null);
 
     // Compute-plan -> PLANNED: an empty target means every candidate is NEW.

@@ -192,7 +192,7 @@ class MergeApplyNamesIT extends AbstractPostgresIT {
 
     NameUsage srcOnca = newUsage(sourceId, userId, "Panthera onca", "Linnaeus, 1758", "species",
         Status.ACCEPTED, srcGenus.getId(), srcNewRef.getId());
-    NameUsage srcOncaSub = newUsage(sourceId, userId, "Panthera onca hernandesii", "Goldman, 1925",
+    newUsage(sourceId, userId, "Panthera onca hernandesii", "Goldman, 1925",
         "subspecies", Status.ACCEPTED, srcOnca.getId(), null);
     NameUsage srcFelisLeo = newUsage(sourceId, userId, "Felis leo", "Linnaeus, 1758", "species",
         Status.SYNONYM, null, null);
@@ -370,7 +370,7 @@ class MergeApplyNamesIT extends AbstractPostgresIT {
         "Zed, Z. 2088. Something else entirely unrelated. Nowhere Press.", null);
     int unresolvableRefId = 999999;
 
-    NameUsage srcUsage = newUsageWithReferenceIds(sourceId, userId, "Refarrayus testus", "species",
+    newUsageWithReferenceIds(sourceId, userId, "Refarrayus testus", "species",
         Status.ACCEPTED, null, List.of(srcRefA.getId(), srcRefB.getId(), unresolvableRefId));
 
     String startBody = mvc.perform(post("/api/projects/" + targetId + "/merge")
