@@ -77,8 +77,11 @@ pipeline {
           $SSH sudo /usr/bin/systemctl restart col-blixa.service
 
           echo "== Backend health check =="
+          # Standalone command (no `&& echo`): a trailing `&& echo` would make curl a non-final
+          # part of an && list, which `set -e` exempts — silently masking a failed health check.
           $SSH 'curl -fsS --retry 10 --retry-delay 3 --retry-connrefused \
-                  http://127.0.0.1:8111/api/ping' && echo " OK"
+                  http://127.0.0.1:8111/api/ping'
+          echo "  backend healthy"
 
           # --- Frontend ---
           echo "== Frontend -> ${HOST}:${APP_DOCROOT} =="
