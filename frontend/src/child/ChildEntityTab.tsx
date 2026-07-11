@@ -15,7 +15,7 @@ import {
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
-import { IconDots, IconPlus } from '@tabler/icons-react';
+import { IconDotsVertical, IconPlus } from '@tabler/icons-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
@@ -200,7 +200,7 @@ export default function ChildEntityTab<T>({
                     <Menu withinPortal position="bottom-end">
                       <Menu.Target>
                         <ActionIcon variant="subtle" color="gray" aria-label="Actions">
-                          <IconDots size={16} />
+                          <IconDotsVertical size={16} />
                         </ActionIcon>
                       </Menu.Target>
                       <Menu.Dropdown>

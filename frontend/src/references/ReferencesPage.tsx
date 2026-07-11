@@ -13,7 +13,7 @@ import {
 import { modals } from '@mantine/modals';
 import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconDots, IconFileImport, IconPlus, IconSearch, IconWorld } from '@tabler/icons-react';
+import { IconDotsVertical, IconFileImport, IconPlus, IconSearch, IconWorld } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -166,7 +166,7 @@ export default function ReferencesPage() {
                   <Menu withinPortal position="bottom-end">
                     <Menu.Target>
                       <ActionIcon variant="subtle" color="gray" aria-label={`Actions for ${r.title ?? r.id}`}>
-                        <IconDots size={16} />
+                        <IconDotsVertical size={16} />
                       </ActionIcon>
                     </Menu.Target>
                     <Menu.Dropdown>

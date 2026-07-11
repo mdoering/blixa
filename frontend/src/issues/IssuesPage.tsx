@@ -11,7 +11,7 @@ import {
   Text,
   Title,
 } from '@mantine/core';
-import { IconDots, IconRefresh } from '@tabler/icons-react';
+import { IconDotsVertical, IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -192,7 +192,7 @@ export default function IssuesPage() {
                   <Menu withinPortal position="bottom-end">
                     <Menu.Target>
                       <ActionIcon variant="subtle" color="gray" aria-label={`Review ${i.rule}`}>
-                        <IconDots size={16} />
+                        <IconDotsVertical size={16} />
                       </ActionIcon>
                     </Menu.Target>
                     <Menu.Dropdown>

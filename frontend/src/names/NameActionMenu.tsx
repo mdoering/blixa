@@ -1,6 +1,6 @@
 import { ActionIcon, Menu } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconArrowsMove, IconCloudDownload, IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconArrowsMove, IconCloudDownload, IconDotsVertical, IconPlus, IconTrash } from '@tabler/icons-react';
 import MoveNameModal from '../tree/MoveNameModal';
 import DemoteModal from '../tree/DemoteModal';
 import PromoteModal from '../tree/PromoteModal';
@@ -95,7 +95,7 @@ export default function NameActionMenu({
             aria-label="Actions"
             onClick={(e) => e.stopPropagation()}
           >
-            <IconDots size={14} />
+            <IconDotsVertical size={14} />
           </ActionIcon>
         </Menu.Target>
         <Menu.Dropdown onClick={(e) => e.stopPropagation()}>

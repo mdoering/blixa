@@ -1,4 +1,4 @@
-import { Box, Button, Grid, Group, Select, Text, TextInput } from '@mantine/core';
+import { Badge, Box, Button, Grid, Group, Select, Text, TextInput, Tooltip } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { MantineReactTable, useMantineReactTable, type MRT_ColumnDef } from 'mantine-react-table';
@@ -34,6 +34,15 @@ const STATUS_OPTIONS = [
   { value: 'MISAPPLIED', label: 'Misapplied' },
   { value: 'UNASSESSED', label: 'Unassessed' },
 ];
+
+// Compact, colour-coded status chips for the table's narrow Status column: a 3-letter abbreviation
+// (scannable by colour, full word on hover) instead of the space-hungry full label.
+const STATUS_META: Record<string, { abbr: string; color: string; label: string }> = {
+  ACCEPTED: { abbr: 'ACC', color: 'green', label: 'Accepted' },
+  SYNONYM: { abbr: 'SYN', color: 'gray', label: 'Synonym' },
+  MISAPPLIED: { abbr: 'MIS', color: 'orange', label: 'Misapplied' },
+  UNASSESSED: { abbr: 'UNA', color: 'blue', label: 'Unassessed' },
+};
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -96,6 +105,7 @@ export default function NameSearchPage() {
       {
         accessorKey: 'scientificName',
         header: 'Scientific name',
+        grow: true,
         Cell: ({ row }) => (
           <Group gap={6} wrap="nowrap">
             <Text size="sm" fs="italic">
@@ -112,12 +122,27 @@ export default function NameSearchPage() {
       {
         accessorKey: 'rank',
         header: 'Rank',
+        size: 96,
+        grow: false,
         Cell: ({ cell }) => cell.getValue<string | null>() ?? '—',
       },
       {
         accessorKey: 'status',
         header: 'Status',
-        Cell: ({ cell }) => cell.getValue<string | null>() ?? '—',
+        size: 70,
+        grow: false,
+        Cell: ({ cell }) => {
+          const v = cell.getValue<string | null>();
+          if (!v) return '—';
+          const m = STATUS_META[v] ?? { abbr: v.slice(0, 3), color: 'gray', label: v };
+          return (
+            <Tooltip label={m.label} withArrow>
+              <Badge color={m.color} variant="light" size="sm" radius="sm">
+                {m.abbr}
+              </Badge>
+            </Tooltip>
+          );
+        },
       },
     ],
     [],
@@ -138,6 +163,19 @@ export default function NameSearchPage() {
     enableTopToolbar: false,
     enableRowActions: canEdit,
     positionActionsColumn: 'last',
+    // Flex layout so the sized/grow columns compact predictably: the scientific-name column grows,
+    // rank/status/actions stay at their fixed widths.
+    layoutMode: 'grid',
+    // Drop the "Actions" heading and make the kebab a slim right-hand column.
+    displayColumnDefOptions: {
+      'mrt-row-actions': {
+        header: '',
+        size: 48,
+        grow: false,
+        mantineTableHeadCellProps: { style: { padding: 0 } },
+        mantineTableBodyCellProps: { style: { paddingLeft: 4, paddingRight: 4 } },
+      },
+    },
     renderRowActions: ({ row }) => (
       <NameActionMenu
         pid={pid}
