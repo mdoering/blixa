@@ -6,6 +6,7 @@ import {
   IconFolders,
   IconHistory,
   IconList,
+  IconLock,
   IconSettings,
   IconUsers,
 } from '@tabler/icons-react';
@@ -39,6 +40,7 @@ export default function AppSidebar({ projectId, collapsed, onNavigate }: AppSide
           { key: 'references', label: 'References', icon: <IconBooks size={ICON} />, to: `/projects/${projectId}/references` },
           { key: 'issues', label: 'Issues', icon: <IconAlertTriangle size={ICON} />, to: `/projects/${projectId}/issues` },
           { key: 'history', label: 'History', icon: <IconHistory size={ICON} />, to: `/projects/${projectId}/history` },
+          { key: 'activity', label: 'Activity', icon: <IconLock size={ICON} />, to: `/projects/${projectId}/activity` },
           { key: 'project', label: 'Project', icon: <IconSettings size={ICON} />, to: `/projects/${projectId}/metadata` },
           { key: 'members', label: 'Members', icon: <IconUsers size={ICON} />, to: `/projects/${projectId}/members` },
         ]
