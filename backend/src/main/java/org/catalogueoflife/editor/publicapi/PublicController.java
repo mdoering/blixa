@@ -15,7 +15,13 @@ import org.catalogueoflife.editor.release.ReleaseMapper;
 import org.catalogueoflife.editor.release.ReleaseMetricsService;
 import org.catalogueoflife.editor.user.AppUser;
 import org.catalogueoflife.editor.user.AppUserMapper;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,6 +33,8 @@ import tools.jackson.databind.node.ObjectNode;
 
 @RestController
 public class PublicController {
+
+  private static final MediaType APPLICATION_ZIP = MediaType.valueOf("application/zip");
 
   private final PublicProjectMapper projects;
   private final ProjectMemberMapper members;
@@ -92,6 +100,28 @@ public class PublicController {
         p.getLicense() == null ? null : p.getLicense().name(),
         p.getNomCode() == null ? null : p.getNomCode().name().toLowerCase(java.util.Locale.ROOT),
         p.getGeographicScope(), p.getTaxonomicScope(), contributors, metrics, rels);
+  }
+
+  // Streams the persisted release zip -- anonymous, but only for a public project's READY release
+  // with a file on disk. Any other case (private project, unknown project/release, mismatched
+  // release-to-project, BUILDING/FAILED release, or a READY row with no file path) 404s rather than
+  // leaking which of those conditions failed.
+  @GetMapping("/api/public/projects/{id}/releases/{rid}/download")
+  public ResponseEntity<Resource> download(@PathVariable int id, @PathVariable int rid) {
+    Project p = projects.findPublicById(id);
+    Release r = releases.findById(rid);
+    if (p == null || r == null || !r.getProjectId().equals(id) || !"READY".equals(r.getStatus())
+        || r.getFilePath() == null) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "not found");
+    }
+    java.nio.file.Path path = java.nio.file.Path.of(r.getFilePath());
+    Resource res = new FileSystemResource(path);
+    ContentDisposition cd = ContentDisposition.attachment().filename(r.getFileName()).build();
+    return ResponseEntity.ok()
+        .contentType(APPLICATION_ZIP)
+        .header(HttpHeaders.CONTENT_DISPOSITION, cd.toString())
+        .contentLength(path.toFile().length())
+        .body(res);
   }
 
   // Filters a metrics snapshot's `contributions` array down to entries whose userId is a current
