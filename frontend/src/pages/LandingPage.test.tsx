@@ -4,10 +4,9 @@ import { server, http, HttpResponse } from '../test/server';
 import LandingPage from './LandingPage';
 
 describe('LandingPage', () => {
-  it('lists public projects and shows the ORCID button when enabled and anonymous', async () => {
+  it('lists public projects and shows a Log in link for anonymous visitors', async () => {
     server.use(
       http.get('/api/me', () => new HttpResponse(null, { status: 401 })),
-      http.get('/api/config', () => HttpResponse.json({ orcidEnabled: true })),
       http.get('/api/public/projects', () => HttpResponse.json([
         { id: 5, title: 'World Ferns', alias: 'ferns', description: 'A checklist',
           latestVersion: '1.0', latestReleasedAt: '2026-07-01T00:00:00Z', nameUsageCount: 42 },
@@ -15,16 +14,20 @@ describe('LandingPage', () => {
     );
     renderWithProviders(<LandingPage />);
     expect(await screen.findByRole('link', { name: /world ferns/i })).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: /sign in with orcid/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /log in/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/username/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /sign in with orcid/i })).not.toBeInTheDocument();
   });
 
-  it('shows the local login form when ORCID is not configured', async () => {
+  it('shows a My projects link for signed-in visitors', async () => {
     server.use(
-      http.get('/api/me', () => new HttpResponse(null, { status: 401 })),
-      http.get('/api/config', () => HttpResponse.json({ orcidEnabled: false })),
+      http.get('/api/me', () =>
+        HttpResponse.json({ id: 1, username: 'alice', orcid: '', displayName: 'Alice' }),
+      ),
       http.get('/api/public/projects', () => HttpResponse.json([])),
     );
     renderWithProviders(<LandingPage />);
-    expect(await screen.findByLabelText(/username/i)).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /my projects/i })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^log in$/i })).not.toBeInTheDocument();
   });
 });

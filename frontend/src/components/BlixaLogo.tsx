@@ -1,22 +1,25 @@
 import type { CSSProperties } from 'react';
 
-type BlixaVariant = 'header' | 'icon' | 'text';
+type BlixaVariant = 'header' | 'icon' | 'text' | 'main';
 
 // Aspect ratios taken from the source SVG viewBoxes in public/brand/.
 const RATIO: Record<BlixaVariant, number> = {
   header: 4167 / 1875,
   icon: 1,
   text: 4267 / 834,
+  main: 1,
 };
 
 const SRC: Record<BlixaVariant, string> = {
   header: '/brand/blixa-header.svg',
   icon: '/brand/blixa-icon.svg',
   text: '/brand/blixa-text.svg',
+  main: '/brand/blixa-main.svg',
 };
 
 export interface BlixaLogoProps {
-  // header = full lockup (monogram + wordmark), icon = square monogram, text = wordmark only.
+  // header = full lockup (monogram + wordmark), icon = square monogram, text = wordmark only,
+  // main = the larger monochrome brand mark used as the landing-page hero.
   variant?: BlixaVariant;
   // Rendered height in px; width is derived from the artwork's aspect ratio.
   height?: number;
