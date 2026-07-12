@@ -41,6 +41,11 @@ class PublicProjectApiIT extends AbstractPostgresIT {
             .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"Public One\",\"alias\":\"" + alias + "\"}"))
         .andReturn().getResponse().getContentAsString();
     int pid = json.readTree(b).get("id").asInt();
+    // A project must have a license before it can be made public (ProjectService.setPublic gate).
+    mvc.perform(put("/api/projects/" + pid + "/metadata").with(csrf()).with(user(owner))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Public One\",\"alias\":\"" + alias + "\",\"license\":\"CC0-1.0\"}"))
+        .andExpect(status().isOk());
     mvc.perform(put("/api/projects/" + pid + "/public").with(csrf()).with(user(owner))
             .contentType(MediaType.APPLICATION_JSON).content("{\"public\":true}")).andExpect(status().isOk());
     return pid;

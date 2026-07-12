@@ -50,6 +50,12 @@ class PublicReleaseDownloadIT extends AbstractPostgresIT {
             .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"" + title + "\"}"))
         .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
     int pid = json.readTree(b).get("id").asInt();
+    // A license is required before a project can be made public or publish a release
+    // (ProjectService.setPublic / ReleaseService.publish gates).
+    mvc.perform(put("/api/projects/" + pid + "/metadata").with(csrf()).with(user(owner))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"" + title + "\",\"license\":\"CC0-1.0\"}"))
+       .andExpect(status().isOk());
     mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf()).with(user(owner))
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"scientificName\":\"Panthera\",\"rank\":\"genus\",\"status\":\"ACCEPTED\"}"))
