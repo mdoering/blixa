@@ -24,6 +24,10 @@ export interface Vocab {
   nomStatus: NomStatusOption[];
   gender: string[];
   environment: string[];
+  // CSL-JSON wire ids (e.g. "article-journal") for the reference `type` dropdown; the same
+  // canonical form the backend persists (ReferenceService.validateType), so a picked value always
+  // round-trips.
+  cslTypes: string[];
 }
 
 export function getVocab(): Promise<Vocab> {

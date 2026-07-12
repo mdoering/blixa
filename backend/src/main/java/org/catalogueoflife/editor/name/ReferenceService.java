@@ -2,6 +2,7 @@ package org.catalogueoflife.editor.name;
 
 import java.util.List;
 import java.util.Map;
+import life.catalogue.api.model.CSLType;
 import org.catalogueoflife.editor.audit.AuditService;
 import org.catalogueoflife.editor.audit.Operation;
 import org.catalogueoflife.editor.name.dto.ContainerTitleFacet;
@@ -72,7 +73,7 @@ public class ReferenceService {
     r.setProjectId(projectId);
     r.setCitation(req.citation());
     r.setCitationManual(Boolean.TRUE.equals(req.citationManual()));
-    r.setType(req.type());
+    r.setType(validateType(req.type()));
     r.setAuthor(req.author());
     r.setEditor(req.editor());
     r.setTitle(req.title());
@@ -114,7 +115,7 @@ public class ReferenceService {
     Map<String, Object> before = objectMapper.convertValue(r, Map.class);
     r.setCitation(req.citation());
     r.setCitationManual(Boolean.TRUE.equals(req.citationManual()));
-    r.setType(req.type());
+    r.setType(validateType(req.type()));
     r.setAuthor(req.author());
     r.setEditor(req.editor());
     r.setTitle(req.title());
@@ -291,6 +292,22 @@ public class ReferenceService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "variants must not be empty");
     }
     return references.mergeContainerTitle(projectId, canonical, variants);
+  }
+
+  // Tolerantly resolves `raw` (the CSL-JSON wire id, e.g. "article-journal", the enum name, or a
+  // case/separator variant thereof -- see CSLType.fromString) into the canonical wire value so only
+  // that form is ever persisted. Null/blank -> null (type is optional, mirrors Licenses.parse's
+  // shape); anything else that doesn't resolve -> 400 rather than silently storing garbage that
+  // would never match a dropdown option again.
+  static String validateType(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return null;
+    }
+    CSLType type = CSLType.fromString(raw);
+    if (type == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown reference type: " + raw);
+    }
+    return type.toString();
   }
 
   private Reference requireInProject(int projectId, int id) {

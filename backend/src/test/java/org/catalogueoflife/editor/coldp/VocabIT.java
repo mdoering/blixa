@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import life.catalogue.api.model.CSLType;
 import life.catalogue.api.vocab.NomStatus;
 import org.catalogueoflife.editor.support.AbstractPostgresIT;
 import org.gbif.nameparser.api.Rank;
@@ -39,11 +40,17 @@ class VocabIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.nomStatus[0].zoological").exists())
         .andExpect(jsonPath("$.gender").isArray())
         .andExpect(jsonPath("$.environment").isArray())
+        // cslTypes carries the CSL-JSON wire ids (e.g. "article-journal") the reference `type`
+        // dropdown offers -- see ReferenceService.validateType for the matching persist-side check.
+        .andExpect(jsonPath("$.cslTypes").isArray())
+        .andExpect(jsonPath("$.cslTypes", org.hamcrest.Matchers.hasItem("article-journal")))
+        .andExpect(jsonPath("$.cslTypes", org.hamcrest.Matchers.hasItem("book")))
         .andReturn().getResponse().getContentAsString();
 
     JsonNode root = json.readTree(body);
     assertThat(root.get("ranks").size()).isEqualTo(Rank.values().length);
     assertThat(root.get("nomStatus").size()).isEqualTo(NomStatus.values().length);
+    assertThat(root.get("cslTypes").size()).isEqualTo(CSLType.values().length);
     // rank values are lower-case; nomStatus values are the upper-case enum name
     assertThat(root.get("ranks").get(0).asString()).isEqualTo(root.get("ranks").get(0).asString().toLowerCase());
     assertThat(root.get("nomStatus")).allMatch(n -> n.get("value").asString().equals(n.get("value").asString().toUpperCase()));

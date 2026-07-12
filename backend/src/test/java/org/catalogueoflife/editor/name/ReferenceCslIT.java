@@ -3,6 +3,7 @@ package org.catalogueoflife.editor.name;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -87,5 +88,47 @@ class ReferenceCslIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.containerTitle").value("Biodiversity Data Journal"))
         .andExpect(jsonPath("$.containerTitleShort").value("Biodivers. Data J."))
         .andExpect(jsonPath("$.issued").value("2026"));
+  }
+
+  // Task 2 of the reference-model-overhaul plan (R1): `type` is validated against CSLType --
+  // create/update reject an unrecognized wire value with 400, a recognized one persists in its
+  // canonical wire form, and a missing/blank type is allowed (the field is optional).
+  @Test
+  @WithMockUser(username = "cslTypeOwner")
+  void typeIsValidatedAgainstCslType() throws Exception {
+    ensureUser("cslTypeOwner");
+    long pid = createProject("csltypeproj");
+
+    // unknown type -> 400 on create
+    mvc.perform(post("/api/projects/" + pid + "/references").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"Bad type\",\"type\":\"not-a-type\"}"))
+        .andExpect(status().isBadRequest());
+
+    // null/absent type is allowed
+    String createBody = mvc.perform(post("/api/projects/" + pid + "/references").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"No type\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.type").value(org.hamcrest.Matchers.nullValue()))
+        .andReturn().getResponse().getContentAsString();
+    JsonNode created = json.readTree(createBody);
+    long refId = created.get("id").asLong();
+
+    // a valid wire value persists and round-trips
+    mvc.perform(put("/api/projects/" + pid + "/references/" + refId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"No type\",\"type\":\"article-journal\",\"version\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.type").value("article-journal"));
+    mvc.perform(get("/api/projects/" + pid + "/references/" + refId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.type").value("article-journal"));
+
+    // unknown type -> 400 on update too
+    mvc.perform(put("/api/projects/" + pid + "/references/" + refId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"citation\":\"No type\",\"type\":\"not-a-type\",\"version\":1}"))
+        .andExpect(status().isBadRequest());
   }
 }
