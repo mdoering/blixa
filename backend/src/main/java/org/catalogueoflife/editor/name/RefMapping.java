@@ -143,6 +143,10 @@ public final class RefMapping {
       return null;
     }
     s = s.replaceAll("\\s+", " ").trim();
+    // jbibtex's toUserString() only strips the outer field delimiter; LaTeX grouping braces used
+    // to protect capitalization (e.g. "{{Bánki}, {Olaf} and ...}") survive into the value. Strip
+    // them here so they don't leak into stored author/title/etc.
+    s = s.replace("{", "").replace("}", "").trim();
     return s.isEmpty() ? null : s;
   }
 
