@@ -2,8 +2,10 @@ package org.catalogueoflife.editor.mergerecords;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.catalogueoflife.editor.audit.AuditService;
 import org.catalogueoflife.editor.audit.Operation;
 import org.catalogueoflife.editor.mergerecords.dto.MergeResult;
@@ -165,9 +167,15 @@ public class MergeRecordsService {
     }
     List<Integer> mergedIds = all.stream().filter(id -> id != survivorId.intValue()).toList();
 
+    // Capture every usage that cites a to-be-merged duplicate BEFORE repointing it: once repointed
+    // (or deleted) the duplicate's id no longer identifies these citers, mirrors
+    // ReferenceService.delete's citingUsageIds/arrayCitingUsageIds capture-before-mutate discipline.
+    Set<Integer> citerIds = new LinkedHashSet<>();
     for (int d : mergedIds) {
       Reference ref = references.findByIdInProject(projectId, d);
       if (ref == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reference not in project: " + d);
+      citerIds.addAll(usages.findIdsByPublishedInReference(projectId, d));
+      citerIds.addAll(usages.findUsageIdsCitingReference(projectId, d));
       merge.repointPublishedIn(projectId, d, survivorId);
       merge.repointReferenceArray(projectId, d, survivorId);
       merge.dedupReferenceArray(projectId, survivorId);
@@ -183,6 +191,15 @@ public class MergeRecordsService {
       // mergeUsages's own issues.deleteByEntity call above).
       issues.deleteByEntity(projectId, "reference", d);
       merge.deleteReference(projectId, d);
+    }
+    // Repointing onto the survivor reference can change what YearVsReferenceRule /
+    // MissingPublishedInRule find for every former citer of a deleted duplicate -- one event per
+    // citer id, published from inside this same @Transactional method so ValidationTrigger's
+    // AFTER_COMMIT listener only fires once this merge actually commits (mirrors
+    // ReferenceService.update/delete). Note: these are usage ids, NOT survivorId (a reference id) --
+    // publishing forUsage(survivorId) here would be a bug.
+    for (int usageId : citerIds) {
+      events.publishEvent(ValidationEvent.forUsage(projectId, usageId));
     }
     return new MergeResult(survivorId, mergedIds.size());
   }
