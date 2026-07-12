@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   Divider,
@@ -14,11 +15,13 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
+import { IconLock } from '@tabler/icons-react';
 import { useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
 import { getProject } from '../api/projects';
 import { getVocab } from '../api/coldp';
+import { listLocks } from '../api/locks';
 import { getUsage, updateUsage } from '../api/usages';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import EntitySelect from '../child/EntitySelect';
@@ -33,6 +36,7 @@ import {
   PropertyTab,
   VernacularTab,
 } from '../child/taxonTabs';
+import { useUsageLock } from '../lock/useUsageLock';
 import IssueList from './IssueList';
 import SynonymList from './SynonymList';
 
@@ -126,6 +130,17 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
     queryFn: () => getProject(pid),
   });
   const canEdit = project ? ['owner', 'editor'].includes(project.role) : false;
+
+  // Shared locks list for this project, polled so a foreign lock's "locked by X" banner (below)
+  // shows immediately on open -- before the current user has made any edit of their own (and thus
+  // before useUsageLock's own `claim()`-driven `holder` would ever be populated).
+  const { data: locks } = useQuery({
+    queryKey: ['locks', pid],
+    queryFn: () => listLocks(pid),
+    refetchInterval: 20_000,
+  });
+  const foreignLock = locks?.find((l) => l.entityType === 'name_usage' && l.entityId === usageId && !l.heldByMe);
+  const { claim } = useUsageLock(pid, usageId, canEdit);
   // Which alternative_id CURIE scopes this project renders a real identifier field for (Project
   // settings page). project.identifierScopes is now a list of {scope, datasetKey} objects (the
   // datasetKey drives CLB matching, unused by this per-scope-field logic) -- reduce to the bare
@@ -266,6 +281,11 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
 
   return (
     <Box>
+      {foreignLock && (
+        <Alert color="orange" variant="light" mb="sm" icon={<IconLock size={16} />}>
+          {foreignLock.username} is editing this name — your changes may conflict.
+        </Alert>
+      )}
       <Tabs defaultValue="details" keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="details">Details</Tabs.Tab>
@@ -283,7 +303,16 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
 
         <Tabs.Panel value="details" pt="md">
           <form onSubmit={form.onSubmit((v) => mutation.mutate(v))}>
-            <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
+            {/* Native DOM onInput, not the mantine form's onValuesChange: real user typing/selection
+                bubbles a native input event up to the fieldset, but the form-seeding effects above
+                (form.setValues/setFieldValue) are programmatic and never dispatch one -- so this
+                claims the lock only on genuine edit intent, not on load/reseed. claim() is
+                idempotent, so firing on every keystroke is fine. */}
+            <fieldset
+              disabled={!canEdit}
+              onInput={() => claim()}
+              style={{ border: 'none', padding: 0, margin: 0 }}
+            >
               <Stack gap="md">
                 <SimpleGrid cols={2}>
                   <TextInput label="Scientific name" {...form.getInputProps('scientificName')} />

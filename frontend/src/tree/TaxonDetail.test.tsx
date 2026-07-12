@@ -5,6 +5,22 @@ import { renderWithProviders } from '../test/utils';
 import { server, http, HttpResponse } from '../test/server';
 import TaxonDetail from './TaxonDetail';
 
+function fakeLock(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: 1,
+    entityType: 'name_usage',
+    entityId: 10,
+    userId: 99,
+    username: 'alice',
+    acquiredAt: '2026-07-12T00:00:00Z',
+    expiresAt: '2026-07-12T00:05:00Z',
+    heldByMe: false,
+    taskId: null,
+    taskTitle: null,
+    ...overrides,
+  };
+}
+
 const project = {
   id: 4, title: 'Mammals', alias: null, description: null, nomCode: null,
   license: null, geographicScope: null, taxonomicScope: null, role: 'owner',
@@ -512,6 +528,44 @@ test('a synonym usage hides the taxon-level tabs', async () => {
   // Relations + Types still apply to any usage.
   expect(screen.getByRole('tab', { name: /relations/i })).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: /types/i })).toBeInTheDocument();
+});
+
+test('shows a non-blocking "locked by X" banner when another user holds the lock', async () => {
+  mockCommon();
+  server.use(
+    http.get('/api/projects/4/locks', () => HttpResponse.json([fakeLock()])),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  expect(await screen.findByText(/alice is editing/i)).toBeInTheDocument();
+});
+
+test('shows no banner when no one else holds the lock (default empty /locks)', async () => {
+  mockCommon();
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await screen.findByLabelText('Scientific name');
+  expect(screen.queryByText(/is editing/i)).not.toBeInTheDocument();
+});
+
+test('claims the lock only on genuine user edit, not on programmatic form seeding', async () => {
+  mockCommon();
+  let acquireCalls = 0;
+  server.use(
+    http.post('/api/projects/4/locks', () => {
+      acquireCalls += 1;
+      return HttpResponse.json(fakeLock({ userId: 1, username: 'me', heldByMe: true }));
+    }),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  const authorship = await screen.findByLabelText('Authorship');
+  await waitFor(() => expect(authorship).toHaveValue('Linnaeus, 1758'));
+  // Form seeding (setValues/setFieldValue effects) must not have triggered a claim.
+  expect(acquireCalls).toBe(0);
+
+  await userEvent.type(authorship, '!');
+  await waitFor(() => expect(acquireCalls).toBeGreaterThan(0));
 });
 
 test('a warning issue shows its badge and message', async () => {

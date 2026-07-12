@@ -14,6 +14,31 @@ export const server = setupServer(
   // Default empty release history, so any owner-role render of ProjectMetadataPage's Releases
   // section doesn't need this mocked per-test unless it cares about the actual list.
   http.get('/api/projects/:id/releases', () => HttpResponse.json([])),
+  // Default empty lock list, so any render of TaxonDetail (which polls the project's locks for
+  // the "locked by X" banner) doesn't need this mocked per-test unless it cares about a lock.
+  http.get('/api/projects/:pid/locks', () => HttpResponse.json([])),
+  // Default claim/release: TaxonDetail's fieldset now claims a lock on genuine user input (see
+  // useUsageLock), so any existing test that types into a form field triggers this even when it
+  // doesn't care about locking. Without a default, that POST/DELETE would be an unhandled request
+  // (onUnhandledRequest: 'error' in setup.ts) -- respond with a normal "acquired by me" lock /
+  // 204 so those tests stay quiet unless they override this to test locking itself.
+  http.post('/api/projects/:pid/locks', async ({ request }) => {
+    const body = (await request.json()) as { entityType: string; entityId: number };
+    const now = new Date();
+    return HttpResponse.json({
+      id: 1,
+      entityType: body.entityType,
+      entityId: body.entityId,
+      userId: 1,
+      username: 'you',
+      acquiredAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + 300_000).toISOString(),
+      heldByMe: true,
+      taskId: null,
+      taskTitle: null,
+    });
+  }),
+  http.delete('/api/projects/:pid/locks/:id', () => new HttpResponse(null, { status: 204 })),
 );
 
 export { http, HttpResponse };
