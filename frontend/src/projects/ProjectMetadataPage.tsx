@@ -318,6 +318,32 @@ export default function ProjectMetadataPage() {
 
   return (
     <Stack style={{ maxWidth: 720 }} gap="xl">
+      {/* Public visibility toggle (owner-only) at the very top -- lists the project on the public
+          landing page + exposes its releases; gated on a license being set (B2). */}
+      {isOwner && (
+        <Stack gap="xs">
+          <Group justify="space-between">
+            <div>
+              <Text fw={600}>Public</Text>
+              <Text size="sm" c="dimmed">
+                List this project on the public landing page and publish its releases.
+              </Text>
+            </div>
+            <Switch
+              aria-label="Public"
+              checked={data?.public ?? false}
+              disabled={!data?.license}
+              onChange={(e) => publicMut.mutate(e.currentTarget.checked)}
+            />
+          </Group>
+          {!data?.license && (
+            <Text size="sm" c="dimmed">
+              Set a license first to make this project public.
+            </Text>
+          )}
+        </Stack>
+      )}
+
       {/* 1. Main metadata form: the core editable project fields + Save. Note that the GBIF map
           toggle and the identifier scopes editor are NOT rendered here -- they're bound to this
           same `form` object (see form.getInputProps below) but visually live in the Settings
@@ -366,34 +392,8 @@ export default function ProjectMetadataPage() {
         </fieldset>
       </form>
 
-      {/* 2. Releases (owner-only): the Public toggle + publish form + release list -- both
-          publishing actions gated on a license being set (B2, see ProjectService.setPublic /
-          ReleaseService.publish). */}
-      {isOwner && (
-        <Stack gap="xs">
-          <Group justify="space-between">
-            <div>
-              <Text fw={600}>Public</Text>
-              <Text size="sm" c="dimmed">
-                List this project on the public landing page and publish its releases.
-              </Text>
-            </div>
-            <Switch
-              aria-label="Public"
-              checked={data?.public ?? false}
-              disabled={!data?.license}
-              onChange={(e) => publicMut.mutate(e.currentTarget.checked)}
-            />
-          </Group>
-          {/* B2: a license is required before a project can be made public -- see ProjectService.setPublic. */}
-          {!data?.license && (
-            <Text size="sm" c="dimmed">
-              Set a license first to make this project public.
-            </Text>
-          )}
-        </Stack>
-      )}
-
+      {/* 2. Releases (owner-only): publish form + release list (publishing gated on a license, B2,
+          see ReleaseService.publish). The Public toggle lives at the very top of the page. */}
       {isOwner && (
         <Stack gap="xs">
           <Title order={4} m={0}>
