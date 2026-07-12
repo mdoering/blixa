@@ -263,3 +263,19 @@ export interface Task {
   title: string;
   status: string;
 }
+
+// Mirrors backend LockResponse: a soft lock on an entity (e.g. a name_usage), held by a user for
+// a limited time (see api/locks.ts). `heldByMe` distinguishes the caller's own lock from someone
+// else's; `taskId`/`taskTitle` are set when the lock was acquired as part of a task.
+export interface Lock {
+  id: number;
+  entityType: string;
+  entityId: number;
+  userId: number;
+  username: string;
+  acquiredAt: string;
+  expiresAt: string;
+  heldByMe: boolean;
+  taskId: number | null;
+  taskTitle: string | null;
+}
