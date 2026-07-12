@@ -1,4 +1,4 @@
-import { Button, Group, Modal, Stack, Text, Textarea } from '@mantine/core';
+import { Button, FileInput, Group, Modal, Stack, Text, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -11,18 +11,30 @@ export interface ImportBibtexModalProps {
   onClose: () => void;
 }
 
-// Paste a .bib blob → the server parses + creates every entry → refresh the table.
+// Paste a .bib blob → the server parses + creates every entry → refresh the table. Mirrors
+// ImportRisModal, plus a .bib/.bibtex FileInput that just reads the file's text into the same
+// Textarea/state.
 export default function ImportBibtexModal({ pid, opened, onClose }: ImportBibtexModalProps) {
   const queryClient = useQueryClient();
+  const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (opened) {
+      setFile(null);
       setText('');
       setError(null);
     }
   }, [opened]);
+
+  const handleFile = async (f: File | null) => {
+    setFile(f);
+    setError(null);
+    if (f) {
+      setText(await f.text());
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: () => importBibtex(pid, text),
@@ -37,6 +49,14 @@ export default function ImportBibtexModal({ pid, opened, onClose }: ImportBibtex
   return (
     <Modal opened={opened} onClose={onClose} size="lg" title="Import BibTeX">
       <Stack>
+        <FileInput
+          label="Or upload a BibTeX file"
+          placeholder="Upload a .bib file"
+          accept=".bib,.bibtex"
+          value={file}
+          onChange={handleFile}
+          clearable
+        />
         <Textarea
           label="BibTeX"
           placeholder="@article{key, author = {…}, title = {…}, year = {…} }"
@@ -45,6 +65,7 @@ export default function ImportBibtexModal({ pid, opened, onClose }: ImportBibtex
           maxRows={16}
           value={text}
           onChange={(e) => {
+            setFile(null);
             setText(e.currentTarget.value);
             setError(null);
           }}

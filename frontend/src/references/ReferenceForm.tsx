@@ -127,16 +127,14 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
     <Modal
       opened={opened}
       onClose={onClose}
-      size="lg"
+      size="xl"
       title={reference ? 'Edit reference' : 'New reference'}
     >
       <form onSubmit={form.onSubmit((v) => mutation.mutate(v))}>
         <Stack gap="sm">
           <TextInput label="Citation" {...form.getInputProps('citation')} />
-          <SimpleGrid cols={2}>
-            <TextInput label="Author" {...form.getInputProps('author')} />
-            <TextInput label="Editor" {...form.getInputProps('editor')} />
-          </SimpleGrid>
+          <TextInput label="Author" {...form.getInputProps('author')} />
+          <TextInput label="Editor" {...form.getInputProps('editor')} />
           <TextInput label="Title" {...form.getInputProps('title')} />
           <SimpleGrid cols={2}>
             <TextInput label="Container title" {...form.getInputProps('containerTitle')} />
