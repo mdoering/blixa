@@ -13,46 +13,19 @@ import {
   TextInput,
   Title,
 } from '@mantine/core';
-import { useForm } from '@mantine/form';
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { getPublicProjects } from '../api/public';
 import { getConfig } from '../api/config';
 import { useMe } from '../auth/useMe';
-import { localLogin, orcidLoginUrl } from '../api/auth';
-import { ApiError } from '../api/client';
+import { orcidLoginUrl } from '../api/auth';
+import { useLocalLogin } from '../auth/useLocalLogin';
 
 function LocalLoginForm() {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const form = useForm({
-    initialValues: { username: '', password: '' },
-    validate: {
-      username: (v) => (v ? null : 'Required'),
-      password: (v) => (v ? null : 'Required'),
-    },
-  });
-
-  async function onFinish(values: { username: string; password: string }) {
-    setSubmitting(true);
-    setError(null);
-    try {
-      await localLogin(values.username, values.password);
-      await queryClient.invalidateQueries({ queryKey: ['me'] });
-      navigate('/projects', { replace: true });
-    } catch (e) {
-      setError(e instanceof ApiError && e.status === 401 ? 'Invalid username or password' : 'Login failed');
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const { form, error, submitting, onSubmit } = useLocalLogin();
 
   return (
-    <form onSubmit={form.onSubmit(onFinish)}>
+    <form onSubmit={onSubmit}>
       <fieldset disabled={submitting} style={{ border: 'none', padding: 0, margin: 0 }}>
         <Stack gap="md">
           {error && <Alert color="red">{error}</Alert>}
