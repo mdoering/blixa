@@ -128,12 +128,12 @@ class ReferencePdfIT extends AbstractPostgresIT {
 
     // Blank link -> the hosted pdf's URL fills it in on export.
     Reference blankLink = referenceService.create(userId, pid, new CreateReferenceRequest(
-        "Blank, A. 2024. No link set.", null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null));
+        "Blank, A. 2024. No link set.", false, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null, null, null));
     // A user-set link -> export must keep it untouched even though a pdf is also attached.
     Reference ownLink = referenceService.create(userId, pid, new CreateReferenceRequest(
-        "Owned, B. 2024. Has its own link.", null, null, null, null, null, null, null, null,
-        null, null, null, null, null, "https://example.org/own-link", null, null));
+        "Owned, B. 2024. Has its own link.", false, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, "https://example.org/own-link", null, null));
 
     MockMultipartFile file =
         new MockMultipartFile("file", "reprint.pdf", "application/pdf", VALID_PDF);

@@ -2,6 +2,7 @@ package org.catalogueoflife.editor.name;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import life.catalogue.api.model.CslName;
 
 // reference uses a per-project compound (project_id, id) primary key (see V3__name_core.sql):
 // id alone is only meaningful together with projectId.
@@ -10,11 +11,19 @@ public class Reference {
   private Integer projectId;
   private List<String> alternativeId;
   private String citation;
+  // Whether `citation` was supplied by a human (kept as-is on write) vs generated from the
+  // structured fields below (see V24__reference_csl.sql; a later reference-model-overhaul task
+  // wires the actual generation -- for now this is just carried through unchanged).
+  private boolean citationManual;
   private String type;
-  private String author;
-  private String editor;
+  // CSL name arrays (JSONB, see V24__reference_csl.sql / CslNameListTypeHandler) -- replaced the
+  // old "; "-joined free-text columns.
+  private List<CslName> author;
+  private List<CslName> editor;
   private String title;
   private String containerTitle;
+  // CSL container-title-short (e.g. a botanical journal abbreviation), alongside containerTitle.
+  private String containerTitleShort;
   private String issued;
   private String volume;
   private String issue;
@@ -44,16 +53,20 @@ public class Reference {
   public void setAlternativeId(List<String> alternativeId) { this.alternativeId = alternativeId; }
   public String getCitation() { return citation; }
   public void setCitation(String citation) { this.citation = citation; }
+  public boolean isCitationManual() { return citationManual; }
+  public void setCitationManual(boolean citationManual) { this.citationManual = citationManual; }
   public String getType() { return type; }
   public void setType(String type) { this.type = type; }
-  public String getAuthor() { return author; }
-  public void setAuthor(String author) { this.author = author; }
-  public String getEditor() { return editor; }
-  public void setEditor(String editor) { this.editor = editor; }
+  public List<CslName> getAuthor() { return author; }
+  public void setAuthor(List<CslName> author) { this.author = author; }
+  public List<CslName> getEditor() { return editor; }
+  public void setEditor(List<CslName> editor) { this.editor = editor; }
   public String getTitle() { return title; }
   public void setTitle(String title) { this.title = title; }
   public String getContainerTitle() { return containerTitle; }
   public void setContainerTitle(String containerTitle) { this.containerTitle = containerTitle; }
+  public String getContainerTitleShort() { return containerTitleShort; }
+  public void setContainerTitleShort(String containerTitleShort) { this.containerTitleShort = containerTitleShort; }
   public String getIssued() { return issued; }
   public void setIssued(String issued) { this.issued = issued; }
   public String getVolume() { return volume; }

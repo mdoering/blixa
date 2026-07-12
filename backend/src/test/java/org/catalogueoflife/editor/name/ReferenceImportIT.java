@@ -105,7 +105,8 @@ class ReferenceImportIT extends AbstractPostgresIT {
             .content("{\"doi\":\"https://doi.org/10.48580/dgy8b\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.title").value("Catalogue of Life"))
-        .andExpect(jsonPath("$.author").value("Bánki, Olaf"))
+        .andExpect(jsonPath("$.author[0].family").value("Bánki"))
+        .andExpect(jsonPath("$.author[0].given").value("Olaf"))
         .andExpect(jsonPath("$.doi").value("10.48580/dgy8b"))
         .andExpect(jsonPath("$.type").value("dataset"));
   }

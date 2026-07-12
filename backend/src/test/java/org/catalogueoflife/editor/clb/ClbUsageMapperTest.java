@@ -330,8 +330,12 @@ class ClbUsageMapperTest {
     assertThat(r.getCitation()).isEqualTo("Linnaeus 1758");
     assertThat(r.getRemarks()).isEqualTo("ref remark");
     assertThat(r.getType()).isEqualTo("article-journal");
-    assertThat(r.getAuthor()).isEqualTo("Linnaeus,Carl");
-    assertThat(r.getEditor()).isEqualTo("Editor,Some");
+    assertThat(r.getAuthor()).hasSize(1);
+    assertThat(r.getAuthor().get(0).getFamily()).isEqualTo("Linnaeus");
+    assertThat(r.getAuthor().get(0).getGiven()).isEqualTo("Carl");
+    assertThat(r.getEditor()).hasSize(1);
+    assertThat(r.getEditor().get(0).getFamily()).isEqualTo("Editor");
+    assertThat(r.getEditor().get(0).getGiven()).isEqualTo("Some");
     assertThat(r.getTitle()).isEqualTo("Systema Naturae");
     assertThat(r.getContainerTitle()).isEqualTo("Syst. Nat.");
     assertThat(r.getIssued()).isEqualTo("1758-01-01");

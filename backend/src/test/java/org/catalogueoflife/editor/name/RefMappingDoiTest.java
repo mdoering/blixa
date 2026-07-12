@@ -67,8 +67,14 @@ class RefMappingDoiTest {
     CreateReferenceRequest r = RefMapping.fromDatacite(attrs);
 
     assertThat(r.title()).isEqualTo("Catalogue of Life");
-    assertThat(r.author()).isEqualTo("Bánki, Olaf; Roskov, Yury");
-    assertThat(r.editor()).isEqualTo("Doe, Jane");
+    assertThat(r.author()).hasSize(2);
+    assertThat(r.author().get(0).getFamily()).isEqualTo("Bánki");
+    assertThat(r.author().get(0).getGiven()).isEqualTo("Olaf");
+    assertThat(r.author().get(1).getFamily()).isEqualTo("Roskov");
+    assertThat(r.author().get(1).getGiven()).isEqualTo("Yury");
+    assertThat(r.editor()).hasSize(1);
+    assertThat(r.editor().get(0).getFamily()).isEqualTo("Doe");
+    assertThat(r.editor().get(0).getGiven()).isEqualTo("Jane");
     assertThat(r.issued()).isEqualTo("2026");
     assertThat(r.publisher()).isEqualTo("Catalogue of Life Foundation");
     assertThat(r.doi()).isEqualTo("10.48580/dgy8b");

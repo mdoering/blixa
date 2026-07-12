@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import life.catalogue.api.model.CslName;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.junit.jupiter.api.Test;
 
@@ -37,7 +38,11 @@ class RefMappingRisTest {
     assertThat(refs).hasSize(1);
     CreateReferenceRequest r = refs.get(0);
     assertThat(r.type()).isEqualTo("article-journal");
-    assertThat(r.author()).isEqualTo("Doe, Jane; Smith, John");
+    assertThat(r.author()).hasSize(2);
+    assertThat(r.author().get(0).getFamily()).isEqualTo("Doe");
+    assertThat(r.author().get(0).getGiven()).isEqualTo("Jane");
+    assertThat(r.author().get(1).getFamily()).isEqualTo("Smith");
+    assertThat(r.author().get(1).getGiven()).isEqualTo("John");
     assertThat(r.title()).isEqualTo("A great paper");
     assertThat(r.containerTitle()).isEqualTo("Journal of Things");
     assertThat(r.issued()).isEqualTo("2020");
@@ -69,8 +74,12 @@ class RefMappingRisTest {
     assertThat(refs).hasSize(1);
     CreateReferenceRequest r = refs.get(0);
     assertThat(r.type()).isEqualTo("book");
-    assertThat(r.author()).isEqualTo("Linnaeus, Carl");
-    assertThat(r.editor()).isEqualTo("Editor, Ed");
+    assertThat(r.author()).hasSize(1);
+    assertThat(r.author().get(0).getFamily()).isEqualTo("Linnaeus");
+    assertThat(r.author().get(0).getGiven()).isEqualTo("Carl");
+    assertThat(r.editor()).hasSize(1);
+    assertThat(r.editor().get(0).getFamily()).isEqualTo("Editor");
+    assertThat(r.editor().get(0).getGiven()).isEqualTo("Ed");
     assertThat(r.title()).isEqualTo("Systema Naturae");
     assertThat(r.issued()).isEqualTo("1758");
     assertThat(r.publisher()).isEqualTo("Salvius");
@@ -107,7 +116,14 @@ class RefMappingRisTest {
         """;
     List<CreateReferenceRequest> refs = RefMapping.fromRis(ris);
     assertThat(refs).hasSize(1);
-    assertThat(refs.get(0).author()).isEqualTo("Doe, Jane; Smith, John; Brown, Alex");
+    List<CslName> authors = refs.get(0).author();
+    assertThat(authors).hasSize(3);
+    assertThat(authors.get(0).getFamily()).isEqualTo("Doe");
+    assertThat(authors.get(0).getGiven()).isEqualTo("Jane");
+    assertThat(authors.get(1).getFamily()).isEqualTo("Smith");
+    assertThat(authors.get(1).getGiven()).isEqualTo("John");
+    assertThat(authors.get(2).getFamily()).isEqualTo("Brown");
+    assertThat(authors.get(2).getGiven()).isEqualTo("Alex");
   }
 
   @Test

@@ -184,8 +184,12 @@ class ImportRefAuthorIT extends AbstractPostgresIT {
     Reference r1 = refs.stream().filter(r -> "A paper on things".equals(r.getTitle())).findFirst().orElseThrow();
     assertThat(r1.getCitation()).isEqualTo("Smith, J. (2020) A paper on things. Journal of Things, 1(1), 1-10.");
     assertThat(r1.getType()).isEqualTo("article-journal");
-    assertThat(r1.getAuthor()).isEqualTo("Smith J");
-    assertThat(r1.getEditor()).isEqualTo("Editor E");
+    // "Smith J" / "Editor E" are comma-free -- RefMapping.parseNames stores a comma-free entry as a
+    // single literal rather than guessing at a family/given split (see ImportRunService.loadReferences).
+    assertThat(r1.getAuthor()).hasSize(1);
+    assertThat(r1.getAuthor().get(0).getLiteral()).isEqualTo("Smith J");
+    assertThat(r1.getEditor()).hasSize(1);
+    assertThat(r1.getEditor().get(0).getLiteral()).isEqualTo("Editor E");
     assertThat(r1.getContainerTitle()).isEqualTo("Journal of Things");
     assertThat(r1.getIssued()).isEqualTo("2020");
     assertThat(r1.getVolume()).isEqualTo("1");

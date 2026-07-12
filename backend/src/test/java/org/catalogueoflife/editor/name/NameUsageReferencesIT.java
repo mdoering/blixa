@@ -156,7 +156,7 @@ class NameUsageReferencesIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.type").value("webpage"))
         .andExpect(jsonPath("$.title").value("Example Page"))
         .andExpect(jsonPath("$.link").value("https://example.org/page"))
-        .andExpect(jsonPath("$.author").value("example.org"))
+        .andExpect(jsonPath("$.author[0].literal").value("example.org"))
         .andExpect(jsonPath("$.accessed").isNotEmpty());
 
     mvc.perform(get("/api/projects/" + pid + "/usages/" + u))

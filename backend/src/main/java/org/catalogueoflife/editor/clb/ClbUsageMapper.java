@@ -1,13 +1,13 @@
 package org.catalogueoflife.editor.clb;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import life.catalogue.api.model.CslData;
 import life.catalogue.api.model.CslDate;
-import life.catalogue.api.model.CslName;
 import life.catalogue.api.model.Distribution;
 import life.catalogue.api.model.Media;
 import life.catalogue.api.model.Name;
@@ -325,8 +325,8 @@ public final class ClbUsageMapper {
     CslData csl = clbRef.getCsl();
     if (csl != null) {
       r.setType(csl.getType() == null ? null : csl.getType().toString());
-      r.setAuthor(CslName.toColdpString(csl.getAuthor()));
-      r.setEditor(CslName.toColdpString(csl.getEditor()));
+      r.setAuthor(csl.getAuthor() == null ? null : Arrays.asList(csl.getAuthor()));
+      r.setEditor(csl.getEditor() == null ? null : Arrays.asList(csl.getEditor()));
       r.setTitle(csl.getTitle());
       r.setContainerTitle(csl.getContainerTitle());
       r.setIssued(cslDateString(csl.getIssued()));

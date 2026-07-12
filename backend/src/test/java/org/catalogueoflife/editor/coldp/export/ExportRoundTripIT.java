@@ -19,6 +19,7 @@ import org.catalogueoflife.editor.name.IdSeqMapper;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.Reference;
+import org.catalogueoflife.editor.name.RefMapping;
 import org.catalogueoflife.editor.name.ReferenceService;
 import org.catalogueoflife.editor.name.Status;
 import org.catalogueoflife.editor.name.SynonymAcceptedMapper;
@@ -113,9 +114,9 @@ class ExportRoundTripIT extends AbstractPostgresIT {
     synonymAccepted.link(pid, proParteSynonym.getId(), root.getId(), null);
 
     Reference reference = referenceService.create(userId, pid, new CreateReferenceRequest(
-        "Linnaeus, C. 1758. Systema Naturae.", "book", "C. Linnaeus", null,
-        "Systema Naturae", null, "1758", null, null, null, null, null, null, null, null, null,
-        null));
+        "Linnaeus, C. 1758. Systema Naturae.", false, "book", RefMapping.parseNames("C. Linnaeus"),
+        null, "Systema Naturae", null, null, "1758", null, null, null, null, null, null, null, null,
+        null, null));
 
     var distribution = distributionService.create(userId, pid, species.getId(),
         new DistributionRequest(null, "tdwg:AB", "tdwg", "native", null, null, null, null));

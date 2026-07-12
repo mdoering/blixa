@@ -27,6 +27,7 @@ import org.catalogueoflife.editor.name.IdSeqMapper;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.Reference;
+import org.catalogueoflife.editor.name.RefMapping;
 import org.catalogueoflife.editor.name.ReferenceMapper;
 import org.catalogueoflife.editor.name.ReferenceService;
 import org.catalogueoflife.editor.name.Status;
@@ -179,13 +180,13 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
     int pid = createProject("roundtrip-source", userId);
 
     Reference ref1 = referenceService.create(userId, pid, new CreateReferenceRequest(
-        "Linnaeus, C. 1758. Systema Naturae.", "book", "C. Linnaeus", null,
-        "Systema Naturae", null, "1758", null, null, null, null, null, null, null, null, null,
-        null));
+        "Linnaeus, C. 1758. Systema Naturae.", false, "book", RefMapping.parseNames("C. Linnaeus"),
+        null, "Systema Naturae", null, null, "1758", null, null, null, null, null, null, null, null,
+        null, null));
     Reference ref2 = referenceService.create(userId, pid, new CreateReferenceRequest(
-        "Pocock, R.I. 1917. On the external characters of the Felidae.", "article-journal",
-        "R.I. Pocock", null, "On the external characters of the Felidae",
-        "Annals and Magazine of Natural History", "1917", "20", null, "329-350",
+        "Pocock, R.I. 1917. On the external characters of the Felidae.", false, "article-journal",
+        RefMapping.parseNames("R.I. Pocock"), null, "On the external characters of the Felidae",
+        "Annals and Magazine of Natural History", null, "1917", "20", null, "329-350",
         null, null, null, null, null, null, null));
 
     Author author = new Author();

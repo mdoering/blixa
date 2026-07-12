@@ -3,6 +3,7 @@ package org.catalogueoflife.editor;
 import org.catalogueoflife.editor.name.NameUsageService;
 import org.catalogueoflife.editor.name.Reference;
 import org.catalogueoflife.editor.name.ReferenceService;
+import org.catalogueoflife.editor.name.RefMapping;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
@@ -91,9 +92,10 @@ public class DevSampleData implements ApplicationRunner {
     Reference linnaeus = references.create(userId, pid, new CreateReferenceRequest(
         "Linnaeus, C. (1758). Systema Naturae per regna tria naturae, 10th ed., vol. 1. "
             + "Laurentius Salvius, Stockholm.",
-        "book", "Linnaeus, C.", null, "Systema Naturae per regna tria naturae",
-        null, "1758", "1", null, "1-824", "Laurentius Salvius",
-        null, null, null, "https://www.biodiversitylibrary.org/item/10277", null, null));
+        false, "book", RefMapping.parseNames("Linnaeus, C."), null,
+        "Systema Naturae per regna tria naturae", null, null, "1758", "1", null, "1-824",
+        "Laurentius Salvius", null, null, null,
+        "https://www.biodiversitylibrary.org/item/10277", null, null));
     int ref = linnaeus.getId();
 
     // Accepted classification, built strictly top-down so each parent is already an accepted usage

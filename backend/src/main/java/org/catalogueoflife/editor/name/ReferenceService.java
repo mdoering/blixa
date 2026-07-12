@@ -71,11 +71,13 @@ public class ReferenceService {
     Reference r = new Reference();
     r.setProjectId(projectId);
     r.setCitation(req.citation());
+    r.setCitationManual(Boolean.TRUE.equals(req.citationManual()));
     r.setType(req.type());
     r.setAuthor(req.author());
     r.setEditor(req.editor());
     r.setTitle(req.title());
     r.setContainerTitle(req.containerTitle());
+    r.setContainerTitleShort(req.containerTitleShort());
     r.setIssued(req.issued());
     r.setVolume(req.volume());
     r.setIssue(req.issue());
@@ -111,11 +113,13 @@ public class ReferenceService {
     @SuppressWarnings("unchecked")
     Map<String, Object> before = objectMapper.convertValue(r, Map.class);
     r.setCitation(req.citation());
+    r.setCitationManual(Boolean.TRUE.equals(req.citationManual()));
     r.setType(req.type());
     r.setAuthor(req.author());
     r.setEditor(req.editor());
     r.setTitle(req.title());
     r.setContainerTitle(req.containerTitle());
+    r.setContainerTitleShort(req.containerTitleShort());
     r.setIssued(req.issued());
     r.setVolume(req.volume());
     r.setIssue(req.issue());

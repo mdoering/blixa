@@ -66,8 +66,8 @@ class ReferenceMatcherIT extends AbstractPostgresIT {
 
   private Reference newReference(int userId, int projectId, String citation, String doi) {
     return referenceService.create(userId, projectId, new CreateReferenceRequest(
-        citation, null, null, null, null, null, null, null, null, null,
-        null, doi, null, null, null, null, null));
+        citation, false, null, null, null, null, null, null, null, null, null,
+        null, null, doi, null, null, null, null, null));
   }
 
   @Test

@@ -44,6 +44,7 @@ import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.Reference;
 import org.catalogueoflife.editor.name.ReferenceMapper;
+import org.catalogueoflife.editor.name.RefMapping;
 import org.catalogueoflife.editor.name.Status;
 import org.catalogueoflife.editor.name.SynonymAcceptedMapper;
 import org.catalogueoflife.editor.name.TaxonInfoMapper;
@@ -374,8 +375,11 @@ public class ImportRunService {
       r.setAlternativeId(alternativeIds(rec, preserveIds, idScope));
       r.setCitation(rec.get(ColdpTerm.citation));
       r.setType(rec.get(ColdpTerm.type));
-      r.setAuthor(rec.get(ColdpTerm.author));
-      r.setEditor(rec.get(ColdpTerm.editor));
+      // ColDP's author/editor columns are a "; "-joined CSL name string (see
+      // ReferenceColdpWriter.row's inverse) -- parse them into structured CslName entries with the
+      // same helper RefMapping.fromCrossref/fromBibtex/fromRis/fromDatacite use.
+      r.setAuthor(RefMapping.parseNames(rec.get(ColdpTerm.author)));
+      r.setEditor(RefMapping.parseNames(rec.get(ColdpTerm.editor)));
       r.setTitle(rec.get(ColdpTerm.title));
       r.setContainerTitle(rec.get(ColdpTerm.containerTitle));
       r.setIssued(rec.get(ColdpTerm.issued));

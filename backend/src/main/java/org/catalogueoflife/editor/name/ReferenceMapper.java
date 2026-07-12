@@ -22,11 +22,15 @@ public interface ReferenceMapper {
   // (0 / now()) apply -- setting them explicitly to a null POJO value would insert
   // an explicit NULL and violate the NOT NULL constraint instead of using the default.
   @Insert("""
-      INSERT INTO reference (project_id, id, alternative_id, citation, type, author, editor,
-                              title, container_title, issued, volume, issue, page, publisher,
-                              doi, isbn, issn, link, accessed, remarks, modified_by)
+      INSERT INTO reference (project_id, id, alternative_id, citation, citation_manual, type, author,
+                              editor, title, container_title, container_title_short, issued, volume,
+                              issue, page, publisher, doi, isbn, issn, link, accessed, remarks,
+                              modified_by)
       VALUES (#{projectId}, #{id}, #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
-              #{citation}, #{type}, #{author}, #{editor}, #{title}, #{containerTitle}, #{issued},
+              #{citation}, #{citationManual}, #{type},
+              #{author,typeHandler=org.catalogueoflife.editor.name.CslNameListTypeHandler},
+              #{editor,typeHandler=org.catalogueoflife.editor.name.CslNameListTypeHandler},
+              #{title}, #{containerTitle}, #{containerTitleShort}, #{issued},
               #{volume}, #{issue}, #{page}, #{publisher}, #{doi}, #{isbn}, #{issn}, #{link},
               #{accessed}, #{remarks}, #{modifiedBy})
       """)
@@ -37,7 +41,9 @@ public interface ReferenceMapper {
       @Result(property = "id", column = "id", id = true),
       @Result(property = "projectId", column = "project_id", id = true),
       @Result(property = "alternativeId", column = "alternative_id",
-          typeHandler = StringArrayTypeHandler.class)
+          typeHandler = StringArrayTypeHandler.class),
+      @Result(property = "author", column = "author", typeHandler = CslNameListTypeHandler.class),
+      @Result(property = "editor", column = "editor", typeHandler = CslNameListTypeHandler.class)
   })
   Reference findByIdInProject(@Param("projectId") int projectId, @Param("id") int id);
 
@@ -87,8 +93,11 @@ public interface ReferenceMapper {
   @Update("""
       UPDATE reference
       SET alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
-          citation = #{citation}, type = #{type}, author = #{author}, editor = #{editor},
-          title = #{title}, container_title = #{containerTitle}, issued = #{issued},
+          citation = #{citation}, citation_manual = #{citationManual}, type = #{type},
+          author = #{author,typeHandler=org.catalogueoflife.editor.name.CslNameListTypeHandler},
+          editor = #{editor,typeHandler=org.catalogueoflife.editor.name.CslNameListTypeHandler},
+          title = #{title}, container_title = #{containerTitle},
+          container_title_short = #{containerTitleShort}, issued = #{issued},
           volume = #{volume}, issue = #{issue}, page = #{page}, publisher = #{publisher},
           doi = #{doi}, isbn = #{isbn}, issn = #{issn}, link = #{link}, accessed = #{accessed},
           remarks = #{remarks},

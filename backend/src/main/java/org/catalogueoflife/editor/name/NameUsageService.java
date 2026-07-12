@@ -360,8 +360,8 @@ public class NameUsageService {
       String title, String accessed, String author) {
     NameUsage before = requireInProject(projectId, usageId);
     CreateReferenceRequest refReq = new CreateReferenceRequest(
-        null, "webpage", author, null, title != null ? title : url, null, null, null, null,
-        null, null, null, null, null, url, accessed, null);
+        null, false, "webpage", RefMapping.parseNames(author), null, title != null ? title : url,
+        null, null, null, null, null, null, null, null, null, null, url, accessed, null);
     Reference ref = referenceService.create(userId, projectId, refReq);
     var ids = new java.util.ArrayList<Integer>(
         before.getReferenceId() == null ? List.of() : before.getReferenceId());
@@ -369,10 +369,11 @@ public class NameUsageService {
     return doSetReferences(userId, projectId, usageId, new ReferenceIdsRequest(ids, before.getVersion()));
   }
 
-  // The URL's host, for the web-reference's author field (a plain literal string, not a
-  // structured Person -- see Reference.author), or null if the URL can't be parsed as a URI (it
-  // already passed WebPageClient's own validation to get here, but this is defensive/best-effort
-  // display only, not a security check).
+  // The URL's host, for the web-reference's author field (RefMapping.parseNames turns this bare,
+  // comma-free string into a single CslName.literal entry rather than a structured family/given
+  // name -- see Reference.author), or null if the URL can't be parsed as a URI (it already passed
+  // WebPageClient's own validation to get here, but this is defensive/best-effort display only,
+  // not a security check).
   private static String hostOf(String url) {
     try {
       return new java.net.URI(url).getHost();

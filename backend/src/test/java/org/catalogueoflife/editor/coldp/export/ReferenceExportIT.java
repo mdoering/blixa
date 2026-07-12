@@ -14,6 +14,7 @@ import org.catalogueoflife.editor.name.Author;
 import org.catalogueoflife.editor.name.AuthorMapper;
 import org.catalogueoflife.editor.name.IdSeqMapper;
 import org.catalogueoflife.editor.name.Reference;
+import org.catalogueoflife.editor.name.RefMapping;
 import org.catalogueoflife.editor.name.ReferenceMapper;
 import org.catalogueoflife.editor.name.ReferenceService;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
@@ -78,13 +79,13 @@ class ReferenceExportIT extends AbstractPostgresIT {
     int pid = createProject("reference-export", userId);
 
     Reference plain = referenceService.create(userId, pid, new CreateReferenceRequest(
-        "Plain, A. 2019. A plain citation.", "article-journal", "Plain A", null,
-        "A plain title", "Journal of Plain Things", "2019", "1", "2", "10-20",
+        "Plain, A. 2019. A plain citation.", false, "article-journal", RefMapping.parseNames("Plain A"),
+        null, "A plain title", "Journal of Plain Things", null, "2019", "1", "2", "10-20",
         null, null, null, null, null, "2026-07-10", null));
 
     Reference withDoiAndAltId = referenceService.create(userId, pid, new CreateReferenceRequest(
-        "Doi, B. 2020. A DOI'd citation.", "article-journal", "Doi B", null,
-        "A DOI title", "Journal of DOIs", "2020", "3", "4", "40-50",
+        "Doi, B. 2020. A DOI'd citation.", false, "article-journal", RefMapping.parseNames("Doi B"),
+        null, "A DOI title", "Journal of DOIs", null, "2020", "3", "4", "40-50",
         "Springer", "10.1234/abcd", null, null, null, null, null));
     withDoiAndAltId.setAlternativeId(List.of("col:REF-2"));
     references.update(withDoiAndAltId);
@@ -143,8 +144,8 @@ class ReferenceExportIT extends AbstractPostgresIT {
     // ColdpReader.validate -> requireOneSchema); this project has no name usages, so give it one
     // reference purely to keep the archive readable -- unrelated to what this test asserts.
     referenceService.create(userId, pid, new CreateReferenceRequest(
-        "Filler, C. 2021. A filler reference.", null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null));
+        "Filler, C. 2021. A filler reference.", false, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null, null, null));
 
     Path targetZip = tmp.resolve("export.zip");
     writer.write(pid, targetZip);

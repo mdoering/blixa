@@ -13,6 +13,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import life.catalogue.api.model.CslName;
 import life.catalogue.api.vocab.Environment;
 import org.catalogueoflife.editor.child.DistributionMapper;
 import org.catalogueoflife.editor.child.EstimateMapper;
@@ -441,11 +442,13 @@ public class MergeApplyService {
     r.setProjectId(targetId);
     r.setModifiedBy(userId);
     r.setCitation(src.getCitation());
+    r.setCitationManual(src.isCitationManual());
     r.setType(src.getType());
     r.setAuthor(src.getAuthor());
     r.setEditor(src.getEditor());
     r.setTitle(src.getTitle());
     r.setContainerTitle(src.getContainerTitle());
+    r.setContainerTitleShort(src.getContainerTitleShort());
     r.setIssued(src.getIssued());
     r.setVolume(src.getVolume());
     r.setIssue(src.getIssue());
@@ -486,14 +489,19 @@ public class MergeApplyService {
     if (!Objects.equals(v, tgt.getCitation())) { tgt.setCitation(v); changed = true; }
     v = mergeString(tgt.getType(), src.getType(), mode);
     if (!Objects.equals(v, tgt.getType())) { tgt.setType(v); changed = true; }
-    v = mergeString(tgt.getAuthor(), src.getAuthor(), mode);
-    if (!Objects.equals(v, tgt.getAuthor())) { tgt.setAuthor(v); changed = true; }
-    v = mergeString(tgt.getEditor(), src.getEditor(), mode);
-    if (!Objects.equals(v, tgt.getEditor())) { tgt.setEditor(v); changed = true; }
+    // author/editor are structured CslName lists (see V24__reference_csl.sql), not scalar strings --
+    // mergeScalar (null-vs-non-null, same as the other non-String scalar fields below) rather than
+    // mergeString (blank-string-vs-non-blank).
+    List<CslName> vNames = mergeScalar(tgt.getAuthor(), src.getAuthor(), mode);
+    if (!Objects.equals(vNames, tgt.getAuthor())) { tgt.setAuthor(vNames); changed = true; }
+    vNames = mergeScalar(tgt.getEditor(), src.getEditor(), mode);
+    if (!Objects.equals(vNames, tgt.getEditor())) { tgt.setEditor(vNames); changed = true; }
     v = mergeString(tgt.getTitle(), src.getTitle(), mode);
     if (!Objects.equals(v, tgt.getTitle())) { tgt.setTitle(v); changed = true; }
     v = mergeString(tgt.getContainerTitle(), src.getContainerTitle(), mode);
     if (!Objects.equals(v, tgt.getContainerTitle())) { tgt.setContainerTitle(v); changed = true; }
+    v = mergeString(tgt.getContainerTitleShort(), src.getContainerTitleShort(), mode);
+    if (!Objects.equals(v, tgt.getContainerTitleShort())) { tgt.setContainerTitleShort(v); changed = true; }
     v = mergeString(tgt.getIssued(), src.getIssued(), mode);
     if (!Objects.equals(v, tgt.getIssued())) { tgt.setIssued(v); changed = true; }
     v = mergeString(tgt.getVolume(), src.getVolume(), mode);

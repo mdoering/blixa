@@ -3,6 +3,7 @@ package org.catalogueoflife.editor.name;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import life.catalogue.api.model.CslName;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.junit.jupiter.api.Test;
 
@@ -34,14 +35,34 @@ class RefMappingBibtexTest {
     assertThat(refs).hasSize(1);
     CreateReferenceRequest r = refs.get(0);
 
-    // must-have: no LaTeX grouping braces survive into the stored author string.
-    assertThat(r.author()).doesNotContain("{").doesNotContain("}");
-
-    String[] names = r.author().split("; ");
-    assertThat(names).hasSize(6);
-    assertThat(names[0]).isEqualTo("Bánki, Olaf");
-    assertThat(r.author())
-        .isEqualTo("Bánki, Olaf; Roskov, Yury; Döring, Markus; Ower, Geoff; Hernández Robles; World Flora Online");
+    List<CslName> authors = r.author();
+    assertThat(authors).hasSize(6);
+    // must-have: no LaTeX grouping braces survive into any structured name field.
+    for (CslName n : authors) {
+      if (n.getFamily() != null) {
+        assertThat(n.getFamily()).doesNotContain("{").doesNotContain("}");
+      }
+      if (n.getGiven() != null) {
+        assertThat(n.getGiven()).doesNotContain("{").doesNotContain("}");
+      }
+      if (n.getLiteral() != null) {
+        assertThat(n.getLiteral()).doesNotContain("{").doesNotContain("}");
+      }
+    }
+    assertThat(authors.get(0).getFamily()).isEqualTo("Bánki");
+    assertThat(authors.get(0).getGiven()).isEqualTo("Olaf");
+    assertThat(authors.get(1).getFamily()).isEqualTo("Roskov");
+    assertThat(authors.get(1).getGiven()).isEqualTo("Yury");
+    assertThat(authors.get(2).getFamily()).isEqualTo("Döring");
+    assertThat(authors.get(2).getGiven()).isEqualTo("Markus");
+    assertThat(authors.get(3).getFamily()).isEqualTo("Ower");
+    assertThat(authors.get(3).getGiven()).isEqualTo("Geoff");
+    // comma-free entries (an institution, or a name with no given part left after the "and" split)
+    // have no family/given -- stored as a single literal instead.
+    assertThat(authors.get(4).getFamily()).isNull();
+    assertThat(authors.get(4).getLiteral()).isEqualTo("Hernández Robles");
+    assertThat(authors.get(5).getFamily()).isNull();
+    assertThat(authors.get(5).getLiteral()).isEqualTo("World Flora Online");
 
     // other fields that flow through the same field() helper must also come out brace-free.
     assertThat(r.title()).isEqualTo("Catalogue of Life");

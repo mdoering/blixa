@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import life.catalogue.api.model.CslName;
 import life.catalogue.coldp.ColdpTerm;
 import org.catalogueoflife.editor.coldp.io.ColdpTsv;
 import org.catalogueoflife.editor.name.Reference;
@@ -44,8 +45,13 @@ public class ReferenceColdpWriter {
     row.put(ColdpTerm.alternativeID, join(r.getAlternativeId()));
     row.put(ColdpTerm.citation, r.getCitation());
     row.put(ColdpTerm.type, r.getType());
-    row.put(ColdpTerm.author, r.getAuthor());
-    row.put(ColdpTerm.editor, r.getEditor());
+    // author/editor are now structured CslName lists (V24__reference_csl.sql) -- ColDP's own
+    // Reference.tsv still wants the "; "-joined free-text form, exactly CLB's own
+    // CslName.toColdpString(CslName[]) produces (and ImportRunService.loadReferences' RefMapping.
+    // parseNames reads back on reimport). Task 4 (reference-model-overhaul plan) may revisit this
+    // to carry the structured form losslessly instead.
+    row.put(ColdpTerm.author, toColdpNameString(r.getAuthor()));
+    row.put(ColdpTerm.editor, toColdpNameString(r.getEditor()));
     row.put(ColdpTerm.title, r.getTitle());
     row.put(ColdpTerm.containerTitle, r.getContainerTitle());
     row.put(ColdpTerm.issued, r.getIssued());
@@ -75,5 +81,9 @@ public class ReferenceColdpWriter {
 
   private static String join(List<String> values) {
     return (values == null || values.isEmpty()) ? null : String.join(",", values);
+  }
+
+  private static String toColdpNameString(List<CslName> names) {
+    return (names == null || names.isEmpty()) ? null : CslName.toColdpString(names.toArray(new CslName[0]));
   }
 }

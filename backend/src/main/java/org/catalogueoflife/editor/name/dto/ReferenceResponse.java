@@ -1,15 +1,19 @@
 package org.catalogueoflife.editor.name.dto;
 
+import java.util.List;
+import life.catalogue.api.model.CslName;
 import org.catalogueoflife.editor.name.Reference;
 
 public record ReferenceResponse(
     Integer id,
     String citation,
+    boolean citationManual,
     String type,
-    String author,
-    String editor,
+    List<CslName> author,
+    List<CslName> editor,
     String title,
     String containerTitle,
+    String containerTitleShort,
     String issued,
     String volume,
     String issue,
@@ -29,9 +33,9 @@ public record ReferenceResponse(
   // since Reference.pdf is only ever a bare filename, never a URL.
   public static ReferenceResponse of(Reference r, String pdfBaseUrl) {
     String pdfUrl = r.getPdf() == null ? null : pdfBaseUrl + "/" + r.getPdf();
-    return new ReferenceResponse(r.getId(), r.getCitation(), r.getType(), r.getAuthor(),
-        r.getEditor(), r.getTitle(), r.getContainerTitle(), r.getIssued(), r.getVolume(),
-        r.getIssue(), r.getPage(), r.getPublisher(), r.getDoi(), r.getIsbn(), r.getIssn(),
-        r.getLink(), r.getAccessed(), r.getRemarks(), r.getVersion(), pdfUrl);
+    return new ReferenceResponse(r.getId(), r.getCitation(), r.isCitationManual(), r.getType(),
+        r.getAuthor(), r.getEditor(), r.getTitle(), r.getContainerTitle(), r.getContainerTitleShort(),
+        r.getIssued(), r.getVolume(), r.getIssue(), r.getPage(), r.getPublisher(), r.getDoi(),
+        r.getIsbn(), r.getIssn(), r.getLink(), r.getAccessed(), r.getRemarks(), r.getVersion(), pdfUrl);
   }
 }

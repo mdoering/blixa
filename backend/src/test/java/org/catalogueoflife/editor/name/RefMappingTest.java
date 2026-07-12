@@ -32,7 +32,11 @@ class RefMappingTest {
     List<CreateReferenceRequest> refs = RefMapping.fromBibtex(bibtex);
     assertThat(refs).hasSize(1);
     CreateReferenceRequest r = refs.get(0);
-    assertThat(r.author()).isEqualTo("Doe, Jane; Smith, John");
+    assertThat(r.author()).hasSize(2);
+    assertThat(r.author().get(0).getFamily()).isEqualTo("Doe");
+    assertThat(r.author().get(0).getGiven()).isEqualTo("Jane");
+    assertThat(r.author().get(1).getFamily()).isEqualTo("Smith");
+    assertThat(r.author().get(1).getGiven()).isEqualTo("John");
     assertThat(r.title()).isEqualTo("A great paper");
     assertThat(r.containerTitle()).isEqualTo("Journal of Things");
     assertThat(r.issued()).isEqualTo("2020");
@@ -80,7 +84,9 @@ class RefMappingTest {
     JsonNode message = JSON.readTree(json);
     CreateReferenceRequest r = RefMapping.fromCrossref(message);
     assertThat(r.title()).isEqualTo("Systema Naturae");
-    assertThat(r.author()).isEqualTo("Linnaeus, Carl");
+    assertThat(r.author()).hasSize(1);
+    assertThat(r.author().get(0).getFamily()).isEqualTo("Linnaeus");
+    assertThat(r.author().get(0).getGiven()).isEqualTo("Carl");
     assertThat(r.containerTitle()).isEqualTo("Nature");
     assertThat(r.issued()).isEqualTo("1758");
     assertThat(r.doi()).isEqualTo("10.5/abc");

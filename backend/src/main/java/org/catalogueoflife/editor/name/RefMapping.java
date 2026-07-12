@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import life.catalogue.api.model.CslName;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.jbibtex.BibTeXDatabase;
 import org.jbibtex.BibTeXEntry;
@@ -57,8 +58,9 @@ public final class RefMapping {
     String type = text(message.path("type"));
     String accessed = crossrefDate(message.path("accessed"));
     String citation = citation(author, year, title, container, volume, issue, page);
-    return new CreateReferenceRequest(citation, type, author, editor, title, container, year, volume,
-        issue, page, publisher, doi, isbn, issn, link, accessed, null);
+    return new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
+        title, container, null, year, volume, issue, page, publisher, doi, isbn, issn, link, accessed,
+        null);
   }
 
   private static String crossrefNames(JsonNode arr) {
@@ -138,8 +140,9 @@ public final class RefMapping {
       type = type.toLowerCase();
     }
     String citation = citation(author, year, title, containerTitle, volume, issue, page);
-    return new CreateReferenceRequest(citation, type, author, editor, title, containerTitle, year,
-        volume, issue, page, publisher, doi, null, null, link, null, null);
+    return new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
+        title, containerTitle, null, year, volume, issue, page, publisher, doi, null, null, link, null,
+        null);
   }
 
   // DataCite creators/contributors: each entry prefers the already-formatted "name" (typically
@@ -210,9 +213,9 @@ public final class RefMapping {
       String page = field(e, "pages");
       String type = e.getType() == null ? null : e.getType().getValue();
       String citation = citation(author, year, title, container, volume, issue, page);
-      out.add(new CreateReferenceRequest(citation, type, author, editor, title, container, year,
-          volume, issue, page, field(e, "publisher"), field(e, "doi"), field(e, "isbn"),
-          field(e, "issn"), field(e, "url"), field(e, "urldate"), null));
+      out.add(new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
+          title, container, null, year, volume, issue, page, field(e, "publisher"), field(e, "doi"),
+          field(e, "isbn"), field(e, "issn"), field(e, "url"), field(e, "urldate"), null));
     }
     if (out.isEmpty()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "no BibTeX entries found");
@@ -310,8 +313,9 @@ public final class RefMapping {
     String id = risFirst(tags, "ID");
     String remarks = id == null ? null : "ris:" + id;
     String citation = citation(author, year, title, container, volume, issue, page);
-    return new CreateReferenceRequest(citation, type, author, editor, title, container, year,
-        volume, issue, page, publisher, doi, isbn, issn, link, null, remarks);
+    return new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
+        title, container, null, year, volume, issue, page, publisher, doi, isbn, issn, link, null,
+        remarks);
   }
 
   private static String risType(String risCode) {
@@ -395,6 +399,40 @@ public final class RefMapping {
   }
 
   // --- shared ---
+
+  // Splits a "; "-joined name string -- the shape crossrefNames/dataciteNames/names/risJoin above
+  // all build, and also the shape CLB's CslName.toColdpString(CslName[]) emits for ColDP's own
+  // author/editor columns (see ImportRunService.loadReferences, which reuses this same helper) --
+  // into structured CslName entries. An entry containing a comma splits into family (before the
+  // first comma) / given (after, trimmed) -- CSL's own "family, given" convention, the inverse of
+  // toColdpString. A comma-free entry -- typically an institution ("World Flora Online") or an
+  // already-terse single name that never had one -- is stored in CslName.literal rather than
+  // guessed at as a bare family name, matching CSL's own literal/institutional-name convention.
+  // Returns null (not an empty list) for a null/blank input, so callers that previously passed a
+  // null joined string straight into CreateReferenceRequest keep getting a null author/editor.
+  public static List<CslName> parseNames(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return null;
+    }
+    List<CslName> names = new ArrayList<>();
+    for (String entry : raw.split("; ")) {
+      entry = entry.trim();
+      if (entry.isEmpty()) {
+        continue;
+      }
+      int comma = entry.indexOf(',');
+      if (comma >= 0) {
+        String family = entry.substring(0, comma).trim();
+        String given = entry.substring(comma + 1).trim();
+        names.add(new CslName(given.isEmpty() ? null : given, family));
+      } else {
+        CslName n = new CslName();
+        n.setLiteral(entry);
+        names.add(n);
+      }
+    }
+    return names.isEmpty() ? null : names;
+  }
 
   private static String citation(String author, String year, String title, String container,
       String volume, String issue, String page) {
