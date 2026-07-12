@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import org.catalogueoflife.editor.audit.AuditService;
 import org.catalogueoflife.editor.audit.Operation;
+import org.catalogueoflife.editor.name.dto.ContainerTitleFacet;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.catalogueoflife.editor.name.dto.UpdateReferenceRequest;
 import org.catalogueoflife.editor.project.ProjectService;
@@ -263,6 +264,29 @@ public class ReferenceService {
         pdfService.delete(filename);
       }
     });
+  }
+
+  // Facet of distinct container_title (journal name) values for the reconcile UI -- any project
+  // member may read it, same gating as list/search/get.
+  public List<ContainerTitleFacet> containerTitleFacet(int userId, int projectId) {
+    projects.requireRole(userId, projectId);
+    return references.containerTitleFacet(projectId);
+  }
+
+  // Normalizes every reference whose container_title is one of `variants` to `canonical` -- a bulk
+  // field reconciliation (OpenRefine-style), not a record merge, so this deliberately does NOT go
+  // through update()'s per-row CAS/audit/ValidationEvent machinery (see ReferenceMapper.
+  // mergeContainerTitle's javadoc). Owner/editor gated, same as create/update/delete.
+  @Transactional
+  public int mergeContainerTitle(int userId, int projectId, String canonical, List<String> variants) {
+    requireEditor(userId, projectId);
+    if (canonical == null || canonical.isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "canonical must not be blank");
+    }
+    if (variants == null || variants.isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "variants must not be empty");
+    }
+    return references.mergeContainerTitle(projectId, canonical, variants);
   }
 
   private Reference requireInProject(int projectId, int id) {

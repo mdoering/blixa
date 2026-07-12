@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import org.catalogueoflife.editor.name.dto.ContainerTitleFacet;
 import org.catalogueoflife.editor.name.dto.ScoredId;
 
 @Mapper
@@ -121,4 +122,29 @@ public interface ReferenceMapper {
       """)
   int updatePdf(@Param("projectId") int projectId, @Param("id") int id, @Param("pdf") String pdf,
       @Param("modifiedBy") int modifiedBy, @Param("version") Integer version);
+
+  // Distinct container_title values (journal names) with their reference counts, most-cited first --
+  // ReconcileJournalsModal's facet, letting an editor spot variant spellings (e.g. "J. Bot." vs
+  // "Journal of Botany") worth normalizing via mergeContainerTitle below. Blank/null titles are
+  // excluded: they aren't a journal-name variant to reconcile, just an unset field.
+  @Select("""
+      SELECT container_title AS "value", count(*) AS "count" FROM reference
+      WHERE project_id = #{projectId} AND container_title IS NOT NULL AND container_title <> ''
+      GROUP BY container_title ORDER BY count(*) DESC, container_title
+      """)
+  List<ContainerTitleFacet> containerTitleFacet(@Param("projectId") int projectId);
+
+  // Bulk field normalization: rewrites every reference in the project whose container_title is one
+  // of `variants` (typically including `canonical` itself, which is a harmless no-op match) to
+  // `canonical`. This is maintenance cleanup of a single field across many rows, not a per-row edit
+  // -- deliberately no version bump / audit row, same convention as removeReferenceIdFromAll
+  // (NameUsageMapper) for the same reason: a concurrent, unrelated edit of one of these references
+  // shouldn't see a spurious CAS conflict just because its journal name got normalized underneath it.
+  @Update({"<script>",
+      "UPDATE reference SET container_title = #{canonical}",
+      "WHERE project_id = #{projectId} AND container_title IN",
+      "<foreach item='v' collection='variants' open='(' separator=',' close=')'>#{v}</foreach>",
+      "</script>"})
+  int mergeContainerTitle(@Param("projectId") int projectId, @Param("canonical") String canonical,
+      @Param("variants") List<String> variants);
 }

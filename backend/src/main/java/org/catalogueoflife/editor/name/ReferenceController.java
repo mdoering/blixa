@@ -2,8 +2,11 @@ package org.catalogueoflife.editor.name;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import org.catalogueoflife.editor.auth.CurrentUser;
 import org.catalogueoflife.editor.name.dto.BibtexRequest;
+import org.catalogueoflife.editor.name.dto.ContainerTitleFacet;
+import org.catalogueoflife.editor.name.dto.ContainerTitleMergeRequest;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.catalogueoflife.editor.name.dto.DoiRequest;
 import org.catalogueoflife.editor.name.dto.ReferenceResponse;
@@ -87,6 +90,22 @@ public class ReferenceController {
     int uid = currentUser.require().getId();
     Reference r = service.create(uid, pid, req);
     return ReferenceResponse.of(r, pdfBaseUrl);
+  }
+
+  // Distinct container_title (journal name) values + counts, for ReconcileJournalsModal's facet.
+  @GetMapping("/facets/container-title")
+  public List<ContainerTitleFacet> containerTitleFacet(@PathVariable int pid) {
+    int uid = currentUser.require().getId();
+    return service.containerTitleFacet(uid, pid);
+  }
+
+  // Normalizes every reference whose container_title is one of req.variants() to req.canonical().
+  @PostMapping("/facets/container-title/merge")
+  public Map<String, Integer> mergeContainerTitle(@PathVariable int pid,
+      @RequestBody ContainerTitleMergeRequest req) {
+    int uid = currentUser.require().getId();
+    int updated = service.mergeContainerTitle(uid, pid, req.canonical(), req.variants());
+    return Map.of("updated", updated);
   }
 
   @GetMapping("/{id}")
