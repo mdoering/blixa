@@ -66,11 +66,22 @@ class PublicProjectApiIT extends AbstractPostgresIT {
     AppUser v = users.requireByUsernameOrNull("viewer1");
     members.upsert(new ProjectMember(pid, v.getId(), Role.VIEWER.dbValue()));
 
+    // Task 10 fix: license must be emitted as the canonical SPDX wire form (e.g. "CC0-1.0"), not the
+    // raw internal enum name (e.g. "CC0") -- see Licenses.toWire, mirrored by ProjectResponse.of.
+    // The metadata endpoint full-replaces most fields, so title (required) and alias (needed below
+    // for the alias-resolution assertion) must be resent alongside license.
+    mvc.perform(put("/api/projects/" + pid + "/metadata").with(csrf()).with(user("owner1"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Public One\",\"alias\":\"pub1\",\"license\":\"CC0-1.0\"}"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.license").value("CC0-1.0"));
+
     // anonymous read
     mvc.perform(get("/api/public/projects/" + pid))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.id").value(pid))
        .andExpect(jsonPath("$.title").value("Public One"))
+       .andExpect(jsonPath("$.license").value("CC0-1.0"))
        .andExpect(jsonPath("$.contributors[?(@.role == 'viewer')]").isEmpty())
        .andExpect(jsonPath("$.contributors[?(@.role == 'owner')]").exists())
        .andExpect(jsonPath("$.contributors[0].email").doesNotExist());

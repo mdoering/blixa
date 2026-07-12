@@ -9,8 +9,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import org.catalogueoflife.editor.release.Release;
+import org.catalogueoflife.editor.release.ReleaseMapper;
 import org.catalogueoflife.editor.support.AbstractPostgresIT;
 import org.catalogueoflife.editor.user.AppUserService;
 import org.junit.jupiter.api.Test;
@@ -34,6 +38,7 @@ class PublicReleaseDownloadIT extends AbstractPostgresIT {
   @Autowired MockMvc mvc;
   @Autowired AppUserService users;
   @Autowired ObjectMapper json;
+  @Autowired ReleaseMapper releases;
 
   private void ensureUser(String u) {
     if (users.requireByUsernameOrNull(u) == null) users.createLocal(u, "pw", u);
@@ -100,6 +105,28 @@ class PublicReleaseDownloadIT extends AbstractPostgresIT {
     mvc.perform(get("/api/public/projects/" + pid + "/releases/" + rid + "/download"))
        .andExpect(status().isOk())
        .andExpect(header().string("Content-Disposition", containsString("attachment")));
+  }
+
+  // Task 10 fix: a READY release row can point at a zip that's gone missing on disk (ops/disk
+  // drift). Before the fix, PublicController#download built a FileSystemResource without checking
+  // existence, producing a broken 200 (zero-length body); it must now 404, mirroring
+  // ExportRunService.fileFor's Files.isRegularFile guard.
+  @Test
+  void readyReleaseWithMissingFileOnDiskIsNotFound() throws Exception {
+    String owner = "dlOwner3";
+    int pid = createProject(owner, "Missing File");
+    setPublic(owner, pid, true);
+    int rid = publishRelease(owner, pid);
+    String finalStatus = pollUntilTerminal(owner, pid, rid);
+    org.assertj.core.api.Assertions.assertThat(finalStatus).isEqualTo("READY");
+
+    Release r = releases.findById(rid);
+    org.assertj.core.api.Assertions.assertThat(r.getFilePath()).isNotNull();
+    Path path = Path.of(r.getFilePath());
+    org.assertj.core.api.Assertions.assertThat(Files.deleteIfExists(path)).isTrue();
+
+    mvc.perform(get("/api/public/projects/" + pid + "/releases/" + rid + "/download"))
+       .andExpect(status().isNotFound());
   }
 
   @Test

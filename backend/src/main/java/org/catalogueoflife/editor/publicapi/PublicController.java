@@ -3,6 +3,7 @@ package org.catalogueoflife.editor.publicapi;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.catalogueoflife.editor.project.Licenses;
 import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectMemberMapper;
 import org.catalogueoflife.editor.project.Role;
@@ -97,7 +98,7 @@ public class PublicController {
     metrics = sanitizeMetrics(metrics, publicContributorIds);
 
     return new PublicProjectInfo(p.getId(), p.getTitle(), p.getAlias(), p.getDescription(),
-        p.getLicense() == null ? null : p.getLicense().name(),
+        Licenses.toWire(p.getLicense()),
         p.getNomCode() == null ? null : p.getNomCode().name().toLowerCase(java.util.Locale.ROOT),
         p.getGeographicScope(), p.getTaxonomicScope(), contributors, metrics, rels);
   }
@@ -115,6 +116,9 @@ public class PublicController {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "not found");
     }
     java.nio.file.Path path = java.nio.file.Path.of(r.getFilePath());
+    if (!java.nio.file.Files.isRegularFile(path)) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "not found");
+    }
     Resource res = new FileSystemResource(path);
     ContentDisposition cd = ContentDisposition.attachment().filename(r.getFileName()).build();
     return ResponseEntity.ok()
