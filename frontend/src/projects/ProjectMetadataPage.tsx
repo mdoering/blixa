@@ -280,7 +280,7 @@ export default function ProjectMetadataPage() {
       // project layout for the project list.
       await queryClient.invalidateQueries({ queryKey: ['projects'] });
       notifications.show({ message: 'Project deleted' });
-      navigate('/');
+      navigate('/projects');
     },
     onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Delete failed') }),
   });

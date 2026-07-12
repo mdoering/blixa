@@ -7,7 +7,10 @@ import App from './App';
 test('anonymous visitor sees the public landing page', async () => {
   // default /api/me handler returns 401
   renderWithProviders(<App />, { route: '/' });
-  expect(await screen.findByRole('link', { name: /sign in/i })).toBeInTheDocument();
+  // Exact-name match: PublicLayout renders a plain "Sign in" link for anonymous visitors, which
+  // LoginPage's "Sign in with ORCID" anchor does not match exactly. This discriminates the public
+  // landing page from a login-redirect (both of which would satisfy a looser /sign in/i regex).
+  expect(await screen.findByRole('link', { name: 'Sign in' })).toBeInTheDocument();
 });
 
 test('authenticated user sees the project list inside the app layout', async () => {

@@ -59,7 +59,7 @@ export default function AppLayout() {
             aria-label="Collapse navigation"
           />
           {/* Brand slot (upper-left) — the full Blixa lockup, masked to inherit the header colour. */}
-          <Anchor component={Link} to="/" underline="never" c="inherit">
+          <Anchor component={Link} to="/projects" underline="never" c="inherit">
             <BlixaLogo variant="header" height={28} />
           </Anchor>
           {/* Read-only current-project context; picking a project happens on the Projects list. */}
