@@ -29,6 +29,7 @@ public class ProjectService {
   public Project create(int userId, CreateProjectRequest req) {
     Project p = new Project();
     p.setTitle(req.title());
+    p.setAlias(req.alias());
     p.setNomCode(parseNomCode(req.nomCode()));
     projects.insert(p);
     members.upsert(new ProjectMember(p.getId(), userId, Role.OWNER.dbValue()));

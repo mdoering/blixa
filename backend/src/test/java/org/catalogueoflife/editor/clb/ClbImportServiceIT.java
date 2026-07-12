@@ -83,7 +83,7 @@ class ClbImportServiceIT extends AbstractPostgresIT {
   }
 
   private int createProject(int userId, String title) {
-    Project p = projectService.create(userId, new CreateProjectRequest(title, "zoological"));
+    Project p = projectService.create(userId, new CreateProjectRequest(title, null, "zoological"));
     return p.getId();
   }
 

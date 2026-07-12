@@ -85,7 +85,7 @@ public class DevSampleData implements ApplicationRunner {
   }
 
   private void seed(int userId) {
-    Project project = projects.create(userId, new CreateProjectRequest(SAMPLE_TITLE, "zoological"));
+    Project project = projects.create(userId, new CreateProjectRequest(SAMPLE_TITLE, null, "zoological"));
     int pid = project.getId();
 
     Reference linnaeus = references.create(userId, pid, new CreateReferenceRequest(

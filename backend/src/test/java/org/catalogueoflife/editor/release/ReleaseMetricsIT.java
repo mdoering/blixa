@@ -26,7 +26,7 @@ class ReleaseMetricsIT extends AbstractPostgresIT {
   @Test
   void computesRankBreakdownAndChangeCounts() throws Exception {
     AppUser u = users.createLocal("mUser", "pw", "M User");
-    var p = projects.create(u.getId(), new CreateProjectRequest("Metrics", "zoological"));
+    var p = projects.create(u.getId(), new CreateProjectRequest("Metrics", null, "zoological"));
     int pid = p.getId();
     // 1 accepted genus + 1 accepted species + 1 synonym species
     usages.create(u.getId(), pid, new CreateNameUsageRequest("Aus", null, "genus", "ACCEPTED",

@@ -348,7 +348,7 @@ public class ImportRunService {
     NomCode nomCode = peekNomCode(reader);
     String nomCodeName = nomCode == null ? null : nomCode.name();
 
-    Project p = projectService.create(userId, new CreateProjectRequest(title, nomCodeName));
+    Project p = projectService.create(userId, new CreateProjectRequest(title, null, nomCodeName));
     projectService.updateMetadata(userId, p.getId(), new UpdateProjectMetadataRequest(
         title, md.alias(), md.description(), nomCodeName, md.license(),
         md.geographicScope(), md.taxonomicScope(), null, null));
