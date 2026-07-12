@@ -3,8 +3,9 @@ package org.catalogueoflife.editor.coldp;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.TreeMap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,7 @@ public class IdScopeService {
 
   private final RestClient http;
   private final ObjectMapper objectMapper;
-  private volatile List<String> cached;
+  private volatile List<IdScope> cached;
 
   public IdScopeService(@Value("${coldp.clb.base-url:https://api.checklistbank.org}") String baseUrl,
       ObjectMapper objectMapper) {
@@ -38,14 +39,14 @@ public class IdScopeService {
     this.objectMapper = objectMapper;
   }
 
-  public List<String> scopes() {
-    List<String> c = cached;
+  public List<IdScope> scopes() {
+    List<IdScope> c = cached;
     if (c != null) {
       return c;
     }
     try {
       String body = http.get().uri("/vocab/identifier-scope").retrieve().body(String.class);
-      List<String> scopes = filter(objectMapper.readTree(body));
+      List<IdScope> scopes = filter(objectMapper.readTree(body));
       cached = scopes;
       return scopes;
     } catch (Exception e) {
@@ -53,12 +54,13 @@ public class IdScopeService {
     }
   }
 
-  // Extract each vocab entry's `scope`, drop the excluded generic scopes, de-duplicate and sort.
-  static List<String> filter(JsonNode arr) {
+  // Extract each vocab entry's scope/title/link, drop the excluded generic scopes, de-duplicate by
+  // scope (first occurrence wins) and sort by scope.
+  static List<IdScope> filter(JsonNode arr) {
     if (arr == null || !arr.isArray()) {
       return List.of();
     }
-    Set<String> out = new TreeSet<>();
+    Map<String, IdScope> out = new TreeMap<>();
     for (JsonNode n : arr) {
       JsonNode s = n.path("scope");
       if (s.isMissingNode() || s.isNull()) {
@@ -66,9 +68,14 @@ public class IdScopeService {
       }
       String scope = s.asString();
       if (scope != null && !scope.isBlank() && !EXCLUDED.contains(scope.toLowerCase())) {
-        out.add(scope.trim());
+        scope = scope.trim();
+        out.putIfAbsent(scope, new IdScope(scope, text(n.path("title")), text(n.path("link"))));
       }
     }
-    return new ArrayList<>(out);
+    return new ArrayList<>(out.values());
+  }
+
+  private static String text(JsonNode n) {
+    return n == null || n.isMissingNode() || n.isNull() ? null : n.asString();
   }
 }

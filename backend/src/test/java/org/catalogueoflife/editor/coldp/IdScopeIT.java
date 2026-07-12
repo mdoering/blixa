@@ -27,16 +27,24 @@ class IdScopeIT extends AbstractPostgresIT {
   @Test
   @WithMockUser(username = "idScopeUser")
   void listsScopesFromService() throws Exception {
-    when(idScopeService.scopes()).thenReturn(List.of("col", "ipni", "inat"));
+    when(idScopeService.scopes()).thenReturn(List.of(
+        new IdScope("col", "Catalogue of Life", "https://www.catalogueoflife.org/building/identifier"),
+        new IdScope("ipni", "IPNI", "https://www.ipni.org"),
+        new IdScope("inat", "iNaturalist", null)));
 
     mvc.perform(get("/api/coldp/id-scopes"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$").isArray())
         .andExpect(jsonPath("$.length()").value(3))
-        .andExpect(jsonPath("$", org.hamcrest.Matchers.hasItem("col")))
-        .andExpect(jsonPath("$", org.hamcrest.Matchers.hasItem("ipni")))
+        .andExpect(jsonPath("$[0].scope").value("col"))
+        // filter-expression jsonpaths always resolve to a list, even for a single match
+        .andExpect(jsonPath("$[?(@.scope=='col')].link")
+            .value(org.hamcrest.Matchers.contains("https://www.catalogueoflife.org/building/identifier")))
+        .andExpect(jsonPath("$[?(@.scope=='ipni')].title")
+            .value(org.hamcrest.Matchers.contains("IPNI")))
         // the generic scopes are excluded by IdScopeService (unit-tested in IdScopeFilterTest)
-        .andExpect(jsonPath("$", org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("local"))));
+        .andExpect(jsonPath("$", org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(
+            org.hamcrest.Matchers.hasEntry("scope", "local")))));
   }
 
   @Test
