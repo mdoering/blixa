@@ -157,6 +157,27 @@ class MemberApiIT extends AbstractPostgresIT {
   }
 
   @Test
+  @WithMockUser(username = "bossSeven")
+  void settingUnknownUserFailsWhenOrcidConfigured() throws Exception {
+    // application-test.yml registers a real ORCID client-id, so ProjectService must treat this
+    // as production/ORCID mode: there's no self-registration for a made-up username, so an
+    // owner can't invent an account for someone who has never logged in.
+    ensureUser("bossSeven");
+
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Fungi\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    long pid = json.readTree(body).get("id").asLong();
+
+    mvc.perform(put("/api/projects/" + pid + "/members").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"username\":\"neverLoggedIn\",\"role\":\"editor\"}"))
+       .andExpect(status().isNotFound());
+  }
+
+  @Test
   @WithMockUser(username = "bossFive")
   void setMemberWithInvalidRoleReturnsBadRequest() throws Exception {
     ensureUser("bossFive");

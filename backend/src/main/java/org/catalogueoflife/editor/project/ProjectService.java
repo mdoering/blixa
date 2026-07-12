@@ -5,8 +5,11 @@ import java.util.Locale;
 import life.catalogue.api.vocab.License;
 import org.catalogueoflife.editor.project.dto.CreateProjectRequest;
 import org.catalogueoflife.editor.project.dto.UpdateProjectMetadataRequest;
+import org.catalogueoflife.editor.user.AppUser;
 import org.catalogueoflife.editor.user.AppUserMapper;
+import org.catalogueoflife.editor.user.AppUserService;
 import org.gbif.nameparser.api.NomCode;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,11 +21,18 @@ public class ProjectService {
   private final ProjectMapper projects;
   private final ProjectMemberMapper members;
   private final AppUserMapper users;
+  private final AppUserService userService;
+  // ORCID is "configured" iff the client-id is not the sentinel default (see ConfigController).
+  private final boolean orcidConfigured;
 
-  public ProjectService(ProjectMapper projects, ProjectMemberMapper members, AppUserMapper users) {
+  public ProjectService(ProjectMapper projects, ProjectMemberMapper members, AppUserMapper users,
+      AppUserService userService,
+      @Value("${spring.security.oauth2.client.registration.orcid.client-id:unconfigured}") String orcidClientId) {
     this.projects = projects;
     this.members = members;
     this.users = users;
+    this.userService = userService;
+    this.orcidConfigured = !"unconfigured".equals(orcidClientId);
   }
 
   @Transactional
@@ -119,9 +129,17 @@ public class ProjectService {
   public void setMember(int actorId, int projectId, String username, String roleValue) {
     requireOwner(actorId, projectId);
     Role role = Role.fromDb(roleValue); // throws IllegalArgumentException -> 400 via handler below
-    var target = users.findByUsername(username);
+    AppUser target = users.findByUsername(username);
     if (target == null) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "unknown user: " + username);
+      if (orcidConfigured) {
+        // ORCID/production mode: there's no self-registration for a made-up username, so we
+        // can't invent an ORCID account on the owner's behalf.
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "unknown user: " + username);
+      }
+      // Local-auth mode (no ORCID configured): there's no self-registration at all, so an owner
+      // could never add a member who hasn't logged in yet. Auto-provision a local account instead
+      // -- password = username, which is fine for local/dev use.
+      target = userService.createLocal(username, username, username);
     }
     String currentRole = members.findRole(projectId, target.getId());
     if (Role.OWNER.dbValue().equals(currentRole) && !Role.OWNER.dbValue().equals(role.dbValue())
