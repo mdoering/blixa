@@ -40,6 +40,19 @@ import { NOM_CODES } from './CreateProjectModal';
 const COL_DATASET_KEY = '3LXR';
 
 const LICENSES = ['CC0-1.0', 'CC-BY-4.0'];
+
+// The bundled CLB CSL styles (see backend CslFormatter.STYLE) -- project-level, applied when
+// rendering every generated (non-citationManual) reference's citation.
+const CSL_STYLES = [
+  { value: 'apa', label: 'APA' },
+  { value: 'chicago', label: 'Chicago' },
+  { value: 'harvard', label: 'Harvard' },
+  { value: 'ieee', label: 'IEEE' },
+  { value: 'mla', label: 'MLA' },
+  { value: 'cse', label: 'CSE' },
+  { value: 'ejt', label: 'EJT' },
+  { value: 'taxon', label: 'Taxon' },
+];
 // Poll interval for the bulk "Match all identifiers" run while it's RUNNING -- a live but not
 // chatty progress indicator over what is, per usage, a sequential CLB round-trip (see
 // ColMatchAsyncConfig's single-thread pool on the backend).
@@ -77,6 +90,7 @@ export default function ProjectMetadataPage() {
       taxonomicScope: undefined,
       gbifOccurrenceLayer: true,
       identifierScopes: [],
+      cslStyle: 'apa',
     },
     validate: {
       title: (v) => (v ? null : 'Required'),
@@ -106,6 +120,9 @@ export default function ProjectMetadataPage() {
         scope: s.scope,
         datasetKey: s.datasetKey ?? '',
       }));
+      // cslStyle defaults to 'apa' (mirrors the backend's default) rather than falling through to
+      // the `?? undefined` mapping above, which would leave the Select blank on legacy projects.
+      values.cslStyle = data.cslStyle ?? 'apa';
       form.setValues(values);
       form.resetDirty(values);
     }
@@ -457,6 +474,16 @@ export default function ProjectMetadataPage() {
               label="Show GBIF occurrence layer on maps"
               {...form.getInputProps('gbifOccurrenceLayer', { type: 'checkbox' })}
             />
+            <Stack gap={2}>
+              <Select
+                label="Citation style"
+                data={CSL_STYLES}
+                {...form.getInputProps('cslStyle')}
+              />
+              <Text size="xs" c="dimmed">
+                Changing this regenerates every generated citation in this project.
+              </Text>
+            </Stack>
             <Stack gap="xs">
               <Stack gap={2}>
                 <Text size="sm" fw={500}>

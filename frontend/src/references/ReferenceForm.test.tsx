@@ -163,6 +163,55 @@ test('editing an existing reference prefills the CslName rows', async () => {
   expect(screen.getByRole('textbox', { name: 'Author name 2' })).toHaveValue('Bishop Museum');
 });
 
+test('a generated (citationManual:false) reference shows the Citation field as read-only with a note', async () => {
+  renderWithProviders(
+    <ReferenceForm pid={3} reference={makeReference({ citationManual: false })} opened onClose={() => {}} />,
+  );
+
+  const citation = await screen.findByRole('textbox', { name: 'Citation' });
+  expect(citation).toHaveValue('Linnaeus 1758');
+  expect(citation).toHaveAttribute('readonly');
+  expect(
+    screen.getByText("Generated from the fields above in the project's citation style."),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('checkbox', { name: 'Enter citation manually' })).not.toBeChecked();
+});
+
+test('checking "Enter citation manually" makes the Citation field editable', async () => {
+  renderWithProviders(
+    <ReferenceForm pid={3} reference={makeReference({ citationManual: false })} opened onClose={() => {}} />,
+  );
+
+  const citation = await screen.findByRole('textbox', { name: 'Citation' });
+  expect(citation).toHaveAttribute('readonly');
+
+  await userEvent.click(screen.getByRole('checkbox', { name: 'Enter citation manually' }));
+
+  expect(citation).not.toHaveAttribute('readonly');
+  expect(
+    screen.queryByText("Generated from the fields above in the project's citation style."),
+  ).not.toBeInTheDocument();
+  await userEvent.clear(citation);
+  await userEvent.type(citation, 'My own citation');
+  expect(citation).toHaveValue('My own citation');
+});
+
+test('a citationManual:true reference loads with the Citation field already editable', async () => {
+  renderWithProviders(
+    <ReferenceForm
+      pid={3}
+      reference={makeReference({ citationManual: true, citation: 'Hand-typed citation' })}
+      opened
+      onClose={() => {}}
+    />,
+  );
+
+  const citation = await screen.findByRole('textbox', { name: 'Citation' });
+  expect(citation).toHaveValue('Hand-typed citation');
+  expect(citation).not.toHaveAttribute('readonly');
+  expect(screen.getByRole('checkbox', { name: 'Enter citation manually' })).toBeChecked();
+});
+
 test('Type is a searchable Select fed by the CSL-type vocab', async () => {
   server.use(
     http.get('/api/coldp/vocab', () =>

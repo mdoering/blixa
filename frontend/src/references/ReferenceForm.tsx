@@ -1,4 +1,4 @@
-import { Anchor, Button, FileInput, Group, Modal, Select, SimpleGrid, Stack, Text, Textarea, TextInput } from '@mantine/core';
+import { Anchor, Button, Checkbox, FileInput, Group, Modal, Select, SimpleGrid, Stack, Text, Textarea, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useEffect, useMemo, useState } from 'react';
@@ -176,7 +176,20 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
     >
       <form onSubmit={form.onSubmit((v) => mutation.mutate(v))}>
         <Stack gap="sm">
-          <TextInput label="Citation" {...form.getInputProps('citation')} />
+          <TextInput
+            label="Citation"
+            readOnly={!form.values.citationManual}
+            description={
+              !form.values.citationManual
+                ? "Generated from the fields above in the project's citation style."
+                : undefined
+            }
+            {...form.getInputProps('citation')}
+          />
+          <Checkbox
+            label="Enter citation manually"
+            {...form.getInputProps('citationManual', { type: 'checkbox' })}
+          />
           <CslNameEditor
             label="Author"
             value={form.values.author}

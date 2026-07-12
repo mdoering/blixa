@@ -26,6 +26,10 @@ export interface Project {
   // scope carries an optional CLB dataset key -- a scope is matchable (eligible for "match all
   // identifiers") iff datasetKey is set.
   identifierScopes: IdentifierScope[] | null;
+  // Lower-case CSL style id (e.g. "apa", "chicago") used to render generated citations for this
+  // project's references -- see CslFormatter.STYLE on the backend. Null on legacy/uninitialized
+  // projects; the UI defaults to 'apa' when seeding the metadata form.
+  cslStyle: string | null;
 }
 
 export interface IdentifierScope {
@@ -70,6 +74,7 @@ export interface UpdateMetadataPayload {
   taxonomicScope?: string;
   gbifOccurrenceLayer?: boolean;
   identifierScopes?: IdentifierScope[];
+  cslStyle?: string;
 }
 
 // Mirrors backend NameUsageResponse (see backend/.../name/dto/NameUsageResponse.java): the

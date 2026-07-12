@@ -59,6 +59,31 @@ test('prefills the form and saves updated metadata', async () => {
   await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument());
 });
 
+test('citation style: seeds the Select from the project and saves a changed value', async () => {
+  let savedBody: { cslStyle?: string } = {};
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json({ ...project, cslStyle: 'harvard' })),
+    http.put('/api/projects/3/metadata', async ({ request }) => {
+      savedBody = (await request.json()) as typeof savedBody;
+      return HttpResponse.json({ ...project, cslStyle: savedBody.cslStyle });
+    }),
+    noLatestMatchRun,
+    noLatestExportRun,
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  const styleSelect = screen.getByRole('textbox', { name: 'Citation style' });
+  await waitFor(() => expect(styleSelect).toHaveValue('Harvard'));
+
+  await userEvent.click(styleSelect);
+  await userEvent.click(await screen.findByRole('option', { name: 'IEEE' }));
+
+  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+  await waitFor(() => expect(savedBody.cslStyle).toBe('ieee'));
+});
+
 test('toggles the GBIF occurrence layer switch and saves it', async () => {
   let savedBody: { gbifOccurrenceLayer?: boolean } = {};
   server.use(
