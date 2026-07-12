@@ -296,6 +296,36 @@ test('?usage= deep-link preselects that usage in the detail pane (no click)', as
   expect(await screen.findByLabelText('Scientific name')).toHaveValue('Abies alba');
 });
 
+test('shows a lock indicator on a row with an active lock', async () => {
+  server.use(
+    http.get('/api/projects/9', () => HttpResponse.json(project)),
+    http.get('/api/projects/9/usages', () =>
+      HttpResponse.json({ items: [abiesAlba, abiesNigra], total: 2 }),
+    ),
+    http.get('/api/projects/9/locks', () =>
+      HttpResponse.json([
+        {
+          id: 1,
+          entityType: 'name_usage',
+          entityId: 1,
+          userId: 9,
+          username: 'alice',
+          acquiredAt: '2026-07-12T00:00:00Z',
+          expiresAt: '2026-07-12T00:05:00Z',
+          heldByMe: false,
+          taskId: null,
+          taskTitle: null,
+        },
+      ]),
+    ),
+  );
+  renderPage();
+
+  await screen.findByText('Abies alba');
+  expect(await screen.findByLabelText('alice is editing')).toBeInTheDocument();
+  expect(screen.getAllByLabelText(/is editing/)).toHaveLength(1);
+});
+
 test('the row action menu opens', async () => {
   server.use(
     http.get('/api/projects/9', () => HttpResponse.json(project)),

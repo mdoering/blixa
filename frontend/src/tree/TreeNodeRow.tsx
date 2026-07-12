@@ -1,8 +1,9 @@
-import { ActionIcon, Badge, Box, Group, Loader, Stack, Text } from '@mantine/core';
-import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
+import { ActionIcon, Badge, Box, Group, Loader, Stack, Text, ThemeIcon, Tooltip } from '@mantine/core';
+import { IconChevronDown, IconChevronRight, IconLock } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getChildren } from '../api/tree';
+import { listLocks } from '../api/locks';
 import type { TreeNode } from '../api/types';
 import NameActionMenu from '../names/NameActionMenu';
 
@@ -49,6 +50,17 @@ export default function TreeNodeRow({
     enabled: expanded && hasChildren,
   });
 
+  // Every row asks for the same project-wide lock list -- the tree is lazy-recursive (each row
+  // fetches its own children), so there's no single container to fetch this once and thread down
+  // through the recursion. TanStack Query dedupes same-key requests, so N rows sharing
+  // ['locks', pid] still cost a single network fetch (see TaxonDetail for the same pattern).
+  const { data: locks } = useQuery({
+    queryKey: ['locks', pid],
+    queryFn: () => listLocks(pid),
+    refetchInterval: 20_000,
+  });
+  const lock = locks?.find((l) => l.entityType === 'name_usage' && l.entityId === node.id);
+
   return (
     <Stack gap={0}>
       <Group
@@ -94,6 +106,19 @@ export default function TreeNodeRow({
             <Badge size="xs" variant="light" color="gray" style={{ flexShrink: 0 }}>
               {node.rank}
             </Badge>
+          )}
+          {lock && (
+            <Tooltip label={`${lock.username} is editing`} withArrow>
+              <ThemeIcon
+                size="xs"
+                variant="light"
+                color={lock.heldByMe ? 'gray' : 'orange'}
+                aria-label={`${lock.username} is editing`}
+                style={{ flexShrink: 0 }}
+              >
+                <IconLock size={12} />
+              </ThemeIcon>
+            </Tooltip>
           )}
           <Text size="sm" fw={selected ? 700 : 400} truncate>
             {node.scientificName}

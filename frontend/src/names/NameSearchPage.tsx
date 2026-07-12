@@ -1,6 +1,6 @@
-import { Badge, Box, Button, Grid, Group, Select, Text, TextInput, Tooltip } from '@mantine/core';
+import { Badge, Box, Button, Grid, Group, Select, Text, TextInput, ThemeIcon, Tooltip } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
-import { IconPlus, IconSearch } from '@tabler/icons-react';
+import { IconLock, IconPlus, IconSearch } from '@tabler/icons-react';
 import {
   MantineReactTable,
   useMantineReactTable,
@@ -11,8 +11,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getProject } from '../api/projects';
+import { listLocks } from '../api/locks';
 import { searchUsages } from '../api/usages';
-import type { NameUsage } from '../api/types';
+import type { Lock, NameUsage } from '../api/types';
 import MergeRecordsModal from '../merge/MergeRecordsModal';
 import TaxonDetail from '../tree/TaxonDetail';
 import CreateNameModal from './CreateNameModal';
@@ -113,24 +114,55 @@ export default function NameSearchPage() {
     placeholderData: keepPreviousData,
   });
 
+  // Shared locks list for this project (same ['locks', pid] query as TaxonDetail/TreeNodeRow --
+  // TanStack Query dedupes it into a single fetch), used to flag rows someone else is editing.
+  const { data: locks } = useQuery({
+    queryKey: ['locks', pid],
+    queryFn: () => listLocks(pid),
+    refetchInterval: 20_000,
+  });
+  const locksByEntity = useMemo(() => {
+    const map = new Map<number, Lock>();
+    for (const l of locks ?? []) {
+      if (l.entityType === 'name_usage') map.set(l.entityId, l);
+    }
+    return map;
+  }, [locks]);
+
   const columns = useMemo<MRT_ColumnDef<NameUsage>[]>(
     () => [
       {
         accessorKey: 'scientificName',
         header: 'Scientific name',
         grow: true,
-        Cell: ({ row }) => (
-          <Group gap={6} wrap="nowrap">
-            <Text size="sm" fs="italic">
-              {row.original.scientificName}
-            </Text>
-            {row.original.authorship && (
-              <Text size="xs" c="dimmed" truncate>
-                {row.original.authorship}
+        Cell: ({ row }) => {
+          const lock = locksByEntity.get(row.original.id);
+          return (
+            <Group gap={6} wrap="nowrap">
+              <Text size="sm" fs="italic">
+                {row.original.scientificName}
               </Text>
-            )}
-          </Group>
-        ),
+              {row.original.authorship && (
+                <Text size="xs" c="dimmed" truncate>
+                  {row.original.authorship}
+                </Text>
+              )}
+              {lock && (
+                <Tooltip label={`${lock.username} is editing`} withArrow>
+                  <ThemeIcon
+                    size="xs"
+                    variant="light"
+                    color={lock.heldByMe ? 'gray' : 'orange'}
+                    aria-label={`${lock.username} is editing`}
+                    style={{ flexShrink: 0 }}
+                  >
+                    <IconLock size={12} />
+                  </ThemeIcon>
+                </Tooltip>
+              )}
+            </Group>
+          );
+        },
       },
       {
         accessorKey: 'rank',
@@ -158,7 +190,7 @@ export default function NameSearchPage() {
         },
       },
     ],
-    [],
+    [locksByEntity],
   );
 
   const table = useMantineReactTable({
