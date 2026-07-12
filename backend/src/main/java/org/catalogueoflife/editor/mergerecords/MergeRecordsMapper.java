@@ -75,4 +75,35 @@ public interface MergeRecordsMapper {
   @Update("UPDATE type_material SET usage_id = #{survivor} WHERE project_id = #{pid} AND usage_id = #{merged}") int repointTypeMaterial(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
   @Update("UPDATE property      SET usage_id = #{survivor} WHERE project_id = #{pid} AND usage_id = #{merged}") int repointProperty(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
   @Update("UPDATE estimate      SET usage_id = #{survivor} WHERE project_id = #{pid} AND usage_id = #{merged}") int repointEstimate(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
+
+  // --- reference merge: association counts + repoints (merged -> survivor), run all BEFORE deleteReference. ---
+  @Select("""
+      SELECT
+        (SELECT count(*) FROM name_usage    WHERE project_id = #{pid} AND published_in_reference_id = #{id}) AS "publishedIn",
+        (SELECT count(*) FROM name_usage    WHERE project_id = #{pid} AND #{id} = ANY(reference_id))          AS "citedBy",
+        (SELECT count(*) FROM name_relation WHERE project_id = #{pid} AND reference_id = #{id})               AS "nameRelations",
+        (SELECT count(*) FROM type_material WHERE project_id = #{pid} AND reference_id = #{id})               AS "typeMaterial",
+        (SELECT count(*) FROM vernacular    WHERE project_id = #{pid} AND reference_id = #{id})               AS vernacular,
+        (SELECT count(*) FROM distribution  WHERE project_id = #{pid} AND reference_id = #{id})               AS distribution,
+        (SELECT count(*) FROM estimate      WHERE project_id = #{pid} AND reference_id = #{id})               AS estimate,
+        (SELECT count(*) FROM property      WHERE project_id = #{pid} AND reference_id = #{id})               AS property
+      """)
+  Map<String, Object> referenceCounts(@Param("pid") int pid, @Param("id") int id);
+
+  @Update("UPDATE name_usage SET published_in_reference_id = #{survivor} WHERE project_id = #{pid} AND published_in_reference_id = #{merged}")
+  int repointPublishedIn(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
+  // array column: replace merged->survivor in every citing usage's reference_id[], then de-dup the array
+  @Update("UPDATE name_usage SET reference_id = array_replace(reference_id, #{merged}, #{survivor}) WHERE project_id = #{pid} AND #{merged} = ANY(reference_id)")
+  int repointReferenceArray(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
+  @Update("UPDATE name_usage SET reference_id = (SELECT array_agg(DISTINCT e) FROM unnest(reference_id) e) WHERE project_id = #{pid} AND #{survivor} = ANY(reference_id)")
+  int dedupReferenceArray(@Param("pid") int pid, @Param("survivor") int survivor);
+
+  @Update("UPDATE name_relation SET reference_id = #{survivor} WHERE project_id = #{pid} AND reference_id = #{merged}") int repointRefNameRelation(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
+  @Update("UPDATE type_material SET reference_id = #{survivor} WHERE project_id = #{pid} AND reference_id = #{merged}") int repointRefTypeMaterial(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
+  @Update("UPDATE vernacular    SET reference_id = #{survivor} WHERE project_id = #{pid} AND reference_id = #{merged}") int repointRefVernacular(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
+  @Update("UPDATE distribution  SET reference_id = #{survivor} WHERE project_id = #{pid} AND reference_id = #{merged}") int repointRefDistribution(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
+  @Update("UPDATE estimate      SET reference_id = #{survivor} WHERE project_id = #{pid} AND reference_id = #{merged}") int repointRefEstimate(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
+  @Update("UPDATE property      SET reference_id = #{survivor} WHERE project_id = #{pid} AND reference_id = #{merged}") int repointRefProperty(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
+  @Delete("DELETE FROM reference WHERE project_id = #{pid} AND id = #{id}")
+  int deleteReference(@Param("pid") int pid, @Param("id") int id);
 }

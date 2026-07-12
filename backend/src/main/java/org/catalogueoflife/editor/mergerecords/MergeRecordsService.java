@@ -7,9 +7,12 @@ import java.util.Map;
 import org.catalogueoflife.editor.audit.AuditService;
 import org.catalogueoflife.editor.audit.Operation;
 import org.catalogueoflife.editor.mergerecords.dto.MergeResult;
+import org.catalogueoflife.editor.mergerecords.dto.ReferenceMergeCandidate;
 import org.catalogueoflife.editor.mergerecords.dto.UsageMergeCandidate;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
+import org.catalogueoflife.editor.name.Reference;
+import org.catalogueoflife.editor.name.ReferenceMapper;
 import org.catalogueoflife.editor.name.Status;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
@@ -27,16 +30,19 @@ public class MergeRecordsService {
 
   private final MergeRecordsMapper merge;
   private final NameUsageMapper usages;
+  private final ReferenceMapper references;
   private final ProjectService projects;
   private final TreeMapper tree;
   private final AuditService audit;
   private final ApplicationEventPublisher events;
   private final IssueMapper issues;
 
-  public MergeRecordsService(MergeRecordsMapper merge, NameUsageMapper usages, ProjectService projects,
-      TreeMapper tree, AuditService audit, ApplicationEventPublisher events, IssueMapper issues) {
+  public MergeRecordsService(MergeRecordsMapper merge, NameUsageMapper usages, ReferenceMapper references,
+      ProjectService projects, TreeMapper tree, AuditService audit, ApplicationEventPublisher events,
+      IssueMapper issues) {
     this.merge = merge;
     this.usages = usages;
+    this.references = references;
     this.projects = projects;
     this.tree = tree;
     this.audit = audit;
@@ -123,6 +129,61 @@ public class MergeRecordsService {
       usages.delete(projectId, d);
     }
     events.publishEvent(ValidationEvent.forUsage(projectId, survivorId));
+    return new MergeResult(survivorId, mergedIds.size());
+  }
+
+  public List<ReferenceMergeCandidate> previewReferences(int userId, int projectId, List<Integer> ids) {
+    projects.requireRole(userId, projectId); // any member may preview
+    List<Integer> distinct = requireAtLeastTwo(ids);
+    List<ReferenceMergeCandidate> out = new ArrayList<>();
+    for (int id : distinct.stream().sorted().toList()) {  // ascending id (oldest first)
+      Reference r = references.findByIdInProject(projectId, id);
+      if (r == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reference not in project: " + id);
+      Map<String, Object> raw = merge.referenceCounts(projectId, id);
+      Map<String, Integer> counts = new LinkedHashMap<>();
+      raw.forEach((k, v) -> counts.put(k, ((Number) v).intValue()));
+      out.add(new ReferenceMergeCandidate(r.getId(), r.getAlternativeId(), r.getCitation(), r.getDoi(), counts));
+    }
+    return out;
+  }
+
+  // Destructive apply: repoints every column that cites each merged (duplicate) reference onto the
+  // survivor, then deletes the duplicates -- one transaction (no tree lock needed, references
+  // aren't tree nodes). Every repoint runs BEFORE the delete: name_usage.published_in_reference_id
+  // is ON DELETE SET NULL, so deleting first would silently null out citations; the 6 child
+  // reference_id columns + the reference_id[] array have no FK at all, so a missed repoint there
+  // would leave a dangling pointer to a deleted row.
+  @Transactional
+  public MergeResult mergeReferences(int userId, int projectId, Integer survivorId, List<Integer> ids) {
+    requireEditor(userId, projectId);
+    List<Integer> all = requireAtLeastTwo(ids);
+    if (survivorId == null || !all.contains(survivorId)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "survivorId must be one of the selected records");
+    }
+    if (references.findByIdInProject(projectId, survivorId) == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "survivor not in project");
+    }
+    List<Integer> mergedIds = all.stream().filter(id -> id != survivorId.intValue()).toList();
+
+    for (int d : mergedIds) {
+      Reference ref = references.findByIdInProject(projectId, d);
+      if (ref == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reference not in project: " + d);
+      merge.repointPublishedIn(projectId, d, survivorId);
+      merge.repointReferenceArray(projectId, d, survivorId);
+      merge.dedupReferenceArray(projectId, survivorId);
+      merge.repointRefNameRelation(projectId, d, survivorId);
+      merge.repointRefTypeMaterial(projectId, d, survivorId);
+      merge.repointRefVernacular(projectId, d, survivorId);
+      merge.repointRefDistribution(projectId, d, survivorId);
+      merge.repointRefEstimate(projectId, d, survivorId);
+      merge.repointRefProperty(projectId, d, survivorId);
+      audit.record(projectId, userId, "reference", d, Operation.DELETE, ref, null);
+      // entity_id is polymorphic (no cascade FK to reference): clean up d's own issue rows now,
+      // or they'd reference a nonexistent entity forever (mirrors ReferenceService.delete /
+      // mergeUsages's own issues.deleteByEntity call above).
+      issues.deleteByEntity(projectId, "reference", d);
+      merge.deleteReference(projectId, d);
+    }
     return new MergeResult(survivorId, mergedIds.size());
   }
 
