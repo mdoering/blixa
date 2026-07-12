@@ -42,9 +42,19 @@ class ProjectPublicApiIT extends AbstractPostgresIT {
     return json.readTree(body).get("id").asInt();
   }
 
+  // A license is required before a project can be made public (B2) -- set one via the metadata
+  // endpoint so the public-toggle tests below exercise the allowed path.
+  private void setLicense(int pid, String owner) throws Exception {
+    mvc.perform(put("/api/projects/" + pid + "/metadata").with(csrf()).with(user(owner))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Pub\",\"license\":\"CC0-1.0\"}"))
+       .andExpect(status().isOk());
+  }
+
   @Test
   void ownerTogglesPublic() throws Exception {
     int pid = createProject("pubOwner");
+    setLicense(pid, "pubOwner");
     mvc.perform(put("/api/projects/" + pid + "/public").with(csrf())
             .contentType(MediaType.APPLICATION_JSON).content("{\"public\":true}"))
        .andExpect(status().isOk());
@@ -62,5 +72,24 @@ class ProjectPublicApiIT extends AbstractPostgresIT {
     mvc.perform(put("/api/projects/" + pid + "/public").with(csrf()).with(user("pubEditor"))
             .contentType(MediaType.APPLICATION_JSON).content("{\"public\":true}"))
        .andExpect(status().isForbidden());
+  }
+
+  // B2: a project's license must be set before it can be made public -- the license-less project
+  // is rejected with 400, and the same request succeeds once a license is set.
+  @Test
+  void makePublicRequiresLicense() throws Exception {
+    int pid = createProject("pubOwner");
+    mvc.perform(put("/api/projects/" + pid + "/public").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content("{\"public\":true}"))
+       .andExpect(status().isBadRequest());
+
+    setLicense(pid, "pubOwner");
+
+    mvc.perform(put("/api/projects/" + pid + "/public").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content("{\"public\":true}"))
+       .andExpect(status().isOk());
+    mvc.perform(get("/api/projects/" + pid))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.public").value(true));
   }
 }

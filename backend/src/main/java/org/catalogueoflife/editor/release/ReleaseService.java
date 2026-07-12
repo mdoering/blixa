@@ -66,6 +66,10 @@ public class ReleaseService {
 
   public ReleaseResponse publish(int userId, int projectId, String version, String notes) {
     requireOwner(userId, projectId);
+    Project project = projects.findById(projectId);
+    if (project.getLicense() == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "a license is required to create a release");
+    }
     if (version == null || version.isBlank()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "version is required");
     }

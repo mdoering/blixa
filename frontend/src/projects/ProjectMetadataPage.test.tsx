@@ -586,7 +586,12 @@ test('owner can toggle public and publish a release', async () => {
   let isPublic = false;
   let published = false;
   server.use(
-    http.get('/api/projects/3', () => HttpResponse.json({ ...project, public: isPublic })),
+    // A license is required before the Public toggle/Publish release action are enabled (B2) --
+    // this fixture has one so the flow under test (toggle + publish) is actually exercisable; the
+    // license-less gating itself is covered separately below.
+    http.get('/api/projects/3', () =>
+      HttpResponse.json({ ...project, public: isPublic, license: 'CC0-1.0' }),
+    ),
     http.put('/api/projects/3/public', async ({ request }) => {
       const body = (await request.json()) as { public: boolean };
       isPublic = body.public;
@@ -652,4 +657,23 @@ test('owner can toggle public and publish a release', async () => {
 
   await waitFor(() => expect(screen.getByText('READY')).toBeInTheDocument());
   expect(screen.getByText('1.0')).toBeInTheDocument();
+});
+
+test('a license-less project disables the Public toggle and Publish release button with a hint', async () => {
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json({ ...project, license: null })),
+    http.get('/api/projects/3/releases', () => HttpResponse.json([])),
+    noLatestMatchRun,
+    noLatestExportRun,
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  expect(screen.getByRole('switch', { name: 'Public' })).toBeDisabled();
+  expect(screen.getByText('Set a license first to make this project public.')).toBeInTheDocument();
+
+  await userEvent.type(screen.getByLabelText('Version'), '1.0');
+  expect(screen.getByRole('button', { name: 'Publish release' })).toBeDisabled();
+  expect(screen.getByText('Set a license first to publish a release.')).toBeInTheDocument();
 });

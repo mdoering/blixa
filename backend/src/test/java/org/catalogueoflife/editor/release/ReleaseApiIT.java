@@ -6,6 +6,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -59,7 +60,15 @@ class ReleaseApiIT extends AbstractPostgresIT {
     if (users.requireByUsernameOrNull(u) == null) users.createLocal(u, "pw", u);
   }
 
+  // A license is required before a release can be published (B2), so the shared fixture sets one;
+  // projectNoLicense/setLicense below let the license-gating test drive both states explicitly.
   private int project(String owner) throws Exception {
+    int pid = projectNoLicense(owner);
+    setLicense(pid, owner);
+    return pid;
+  }
+
+  private int projectNoLicense(String owner) throws Exception {
     ensureUser(owner);
     String b = mvc.perform(post("/api/projects").with(csrf()).with(user(owner))
             .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"Rel\"}"))
@@ -70,6 +79,13 @@ class ReleaseApiIT extends AbstractPostgresIT {
             .content("{\"scientificName\":\"Panthera\",\"rank\":\"genus\",\"status\":\"ACCEPTED\"}"))
        .andExpect(status().isCreated());
     return pid;
+  }
+
+  private void setLicense(int pid, String owner) throws Exception {
+    mvc.perform(put("/api/projects/" + pid + "/metadata").with(csrf()).with(user(owner))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Rel\",\"license\":\"CC0-1.0\"}"))
+       .andExpect(status().isOk());
   }
 
   private JsonNode listReleases(int pid) throws Exception {
@@ -133,6 +149,23 @@ class ReleaseApiIT extends AbstractPostgresIT {
     mvc.perform(post("/api/projects/" + pid + "/releases").with(csrf()).with(user("relEditor"))
             .contentType(MediaType.APPLICATION_JSON).content("{\"version\":\"1.0\"}"))
        .andExpect(status().isForbidden());
+  }
+
+  // B2: a project's license must be set before a release can be published -- the license-less
+  // project is rejected with 400, and the same publish request succeeds once a license is set.
+  @Test
+  void publishRequiresLicense() throws Exception {
+    int pid = projectNoLicense("relOwner");
+    mvc.perform(post("/api/projects/" + pid + "/releases").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content("{\"version\":\"1.0\"}"))
+       .andExpect(status().isBadRequest());
+
+    setLicense(pid, "relOwner");
+
+    mvc.perform(post("/api/projects/" + pid + "/releases").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content("{\"version\":\"1.0\"}"))
+       .andExpect(status().isAccepted())
+       .andExpect(jsonPath("$.status").value("BUILDING"));
   }
 
   @Test

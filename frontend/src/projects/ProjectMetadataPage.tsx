@@ -313,9 +313,16 @@ export default function ProjectMetadataPage() {
             <Switch
               aria-label="Public"
               checked={data?.public ?? false}
+              disabled={!data?.license}
               onChange={(e) => publicMut.mutate(e.currentTarget.checked)}
             />
           </Group>
+          {/* B2: a license is required before a project can be made public -- see ProjectService.setPublic. */}
+          {!data?.license && (
+            <Text size="sm" c="dimmed">
+              Set a license first to make this project public.
+            </Text>
+          )}
         </Stack>
       )}
 
@@ -335,12 +342,18 @@ export default function ProjectMetadataPage() {
             <Button
               variant="default"
               loading={publishMut.isPending}
-              disabled={!releaseVersion.trim()}
+              disabled={!releaseVersion.trim() || !data?.license}
               onClick={() => publishMut.mutate()}
             >
               Publish release
             </Button>
           </Group>
+          {/* B2: a license is required before a release can be published -- see ReleaseService.publish. */}
+          {!data?.license && (
+            <Text size="sm" c="dimmed">
+              Set a license first to publish a release.
+            </Text>
+          )}
           {(releases?.length ?? 0) > 0 && (
             <Table striped>
               <Table.Thead>

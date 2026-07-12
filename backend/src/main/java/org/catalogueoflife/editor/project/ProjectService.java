@@ -80,6 +80,12 @@ public class ProjectService {
     if (!role.equals(Role.OWNER.dbValue())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner required");
     }
+    if (isPublic) {
+      Project p = projects.findById(projectId);
+      if (p.getLicense() == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "a license is required to make a project public");
+      }
+    }
     projects.updatePublic(projectId, isPublic);
   }
 
