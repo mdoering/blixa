@@ -36,7 +36,12 @@ public class ReferenceCitationService {
   // e.g. "apa"/"harvard"; null/unrecognized -> APA). Never throws: citeproc itself already
   // catches+logs rendering failures inside CslFormatter.cite (returning null), and this additionally
   // guards CslData assembly -- a reference save must never 500 just because its citation could not
-  // be generated. Falls back to a minimal "author (year) title" string instead.
+  // be generated. Fallback order when citeproc produces nothing: `ref.getCitation()` (whatever is
+  // already stored -- e.g. an imported citation-only string) if non-blank, THEN the minimal
+  // "author (year) title" string. This ordering is deliberate, not incidental: render() must never
+  // turn a non-empty citation into "" -- ProjectService.regenerateCitations persists whatever this
+  // method returns straight into the citation column with no guard of its own beyond isStructured,
+  // so a blank return here would silently blank out that caller's existing citation for real.
   public String render(Reference ref, String cslStyle) {
     try {
       CslData data = toCslData(ref);
@@ -48,6 +53,9 @@ public class ReferenceCitationService {
       }
     } catch (RuntimeException e) {
       // fall through to the fallback below
+    }
+    if (notBlank(ref.getCitation())) {
+      return ref.getCitation();
     }
     return fallback(ref);
   }
@@ -109,10 +117,11 @@ public class ReferenceCitationService {
     return STYLE.APA;
   }
 
-  // Minimal citation used when citeproc produces nothing at all (an unexpected rendering failure,
-  // or a CslData citeproc itself considers "empty") -- non-blank as long as `ref` has *something*
-  // structured, which is guaranteed by isStructured being the only gate on calling render() at all
-  // (see ReferenceService.applyCitation).
+  // Last-resort citation, only reached when BOTH citeproc produced nothing (an unexpected rendering
+  // failure, or a CslData citeproc itself considers "empty") AND ref.getCitation() was already blank
+  // (render()'s own fallback order tries that first) -- non-blank as long as `ref` has *something*
+  // structured, which is guaranteed by isStructured gating every call to render() (see
+  // ReferenceService.applyCitation and ProjectService.regenerateCitations).
   private static String fallback(Reference ref) {
     StringBuilder sb = new StringBuilder();
     String author = firstAuthorName(ref);

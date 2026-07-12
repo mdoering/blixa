@@ -149,16 +149,23 @@ public class ProjectService {
     return projects.findById(projectId).getCslStyle();
   }
 
-  // Re-renders and persists the citation of every non-manual reference in `projectId` -- called
-  // only when updateMetadata just changed cslStyle. Deliberately bypasses ReferenceMapper.update's
-  // per-row CAS/audit/ValidationEvent machinery (via updateCitation, a narrow write) the same way
-  // ReferenceService.mergeContainerTitle does for its own bulk field rewrite: a citation regenerated
-  // because the PROJECT'S style changed is system-driven maintenance, not a per-reference edit a
-  // concurrent editor should see as a stale-version conflict.
+  // Re-renders and persists the citation of every non-manual, STRUCTURED reference in `projectId`
+  // -- called only when updateMetadata just changed cslStyle. Deliberately bypasses
+  // ReferenceMapper.update's per-row CAS/audit/ValidationEvent machinery (via updateCitation, a
+  // narrow write) the same way ReferenceService.mergeContainerTitle does for its own bulk field
+  // rewrite: a citation regenerated because the PROJECT'S style changed is system-driven
+  // maintenance, not a per-reference edit a concurrent editor should see as a stale-version conflict.
+  // The isStructured guard mirrors applyCitation's own gate (ReferenceService): a non-manual
+  // reference with NO structured content is a citation-only string (the overwhelming majority of
+  // legacy/imported data -- e.g. ImportRunService.loadReferences and the CLB import path insert
+  // references directly, bypassing applyCitation, so citationManual stays false on a citation-only
+  // row). Without this guard, render() on such a reference's all-null CslData would fall back to a
+  // blank/minimal string and silently blank out the original citation -- see the fix's report for
+  // the data-loss scenario this closes.
   // NOTE: could be async for very large projects -- synchronous is fine for now.
   private void regenerateCitations(int projectId, String cslStyle) {
     for (Reference ref : references.findAllByProject(projectId)) {
-      if (!ref.isCitationManual()) {
+      if (!ref.isCitationManual() && citationService.isStructured(ref)) {
         references.updateCitation(projectId, ref.getId(), citationService.render(ref, cslStyle));
       }
     }

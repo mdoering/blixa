@@ -34,6 +34,7 @@ class ReferenceCitationIT extends AbstractPostgresIT {
   @Autowired MockMvc mvc;
   @Autowired AppUserService users;
   @Autowired ReferenceMapper references;
+  @Autowired IdSeqMapper idSeq;
   @Autowired ObjectMapper json;
 
   private void ensureUser(String username) {
@@ -164,5 +165,81 @@ class ReferenceCitationIT extends AbstractPostgresIT {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"title\":\"citestyleproj\",\"cslStyle\":\"not-a-style\"}"))
         .andExpect(status().isBadRequest());
+  }
+
+  // Regression test for the data-loss bug fixed alongside this test: ProjectService.
+  // regenerateCitations used to regenerate EVERY non-manual reference on a project cslStyle change,
+  // with no structured-content guard. Import paths (ImportRunService.loadReferences,
+  // ClbImportService/ClbUsageMapper.toReference) insert references DIRECTLY via ReferenceMapper.
+  // insert, bypassing ReferenceService.applyCitation entirely -- so a citation-only imported
+  // reference (only `citation` set, everything structured left null) keeps citationManual=false
+  // (the primitive default), NOT true. Before the fix, a style change would call render() on that
+  // reference's all-null CslData, get nothing back from citeproc, fall through to the minimal
+  // "author (year) title" fallback (empty, since there's no author/year/title to build one from),
+  // and persist that "" straight over the original citation via updateCitation -- silently
+  // destroying the only citation text the reference ever had. The fix adds an isStructured guard to
+  // regenerateCitations (mirroring applyCitation's own gate) AND, as defense in depth, makes
+  // ReferenceCitationService.render prefer the existing ref.getCitation() over the blank fallback.
+  @Test
+  @WithMockUser(username = "citeImportOwner")
+  void styleChangeDoesNotBlankCitationOnlyImportedReference() throws Exception {
+    ensureUser("citeImportOwner");
+    long pid = createProject("citeimportproj");
+    int userId = users.requireByUsernameOrNull("citeImportOwner").getId();
+
+    // Mirrors ImportRunService.loadReferences' insert exactly: only `citation` is populated, every
+    // structured field (author/title/containerTitle/type) stays null, and citationManual is never
+    // touched -- so it keeps its primitive default of false. Deliberately NOT built via POST
+    // /references, which would route through ReferenceService.applyCitation and flip
+    // citationManual to true for this exact shape (see applyCitation's javadoc, case 3) -- that's
+    // the normal API path, not the import path this test reproduces.
+    String originalCitation = "Smith, J. (1999). Some old citation.";
+    Reference imported = new Reference();
+    imported.setProjectId((int) pid);
+    imported.setId(idSeq.allocate((int) pid, "reference"));
+    imported.setCitation(originalCitation);
+    imported.setModifiedBy(userId);
+    references.insert(imported);
+    assertThat(imported.isCitationManual()).isFalse();
+
+    // A second, genuinely-structured non-manual reference in the SAME project, created through the
+    // normal API path -- this one SHOULD be regenerated on the style change below, proving the new
+    // guard doesn't over-suppress legitimate regeneration.
+    String structuredPayload = """
+        {
+          "type": "article-journal",
+          "author": [{"family": "Jones", "given": "A."}],
+          "title": "A Structured Reference",
+          "containerTitle": "Journal of Testing",
+          "issued": "2010"
+        }
+        """;
+    String structuredBody = mvc.perform(post("/api/projects/" + pid + "/references").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(structuredPayload))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.citationManual").value(false))
+        .andReturn().getResponse().getContentAsString();
+    long structuredRefId = json.readTree(structuredBody).get("id").asLong();
+    String apaStructuredCitation = json.readTree(structuredBody).get("citation").asString();
+    assertThat(apaStructuredCitation).isNotBlank();
+
+    // default project style is "apa" -- switch to "harvard".
+    mvc.perform(put("/api/projects/" + pid + "/metadata").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"citeimportproj\",\"cslStyle\":\"harvard\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.cslStyle").value("harvard"));
+
+    // the citation-only imported reference must be COMPLETELY UNCHANGED -- not blanked, not
+    // regenerated (there's nothing structured to regenerate it from).
+    Reference afterStyleChange = references.findByIdInProject((int) pid, imported.getId());
+    assertThat(afterStyleChange.getCitation()).isEqualTo(originalCitation);
+    assertThat(afterStyleChange.isCitationManual()).isFalse();
+
+    // the structured reference DOES get regenerated in the new style -- the guard didn't
+    // over-suppress legitimate regeneration.
+    Reference structuredAfter = references.findByIdInProject((int) pid, (int) structuredRefId);
+    assertThat(structuredAfter.getCitation()).isNotBlank().isNotEqualTo(apaStructuredCitation);
   }
 }
