@@ -25,6 +25,7 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/ping").permitAll()
             .requestMatchers("/api/auth/login", "/login/**", "/oauth2/**").permitAll()
+            .requestMatchers("/api/public/**", "/api/config").permitAll()
             // Public reference-PDF download (name/PdfController) -- hosted PDFs must be citable
             // without auth, same as GET /pdf/{filename} itself is a public read, unlike the
             // authenticated POST/DELETE .../references/{id}/pdf under /api/**.
@@ -46,7 +47,7 @@ public class SecurityConfig {
         // (raw JSON) instead of the app. alwaysUse=true ignores the saved request.
         .oauth2Login(o -> o
             .userInfoEndpoint(u -> u.oidcUserService(orcidUserService))
-            .defaultSuccessUrl("/", true))
+            .defaultSuccessUrl("/projects", true))
         .logout(out -> out.logoutUrl("/api/auth/logout")
             .logoutSuccessHandler((req, res, a) -> res.setStatus(HttpStatus.OK.value())))
         .exceptionHandling(ex -> ex
