@@ -64,6 +64,10 @@ test('renders a public project: title, contributor, release version, and a downl
 
   const downloadLink = screen.getByRole('link', { name: /download/i });
   expect(downloadLink.getAttribute('href')).toContain('/api/public/projects/5/releases/9/download');
+
+  // Headline name-usage count is sourced from the latest release, not the metrics blob (which
+  // never actually carries nameUsageCount in the real backend response).
+  expect(screen.getByText('150 names')).toBeInTheDocument();
 });
 
 test('shows a friendly message when the project is private or does not exist (404)', async () => {

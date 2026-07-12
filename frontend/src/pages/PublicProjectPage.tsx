@@ -36,7 +36,7 @@ interface Contribution {
 }
 
 function asContributions(v: unknown): Contribution[] {
-  return Array.isArray(v) ? (v as Contribution[]) : [];
+  return Array.isArray(v) ? v.filter((c): c is Contribution => typeof c === 'object' && c !== null) : [];
 }
 
 export default function PublicProjectPage() {
@@ -82,13 +82,19 @@ export default function PublicProjectPage() {
   const accepted = asRankCounts(metrics.acceptedByRank);
   const synonyms = asRankCounts(metrics.synonymsByRank);
   const supplementary = asRankCounts(metrics.supplementary);
-  const nameUsageCount = typeof metrics.nameUsageCount === 'number' ? metrics.nameUsageCount : null;
+  // The backend's metrics blob (ReleaseMetricsService.compute) never actually contains
+  // nameUsageCount -- only acceptedByRank/synonymsByRank/supplementary/changesSinceLastRelease/
+  // contributions. The real headline count lives on the latest release (releases are returned
+  // newest-first), so prefer that and keep the metrics field only as a defensive fallback.
+  const headlineNameCount =
+    data.releases[0]?.nameUsageCount ??
+    (typeof metrics.nameUsageCount === 'number' ? metrics.nameUsageCount : null);
   const changesSinceLastRelease =
     typeof metrics.changesSinceLastRelease === 'number' ? metrics.changesSinceLastRelease : null;
   const contributions = asContributions(metrics.contributions);
   const hasMetadata = data.license || data.nomCode || data.geographicScope || data.taxonomicScope;
   const hasMetrics =
-    nameUsageCount != null ||
+    headlineNameCount != null ||
     accepted.length > 0 ||
     synonyms.length > 0 ||
     supplementary.length > 0 ||
@@ -158,9 +164,9 @@ export default function PublicProjectPage() {
       {hasMetrics && (
         <Stack gap="xs">
           <Title order={3}>Metrics</Title>
-          {nameUsageCount != null && (
+          {headlineNameCount != null && (
             <Text size="lg" fw={600}>
-              {nameUsageCount.toLocaleString()} names
+              {headlineNameCount.toLocaleString()} names
             </Text>
           )}
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
