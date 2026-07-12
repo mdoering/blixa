@@ -115,21 +115,6 @@ export default function PublicProjectPage() {
         {data.description && <Text>{data.description}</Text>}
       </Stack>
 
-      <Paper withBorder p="md">
-        <Group justify="space-between" wrap="nowrap" align="center">
-          <Stack gap={2}>
-            <Text fw={500}>Join this project</Text>
-            <Text size="sm" c="dimmed">
-              Contribute to this checklist by requesting to join. A project owner reviews each request.
-            </Text>
-          </Stack>
-          <Button onClick={() => setJoining(true)}>Request to join</Button>
-        </Group>
-      </Paper>
-      {idOrAlias && (
-        <JoinRequestModal idOrAlias={idOrAlias} opened={joining} onClose={() => setJoining(false)} />
-      )}
-
       {hasMetadata && (
         <Paper withBorder p="md">
           <Stack gap={4}>
@@ -177,6 +162,21 @@ export default function PublicProjectPage() {
           </Stack>
         )}
       </Stack>
+
+      <Paper withBorder p="md">
+        <Group justify="space-between" wrap="nowrap" align="center">
+          <Stack gap={2}>
+            <Text fw={500}>Join this project</Text>
+            <Text size="sm" c="dimmed">
+              Contribute to this checklist by requesting to join. A project owner reviews each request.
+            </Text>
+          </Stack>
+          <Button onClick={() => setJoining(true)}>Request to join</Button>
+        </Group>
+      </Paper>
+      {idOrAlias && (
+        <JoinRequestModal idOrAlias={idOrAlias} opened={joining} onClose={() => setJoining(false)} />
+      )}
 
       {hasMetrics && (
         <Stack gap="xs">
