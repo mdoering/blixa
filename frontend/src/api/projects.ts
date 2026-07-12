@@ -25,3 +25,6 @@ export function removeMember(id: number, userId: number): Promise<void> {
 export function deleteProject(id: number): Promise<void> {
   return api<void>(`/api/projects/${id}`, { method: 'DELETE' });
 }
+export function setPublic(id: number, isPublic: boolean): Promise<void> {
+  return api<void>(`/api/projects/${id}/public`, { method: 'PUT', json: { public: isPublic } });
+}

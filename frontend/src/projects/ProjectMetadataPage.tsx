@@ -11,6 +11,7 @@ import {
   Stack,
   Select,
   Switch,
+  Table,
   Text,
   Textarea,
   TextInput,
@@ -23,10 +24,11 @@ import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { deleteProject, getProject, updateMetadata } from '../api/projects';
+import { deleteProject, getProject, setPublic, updateMetadata } from '../api/projects';
 import { getIdScopes } from '../api/coldp';
 import { getColMatchRun, getLatestColMatch, startColMatch } from '../api/col';
 import { exportFileUrl, getExportRun, getLatestExport, startExport } from '../api/export';
+import { deleteRelease, listReleases, publishRelease } from '../api/releases';
 import { messageFor } from '../api/client';
 import type { UpdateMetadataPayload } from '../api/types';
 import MergeModal from '../merge/MergeModal';
@@ -46,6 +48,9 @@ const COL_MATCH_POLL_MS = 1500;
 // total/processed tally (unlike col-match), so this just drives a live status check rather than a
 // progress bar; see ExportAsyncConfig's single-thread pool on the backend.
 const EXPORT_POLL_MS = 1500;
+// Poll interval for the release history while any release is BUILDING (release builds have no
+// total/processed tally either, same reasoning as EXPORT_POLL_MS above).
+const RELEASE_POLL_MS = 1500;
 
 // export_run.fileSize is bytes -- a friendly human-readable label for the DONE summary.
 function formatFileSize(bytes: number): string {
@@ -226,6 +231,48 @@ export default function ProjectMetadataPage() {
   // MergeModal, which owns its own start/poll/apply state scoped to this project as the target.
   const [merging, setMerging] = useState(false);
 
+  // Public visibility toggle (owner-only): lists the project on the public landing page and
+  // exposes its READY releases through the public read API (Phase 2, not this task).
+  const publicMut = useMutation({
+    mutationFn: (v: boolean) => setPublic(id, v),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['project', id] });
+    },
+    onError: (e) =>
+      notifications.show({ color: 'red', message: messageFor(e, 'Could not update visibility') }),
+  });
+
+  // Release history (owner-only): newest-first, polling while any release is still BUILDING so a
+  // publish started in this session (or a still-building one from a prior visit) resolves to
+  // READY/FAILED without a manual reload.
+  const { data: releases } = useQuery({
+    queryKey: ['releases', id],
+    queryFn: () => listReleases(id),
+    enabled: isOwner,
+    refetchInterval: (query) =>
+      query.state.data?.some((r) => r.status === 'BUILDING') ? RELEASE_POLL_MS : false,
+  });
+  const [releaseVersion, setReleaseVersion] = useState('');
+
+  const publishMut = useMutation({
+    mutationFn: () => publishRelease(id, releaseVersion.trim()),
+    onSuccess: async () => {
+      setReleaseVersion('');
+      await queryClient.invalidateQueries({ queryKey: ['releases', id] });
+    },
+    onError: (e) =>
+      notifications.show({ color: 'red', message: messageFor(e, 'Publish release failed') }),
+  });
+
+  const deleteReleaseMut = useMutation({
+    mutationFn: (rid: number) => deleteRelease(id, rid),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['releases', id] });
+    },
+    onError: (e) =>
+      notifications.show({ color: 'red', message: messageFor(e, 'Delete release failed') }),
+  });
+
   const deleteMut = useMutation({
     mutationFn: () => deleteProject(id),
     onSuccess: async () => {
@@ -254,6 +301,84 @@ export default function ProjectMetadataPage() {
 
   return (
     <Stack style={{ maxWidth: 720 }} gap="xl">
+      {isOwner && (
+        <Stack gap="xs">
+          <Group justify="space-between">
+            <div>
+              <Text fw={600}>Public</Text>
+              <Text size="sm" c="dimmed">
+                List this project on the public landing page and publish its releases.
+              </Text>
+            </div>
+            <Switch
+              aria-label="Public"
+              checked={data?.public ?? false}
+              onChange={(e) => publicMut.mutate(e.currentTarget.checked)}
+            />
+          </Group>
+        </Stack>
+      )}
+
+      {isOwner && (
+        <Stack gap="xs">
+          <Title order={4} m={0}>
+            Releases
+          </Title>
+          <Group align="flex-end" gap="xs">
+            <TextInput
+              label="Version"
+              placeholder="e.g. 1.0"
+              value={releaseVersion}
+              onChange={(e) => setReleaseVersion(e.currentTarget.value)}
+              style={{ flex: 1 }}
+            />
+            <Button
+              variant="default"
+              loading={publishMut.isPending}
+              disabled={!releaseVersion.trim()}
+              onClick={() => publishMut.mutate()}
+            >
+              Publish release
+            </Button>
+          </Group>
+          {(releases?.length ?? 0) > 0 && (
+            <Table striped>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Version</Table.Th>
+                  <Table.Th>Status</Table.Th>
+                  <Table.Th>Date</Table.Th>
+                  <Table.Th>Size</Table.Th>
+                  <Table.Th />
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {releases?.map((r) => (
+                  <Table.Tr key={r.id}>
+                    <Table.Td>{r.version}</Table.Td>
+                    <Table.Td>{r.status}</Table.Td>
+                    <Table.Td>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}</Table.Td>
+                    <Table.Td>{r.fileSize != null ? formatFileSize(r.fileSize) : ''}</Table.Td>
+                    <Table.Td>
+                      <ActionIcon
+                        type="button"
+                        variant="subtle"
+                        color="red"
+                        aria-label={`Delete release ${r.version}`}
+                        loading={deleteReleaseMut.isPending}
+                        onClick={() => deleteReleaseMut.mutate(r.id)}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          )}
+        </Stack>
+      )}
+
       <Stack gap="xs">
         <Group justify="space-between">
           <Title order={4} m={0}>

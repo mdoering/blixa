@@ -10,7 +10,7 @@ import ProjectMetadataPage from './ProjectMetadataPage';
 const project = {
   id: 3, title: 'Mammals', alias: null, description: null, nomCode: 'zoological',
   license: null, geographicScope: null, taxonomicScope: null, role: 'owner',
-  gbifOccurrenceLayer: true,
+  gbifOccurrenceLayer: true, public: false,
 };
 
 // "Match all identifiers" is disabled unless the persisted project has a matchable identifier
@@ -578,3 +578,78 @@ test(
   },
   10000,
 );
+
+test('owner can toggle public and publish a release', async () => {
+  // `isPublic`/`published` are mutated by the PUT/POST handlers below and read back by the GET
+  // handlers, so the switch flip and the release-history refresh are driven by the same
+  // request/response round trip the component makes, not a canned static fixture.
+  let isPublic = false;
+  let published = false;
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json({ ...project, public: isPublic })),
+    http.put('/api/projects/3/public', async ({ request }) => {
+      const body = (await request.json()) as { public: boolean };
+      isPublic = body.public;
+      return new HttpResponse(null, { status: 200 });
+    }),
+    http.get('/api/projects/3/releases', () =>
+      HttpResponse.json(
+        published
+          ? [
+              {
+                id: 1,
+                projectId: 3,
+                version: '1.0',
+                notes: null,
+                status: 'READY',
+                nameUsageCount: 3,
+                metrics: {},
+                fileName: 'x.zip',
+                fileSize: 10,
+                error: null,
+                createdAt: '2026-07-12T00:00:00Z',
+              },
+            ]
+          : [],
+      ),
+    ),
+    http.post('/api/projects/3/releases', async () => {
+      published = true;
+      return new HttpResponse(
+        JSON.stringify({
+          id: 1,
+          projectId: 3,
+          version: '1.0',
+          notes: null,
+          status: 'BUILDING',
+          nameUsageCount: null,
+          metrics: null,
+          fileName: null,
+          fileSize: null,
+          error: null,
+          createdAt: '2026-07-12T00:00:00Z',
+        }),
+        { status: 202, headers: { 'content-type': 'application/json' } },
+      );
+    }),
+    noLatestMatchRun,
+    noLatestExportRun,
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  const publicSwitch = screen.getByRole('switch', { name: 'Public' });
+  expect(publicSwitch).not.toBeChecked();
+  await userEvent.click(publicSwitch);
+  // The switch reflects `data.public`, which only flips once the PUT resolves and the project
+  // query is invalidated/refetched -- asserting on the checked state (rather than a spy) proves
+  // both the request happened AND the page picked up the result.
+  await waitFor(() => expect(publicSwitch).toBeChecked());
+
+  await userEvent.type(screen.getByLabelText('Version'), '1.0');
+  await userEvent.click(screen.getByRole('button', { name: 'Publish release' }));
+
+  await waitFor(() => expect(screen.getByText('READY')).toBeInTheDocument());
+  expect(screen.getByText('1.0')).toBeInTheDocument();
+});

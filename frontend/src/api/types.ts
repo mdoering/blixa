@@ -18,6 +18,9 @@ export interface Project {
   taxonomicScope: string | null;
   role: Role;
   gbifOccurrenceLayer: boolean;
+  // Whether the project (and its READY releases) are visible on the public landing page /
+  // portal-facing read API (see PUT /api/projects/{id}/public, owner-only).
+  public: boolean;
   // Which alternative_id CURIE scopes (e.g. "ipni", "gbif") the taxon Details form renders a
   // real per-scope identifier field for -- null/absent on projects that haven't set any. Each
   // scope carries an optional CLB dataset key -- a scope is matchable (eligible for "match all

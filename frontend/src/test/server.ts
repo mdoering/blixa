@@ -9,6 +9,9 @@ export const server = setupServer(
   // Default id-scopes vocab, so any page that seeds a scopes picker from it (ProjectMetadataPage)
   // doesn't need this mocked per-test unless it cares about the exact list.
   http.get('/api/coldp/id-scopes', () => HttpResponse.json(['col', 'gbif', 'ipni', 'tsn'])),
+  // Default empty release history, so any owner-role render of ProjectMetadataPage's Releases
+  // section doesn't need this mocked per-test unless it cares about the actual list.
+  http.get('/api/projects/:id/releases', () => HttpResponse.json([])),
 );
 
 export { http, HttpResponse };
