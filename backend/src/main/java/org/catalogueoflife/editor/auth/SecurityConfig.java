@@ -33,7 +33,12 @@ public class SecurityConfig {
             .anyRequest().authenticated())
         .csrf(csrf -> csrf
             .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-            .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
+            .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
+            // /api/public/** is unauthenticated (permitAll above) -- there's no session cookie for
+            // a CSRF token to protect, so a visitor's browser can never have picked one up before
+            // e.g. POSTing a join request from a public project page. Exempt the whole permitAll
+            // public surface, same reasoning as the existing "no session, no CSRF" exemptions.
+            .ignoringRequestMatchers("/api/public/**"))
         .addFilterAfter(new CsrfCookieFilter(),
             org.springframework.security.web.authentication.www.BasicAuthenticationFilter.class)
         .formLogin(form -> form

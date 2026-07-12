@@ -170,7 +170,9 @@ public class ProjectService {
         .filter(m -> m.getRole().equals(Role.OWNER.dbValue())).count();
   }
 
-  private void requireOwner(int actorId, int projectId) {
+  // Public so other project-scoped services (e.g. JoinRequestService) can gate owner-only actions
+  // through the same role check without duplicating it.
+  public void requireOwner(int actorId, int projectId) {
     if (!Role.OWNER.dbValue().equals(requireRole(actorId, projectId))) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner required");
     }

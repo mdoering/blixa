@@ -3,6 +3,8 @@ package org.catalogueoflife.editor.publicapi;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.catalogueoflife.editor.join.JoinRequestService;
+import org.catalogueoflife.editor.join.dto.JoinRequestBody;
 import org.catalogueoflife.editor.project.Licenses;
 import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectMemberMapper;
@@ -25,6 +27,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
@@ -42,15 +47,18 @@ public class PublicController {
   private final AppUserMapper users;
   private final ReleaseMapper releases;
   private final ReleaseMetricsService metricsService;
+  private final JoinRequestService joinRequestService;
   private final ObjectMapper json;
 
   public PublicController(PublicProjectMapper projects, ProjectMemberMapper members, AppUserMapper users,
-      ReleaseMapper releases, ReleaseMetricsService metricsService, ObjectMapper json) {
+      ReleaseMapper releases, ReleaseMetricsService metricsService, JoinRequestService joinRequestService,
+      ObjectMapper json) {
     this.projects = projects;
     this.members = members;
     this.users = users;
     this.releases = releases;
     this.metricsService = metricsService;
+    this.joinRequestService = joinRequestService;
     this.json = json;
   }
 
@@ -126,6 +134,14 @@ public class PublicController {
         .header(HttpHeaders.CONTENT_DISPOSITION, cd.toString())
         .contentLength(path.toFile().length())
         .body(res);
+  }
+
+  // Unauthenticated: a visitor on a public project page requests to join by submitting their
+  // ORCID. Validation (ORCID format, project must be public) lives in JoinRequestService.
+  @PostMapping("/api/public/projects/{idOrAlias}/join")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void join(@PathVariable String idOrAlias, @RequestBody JoinRequestBody body) {
+    joinRequestService.request(idOrAlias, body);
   }
 
   // Filters a metrics snapshot's `contributions` array down to entries whose userId is a current
