@@ -208,6 +208,50 @@ class UsageMergeApplyIT extends AbstractPostgresIT {
   }
 
   @Test
+  void mergeRejectsAcceptedSurvivorAbsorbingForeignSynonym() throws Exception {
+    ensureUser("maOwner");
+    long pid = createProject("ma3c");
+
+    int s = createUsage(pid, "Aus", "genus", "ACCEPTED", null);
+    int x = createUsage(pid, "Zus", "genus", "ACCEPTED", null); // a DIFFERENT accepted usage
+    int d = createUsage(pid, "Xus", "genus", "SYNONYM", null);
+    linkSynonym(pid, d, x); // d is a synonym of x, not of s
+
+    mvc.perform(post("/api/projects/" + pid + "/usages/merge").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mergeRequest(s, s, d)))
+        .andExpect(status().isBadRequest());
+
+    // rolled back: d still exists
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + d))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void mergeAllowsSynonymIntoItsOwnAcceptedSurvivor() throws Exception {
+    ensureUser("maOwner");
+    long pid = createProject("ma3d");
+
+    int s = createUsage(pid, "Aus", "genus", "ACCEPTED", null);
+    int d = createUsage(pid, "Xus", "genus", "SYNONYM", null);
+    linkSynonym(pid, d, s); // d is a synonym of s itself
+
+    mvc.perform(post("/api/projects/" + pid + "/usages/merge").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mergeRequest(s, s, d)))
+        .andExpect(status().isOk());
+
+    // d is gone
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + d))
+        .andExpect(status().isNotFound());
+
+    // the self-link was dropped, not left dangling on the survivor
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + s + "/synonyms"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
   void mergeRequiresEditorRole() throws Exception {
     ensureUser("maOwner");
     ensureUser("maViewer");

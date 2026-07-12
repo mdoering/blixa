@@ -41,6 +41,9 @@ public interface MergeRecordsMapper {
   @Update("UPDATE synonym_accepted SET synonym_id = #{survivor} WHERE project_id = #{pid} AND synonym_id = #{merged}")
   int repointSynonymId(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
 
+  @Select("SELECT count(*) FROM synonym_accepted WHERE project_id = #{pid} AND synonym_id = #{id}")
+  int acceptedOfCount(@Param("pid") int pid, @Param("id") int id);
+
   @Delete("""
       DELETE FROM synonym_accepted d WHERE d.project_id = #{pid} AND d.accepted_id = #{merged}
         AND EXISTS (SELECT 1 FROM synonym_accepted x WHERE x.project_id = #{pid}

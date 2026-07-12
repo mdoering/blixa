@@ -130,6 +130,17 @@ public class MergeRecordsService {
       issues.deleteByEntity(projectId, "name_usage", d);
       usages.delete(projectId, d);
     }
+
+    // Symmetric to the accepted-parent guard above: after all repoints, an ACCEPTED survivor must
+    // not have been turned into a synonym by absorbing a merged synonym's synonym-of-X link. Self-
+    // links (X == survivor) and links to other merged ids already collapsed/dropped in the loop; a
+    // leftover row means the survivor now points at a DIFFERENT surviving accepted -> accepted AND
+    // synonym at once (inconsistent ColDP). Reject (rolls back the whole @Transactional merge).
+    if (survivor.getStatus() == Status.ACCEPTED && merge.acceptedOfCount(projectId, survivorId) > 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "cannot merge a synonym into an accepted survivor; resolve its accepted/synonym status first");
+    }
+
     events.publishEvent(ValidationEvent.forUsage(projectId, survivorId));
     return new MergeResult(survivorId, mergedIds.size());
   }
