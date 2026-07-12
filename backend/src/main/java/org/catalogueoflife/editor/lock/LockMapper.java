@@ -79,4 +79,24 @@ public interface LockMapper {
 
   @Delete("DELETE FROM lock WHERE id = #{id} AND project_id = #{projectId} AND user_id = #{userId}")
   int delete(@Param("projectId") int projectId, @Param("id") int id, @Param("userId") int userId);
+
+  // Retention sweep (see LockRetentionSweep): every findActive/upsertTakeover call already treats
+  // an expired row as absent, but nothing physically removes it -- this is that cleanup, run
+  // periodically rather than on every read.
+  @Delete("DELETE FROM lock WHERE expires_at <= now()")
+  int deleteExpired();
+
+  // Advisory locks are meaningless once their target entity is gone: called from
+  // NameUsageService.delete and MergeRecordsService.mergeUsages right after the entity's own
+  // polymorphic issue rows are cleaned up, for the same reason (no cascade FK, since entity_id is
+  // polymorphic across entity_type).
+  @Delete("DELETE FROM lock WHERE project_id = #{projectId} AND entity_type = #{entityType} AND entity_id = #{entityId}")
+  int deleteByEntity(@Param("projectId") int projectId, @Param("entityType") String entityType,
+      @Param("entityId") int entityId);
+
+  // Test-only: upsertTakeover's ttl is a positive seconds-from-now offset, so a past expires_at
+  // can't be seeded through the public API -- this lets LockSweepIT force a row into the expired
+  // state deleteExpired() is meant to sweep.
+  @Update("UPDATE lock SET expires_at = now() - interval '1 hour' WHERE id = #{id}")
+  void expireForTest(@Param("id") int id);
 }

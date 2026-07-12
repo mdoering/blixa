@@ -10,6 +10,7 @@ import life.catalogue.api.vocab.Gender;
 import life.catalogue.api.vocab.NomStatus;
 import org.catalogueoflife.editor.audit.AuditService;
 import org.catalogueoflife.editor.audit.Operation;
+import org.catalogueoflife.editor.lock.LockMapper;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.catalogueoflife.editor.name.dto.DemoteRequest;
@@ -59,6 +60,7 @@ public class NameUsageService {
   private final ReferenceMapper references;
   private final ReferenceService referenceService;
   private final WebPageClient webPageClient;
+  private final LockMapper locks;
 
   // Self-reference through the Spring proxy so createAndLinkWebReference's @Transactional actually
   // applies when called from addWebReference below -- see ExportRunService/ColMatchJobService's
@@ -73,7 +75,8 @@ public class NameUsageService {
       ProjectService projects, ProjectMapper projectMapper, NameParserService parser, TreeMapper tree,
       AuditService audit, ObjectMapper objectMapper, ApplicationEventPublisher events, IssueMapper issues,
       TaxonInfoMapper taxonInfo, org.catalogueoflife.editor.child.TaxonChildMapper taxonChildren,
-      ReferenceMapper references, ReferenceService referenceService, WebPageClient webPageClient) {
+      ReferenceMapper references, ReferenceService referenceService, WebPageClient webPageClient,
+      LockMapper locks) {
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
     this.idSeq = idSeq;
@@ -90,6 +93,7 @@ public class NameUsageService {
     this.references = references;
     this.referenceService = referenceService;
     this.webPageClient = webPageClient;
+    this.locks = locks;
   }
 
   // Unified list/search backing GET /usages: q/rank/status are each optional and ANDed together
@@ -430,6 +434,7 @@ public class NameUsageService {
     // entity_id is polymorphic (no cascade FK to name_usage): clean up this usage's own issue rows
     // now, or they'd reference a nonexistent entity forever (see validation/IssueMapper.deleteByEntity).
     issues.deleteByEntity(projectId, ENTITY, id);
+    locks.deleteByEntity(projectId, ENTITY, id); // advisory lock is meaningless once the usage is gone
     audit.record(projectId, userId, ENTITY, id, Operation.DELETE, before, null);
     // The usage itself is gone by the time this fires (AFTER_COMMIT), so
     // ValidationService.revalidateUsage will find nothing and no-op -- published anyway per the

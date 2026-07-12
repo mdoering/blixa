@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import org.catalogueoflife.editor.audit.AuditService;
 import org.catalogueoflife.editor.audit.Operation;
+import org.catalogueoflife.editor.lock.LockMapper;
 import org.catalogueoflife.editor.mergerecords.dto.MergeResult;
 import org.catalogueoflife.editor.mergerecords.dto.ReferenceMergeCandidate;
 import org.catalogueoflife.editor.mergerecords.dto.UsageMergeCandidate;
@@ -38,10 +39,11 @@ public class MergeRecordsService {
   private final AuditService audit;
   private final ApplicationEventPublisher events;
   private final IssueMapper issues;
+  private final LockMapper locks;
 
   public MergeRecordsService(MergeRecordsMapper merge, NameUsageMapper usages, ReferenceMapper references,
       ProjectService projects, TreeMapper tree, AuditService audit, ApplicationEventPublisher events,
-      IssueMapper issues) {
+      IssueMapper issues, LockMapper locks) {
     this.merge = merge;
     this.usages = usages;
     this.references = references;
@@ -50,6 +52,7 @@ public class MergeRecordsService {
     this.audit = audit;
     this.events = events;
     this.issues = issues;
+    this.locks = locks;
   }
 
   public List<UsageMergeCandidate> previewUsages(int userId, int projectId, List<Integer> ids) {
@@ -128,6 +131,7 @@ public class MergeRecordsService {
       // or they'd reference a nonexistent entity forever (see validation/IssueMapper.deleteByEntity,
       // mirrors NameUsageService.delete's single-usage cleanup).
       issues.deleteByEntity(projectId, "name_usage", d);
+      locks.deleteByEntity(projectId, "name_usage", d); // release any advisory lock on the merged duplicate
       usages.delete(projectId, d);
     }
 

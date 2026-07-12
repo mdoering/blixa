@@ -1,5 +1,6 @@
 package org.catalogueoflife.editor.mergerecords;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -20,6 +21,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 // The destructive apply step of usage merge: repoint every FK pointing at the merged (duplicate)
@@ -101,6 +103,12 @@ class UsageMergeApplyIT extends AbstractPostgresIT {
     createRelation(pid, child, d, "spelling_correction");
     // D has a vernacular
     createVernacular(pid, d, "Lion");
+    // D also has an advisory lock on it -- merge must release it (MergeRecordsService.mergeUsages's
+    // locks.deleteByEntity call), since holding a lock on a now-deleted duplicate is meaningless.
+    mvc.perform(post("/api/projects/" + pid + "/locks").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"entityType\":\"name_usage\",\"entityId\":" + d + "}"))
+        .andExpect(status().isOk());
 
     mvc.perform(post("/api/projects/" + pid + "/usages/merge").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
@@ -112,6 +120,14 @@ class UsageMergeApplyIT extends AbstractPostgresIT {
     // D is gone
     mvc.perform(get("/api/projects/" + pid + "/usages/" + d))
         .andExpect(status().isNotFound());
+
+    // D's advisory lock is gone too -- no longer among the project's active locks.
+    String activeLocksBody = mvc.perform(get("/api/projects/" + pid + "/locks"))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    for (JsonNode lock : json.readTree(activeLocksBody)) {
+      assertThat(lock.get("entityId").asInt()).isNotEqualTo(d);
+    }
 
     // D's child now hangs under S
     mvc.perform(get("/api/projects/" + pid + "/usages/" + child))

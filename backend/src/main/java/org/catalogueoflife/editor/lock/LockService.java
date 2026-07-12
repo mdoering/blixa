@@ -7,6 +7,7 @@ import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.task.Task;
 import org.catalogueoflife.editor.task.TaskMapper;
 import org.catalogueoflife.editor.task.TaskStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,18 +21,20 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class LockService {
 
-  static final int DEFAULT_TTL_SECONDS = 300;
   static final int MIN_TTL_SECONDS = 30;
   static final int MAX_TTL_SECONDS = 3600;
 
   private final LockMapper locks;
   private final ProjectService projects;
   private final TaskMapper tasks;
+  private final int defaultTtlSeconds;
 
-  public LockService(LockMapper locks, ProjectService projects, TaskMapper tasks) {
+  public LockService(LockMapper locks, ProjectService projects, TaskMapper tasks,
+      @Value("${coldp.lock.ttl-seconds:300}") int defaultTtlSeconds) {
     this.locks = locks;
     this.projects = projects;
     this.tasks = tasks;
+    this.defaultTtlSeconds = defaultTtlSeconds;
   }
 
   @Transactional
@@ -100,8 +103,8 @@ public class LockService {
         l.getTaskId(), l.getTaskTitle());
   }
 
-  private static int clampTtl(Integer ttlSeconds) {
-    int ttl = ttlSeconds == null ? DEFAULT_TTL_SECONDS : ttlSeconds;
+  private int clampTtl(Integer ttlSeconds) {
+    int ttl = ttlSeconds == null ? defaultTtlSeconds : ttlSeconds;
     return Math.max(MIN_TTL_SECONDS, Math.min(MAX_TTL_SECONDS, ttl));
   }
 }
