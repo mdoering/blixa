@@ -36,10 +36,11 @@ public class ReferenceService {
   private final ApplicationEventPublisher events;
   private final IssueMapper issues;
   private final PdfService pdfService;
+  private final ReferenceCitationService citationService;
 
   public ReferenceService(ReferenceMapper references, IdSeqMapper idSeq, ProjectService projects,
       AuditService audit, ObjectMapper objectMapper, NameUsageMapper usages, ApplicationEventPublisher events,
-      IssueMapper issues, PdfService pdfService) {
+      IssueMapper issues, PdfService pdfService, ReferenceCitationService citationService) {
     this.references = references;
     this.idSeq = idSeq;
     this.projects = projects;
@@ -49,6 +50,7 @@ public class ReferenceService {
     this.events = events;
     this.issues = issues;
     this.pdfService = pdfService;
+    this.citationService = citationService;
   }
 
   public List<Reference> list(int userId, int projectId, int limit, int offset) {
@@ -71,8 +73,6 @@ public class ReferenceService {
     requireEditor(userId, projectId);
     Reference r = new Reference();
     r.setProjectId(projectId);
-    r.setCitation(req.citation());
-    r.setCitationManual(Boolean.TRUE.equals(req.citationManual()));
     r.setType(validateType(req.type()));
     r.setAuthor(req.author());
     r.setEditor(req.editor());
@@ -91,6 +91,9 @@ public class ReferenceService {
     r.setAccessed(req.accessed());
     r.setRemarks(req.remarks());
     r.setModifiedBy(userId);
+    // Structured fields above must be populated first: applyCitation's isStructured/render calls
+    // read them off `r` (see that method's javadoc for the full manual-vs-generated decision).
+    applyCitation(r, projectId, req.citation(), req.citationManual());
     // allocate the next per-project id BEFORE inserting: reference has no DB identity column
     // any more (see V3__name_core.sql), so the app owns id generation via id_seq.
     r.setId(idSeq.allocate(projectId, ENTITY));
@@ -113,8 +116,6 @@ public class ReferenceService {
     // subsequent mutation.
     @SuppressWarnings("unchecked")
     Map<String, Object> before = objectMapper.convertValue(r, Map.class);
-    r.setCitation(req.citation());
-    r.setCitationManual(Boolean.TRUE.equals(req.citationManual()));
     r.setType(validateType(req.type()));
     r.setAuthor(req.author());
     r.setEditor(req.editor());
@@ -134,6 +135,9 @@ public class ReferenceService {
     r.setRemarks(req.remarks());
     r.setModifiedBy(userId);
     r.setVersion(req.version());
+    // Structured fields above must be populated first, same as create() -- see applyCitation's
+    // javadoc.
+    applyCitation(r, projectId, req.citation(), req.citationManual());
     int updated = references.update(r);
     if (updated == 0) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
@@ -292,6 +296,30 @@ public class ReferenceService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "variants must not be empty");
     }
     return references.mergeContainerTitle(projectId, canonical, variants);
+  }
+
+  // Decides whether `r`'s citation is GENERATED (via ReferenceCitationService, in the project's
+  // csl_style) or MANUAL (the caller's own string, kept verbatim) and sets both citation/
+  // citationManual accordingly. Called from create/update AFTER every structured field (author,
+  // title, containerTitle, type, ...) has already been set on `r` -- isStructured/render below read
+  // those fields off `r` itself, not off the request.
+  //   1. citationManual explicitly true  -> MANUAL: keep `citation` as supplied.
+  //   2. else, r has structured content  -> GENERATED: render() overwrites any supplied `citation`.
+  //   3. else (no structured content)    -> MANUAL: nothing to generate from, keep `citation` as
+  //      supplied (this is also what a plain "citation-string-only" reference -- the overwhelming
+  //      majority of legacy/imported data -- looks like).
+  private void applyCitation(Reference r, int projectId, String citation, Boolean citationManual) {
+    if (Boolean.TRUE.equals(citationManual)) {
+      r.setCitation(citation);
+      r.setCitationManual(true);
+    } else if (citationService.isStructured(r)) {
+      String cslStyle = projects.getCslStyle(projectId);
+      r.setCitation(citationService.render(r, cslStyle));
+      r.setCitationManual(false);
+    } else {
+      r.setCitation(citation);
+      r.setCitationManual(true);
+    }
   }
 
   // Tolerantly resolves `raw` (the CSL-JSON wire id, e.g. "article-journal", the enum name, or a

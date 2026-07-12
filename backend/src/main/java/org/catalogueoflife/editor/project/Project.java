@@ -21,6 +21,13 @@ public class Project {
   // ProjectResponse/UpdateProjectMetadataRequest for the wire-facing read/write shape.
   private List<IdentifierScope> identifierScopes;
   private boolean isPublic;
+  // Which CSL citation style (life.catalogue.common.csl.CslFormatter.STYLE, lower-cased, e.g.
+  // "apa"/"harvard") this project's GENERATED reference citations render in -- see
+  // V25__project_csl_style.sql / ReferenceCitationService.render / ProjectService.updateMetadata
+  // (which validates + persists changes and regenerates every non-manual reference's citation).
+  // Default mirrors the DB column default so a freshly-created, not-yet-refetched Project (see
+  // ProjectService.create) already carries the right in-memory value, same as gbifOccurrenceLayer.
+  private String cslStyle = "apa";
 
   public Integer getId() { return id; }
   public void setId(Integer id) { this.id = id; }
@@ -46,4 +53,6 @@ public class Project {
   public void setIdentifierScopes(List<IdentifierScope> identifierScopes) { this.identifierScopes = identifierScopes; }
   public boolean isPublic() { return isPublic; }
   public void setPublic(boolean isPublic) { this.isPublic = isPublic; }
+  public String getCslStyle() { return cslStyle; }
+  public void setCslStyle(String cslStyle) { this.cslStyle = cslStyle; }
 }

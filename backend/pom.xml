@@ -134,6 +134,19 @@
         <exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId></exclusion>
       </exclusions>
     </dependency>
+    <!-- CslFormatter/CslData (life.catalogue.common.csl / life.catalogue.api.model), same
+         org.catalogueoflife:api transitive (already pulled in by `reader` above) that provides the
+         bundled /csl-styles/*.csl resources CslFormatter loads off the classpath. Used by
+         name/ReferenceCitationService to generate reference citations (see V25__project_csl_style.sql). -->
+    <dependency>
+      <groupId>org.catalogueoflife</groupId>
+      <artifactId>reference</artifactId>
+      <version>1.3.0-SNAPSHOT</version>
+      <exclusions>
+        <exclusion><groupId>org.junit.vintage</groupId><artifactId>junit-vintage-engine</artifactId></exclusion>
+        <exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId></exclusion>
+      </exclusions>
+    </dependency>
     <!-- BibTeX parsing for reference import (see name/RefMapping.fromBibtex). -->
     <dependency>
       <groupId>org.jbibtex</groupId>

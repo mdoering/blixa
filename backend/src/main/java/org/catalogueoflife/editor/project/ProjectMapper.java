@@ -48,6 +48,7 @@ public interface ProjectMapper {
           geographic_scope = #{geographicScope}, taxonomic_scope = #{taxonomicScope},
           metadata = #{metadata}::jsonb, gbif_occurrence_layer = #{gbifOccurrenceLayer},
           identifier_scopes = #{identifierScopes,typeHandler=org.catalogueoflife.editor.project.IdentifierScopeListTypeHandler,jdbcType=OTHER},
+          csl_style = #{cslStyle},
           updated_at = now()
       WHERE id = #{id}
       """)

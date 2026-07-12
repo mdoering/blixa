@@ -17,4 +17,11 @@ public record UpdateProjectMetadataRequest(
     // identifier field for, each with an optional CLB dataset key (matchable iff datasetKey is
     // set). Same "omitted -> keep existing" contract as gbifOccurrenceLayer (see
     // ProjectService.updateMetadata); an explicit [] clears the configured scopes.
-    List<IdentifierScope> identifierScopes) {}
+    List<IdentifierScope> identifierScopes,
+    // Which CSL style (e.g. "apa", "harvard" -- life.catalogue.common.csl.CslFormatter.STYLE,
+    // case-insensitive) generated reference citations should render in. Same "omitted -> keep
+    // existing" contract as gbifOccurrenceLayer/identifierScopes above; a non-null value is
+    // validated against the STYLE set by ProjectService.updateMetadata (400 if unrecognized), and a
+    // value that actually changes the project's stored style regenerates every non-manual
+    // reference's citation.
+    String cslStyle) {}

@@ -3,6 +3,10 @@ package org.catalogueoflife.editor.project;
 import java.util.List;
 import java.util.Locale;
 import life.catalogue.api.vocab.License;
+import life.catalogue.common.csl.CslFormatter;
+import org.catalogueoflife.editor.name.Reference;
+import org.catalogueoflife.editor.name.ReferenceCitationService;
+import org.catalogueoflife.editor.name.ReferenceMapper;
 import org.catalogueoflife.editor.project.dto.CreateProjectRequest;
 import org.catalogueoflife.editor.project.dto.UpdateProjectMetadataRequest;
 import org.catalogueoflife.editor.user.AppUser;
@@ -22,16 +26,20 @@ public class ProjectService {
   private final ProjectMemberMapper members;
   private final AppUserMapper users;
   private final AppUserService userService;
+  private final ReferenceMapper references;
+  private final ReferenceCitationService citationService;
   // ORCID is "configured" iff the client-id is not the sentinel default (see ConfigController).
   private final boolean orcidConfigured;
 
   public ProjectService(ProjectMapper projects, ProjectMemberMapper members, AppUserMapper users,
-      AppUserService userService,
+      AppUserService userService, ReferenceMapper references, ReferenceCitationService citationService,
       @Value("${spring.security.oauth2.client.registration.orcid.client-id:unconfigured}") String orcidClientId) {
     this.projects = projects;
     this.members = members;
     this.users = users;
     this.userService = userService;
+    this.references = references;
+    this.citationService = citationService;
     this.orcidConfigured = !"unconfigured".equals(orcidClientId);
   }
 
@@ -98,6 +106,7 @@ public class ProjectService {
     NomCode nomCode = parseNomCode(req.nomCode());
     License license = Licenses.parse(req.license());
     Project p = projects.findById(projectId);
+    String oldCslStyle = p.getCslStyle();
     p.setTitle(req.title());
     p.setAlias(req.alias());
     p.setDescription(req.description());
@@ -116,8 +125,54 @@ public class ProjectService {
     if (req.identifierScopes() != null) {
       p.setIdentifierScopes(req.identifierScopes());
     }
+    // Same null-safe carry-over again: a non-null cslStyle must be one of CslFormatter.STYLE
+    // (case-insensitive) -- reject anything else with 400 rather than silently storing a value
+    // ReferenceCitationService would then quietly fall back to APA for.
+    if (req.cslStyle() != null) {
+      p.setCslStyle(validateCslStyle(req.cslStyle()));
+    }
     projects.updateMetadata(p);
+    // A style change invalidates every previously-GENERATED citation in the project -- regenerate
+    // them all in the new style so the UI/ColDP export don't keep showing stale text under a
+    // project that now says e.g. "harvard". Manual citations (Reference.citationManual) are left
+    // untouched: they were never derived from cslStyle to begin with.
+    if (!p.getCslStyle().equals(oldCslStyle)) {
+      regenerateCitations(projectId, p.getCslStyle());
+    }
     return p;
+  }
+
+  // Internal accessor for ReferenceService.applyCitation: the caller has already passed an
+  // editor-role check (requireEditor) before creating/updating a reference, so this intentionally
+  // skips a second requireRole/ACL round-trip.
+  public String getCslStyle(int projectId) {
+    return projects.findById(projectId).getCslStyle();
+  }
+
+  // Re-renders and persists the citation of every non-manual reference in `projectId` -- called
+  // only when updateMetadata just changed cslStyle. Deliberately bypasses ReferenceMapper.update's
+  // per-row CAS/audit/ValidationEvent machinery (via updateCitation, a narrow write) the same way
+  // ReferenceService.mergeContainerTitle does for its own bulk field rewrite: a citation regenerated
+  // because the PROJECT'S style changed is system-driven maintenance, not a per-reference edit a
+  // concurrent editor should see as a stale-version conflict.
+  // NOTE: could be async for very large projects -- synchronous is fine for now.
+  private void regenerateCitations(int projectId, String cslStyle) {
+    for (Reference ref : references.findAllByProject(projectId)) {
+      if (!ref.isCitationManual()) {
+        references.updateCitation(projectId, ref.getId(), citationService.render(ref, cslStyle));
+      }
+    }
+  }
+
+  // Tolerantly upper-cases + resolves `raw` against CslFormatter.STYLE, mirroring parseNomCode's
+  // shape below; rejects anything unrecognized with a 400 rather than silently storing garbage.
+  // Stored lower-case to match the wire form (see ProjectResponse.of / Project.cslStyle's javadoc).
+  private static String validateCslStyle(String raw) {
+    try {
+      return CslFormatter.STYLE.valueOf(raw.trim().toUpperCase(Locale.ROOT)).name().toLowerCase(Locale.ROOT);
+    } catch (IllegalArgumentException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown csl style: " + raw);
+    }
   }
 
   public java.util.List<org.catalogueoflife.editor.project.dto.MemberResponse> listMembers(int actorId, int projectId) {

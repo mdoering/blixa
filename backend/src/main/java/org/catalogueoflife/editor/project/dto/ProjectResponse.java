@@ -14,7 +14,10 @@ public record ProjectResponse(
     boolean gbifOccurrenceLayer, List<IdentifierScope> identifierScopes,
     // Named "isPublic" (not "public", a reserved word) on the wire as "public" via @JsonProperty,
     // same reserved-word dodge as MergeRunResponse.MergeMetrics.NameCounts#newCount -> "new".
-    @JsonProperty("public") boolean isPublic) {
+    @JsonProperty("public") boolean isPublic,
+    // See UpdateProjectMetadataRequest.cslStyle's javadoc -- round-trips the project's generated-
+    // citation style so a settings UI can show/edit the current value.
+    String cslStyle) {
 
   public static ProjectResponse of(Project p, String role) {
     return new ProjectResponse(p.getId(), p.getTitle(), p.getAlias(), p.getDescription(),
@@ -23,6 +26,6 @@ public record ProjectResponse(
         p.getNomCode() == null ? null : p.getNomCode().name().toLowerCase(Locale.ROOT),
         Licenses.toWire(p.getLicense()),
         p.getGeographicScope(), p.getTaxonomicScope(), role, p.getGbifOccurrenceLayer(),
-        p.getIdentifierScopes(), p.isPublic());
+        p.getIdentifierScopes(), p.isPublic(), p.getCslStyle());
   }
 }

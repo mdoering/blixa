@@ -156,4 +156,13 @@ public interface ReferenceMapper {
       "</script>"})
   int mergeContainerTitle(@Param("projectId") int projectId, @Param("canonical") String canonical,
       @Param("variants") List<String> variants);
+
+  // Narrow write of just `citation` -- ProjectService.updateMetadata uses this to bulk-regenerate
+  // every non-manual reference's citation after a project cslStyle change. Same "bulk maintenance,
+  // no version bump / no audit row" convention as mergeContainerTitle above: a citation regenerated
+  // because the PROJECT'S style changed is not a per-reference edit a concurrent editor should see
+  // as a CAS conflict.
+  @Update("UPDATE reference SET citation = #{citation} WHERE project_id = #{projectId} AND id = #{id}")
+  void updateCitation(@Param("projectId") int projectId, @Param("id") int id,
+      @Param("citation") String citation);
 }
