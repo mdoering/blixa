@@ -301,6 +301,57 @@ export default function ProjectMetadataPage() {
 
   return (
     <Stack style={{ maxWidth: 720 }} gap="xl">
+      {/* 1. Main metadata form: the core editable project fields + Save. Note that the GBIF map
+          toggle and the identifier scopes editor are NOT rendered here -- they're bound to this
+          same `form` object (see form.getInputProps below) but visually live in the Settings
+          section further down the page; Mantine's form state is independent of DOM position, so
+          this Save button still submits their values along with everything below. */}
+      <form
+        onSubmit={form.onSubmit((v) => {
+          // Blank rows (added via "Add scope" but never filled in) are dropped rather than saved
+          // as an empty-scope entry; a blank datasetKey is sent as undefined (-> null on the
+          // backend, not matchable) rather than "" so the two states can't drift apart.
+          const identifierScopes = (v.identifierScopes ?? [])
+            .map((s) => ({ scope: s.scope.trim(), datasetKey: (s.datasetKey ?? '').trim() || undefined }))
+            .filter((s) => s.scope !== '');
+          mutation.mutate({ ...v, identifierScopes });
+        })}
+      >
+        <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
+          <Stack gap="md">
+            <TextInput label="Title" {...form.getInputProps('title')} />
+            <SimpleGrid cols={2}>
+              <TextInput label="Alias" {...form.getInputProps('alias')} />
+              <Select
+                label="Nomenclatural code"
+                clearable
+                data={NOM_CODES.map((c) => ({ value: c, label: c }))}
+                {...form.getInputProps('nomCode')}
+              />
+            </SimpleGrid>
+            <Textarea label="Description" rows={3} {...form.getInputProps('description')} />
+            <SimpleGrid cols={2}>
+              <Select
+                label="License"
+                clearable
+                data={LICENSES.map((l) => ({ value: l, label: l }))}
+                {...form.getInputProps('license')}
+              />
+            </SimpleGrid>
+            <SimpleGrid cols={2}>
+              <TextInput label="Geographic scope" {...form.getInputProps('geographicScope')} />
+              <TextInput label="Taxonomic scope" {...form.getInputProps('taxonomicScope')} />
+            </SimpleGrid>
+            <Button type="submit" loading={mutation.isPending} disabled={!canEdit}>
+              Save
+            </Button>
+          </Stack>
+        </fieldset>
+      </form>
+
+      {/* 2. Releases (owner-only): the Public toggle + publish form + release list -- both
+          publishing actions gated on a license being set (B2, see ProjectService.setPublic /
+          ReleaseService.publish). */}
       {isOwner && (
         <Stack gap="xs">
           <Group justify="space-between">
@@ -392,170 +443,16 @@ export default function ProjectMetadataPage() {
         </Stack>
       )}
 
-      <Stack gap="xs">
-        <Group justify="space-between">
-          <Title order={4} m={0}>
-            Export ColDP
-          </Title>
-          <Button
-            variant="default"
-            loading={startExportMut.isPending}
-            disabled={exportRunning}
-            onClick={() => startExportMut.mutate()}
-          >
-            Export ColDP
-          </Button>
-        </Group>
-        {exportRun?.status === 'RUNNING' && (
-          <Text size="sm" c="dimmed">
-            Exporting…
-          </Text>
-        )}
-        {exportRun?.status === 'DONE' && (
-          <Stack gap={4}>
-            <Group gap="xs">
-              <Text size="sm">
-                {exportRun.fileName}
-                {exportRun.fileSize != null && ` (${formatFileSize(exportRun.fileSize)})`}
-              </Text>
-              <Anchor href={exportFileUrl(id, exportRun.id)} download>
-                Download
-              </Anchor>
-            </Group>
-            <Group gap="xs">
-              <Badge color="blue" variant="light">
-                usages {exportRun.nameUsageCount}
-              </Badge>
-              <Badge color="grape" variant="light">
-                references {exportRun.referenceCount}
-              </Badge>
-            </Group>
-          </Stack>
-        )}
-        {exportRun?.status === 'FAILED' && (
-          <Alert color="red" title="Export ColDP failed">
-            {exportRun.error ?? 'Unknown error'}
-          </Alert>
-        )}
-      </Stack>
-
-      {canEdit && (
-        <Stack gap="xs">
-          <Group justify="space-between">
-            <Title order={4} m={0}>
-              Match all identifiers
-            </Title>
-            <Button
-              variant="default"
-              loading={startMatchMut.isPending}
-              disabled={matchRunning || !hasMatchableScope}
-              onClick={() => startMatchMut.mutate()}
-            >
-              Match all identifiers
-            </Button>
-          </Group>
-          {!hasMatchableScope && (
-            <Text size="sm" c="dimmed">
-              Configure an identifier scope with a dataset key below to enable matching.
-            </Text>
-          )}
-          {matchRun?.status === 'RUNNING' && (
-            <Stack gap={4}>
-              <Progress
-                value={matchRun.total ? (matchRun.processed / matchRun.total) * 100 : 0}
-                animated
-              />
-              <Text size="sm" c="dimmed">
-                Matched {matchRun.processed} of {matchRun.total}…
-              </Text>
-            </Stack>
-          )}
-          {matchRun?.status === 'DONE' && (
-            <Stack gap={4}>
-              <Group gap="xs">
-                <Badge color="blue" variant="light">
-                  verified {matchRun.verified}
-                </Badge>
-                <Badge color="green" variant="light">
-                  added {matchRun.added}
-                </Badge>
-                <Badge color="yellow" variant="light">
-                  updated {matchRun.updated}
-                </Badge>
-                <Badge color="red" variant="light">
-                  unmatched {matchRun.unmatched}
-                </Badge>
-              </Group>
-              <Text size="sm" c="dimmed">
-                Flags appear in the{' '}
-                <Anchor component={Link} to={`/projects/${id}/issues`}>
-                  Issues
-                </Anchor>{' '}
-                view.
-              </Text>
-            </Stack>
-          )}
-          {matchRun?.status === 'FAILED' && (
-            <Alert color="red" title="Match all identifiers failed">
-              {matchRun.error ?? 'Unknown error'}
-            </Alert>
-          )}
-        </Stack>
-      )}
-
-      {canEdit && (
-        <Stack gap="xs">
-          <Group justify="space-between">
-            <Title order={4} m={0}>
-              Merge project
-            </Title>
-            <Button variant="default" onClick={() => setMerging(true)}>
-              Merge…
-            </Button>
-          </Group>
-          <Text size="sm" c="dimmed">
-            Merge another project&apos;s names and references into this one.
-          </Text>
-          <MergeModal opened={merging} onClose={() => setMerging(false)} targetId={id} />
-        </Stack>
-      )}
-
-      <form
-        onSubmit={form.onSubmit((v) => {
-          // Blank rows (added via "Add scope" but never filled in) are dropped rather than saved
-          // as an empty-scope entry; a blank datasetKey is sent as undefined (-> null on the
-          // backend, not matchable) rather than "" so the two states can't drift apart.
-          const identifierScopes = (v.identifierScopes ?? [])
-            .map((s) => ({ scope: s.scope.trim(), datasetKey: (s.datasetKey ?? '').trim() || undefined }))
-            .filter((s) => s.scope !== '');
-          mutation.mutate({ ...v, identifierScopes });
-        })}
-      >
+      {/* 3. Settings: project-level configuration that isn't part of the core bibliographic
+          metadata above -- the GBIF occurrence map toggle and the identifier scopes editor. Both
+          are still bound to `form` (see the comment on the <form> above) and disabled the same
+          way the main metadata fields are (fieldset disabled={!canEdit}). */}
+      <Stack gap="md">
+        <Title order={4} m={0}>
+          Settings
+        </Title>
         <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
           <Stack gap="md">
-            <TextInput label="Title" {...form.getInputProps('title')} />
-            <SimpleGrid cols={2}>
-              <TextInput label="Alias" {...form.getInputProps('alias')} />
-              <Select
-                label="Nomenclatural code"
-                clearable
-                data={NOM_CODES.map((c) => ({ value: c, label: c }))}
-                {...form.getInputProps('nomCode')}
-              />
-            </SimpleGrid>
-            <Textarea label="Description" rows={3} {...form.getInputProps('description')} />
-            <SimpleGrid cols={2}>
-              <Select
-                label="License"
-                clearable
-                data={LICENSES.map((l) => ({ value: l, label: l }))}
-                {...form.getInputProps('license')}
-              />
-            </SimpleGrid>
-            <SimpleGrid cols={2}>
-              <TextInput label="Geographic scope" {...form.getInputProps('geographicScope')} />
-              <TextInput label="Taxonomic scope" {...form.getInputProps('taxonomicScope')} />
-            </SimpleGrid>
             <Switch
               label="Show GBIF occurrence layer on maps"
               {...form.getInputProps('gbifOccurrenceLayer', { type: 'checkbox' })}
@@ -621,13 +518,147 @@ export default function ProjectMetadataPage() {
                 Add scope
               </Button>
             </Stack>
-            <Button type="submit" loading={mutation.isPending} disabled={!canEdit}>
-              Save
-            </Button>
           </Stack>
         </fieldset>
-      </form>
+      </Stack>
 
+      {/* 4. Tools: one-off actions over the project's data -- export, bulk identifier matching,
+          and the supervised project merge. */}
+      <Stack gap="md">
+        <Title order={4} m={0}>
+          Tools
+        </Title>
+
+        <Stack gap="xs">
+          <Group justify="space-between">
+            <Title order={5} m={0}>
+              Export ColDP
+            </Title>
+            <Button
+              variant="default"
+              loading={startExportMut.isPending}
+              disabled={exportRunning}
+              onClick={() => startExportMut.mutate()}
+            >
+              Export ColDP
+            </Button>
+          </Group>
+          {exportRun?.status === 'RUNNING' && (
+            <Text size="sm" c="dimmed">
+              Exporting…
+            </Text>
+          )}
+          {exportRun?.status === 'DONE' && (
+            <Stack gap={4}>
+              <Group gap="xs">
+                <Text size="sm">
+                  {exportRun.fileName}
+                  {exportRun.fileSize != null && ` (${formatFileSize(exportRun.fileSize)})`}
+                </Text>
+                <Anchor href={exportFileUrl(id, exportRun.id)} download>
+                  Download
+                </Anchor>
+              </Group>
+              <Group gap="xs">
+                <Badge color="blue" variant="light">
+                  usages {exportRun.nameUsageCount}
+                </Badge>
+                <Badge color="grape" variant="light">
+                  references {exportRun.referenceCount}
+                </Badge>
+              </Group>
+            </Stack>
+          )}
+          {exportRun?.status === 'FAILED' && (
+            <Alert color="red" title="Export ColDP failed">
+              {exportRun.error ?? 'Unknown error'}
+            </Alert>
+          )}
+        </Stack>
+
+        {canEdit && (
+          <Stack gap="xs">
+            <Group justify="space-between">
+              <Title order={5} m={0}>
+                Match all identifiers
+              </Title>
+              <Button
+                variant="default"
+                loading={startMatchMut.isPending}
+                disabled={matchRunning || !hasMatchableScope}
+                onClick={() => startMatchMut.mutate()}
+              >
+                Match all identifiers
+              </Button>
+            </Group>
+            {!hasMatchableScope && (
+              <Text size="sm" c="dimmed">
+                Configure an identifier scope with a dataset key below to enable matching.
+              </Text>
+            )}
+            {matchRun?.status === 'RUNNING' && (
+              <Stack gap={4}>
+                <Progress
+                  value={matchRun.total ? (matchRun.processed / matchRun.total) * 100 : 0}
+                  animated
+                />
+                <Text size="sm" c="dimmed">
+                  Matched {matchRun.processed} of {matchRun.total}…
+                </Text>
+              </Stack>
+            )}
+            {matchRun?.status === 'DONE' && (
+              <Stack gap={4}>
+                <Group gap="xs">
+                  <Badge color="blue" variant="light">
+                    verified {matchRun.verified}
+                  </Badge>
+                  <Badge color="green" variant="light">
+                    added {matchRun.added}
+                  </Badge>
+                  <Badge color="yellow" variant="light">
+                    updated {matchRun.updated}
+                  </Badge>
+                  <Badge color="red" variant="light">
+                    unmatched {matchRun.unmatched}
+                  </Badge>
+                </Group>
+                <Text size="sm" c="dimmed">
+                  Flags appear in the{' '}
+                  <Anchor component={Link} to={`/projects/${id}/issues`}>
+                    Issues
+                  </Anchor>{' '}
+                  view.
+                </Text>
+              </Stack>
+            )}
+            {matchRun?.status === 'FAILED' && (
+              <Alert color="red" title="Match all identifiers failed">
+                {matchRun.error ?? 'Unknown error'}
+              </Alert>
+            )}
+          </Stack>
+        )}
+
+        {canEdit && (
+          <Stack gap="xs">
+            <Group justify="space-between">
+              <Title order={5} m={0}>
+                Merge project
+              </Title>
+              <Button variant="default" onClick={() => setMerging(true)}>
+                Merge…
+              </Button>
+            </Group>
+            <Text size="sm" c="dimmed">
+              Merge another project&apos;s names and references into this one.
+            </Text>
+            <MergeModal opened={merging} onClose={() => setMerging(false)} targetId={id} />
+          </Stack>
+        )}
+      </Stack>
+
+      {/* 5. Danger zone (owner-only): stays at the very bottom. */}
       {isOwner && (
         <Stack
           gap="xs"
