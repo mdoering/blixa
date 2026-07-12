@@ -5,6 +5,6 @@
 # user (admin/admin) via DevBootstrap.
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5433/coldp_editor}
-    username: ${DB_USER:coldp_editor}
-    password: ${DB_PASSWORD:coldp_editor}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:blixa}
+    username: ${DB_USER:blixa}
+    password: ${DB_PASSWORD:blixa}

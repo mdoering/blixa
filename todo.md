@@ -113,3 +113,7 @@ Generalizes the COL-only bulk match to **every configured matchable scope**. 4 t
 - Per-row actions = `⋮` + right-click menu (not text buttons). Create = toolbar ＋New + contextual add-child/synonym.
 - Wire forms: name-usage `status` UPPERCASE, `rank` lowercase; project `nomCode` lowercase, `license` SPDX (`CC0-1.0`/`CC-BY-4.0`).
 - IDE "cannot find module / undefined" diagnostics after subagent edits are usually **stale** — verify with an actual `mvn verify` / `npm run build`.
+
+## Deployment
+- remove the pg only docker compose. Local dev users will have a postgres db running. Document how to configure the pg dbname/user/passwd and do a db init or flyway update (does the backend do that automatically?)
+- rename docker compose full to just docker compose
