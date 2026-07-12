@@ -9,8 +9,16 @@ export const server = setupServer(
   http.get('/api/config', () => HttpResponse.json({ orcidEnabled: true })),
   http.get('/api/public/projects', () => HttpResponse.json([])),
   // Default id-scopes vocab, so any page that seeds a scopes picker from it (ProjectMetadataPage)
-  // doesn't need this mocked per-test unless it cares about the exact list.
-  http.get('/api/coldp/id-scopes', () => HttpResponse.json(['col', 'gbif', 'ipni', 'tsn'])),
+  // or resolves a CURIE's link (CurieId) doesn't need this mocked per-test unless it cares about
+  // the exact list.
+  http.get('/api/coldp/id-scopes', () =>
+    HttpResponse.json([
+      { scope: 'col', title: 'Catalogue of Life', link: 'https://www.catalogueoflife.org' },
+      { scope: 'gbif', title: 'GBIF', link: 'https://www.gbif.org' },
+      { scope: 'ipni', title: 'IPNI', link: 'https://www.ipni.org' },
+      { scope: 'tsn', title: 'ITIS TSN', link: null },
+    ]),
+  ),
   // Default enum vocab (VocabController), so any render of a component that seeds a dropdown from
   // it -- TaxonDetail's Rank/Nomenclatural-status selects, ReferenceForm's Type select -- doesn't
   // need this mocked per-test unless it cares about the exact list (both currently override this

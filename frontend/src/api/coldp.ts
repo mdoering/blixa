@@ -1,10 +1,13 @@
 import { api } from './client';
+import type { IdScope } from './types';
 
 // The ColDP identifier-scope vocabulary (backend IdScopeController): lowercase CURIE prefixes
-// like "col", "gbif", "ipni". Used to seed the Project settings page's identifier-scopes picker
-// with known scopes, on top of which a project can still add free custom entries.
-export function getIdScopes(): Promise<string[]> {
-  return api<string[]>('/api/coldp/id-scopes');
+// like "col", "gbif", "ipni", each carrying an optional title and a resolver base `link` (used by
+// CurieId to render a clickable CURIE). Used to seed the Project settings page's
+// identifier-scopes picker with known scopes, on top of which a project can still add free custom
+// entries.
+export function getIdScopes(): Promise<IdScope[]> {
+  return api<IdScope[]>('/api/coldp/id-scopes');
 }
 
 // The enum vocabularies used to constrain the taxon editing form's dropdowns (backend

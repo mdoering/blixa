@@ -122,7 +122,7 @@ export default function ImportProjectModal({ opened, onClose }: ImportProjectMod
           <Autocomplete
             label="Identifier scope"
             placeholder="e.g. col"
-            data={idScopesVocab ?? []}
+            data={(idScopesVocab ?? []).map((s) => s.scope)}
             value={idScope}
             onChange={setIdScope}
             error={scopeMissing ? 'Required' : null}

@@ -37,6 +37,16 @@ export interface IdentifierScope {
   datasetKey?: string | null;
 }
 
+// One entry from the backend's ColDP identifier-scope vocab (GET /api/coldp/id-scopes, see
+// IdScopeController/IdScopeService): a CURIE prefix from the CLB `identifier-scope` vocab, plus
+// its human title and resolver base `link` (e.g. "ipni" -> "https://www.ipni.org"). Distinct from
+// IdentifierScope above, which is a project's own per-scope form-field configuration.
+export interface IdScope {
+  scope: string;
+  title: string | null;
+  link: string | null;
+}
+
 export interface Member {
   userId: number;
   username: string;

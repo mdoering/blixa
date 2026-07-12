@@ -1,4 +1,5 @@
 import {
+  ActionIcon,
   Alert,
   Box,
   Button,
@@ -15,8 +16,8 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconLock } from '@tabler/icons-react';
-import { useEffect, useMemo } from 'react';
+import { IconLock, IconPencil } from '@tabler/icons-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
 import { getProject } from '../api/projects';
@@ -24,6 +25,7 @@ import { getVocab } from '../api/coldp';
 import { listLocks } from '../api/locks';
 import { getUsage, updateUsage } from '../api/usages';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
+import CurieId from '../components/CurieId';
 import EntitySelect from '../child/EntitySelect';
 import NameRelationsTab, { referenceOptions } from '../child/NameRelationsTab';
 import { colIdFrom, scopedId, withScopedId } from '../child/map/mapUrls';
@@ -50,6 +52,14 @@ const STATUS_OPTIONS = [
 // enum name -> human label for a dropdown option, e.g. REPLACEMENT_NAME -> "replacement name".
 function prettyEnum(v: string): string {
   return v.toLowerCase().replace(/_/g, ' ');
+}
+
+// Splits an alternativeId CURIE entry ("scope:id") on the FIRST colon, so a scope-less or
+// malformed entry (no colon) is skipped rather than rendered as a bare/garbled chip.
+function parseCurie(entry: string): { scope: string; id: string } | null {
+  const i = entry.indexOf(':');
+  if (i < 0) return null;
+  return { scope: entry.slice(0, i), id: entry.slice(i + 1) };
 }
 
 interface EditableFields {
@@ -101,6 +111,12 @@ export interface TaxonDetailProps {
 // reloads the usage and reseeds the form instead of clobbering their change.
 export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
   const queryClient = useQueryClient();
+
+  // Identifiers section view/edit toggle: view mode (default) shows usage.alternativeId as
+  // read-only linked CurieId chips; edit mode shows the per-scope TextInput form below. Collapses
+  // back to view mode on a successful save (see the mutation's onSuccess) so the freshly-saved
+  // identifiers immediately show as resolved chips again.
+  const [editingIds, setEditingIds] = useState(false);
 
   const form = useForm<EditableFields>({
     initialValues: {
@@ -243,6 +259,9 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
       return updateUsage(pid, usageId, payload);
     },
     onSuccess: async () => {
+      // Collapse the identifiers section back to its read-only chip view, now showing whatever
+      // was just saved.
+      setEditingIds(false);
       await queryClient.invalidateQueries({ queryKey: ['usage', pid, usageId] });
       // The edited scientificName/authorship/rank/status can all show up in the tree rows.
       await queryClient.invalidateQueries({ queryKey: ['treeRoots', pid] });
@@ -398,17 +417,38 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                     nomStatusInputProps.onChange(v);
                   }}
                 />
-                {scopes.length > 0 && (
-                  <SimpleGrid cols={Math.min(scopes.length, 3)}>
-                    {scopes.map((scope) => (
-                      <TextInput
-                        key={scope}
-                        label={scope.toUpperCase()}
-                        {...form.getInputProps(`identifiers.${scope}`)}
-                      />
-                    ))}
-                  </SimpleGrid>
-                )}
+                {((usage.alternativeId?.length ?? 0) > 0 || (canEdit && scopes.length > 0)) &&
+                  (editingIds ? (
+                    <SimpleGrid cols={Math.min(scopes.length, 3)}>
+                      {scopes.map((scope) => (
+                        <TextInput
+                          key={scope}
+                          label={scope.toUpperCase()}
+                          {...form.getInputProps(`identifiers.${scope}`)}
+                        />
+                      ))}
+                    </SimpleGrid>
+                  ) : (
+                    <Group gap="xs" wrap="wrap">
+                      {(usage.alternativeId ?? []).map((entry) => {
+                        const parsed = parseCurie(entry);
+                        return parsed ? (
+                          <CurieId key={entry} scope={parsed.scope} id={parsed.id} />
+                        ) : null;
+                      })}
+                      {canEdit && scopes.length > 0 && (
+                        <ActionIcon
+                          type="button"
+                          variant="subtle"
+                          size="xs"
+                          aria-label="Edit identifiers"
+                          onClick={() => setEditingIds(true)}
+                        >
+                          <IconPencil size={12} />
+                        </ActionIcon>
+                      )}
+                    </Group>
+                  ))}
                 <Textarea label="Etymology" rows={2} {...form.getInputProps('etymology')} />
                 <Textarea label="Remarks" rows={2} {...form.getInputProps('remarks')} />
                 <Group>

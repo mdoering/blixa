@@ -219,7 +219,37 @@ test('a 409 conflict shows a notice and refetches the usage', async () => {
   await waitFor(() => expect(authorship).toHaveValue('Linnaeus, 1758'));
 });
 
-test('renders a per-scope identifier field from project.identifierScopes, prefilled from alternativeId, and saving folds the edit back in while preserving col:', async () => {
+test('view mode renders the alternativeId entries as linked CurieId chips, with an edit pencil for an editor', async () => {
+  mockCommon(baseUsage({ alternativeId: ['col:XYZ', 'ipni:123'] }));
+  server.use(
+    http.get('/api/projects/4', () => HttpResponse.json({ ...project, role: 'owner', identifierScopes: [{ scope: 'ipni' }] })),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await screen.findByLabelText('Scientific name');
+  expect(await screen.findByText('col:XYZ')).toBeInTheDocument();
+  expect(screen.getByText('ipni:123')).toBeInTheDocument();
+  // The per-scope edit form is behind the toggle -- not shown until the pencil is clicked.
+  expect(screen.queryByLabelText('IPNI')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Edit identifiers' })).toBeInTheDocument();
+});
+
+test('a viewer sees the identifier chips but no edit pencil', async () => {
+  mockCommon(baseUsage({ alternativeId: ['col:XYZ', 'ipni:123'] }), 'viewer');
+  server.use(
+    http.get('/api/projects/4', () => HttpResponse.json({ ...project, role: 'viewer', identifierScopes: [{ scope: 'ipni' }] })),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  // Wait for the base form to finish loading before asserting on the identifiers chips -- the
+  // usage/project/idScopes queries all settle together, and asserting on the chips alone can
+  // otherwise race the default findBy* timeout.
+  await screen.findByLabelText('Scientific name');
+  expect(await screen.findByText('col:XYZ')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Edit identifiers' })).not.toBeInTheDocument();
+});
+
+test('clicking the edit pencil reveals a per-scope identifier field from project.identifierScopes, prefilled from alternativeId, and saving folds the edit back in while preserving col:', async () => {
   mockCommon(baseUsage({ alternativeId: ['col:XYZ', 'ipni:123'] }));
   server.use(
     http.get('/api/projects/4', () => HttpResponse.json({ ...project, role: 'owner', identifierScopes: [{ scope: 'ipni' }] })),
@@ -233,6 +263,9 @@ test('renders a per-scope identifier field from project.identifierScopes, prefil
   );
   renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
 
+  await screen.findByText('ipni:123');
+  await userEvent.click(screen.getByRole('button', { name: 'Edit identifiers' }));
+
   const ipni = await screen.findByLabelText('IPNI');
   await waitFor(() => expect(ipni).toHaveValue('123'));
 
@@ -242,6 +275,8 @@ test('renders a per-scope identifier field from project.identifierScopes, prefil
 
   await waitFor(() => expect(putBody).toBeDefined());
   expect(putBody?.alternativeId).toEqual(['col:XYZ', 'ipni:456']);
+  // The identifiers section collapses back to the read-only chip view after a successful save.
+  await waitFor(() => expect(screen.queryByLabelText('IPNI')).not.toBeInTheDocument());
 });
 
 test('a viewer role sees a disabled Save button', async () => {

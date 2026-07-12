@@ -501,7 +501,7 @@ export default function ProjectMetadataPage() {
                   <Autocomplete
                     aria-label={`Scope ${index + 1}`}
                     placeholder="e.g. ipni"
-                    data={idScopesVocab ?? []}
+                    data={(idScopesVocab ?? []).map((s) => s.scope)}
                     style={{ flex: 1 }}
                     {...form.getInputProps(`identifierScopes.${index}.scope`)}
                     onChange={(value) => {
