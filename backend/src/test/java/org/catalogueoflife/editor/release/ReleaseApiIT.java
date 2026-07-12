@@ -9,8 +9,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.catalogueoflife.editor.project.ProjectMember;
 import org.catalogueoflife.editor.project.ProjectMemberMapper;
 import org.catalogueoflife.editor.project.Role;
@@ -19,8 +23,11 @@ import org.catalogueoflife.editor.user.AppUser;
 import org.catalogueoflife.editor.user.AppUserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
@@ -43,6 +50,10 @@ class ReleaseApiIT extends AbstractPostgresIT {
   @Autowired AppUserService users;
   @Autowired ProjectMemberMapper members;
   @Autowired ObjectMapper json;
+  @Autowired ReleaseMapper releaseMapper;
+  @Autowired ReleaseService releaseService;
+  @Autowired @Qualifier(ReleaseAsyncConfig.EXECUTOR_BEAN) java.util.concurrent.Executor releaseExecutor;
+  @Value("${coldp.release.dir:${java.io.tmpdir}/coldp-releases}") String releaseDirProp;
 
   private void ensureUser(String u) {
     if (users.requireByUsernameOrNull(u) == null) users.createLocal(u, "pw", u);
@@ -138,5 +149,39 @@ class ReleaseApiIT extends AbstractPostgresIT {
        .andExpect(status().isOk());
     mvc.perform(get("/api/projects/" + pid + "/releases"))
        .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  // Reproduces the permanent-file-leak race: the release row is gone (owner deleted it) by the time
+  // build() finishes, so ReleaseMapper.ready(...)'s CAS ("WHERE id = ? AND status = 'BUILDING'")
+  // matches zero rows and silently no-ops. Before the fix, build() ignored that return value and left
+  // {rid}.zip on disk forever with no DB reference and no retention sweep. We drive this deterministically
+  // (no real race) by deleting the row *before* calling build() directly, then proving no orphan zip
+  // survives -- ReleaseService.build() must now check ready()'s row count and delete the file it just wrote.
+  @Test
+  void orphanZipRemovedWhenReleaseDeletedBeforeBuildCompletes() throws Exception {
+    int pid = project("relOwner");
+    AppUser owner = users.requireByUsernameOrNull("relOwner");
+
+    Release r = new Release();
+    r.setProjectId(pid);
+    r.setVersion("orphan-1.0");
+    r.setCreatedBy(owner.getId());
+    releaseMapper.insertBuilding(r);
+    int rid = r.getId();
+
+    // Simulate "owner deletes the release while the build is still running": the row is gone before
+    // build() gets a chance to CAS it to READY.
+    releaseMapper.delete(rid);
+
+    // build() is @Async on ReleaseAsyncConfig.EXECUTOR_BEAN, a dedicated single-thread pool. Calling
+    // it on the injected (proxied) bean still queues it onto that executor, so instead of polling we
+    // submit a no-op barrier task right after it: since the pool is single-threaded and FIFO, waiting
+    // on the barrier's Future guarantees build() has already run to completion.
+    releaseService.build(pid, rid);
+    Future<?> barrier = ((ThreadPoolTaskExecutor) releaseExecutor).getThreadPoolExecutor().submit(() -> { });
+    barrier.get(10, TimeUnit.SECONDS);
+
+    Path zip = Path.of(releaseDirProp).resolve(rid + ".zip");
+    assertThat(Files.exists(zip)).isFalse();
   }
 }

@@ -86,8 +86,13 @@ public class ReleaseService {
     try {
       ColdpWriter.Counts counts = writer.write(projectId, target);
       String metrics = "{}"; // Task 3 replaces this with the rich snapshot
-      releases.ready(releaseId, counts.nameUsageCount(), metrics, target.toString(),
+      int updated = releases.ready(releaseId, counts.nameUsageCount(), metrics, target.toString(),
           downloadFileName(projectId, releaseId), Files.size(target));
+      if (updated == 0) {
+        // The release row was deleted (or left BUILDING) mid-build -> the zip we just wrote has no
+        // DB reference and no retention sweep, so remove it rather than leak it.
+        Files.deleteIfExists(target);
+      }
     } catch (Exception e) {
       log.warn("release build {} failed for project {}: {}", releaseId, projectId, e.getMessage(), e);
       releases.fail(releaseId, e.getMessage());
