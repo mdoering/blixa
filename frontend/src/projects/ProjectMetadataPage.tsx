@@ -5,6 +5,7 @@ import {
   Autocomplete,
   Badge,
   Button,
+  Divider,
   Group,
   Progress,
   SimpleGrid,
@@ -396,6 +397,7 @@ export default function ProjectMetadataPage() {
           see ReleaseService.publish). The Public toggle lives at the very top of the page. */}
       {isOwner && (
         <Stack gap="xs">
+          <Divider />
           <Title order={4} m={0}>
             Releases
           </Title>
@@ -552,6 +554,7 @@ export default function ProjectMetadataPage() {
       {/* 4. Tools: one-off actions over the project's data -- export, bulk identifier matching,
           and the supervised project merge. */}
       <Stack gap="md">
+        <Divider />
         <Title order={4} m={0}>
           Tools
         </Title>
