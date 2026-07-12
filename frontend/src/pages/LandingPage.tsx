@@ -13,11 +13,8 @@ export default function LandingPage() {
     <Container size="md" py="xl">
       <Stack gap="xl">
         <Stack gap="xs" align="flex-start">
-          {/* Brand lockup: the square logo mark on the left edge + a large wordmark. */}
-          <Group gap="xl" align="center" wrap="nowrap">
-            <BlixaLogo variant="logo" height={104} />
-            <BlixaLogo variant="text" height={128} />
-          </Group>
+          {/* Just the large wordmark. */}
+          <BlixaLogo variant="text" height={140} />
           <Text c="dimmed">
             Blixa is a lightweight editor for building and releasing taxonomic checklists in the
             Catalogue of Life Data Package (ColDP) format.
