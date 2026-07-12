@@ -10,10 +10,22 @@ import {
   IconSettings,
   IconUsers,
 } from '@tabler/icons-react';
+import type { ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { joinRequestCount } from '../api/join';
+import { getProject } from '../api/projects';
 import NavItem from './NavItem';
 
 const ICON = 18;
+
+interface Section {
+  key: string;
+  label: string;
+  icon: ReactNode;
+  to: string;
+  badge?: number;
+}
 
 export interface AppSidebarProps {
   projectId: number | null;
@@ -32,7 +44,22 @@ export default function AppSidebar({ projectId, collapsed, onNavigate }: AppSide
     onNavigate?.();
   };
 
-  const sections =
+  // Pending join requests only matter -- and are only visible -- to a project owner, so the count
+  // query is gated on the role lookup succeeding first. Non-owners and the no-project state issue
+  // neither query.
+  const { data: project } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: () => getProject(projectId as number),
+    enabled: projectId != null,
+  });
+  const isOwner = project?.role === 'owner';
+  const { data: joinRequestCountValue } = useQuery({
+    queryKey: ['joinRequestCount', projectId],
+    queryFn: () => joinRequestCount(projectId as number),
+    enabled: projectId != null && isOwner,
+  });
+
+  const sections: Section[] =
     projectId != null
       ? [
           { key: 'tree', label: 'Tree', icon: <IconBinaryTree2 size={ICON} />, to: `/projects/${projectId}/tree` },
@@ -42,7 +69,13 @@ export default function AppSidebar({ projectId, collapsed, onNavigate }: AppSide
           { key: 'history', label: 'History', icon: <IconHistory size={ICON} />, to: `/projects/${projectId}/history` },
           { key: 'activity', label: 'Activity', icon: <IconLock size={ICON} />, to: `/projects/${projectId}/activity` },
           { key: 'project', label: 'Project', icon: <IconSettings size={ICON} />, to: `/projects/${projectId}/metadata` },
-          { key: 'members', label: 'Members', icon: <IconUsers size={ICON} />, to: `/projects/${projectId}/members` },
+          {
+            key: 'members',
+            label: 'Members',
+            icon: <IconUsers size={ICON} />,
+            to: `/projects/${projectId}/members`,
+            badge: isOwner ? joinRequestCountValue : undefined,
+          },
         ]
       : [];
 
@@ -69,6 +102,7 @@ export default function AppSidebar({ projectId, collapsed, onNavigate }: AppSide
               label={s.label}
               active={pathname.startsWith(s.to)}
               collapsed={collapsed}
+              badge={s.badge}
               onClick={() => go(s.to)}
             />
           ))}

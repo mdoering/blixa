@@ -1,9 +1,10 @@
-import { Alert, Anchor, Badge, Center, Group, Loader, Paper, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
-import { useEffect } from 'react';
+import { Alert, Anchor, Badge, Button, Center, Group, Loader, Paper, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { getPublicProject } from '../api/public';
+import JoinRequestModal from './JoinRequestModal';
 
 // release.fileSize is bytes -- a friendly human-readable label (mirrors ProjectMetadataPage's
 // own formatFileSize; duplicated rather than shared since the public page has no other coupling
@@ -42,6 +43,7 @@ function asContributions(v: unknown): Contribution[] {
 export default function PublicProjectPage() {
   const { idOrAlias } = useParams<{ idOrAlias: string }>();
   const navigate = useNavigate();
+  const [joining, setJoining] = useState(false);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['publicProject', idOrAlias],
@@ -112,6 +114,21 @@ export default function PublicProjectPage() {
         )}
         {data.description && <Text>{data.description}</Text>}
       </Stack>
+
+      <Paper withBorder p="md">
+        <Group justify="space-between" wrap="nowrap" align="center">
+          <Stack gap={2}>
+            <Text fw={500}>Join this project</Text>
+            <Text size="sm" c="dimmed">
+              Contribute to this checklist by requesting to join. A project owner reviews each request.
+            </Text>
+          </Stack>
+          <Button onClick={() => setJoining(true)}>Request to join</Button>
+        </Group>
+      </Paper>
+      {idOrAlias && (
+        <JoinRequestModal idOrAlias={idOrAlias} opened={joining} onClose={() => setJoining(false)} />
+      )}
 
       {hasMetadata && (
         <Paper withBorder p="md">
