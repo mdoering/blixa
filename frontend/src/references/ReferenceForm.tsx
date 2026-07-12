@@ -1,11 +1,13 @@
-import { Anchor, Button, FileInput, Group, Modal, SimpleGrid, Stack, Text, Textarea, TextInput } from '@mantine/core';
+import { Anchor, Button, FileInput, Group, Modal, Select, SimpleGrid, Stack, Text, Textarea, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { useEffect, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
+import { getVocab } from '../api/coldp';
 import { attachReferencePdf, createReference, removeReferencePdf, updateReference } from '../api/references';
-import type { CreateRefPayload, Reference } from '../api/types';
+import type { CreateRefPayload, CslName, Reference } from '../api/types';
+import CslNameEditor from './CslNameEditor';
 
 export interface ReferenceFormProps {
   pid: number;
@@ -15,12 +17,13 @@ export interface ReferenceFormProps {
   onClose: () => void;
 }
 
+// Scalar (string) fields only -- author/editor are CslName[] and citationManual is a boolean, both
+// handled separately below (see FormValues).
 const FIELDS = [
   'citation',
-  'author',
-  'editor',
   'title',
   'containerTitle',
+  'containerTitleShort',
   'type',
   'issued',
   'volume',
@@ -34,24 +37,53 @@ const FIELDS = [
   'accessed',
   'remarks',
 ] as const;
-type FormValues = Record<(typeof FIELDS)[number], string>;
-const EMPTY = Object.fromEntries(FIELDS.map((f) => [f, ''])) as FormValues;
+type FormValues = Record<(typeof FIELDS)[number], string> & {
+  author: CslName[];
+  editor: CslName[];
+  citationManual: boolean;
+};
+const EMPTY: FormValues = {
+  ...(Object.fromEntries(FIELDS.map((f) => [f, ''])) as Record<(typeof FIELDS)[number], string>),
+  author: [],
+  editor: [],
+  citationManual: false,
+};
 
 function toValues(src: Reference | CreateRefPayload): FormValues {
   const rec = src as Record<string, unknown>;
-  const v = { ...EMPTY };
+  const v: FormValues = { ...EMPTY };
   for (const f of FIELDS) {
     const raw = rec[f];
     v[f] = raw == null ? '' : String(raw);
   }
+  v.author = (rec.author as CslName[] | null | undefined) ?? [];
+  v.editor = (rec.editor as CslName[] | null | undefined) ?? [];
+  v.citationManual = Boolean(rec.citationManual);
   return v;
 }
+
+// A row a user clicked "Add" on but never filled in -- dropped on submit rather than sent as a
+// meaningless `{}` entry.
+function isBlankName(n: CslName): boolean {
+  return (
+    !n.family?.trim() &&
+    !n.given?.trim() &&
+    !n.literal?.trim() &&
+    !n['dropping-particle']?.trim() &&
+    !n['non-dropping-particle']?.trim() &&
+    !n.suffix?.trim()
+  );
+}
+
 function toPayload(v: FormValues): CreateRefPayload {
-  const out: Record<string, string> = {};
+  const out: Record<string, unknown> = {};
   for (const f of FIELDS) {
     const val = v[f].trim();
     if (val) out[f] = val;
   }
+  out.author = v.author.filter((n) => !isBlankName(n));
+  out.editor = v.editor.filter((n) => !isBlankName(n));
+  out.citationManual = v.citationManual;
   return out as CreateRefPayload;
 }
 
@@ -59,6 +91,18 @@ function toPayload(v: FormValues): CreateRefPayload {
 export default function ReferenceForm({ pid, reference, initial, opened, onClose }: ReferenceFormProps) {
   const queryClient = useQueryClient();
   const form = useForm<FormValues>({ initialValues: EMPTY });
+
+  // The reference `type` dropdown's data (CSL-JSON wire ids, e.g. "article-journal") -- same vocab
+  // endpoint TaxonDetail's Rank/Nomenclatural-status selects use, so it shares that query's cache.
+  const { data: vocab } = useQuery({ queryKey: ['vocab'], queryFn: getVocab, staleTime: Infinity });
+  const typeInputProps = form.getInputProps('type');
+  // Never blank on load: a stored `type` that predates this vocab (or was written by a source that
+  // used a slightly different CSLType spelling) still shows up as a selectable option rather than
+  // silently vanishing from the dropdown -- mirrors TaxonDetail's rankData/nomStatusData.
+  const cslTypeData = useMemo(
+    () => Array.from(new Set([...(vocab?.cslTypes ?? []), form.values.type].filter(Boolean))),
+    [vocab?.cslTypes, form.values.type],
+  );
 
   // The PDF control's own state, separate from the form's text fields: pdfUrl mirrors the loaded
   // reference but is updated locally on attach/remove success (rather than only via a parent
@@ -133,12 +177,28 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
       <form onSubmit={form.onSubmit((v) => mutation.mutate(v))}>
         <Stack gap="sm">
           <TextInput label="Citation" {...form.getInputProps('citation')} />
-          <TextInput label="Author" {...form.getInputProps('author')} />
-          <TextInput label="Editor" {...form.getInputProps('editor')} />
+          <CslNameEditor
+            label="Author"
+            value={form.values.author}
+            onChange={(v) => form.setFieldValue('author', v)}
+          />
+          <CslNameEditor
+            label="Editor"
+            value={form.values.editor}
+            onChange={(v) => form.setFieldValue('editor', v)}
+          />
           <TextInput label="Title" {...form.getInputProps('title')} />
-          <SimpleGrid cols={2}>
+          <SimpleGrid cols={3}>
             <TextInput label="Container title" {...form.getInputProps('containerTitle')} />
-            <TextInput label="Type" {...form.getInputProps('type')} />
+            <TextInput label="Container title (short)" {...form.getInputProps('containerTitleShort')} />
+            <Select
+              label="Type"
+              searchable
+              clearable
+              data={cslTypeData}
+              {...typeInputProps}
+              onChange={(v) => typeInputProps.onChange(v ?? '')}
+            />
           </SimpleGrid>
           <SimpleGrid cols={4}>
             <TextInput label="Year" {...form.getInputProps('issued')} />

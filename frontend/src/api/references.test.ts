@@ -31,8 +31,8 @@ test('createReference POSTs the payload', async () => {
       return HttpResponse.json({ id: 1, version: 0 });
     }),
   );
-  await createReference(3, { title: 'T', author: 'A' });
-  expect(body).toEqual({ title: 'T', author: 'A' });
+  await createReference(3, { title: 'T', author: [{ family: 'A' }] });
+  expect(body).toEqual({ title: 'T', author: [{ family: 'A' }] });
 });
 
 test('updateReference PUTs with version', async () => {

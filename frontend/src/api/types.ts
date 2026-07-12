@@ -168,16 +168,39 @@ export interface UsagePage {
   total: number;
 }
 
+// Mirrors backend life.catalogue.api.model.CslName -- the structured CSL-JSON name parts that
+// replaced the old free-text `author`/`editor` strings (see ReferenceResponse.author|editor).
+// `dropping-particle`/`non-dropping-particle` are declared with their literal CSL-JSON wire keys
+// (the Java model puts an explicit @JsonProperty("dropping-particle") etc. on those two fields
+// only -- every other field is plain camelCase) so a round-trip through JSON.stringify/parse (see
+// api/client.ts's `api()`, which does no field renaming) doesn't silently drop them. The editor
+// UI (CslNameEditor) only exposes family/given/literal/isInstitution; the particle/suffix fields
+// still round-trip untouched via object spreads wherever a name is edited.
+export interface CslName {
+  family?: string;
+  given?: string;
+  'dropping-particle'?: string;
+  'non-dropping-particle'?: string;
+  suffix?: string;
+  isInstitution?: boolean;
+  literal?: string;
+}
+
 // Mirrors backend IssueResponse. severity/status are lowercase API strings.
 // Mirrors backend ReferenceResponse (writable fields + id/version). All strings are nullable.
 export interface Reference {
   id: number;
   citation: string | null;
+  // Whether `citation` was hand-edited (vs auto-rendered from the structured fields) -- see
+  // ReferenceService's citationManual handling. Not yet surfaced as an editable control (Task 6
+  // makes the Citation field read-only for structured refs); the form just carries it through.
+  citationManual: boolean;
   type: string | null;
-  author: string | null;
-  editor: string | null;
+  author: CslName[] | null;
+  editor: CslName[] | null;
   title: string | null;
   containerTitle: string | null;
+  containerTitleShort: string | null;
   issued: string | null;
   volume: string | null;
   issue: string | null;
@@ -198,11 +221,13 @@ export interface Reference {
 // Mirrors backend CreateReferenceRequest (also the shape returned by resolve-doi as a preview).
 export interface CreateRefPayload {
   citation?: string;
+  citationManual?: boolean;
   type?: string;
-  author?: string;
-  editor?: string;
+  author?: CslName[];
+  editor?: CslName[];
   title?: string;
   containerTitle?: string;
+  containerTitleShort?: string;
   issued?: string;
   volume?: string;
   issue?: string;

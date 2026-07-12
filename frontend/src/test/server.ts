@@ -11,6 +11,19 @@ export const server = setupServer(
   // Default id-scopes vocab, so any page that seeds a scopes picker from it (ProjectMetadataPage)
   // doesn't need this mocked per-test unless it cares about the exact list.
   http.get('/api/coldp/id-scopes', () => HttpResponse.json(['col', 'gbif', 'ipni', 'tsn'])),
+  // Default enum vocab (VocabController), so any render of a component that seeds a dropdown from
+  // it -- TaxonDetail's Rank/Nomenclatural-status selects, ReferenceForm's Type select -- doesn't
+  // need this mocked per-test unless it cares about the exact list (both currently override this
+  // per-test anyway; this default only covers renders that don't).
+  http.get('/api/coldp/vocab', () =>
+    HttpResponse.json({
+      ranks: [],
+      nomStatus: [],
+      gender: [],
+      environment: [],
+      cslTypes: ['article-journal', 'book', 'chapter', 'thesis'],
+    }),
+  ),
   // Default empty release history, so any owner-role render of ProjectMetadataPage's Releases
   // section doesn't need this mocked per-test unless it cares about the actual list.
   http.get('/api/projects/:id/releases', () => HttpResponse.json([])),

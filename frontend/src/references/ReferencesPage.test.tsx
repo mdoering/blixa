@@ -16,7 +16,7 @@ function mockProject(role = 'owner') {
           id: 1,
           citation: 'Linnaeus 1758',
           title: 'Systema Naturae',
-          author: 'Linnaeus, C.',
+          author: [{ family: 'Linnaeus', given: 'C.' }],
           issued: '1758',
           containerTitle: null,
           doi: '10.5/abc',
@@ -42,6 +42,8 @@ test('lists references', async () => {
   renderPage();
   expect(await screen.findByText('Systema Naturae')).toBeInTheDocument();
   expect(screen.getByText('10.5/abc')).toBeInTheDocument();
+  // The author cell renders a CslName[] author joined as "Family, Given" (authorsToString).
+  expect(screen.getByText('Linnaeus, C.')).toBeInTheDocument();
 });
 
 test('"New reference" opens the form', async () => {
@@ -97,7 +99,7 @@ test('?ref= deep-link opens that reference in the edit form', async () => {
         id: 2,
         citation: 'Darwin 1859',
         title: 'On the Origin of Species',
-        author: 'Darwin, C.',
+        author: [{ family: 'Darwin', given: 'C.' }],
         issued: '1859',
         containerTitle: null,
         doi: null,
@@ -108,7 +110,10 @@ test('?ref= deep-link opens that reference in the edit form', async () => {
   );
   renderPage('/projects/3/references?ref=2');
   const dialog = await screen.findByRole('dialog');
-  expect(within(dialog).getByDisplayValue('On the Origin of Species')).toBeInTheDocument();
+  // findBy*, not getBy*: the reference is fetched, then the form's own effect seeds its fields --
+  // the dialog itself mounts (empty) a tick before that effect flushes, now that ReferenceForm also
+  // kicks off the Type select's vocab query on mount alongside its field-seeding effect.
+  expect(await within(dialog).findByDisplayValue('On the Origin of Species')).toBeInTheDocument();
 });
 
 test('?ref= for a deleted reference (404) fails gracefully -- no form, no crash', async () => {
@@ -162,7 +167,7 @@ test('selecting 2 references opens the merge modal and refreshes the list on suc
           id: 1,
           citation: 'Linnaeus 1758',
           title: 'Systema Naturae',
-          author: 'Linnaeus, C.',
+          author: [{ family: 'Linnaeus', given: 'C.' }],
           issued: '1758',
           containerTitle: null,
           doi: '10.5/abc',
@@ -173,7 +178,7 @@ test('selecting 2 references opens the merge modal and refreshes the list on suc
           id: 2,
           citation: 'Darwin 1859',
           title: 'On the Origin of Species',
-          author: 'Darwin, C.',
+          author: [{ family: 'Darwin', given: 'C.' }],
           issued: '1859',
           containerTitle: null,
           doi: null,

@@ -29,7 +29,7 @@ import { messageFor } from '../api/client';
 import MergeRecordsModal from '../merge/MergeRecordsModal';
 import { getProject } from '../api/projects';
 import { deleteReference, getReference, listReferences } from '../api/references';
-import type { CreateRefPayload, Reference } from '../api/types';
+import type { CreateRefPayload, CslName, Reference } from '../api/types';
 import ImportBibtexModal from './ImportBibtexModal';
 import ImportDoiModal from './ImportDoiModal';
 import ImportRisModal from './ImportRisModal';
@@ -37,6 +37,17 @@ import ReconcileJournalsModal from './ReconcileJournalsModal';
 import ReferenceForm from './ReferenceForm';
 
 const PAGE = 25;
+
+// Renders a CslName[] author/editor as a compact display string: an institutional name shows its
+// literal, a personal name shows "Family, Given" -- joined with "; " for multiple names. Mirrors
+// CslName.toString() on the backend closely enough for a table cell (full particle/suffix
+// formatting is CslNameEditor's/Task 6's concern, not this read-only list view's).
+function authorsToString(names: CslName[] | null): string {
+  if (!names || names.length === 0) return '';
+  return names
+    .map((n) => n.literal || [n.family, n.given].filter(Boolean).join(', '))
+    .join('; ');
+}
 
 // Project References editor: fuzzy citation search, a paged table, create/edit/delete, and DOI +
 // BibTeX + RIS import.
@@ -202,7 +213,7 @@ export default function ReferencesPage() {
                 </Table.Td>
               )}
               <Table.Td onClick={() => canEdit && setForm({ reference: r })}>
-                <Text size="sm">{r.author ?? '—'}</Text>
+                <Text size="sm">{authorsToString(r.author) || '—'}</Text>
               </Table.Td>
               <Table.Td onClick={() => canEdit && setForm({ reference: r })}>
                 <Text size="sm">{r.issued ?? '—'}</Text>
