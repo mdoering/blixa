@@ -42,13 +42,13 @@ const STATUS_OPTIONS = [
   { value: 'UNASSESSED', label: 'Unassessed' },
 ];
 
-// Compact, colour-coded status chips for the table's narrow Status column: a 3-letter abbreviation
-// (scannable by colour, full word on hover) instead of the space-hungry full label.
+// Compact, colour-coded status chips for the table's narrow Status column: a 3-letter,
+// title-case abbreviation (scannable by colour) instead of the space-hungry full label.
 const STATUS_META: Record<string, { abbr: string; color: string; label: string }> = {
-  ACCEPTED: { abbr: 'ACC', color: 'green', label: 'Accepted' },
-  SYNONYM: { abbr: 'SYN', color: 'gray', label: 'Synonym' },
-  MISAPPLIED: { abbr: 'MIS', color: 'orange', label: 'Misapplied' },
-  UNASSESSED: { abbr: 'UNA', color: 'blue', label: 'Unassessed' },
+  ACCEPTED: { abbr: 'Acc', color: 'green', label: 'Accepted' },
+  SYNONYM: { abbr: 'Syn', color: 'gray', label: 'Synonym' },
+  MISAPPLIED: { abbr: 'Mis', color: 'orange', label: 'Misapplied' },
+  UNASSESSED: { abbr: 'Una', color: 'blue', label: 'Unassessed' },
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -174,18 +174,16 @@ export default function NameSearchPage() {
       {
         accessorKey: 'status',
         header: 'Status',
-        size: 70,
+        size: 82,
         grow: false,
         Cell: ({ cell }) => {
           const v = cell.getValue<string | null>();
           if (!v) return '—';
           const m = STATUS_META[v] ?? { abbr: v.slice(0, 3), color: 'gray', label: v };
           return (
-            <Tooltip label={m.label} withArrow>
-              <Badge color={m.color} variant="light" size="sm" radius="sm">
-                {m.abbr}
-              </Badge>
-            </Tooltip>
+            <Badge color={m.color} variant="light" size="sm" radius="sm">
+              {m.abbr}
+            </Badge>
           );
         },
       },

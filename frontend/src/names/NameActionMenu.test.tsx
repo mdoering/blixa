@@ -31,6 +31,20 @@ test('an editor sees add-child/add-synonym/change-status/delete actions', async 
   expect(screen.getByText('Delete')).toBeInTheDocument();
 });
 
+test('the change-status list greys out the usage\'s current status', async () => {
+  renderWithProviders(<NameActionMenu pid={3} usage={usage} canEdit onSelect={() => {}} />);
+
+  await userEvent.click(screen.getByLabelText('Actions'));
+  await screen.findByText('Change status');
+
+  // `usage` is ACCEPTED -- that option is disabled (can't "change" to the status it already has)
+  // while the others remain clickable.
+  expect(screen.getByText('Accepted').closest('button')).toBeDisabled();
+  expect(screen.getByText('Synonym').closest('button')).toBeEnabled();
+  expect(screen.getByText('Misapplied').closest('button')).toBeEnabled();
+  expect(screen.getByText('Unassessed').closest('button')).toBeEnabled();
+});
+
 test('add-child/add-synonym are hidden for a non-accepted usage (backend 400s both)', async () => {
   renderWithProviders(
     <NameActionMenu pid={3} usage={synonymUsage} canEdit onSelect={() => {}} />,

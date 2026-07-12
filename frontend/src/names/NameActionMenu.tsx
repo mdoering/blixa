@@ -143,9 +143,17 @@ export default function NameActionMenu({
               Add accepted name…
             </Menu.Item>
           )}
+          {/* Menu.Sub (nested submenu) isn't available in the installed @mantine/core version
+              (Menu.Sub / MenuSub is unwired from the package's public exports here), so this
+              falls back to a flat, labelled section -- with the current status disabled so a
+              user can't "change" to the status the usage already has. */}
           <Menu.Label>Change status</Menu.Label>
           {STATUS_OPTIONS.map((s) => (
-            <Menu.Item key={s.value} onClick={() => onStatusClick(s.value)}>
+            <Menu.Item
+              key={s.value}
+              disabled={usage.status === s.value}
+              onClick={() => onStatusClick(s.value)}
+            >
               {s.label}
             </Menu.Item>
           ))}

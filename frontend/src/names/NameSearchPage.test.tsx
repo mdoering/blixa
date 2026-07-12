@@ -99,6 +99,16 @@ test('rows render from the search results', async () => {
   expect(await screen.findByText('Abies alba')).toBeInTheDocument();
   expect(screen.getByText('Abies nigra')).toBeInTheDocument();
   expect(screen.getByText('Mill.')).toBeInTheDocument();
+
+  // Status chips are the title-case 3-letter abbreviation (not the old ALL-CAPS form), rendered
+  // as a plain badge with no hover-tooltip popover around it.
+  expect(screen.getByText('Acc')).toBeInTheDocument();
+  expect(screen.getByText('Syn')).toBeInTheDocument();
+  expect(screen.queryByText('ACC')).not.toBeInTheDocument();
+  expect(screen.queryByText('SYN')).not.toBeInTheDocument();
+
+  // The Status column header renders its full word (the column was widened so it isn't clipped).
+  expect(screen.getByText('Status')).toBeInTheDocument();
 });
 
 test('setting the status filter re-queries with status= and shows the filtered set', async () => {
