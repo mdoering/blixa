@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 
-type BlixaVariant = 'header' | 'icon' | 'text' | 'main';
+type BlixaVariant = 'header' | 'icon' | 'text' | 'main' | 'logo';
 
 // Aspect ratios taken from the source SVG viewBoxes in public/brand/.
 const RATIO: Record<BlixaVariant, number> = {
@@ -8,6 +8,7 @@ const RATIO: Record<BlixaVariant, number> = {
   icon: 1,
   text: 4267 / 834,
   main: 1,
+  logo: 1,
 };
 
 const SRC: Record<BlixaVariant, string> = {
@@ -15,6 +16,7 @@ const SRC: Record<BlixaVariant, string> = {
   icon: '/brand/blixa-icon.svg',
   text: '/brand/blixa-text.svg',
   main: '/brand/blixa-main.svg',
+  logo: '/brand/blixa-logo.svg',
 };
 
 export interface BlixaLogoProps {
