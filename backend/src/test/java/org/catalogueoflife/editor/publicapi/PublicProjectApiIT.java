@@ -32,9 +32,13 @@ class PublicProjectApiIT extends AbstractPostgresIT {
   private void ensureUser(String u) { if (users.requireByUsernameOrNull(u) == null) users.createLocal(u, "pw", u); }
 
   private int makePublicProject(String owner) throws Exception {
+    return makePublicProject(owner, "pub1");
+  }
+
+  private int makePublicProject(String owner, String alias) throws Exception {
     ensureUser(owner);
     String b = mvc.perform(post("/api/projects").with(csrf()).with(user(owner))
-            .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"Public One\",\"alias\":\"pub1\"}"))
+            .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"Public One\",\"alias\":\"" + alias + "\"}"))
         .andReturn().getResponse().getContentAsString();
     int pid = json.readTree(b).get("id").asInt();
     mvc.perform(put("/api/projects/" + pid + "/public").with(csrf()).with(user(owner))
@@ -74,5 +78,38 @@ class PublicProjectApiIT extends AbstractPostgresIT {
     mvc.perform(get("/api/public/projects/pub1"))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.id").value(pid));
+  }
+
+  // Task 6 privacy fix: metrics.contributions is derived from the append-only `change` audit log
+  // with no membership filter. A user who contributed edits but was later removed (or downgraded
+  // to viewer) must not have their identity (userId/name/orcid) leaked to anonymous callers, even
+  // though their edits are still counted in the release's stored metrics snapshot.
+  @Test
+  void metricsContributionsExcludeFormerMembers() throws Exception {
+    int pid = makePublicProject("mOwner", "pubmetrics");
+    AppUser owner = users.requireByUsernameOrNull("mOwner");
+
+    ensureUser("mEditor");
+    AppUser editor = users.requireByUsernameOrNull("mEditor");
+    members.upsert(new ProjectMember(pid, editor.getId(), Role.EDITOR.dbValue()));
+
+    // Both the owner and the editor make an edit, so both show up in the change log / contributions.
+    mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf()).with(user("mOwner"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Panthera\",\"rank\":\"genus\",\"status\":\"ACCEPTED\"}"))
+       .andExpect(status().isCreated());
+    mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf()).with(user("mEditor"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Leo\",\"rank\":\"species\",\"status\":\"ACCEPTED\"}"))
+       .andExpect(status().isCreated());
+
+    // The editor is now removed from the project entirely -- no longer a current member at all.
+    members.delete(pid, editor.getId());
+
+    mvc.perform(get("/api/public/projects/" + pid))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.metrics.contributions[?(@.userId == " + owner.getId() + ")]").exists())
+       .andExpect(jsonPath("$.metrics.contributions[?(@.userId == " + editor.getId() + ")]").isEmpty())
+       .andExpect(jsonPath("$.metrics.contributions[?(@.name == 'mEditor')]").isEmpty());
   }
 }

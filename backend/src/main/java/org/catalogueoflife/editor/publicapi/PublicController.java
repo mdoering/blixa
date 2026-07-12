@@ -1,8 +1,9 @@
 package org.catalogueoflife.editor.publicapi;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.catalogueoflife.editor.project.Project;
-import org.catalogueoflife.editor.project.ProjectMember;
 import org.catalogueoflife.editor.project.ProjectMemberMapper;
 import org.catalogueoflife.editor.project.Role;
 import org.catalogueoflife.editor.publicapi.dto.PublicContributor;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 @RestController
 public class PublicController {
@@ -56,7 +59,8 @@ public class PublicController {
   @GetMapping("/api/public/projects/{idOrAlias}")
   public PublicProjectInfo info(@PathVariable String idOrAlias) {
     Project p = resolve(idOrAlias);
-    List<PublicContributor> contributors = members.findByProject(p.getId()).stream()
+    var projectMembers = members.findByProject(p.getId());
+    List<PublicContributor> contributors = projectMembers.stream()
         .filter(m -> !Role.VIEWER.dbValue().equals(m.getRole()))
         .map(m -> {
           AppUser u = users.findById(m.getUserId());
@@ -64,21 +68,50 @@ public class PublicController {
           return new PublicContributor(name, u == null ? null : u.getOrcid(), m.getRole());
         }).toList();
 
+    // Contributions in the metrics come from the append-only change log and may include users who
+    // are no longer current owner/editor members (removed, or downgraded to viewer). Only current
+    // non-viewer members may have their identity (name/orcid) exposed publicly.
+    Set<Integer> publicContributorIds = projectMembers.stream()
+        .filter(m -> !Role.VIEWER.dbValue().equals(m.getRole()))
+        .map(m -> m.getUserId())
+        .collect(Collectors.toSet());
+
     List<Release> ready = releases.findReadyByProject(p.getId());
     List<PublicRelease> rels = ready.stream().map(r -> new PublicRelease(
         r.getId(), r.getVersion(), r.getNotes(), r.getCreatedAt(), r.getFileName(), r.getFileSize(),
-        r.getNameUsageCount(), parse(r.getMetrics()),
+        r.getNameUsageCount(), sanitizeMetrics(parse(r.getMetrics()), publicContributorIds),
         "/api/public/projects/" + p.getId() + "/releases/" + r.getId() + "/download")).toList();
 
     // Headline metrics: latest release snapshot if any, else a live compute (all-time, since=null).
     JsonNode metrics = ready.isEmpty()
         ? parse(metricsService.compute(p.getId(), null))
         : parse(ready.get(0).getMetrics());
+    metrics = sanitizeMetrics(metrics, publicContributorIds);
 
     return new PublicProjectInfo(p.getId(), p.getTitle(), p.getAlias(), p.getDescription(),
         p.getLicense() == null ? null : p.getLicense().name(),
         p.getNomCode() == null ? null : p.getNomCode().name().toLowerCase(java.util.Locale.ROOT),
         p.getGeographicScope(), p.getTaxonomicScope(), contributors, metrics, rels);
+  }
+
+  // Filters a metrics snapshot's `contributions` array down to entries whose userId is a current
+  // owner/editor member, so identity (name, orcid) of former/downgraded members isn't leaked
+  // publicly. All other metrics keys are left untouched.
+  private JsonNode sanitizeMetrics(JsonNode metrics, Set<Integer> allowedUserIds) {
+    if (metrics == null || !metrics.isObject()) return metrics;
+    JsonNode contributions = metrics.get("contributions");
+    if (contributions == null || !contributions.isArray()) return metrics;
+
+    ArrayNode filtered = json.createArrayNode();
+    for (JsonNode c : contributions) {
+      JsonNode userId = c.get("userId");
+      if (userId != null && !userId.isNull() && allowedUserIds.contains(userId.asInt())) {
+        filtered.add(c);
+      }
+    }
+    ObjectNode copy = (ObjectNode) metrics.deepCopy();
+    copy.set("contributions", filtered);
+    return copy;
   }
 
   private Project resolve(String idOrAlias) {
