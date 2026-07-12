@@ -15,12 +15,28 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
 
-// Maps external reference formats (a Crossref/CSL work message; BibTeX entries) into the editor's
-// CreateReferenceRequest so they flow through the normal ReferenceService.create path. Pure/static;
-// the HTTP fetch lives in CrossrefClient and the persistence in ReferenceImportService.
+// Maps external reference formats (a Crossref/CSL work message; a DataCite JSON:API attributes
+// node; BibTeX entries) into the editor's CreateReferenceRequest so they flow through the normal
+// ReferenceService.create path. Pure/static; the HTTP fetches live in CrossrefClient/DataciteClient
+// and the persistence in ReferenceImportService.
 public final class RefMapping {
 
   private RefMapping() {}
+
+  // --- DOI normalization ---
+
+  // A raw DOI input may arrive bare (10.xxxx/yyyy), "doi:"-prefixed (case-insensitive), or as a
+  // resolver URL (https://doi.org/..., http://doi.org/..., https://dx.doi.org/...). Strip whichever
+  // of those wraps the bare DOI and trim, so CrossrefClient/DataciteClient always see 10.xxxx/yyyy.
+  private static final Pattern DOI_PREFIX =
+      Pattern.compile("^\\s*(?:doi:|https?://(?:dx\\.)?doi\\.org/)?\\s*", Pattern.CASE_INSENSITIVE);
+
+  public static String normalizeDoi(String raw) {
+    if (raw == null) {
+      return null;
+    }
+    return DOI_PREFIX.matcher(raw).replaceFirst("").trim();
+  }
 
   // --- Crossref / CSL ---
 
@@ -97,6 +113,77 @@ public final class RefMapping {
     }
     String s = n.asString();
     return (s == null || s.isBlank()) ? null : s.trim();
+  }
+
+  // --- DataCite ---
+
+  // Maps the `data.attributes` node of DataCite's GET /dois/{doi} response (JSON:API). Used as a
+  // fallback when a DOI isn't registered with Crossref (datasets, software, and other DataCite-only
+  // DOIs commonly aren't).
+  public static CreateReferenceRequest fromDatacite(JsonNode attributes) {
+    String title = text(attributes.path("titles").path(0).path("title"));
+    String author = dataciteNames(attributes.path("creators"), null);
+    String editor = dataciteNames(attributes.path("contributors"), "Editor");
+    String year = dataciteYear(attributes.path("publicationYear"));
+    String publisher = dataciteText(attributes.path("publisher"));
+    JsonNode container = attributes.path("container");
+    String containerTitle = text(container.path("title"));
+    String volume = text(container.path("volume"));
+    String issue = text(container.path("issue"));
+    String page = joinPage(text(container.path("firstPage")), text(container.path("lastPage")));
+    String doi = text(attributes.path("doi"));
+    String link = text(attributes.path("url"));
+    String type = dataciteText(attributes.path("types").path("resourceTypeGeneral"));
+    if (type != null) {
+      type = type.toLowerCase();
+    }
+    String citation = citation(author, year, title, containerTitle, volume, issue, page);
+    return new CreateReferenceRequest(citation, type, author, editor, title, containerTitle, year,
+        volume, issue, page, publisher, doi, null, null, link, null, null);
+  }
+
+  // DataCite creators/contributors: each entry prefers the already-formatted "name" (typically
+  // "Family, Given"), falling back to familyName/givenName when name is absent. When
+  // contributorType is non-null, only entries whose contributorType matches are included (e.g.
+  // "Editor" for the editor field) -- creators (the author field) pass null to take everyone.
+  private static String dataciteNames(JsonNode arr, String contributorType) {
+    if (arr == null || !arr.isArray() || arr.isEmpty()) {
+      return null;
+    }
+    List<String> names = new ArrayList<>();
+    for (JsonNode a : arr) {
+      if (contributorType != null
+          && !contributorType.equalsIgnoreCase(text(a.path("contributorType")))) {
+        continue;
+      }
+      String name = text(a.path("name"));
+      if (name == null) {
+        String family = text(a.path("familyName"));
+        String given = text(a.path("givenName"));
+        name = (family != null && given != null) ? family + ", " + given : family;
+      }
+      if (name != null) {
+        names.add(name);
+      }
+    }
+    return names.isEmpty() ? null : String.join("; ", names);
+  }
+
+  // publicationYear is a JSON number in the DataCite API, not a string.
+  private static String dataciteYear(JsonNode n) {
+    if (n == null || n.isMissingNode() || n.isNull()) {
+      return null;
+    }
+    return n.isNumber() ? String.valueOf(n.asInt()) : text(n);
+  }
+
+  // publisher is usually a plain string, but defensively accept an object with a "name" child too
+  // (newer DataCite schema versions allow a structured publisher).
+  private static String dataciteText(JsonNode n) {
+    if (n == null || n.isMissingNode() || n.isNull()) {
+      return null;
+    }
+    return n.isObject() ? text(n.path("name")) : text(n);
   }
 
   // --- BibTeX ---
@@ -209,7 +296,7 @@ public final class RefMapping {
     String year = risYear(risFirst(tags, "PY", "Y1"));
     String volume = risFirst(tags, "VL");
     String issue = risFirst(tags, "IS");
-    String page = risPage(risFirst(tags, "SP"), risFirst(tags, "EP"));
+    String page = joinPage(risFirst(tags, "SP"), risFirst(tags, "EP"));
     String doi = risFirst(tags, "DO");
     String sn = risFirst(tags, "SN");
     String isbn = isIsbn(sn) ? sn : null;
@@ -254,11 +341,13 @@ public final class RefMapping {
     return year.isBlank() ? null : year;
   }
 
-  private static String risPage(String sp, String ep) {
-    if (sp == null) {
+  // Joins a first/last page pair as "first-last" (or just "first" when there's no last). Shared by
+  // RIS (SP/EP tags) and DataCite (container.firstPage/lastPage).
+  private static String joinPage(String first, String last) {
+    if (first == null) {
       return null;
     }
-    return ep == null ? sp : sp + "-" + ep;
+    return last == null ? first : first + "-" + last;
   }
 
   // SN is ambiguous in RIS (both books and journals use it): treat it as an ISBN when it looks

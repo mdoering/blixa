@@ -13,8 +13,8 @@ export interface ImportDoiModalProps {
   onResolved: (payload: CreateRefPayload) => void;
 }
 
-// Enter a DOI → server resolves it via Crossref → hand the preview to the caller (which opens the
-// reference form pre-filled). Nothing is saved here.
+// Enter a DOI → server resolves it via Crossref (falling back to DataCite) → hand the preview to
+// the caller (which opens the reference form pre-filled). Nothing is saved here.
 export default function ImportDoiModal({ pid, opened, onClose, onResolved }: ImportDoiModalProps) {
   const [doi, setDoi] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +40,7 @@ export default function ImportDoiModal({ pid, opened, onClose, onResolved }: Imp
       <Stack>
         <TextInput
           label="DOI"
-          placeholder="10.xxxx/xxxxx"
+          placeholder="10.xxxx/xxxx, doi:10.xxxx/xxxx, or https://doi.org/…"
           data-autofocus
           value={doi}
           onChange={(e) => {
@@ -48,6 +48,9 @@ export default function ImportDoiModal({ pid, opened, onClose, onResolved }: Imp
             setError(null);
           }}
         />
+        <Text size="xs" c="dimmed">
+          Crossref, with DataCite fallback.
+        </Text>
         {error && (
           <Text c="red" size="sm">
             {error}

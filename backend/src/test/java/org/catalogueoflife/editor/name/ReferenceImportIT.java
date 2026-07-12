@@ -13,10 +13,12 @@ import org.catalogueoflife.editor.user.AppUserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 
 @AutoConfigureMockMvc
@@ -27,8 +29,9 @@ class ReferenceImportIT extends AbstractPostgresIT {
   @Autowired AppUserService users;
   @Autowired ObjectMapper json;
 
-  // Stub the external Crossref HTTP so resolve-doi is deterministic and offline.
+  // Stub the external Crossref/DataCite HTTP so resolve-doi is deterministic and offline.
   @MockitoBean CrossrefClient crossref;
+  @MockitoBean DataciteClient datacite;
 
   private void ensureUser(String username) {
     if (users.requireByUsernameOrNull(username) == null) users.createLocal(username, "pw", username);
@@ -81,5 +84,29 @@ class ReferenceImportIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + pid + "/references"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
+  void fallsBackToDataciteWhenCrossrefDoesNotHaveTheDoi() throws Exception {
+    ensureUser("refImportOwner");
+    long pid = createProject("refresolve-datacite");
+
+    when(crossref.fetchWork("10.48580/dgy8b"))
+        .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "DOI not found"));
+    when(datacite.fetchDoi("10.48580/dgy8b")).thenReturn(json.readTree(
+        "{\"doi\":\"10.48580/dgy8b\",\"titles\":[{\"title\":\"Catalogue of Life\"}],"
+            + "\"creators\":[{\"name\":\"Bánki, Olaf\"}],\"publicationYear\":2026,"
+            + "\"publisher\":\"Catalogue of Life Foundation\","
+            + "\"types\":{\"resourceTypeGeneral\":\"Dataset\"}}"));
+
+    // resolve-doi accepts the doi.org resolver URL form too (RefMapping.normalizeDoi).
+    mvc.perform(post("/api/projects/" + pid + "/references/resolve-doi").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"doi\":\"https://doi.org/10.48580/dgy8b\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.title").value("Catalogue of Life"))
+        .andExpect(jsonPath("$.author").value("Bánki, Olaf"))
+        .andExpect(jsonPath("$.doi").value("10.48580/dgy8b"))
+        .andExpect(jsonPath("$.type").value("dataset"));
   }
 }
