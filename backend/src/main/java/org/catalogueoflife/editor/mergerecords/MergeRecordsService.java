@@ -14,6 +14,7 @@ import org.catalogueoflife.editor.name.Status;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
 import org.catalogueoflife.editor.tree.TreeMapper;
+import org.catalogueoflife.editor.validation.IssueMapper;
 import org.catalogueoflife.editor.validation.ValidationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -30,15 +31,17 @@ public class MergeRecordsService {
   private final TreeMapper tree;
   private final AuditService audit;
   private final ApplicationEventPublisher events;
+  private final IssueMapper issues;
 
   public MergeRecordsService(MergeRecordsMapper merge, NameUsageMapper usages, ProjectService projects,
-      TreeMapper tree, AuditService audit, ApplicationEventPublisher events) {
+      TreeMapper tree, AuditService audit, ApplicationEventPublisher events, IssueMapper issues) {
     this.merge = merge;
     this.usages = usages;
     this.projects = projects;
     this.tree = tree;
     this.audit = audit;
     this.events = events;
+    this.issues = issues;
   }
 
   public List<UsageMergeCandidate> previewUsages(int userId, int projectId, List<Integer> ids) {
@@ -74,16 +77,21 @@ public class MergeRecordsService {
     if (survivor == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "survivor not in project");
     List<Integer> mergedIds = all.stream().filter(id -> id != survivorId.intValue()).toList();
 
-    // survivor must be accepted if it will receive children (its own or a merged usage's)
+    // survivor must be accepted if it will receive children (its own or a merged usage's), or if
+    // a merged usage will hand it synonyms (no synonym chaining: the survivor's OWN synonyms don't
+    // matter here -- a synonym can't itself have synonyms, so only what a MERGED usage brings along
+    // can turn the survivor into an accepted-of-synonyms).
     boolean survivorReceivesChildren = childCount(projectId, survivorId) > 0;
+    boolean survivorReceivesSynonyms = false;
     for (int d : mergedIds) {
       NameUsage du = usages.findByIdInProject(projectId, d);
       if (du == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "usage not in project: " + d);
       if (childCount(projectId, d) > 0) survivorReceivesChildren = true;
+      if (synonymCount(projectId, d) > 0) survivorReceivesSynonyms = true;
     }
-    if (survivorReceivesChildren && survivor.getStatus() != Status.ACCEPTED) {
+    if ((survivorReceivesChildren || survivorReceivesSynonyms) && survivor.getStatus() != Status.ACCEPTED) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-          "survivor must be an accepted name to receive children");
+          "survivor must be an accepted name to receive children or synonyms");
     }
 
     for (int d : mergedIds) {
@@ -108,6 +116,10 @@ public class MergeRecordsService {
       merge.repointProperty(projectId, d, survivorId);
       merge.repointEstimate(projectId, d, survivorId);
       audit.record(projectId, userId, "name_usage", d, Operation.DELETE, du, null);
+      // entity_id is polymorphic (no cascade FK to name_usage): clean up d's own issue rows now,
+      // or they'd reference a nonexistent entity forever (see validation/IssueMapper.deleteByEntity,
+      // mirrors NameUsageService.delete's single-usage cleanup).
+      issues.deleteByEntity(projectId, "name_usage", d);
       usages.delete(projectId, d);
     }
     events.publishEvent(ValidationEvent.forUsage(projectId, survivorId));
@@ -116,6 +128,11 @@ public class MergeRecordsService {
 
   private int childCount(int projectId, int id) {
     Object v = merge.usageCounts(projectId, id).get("children");
+    return v == null ? 0 : ((Number) v).intValue();
+  }
+
+  private int synonymCount(int projectId, int id) {
+    Object v = merge.usageCounts(projectId, id).get("synonyms");
     return v == null ? 0 : ((Number) v).intValue();
   }
 

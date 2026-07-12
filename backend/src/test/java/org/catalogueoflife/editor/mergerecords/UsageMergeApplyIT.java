@@ -96,6 +96,9 @@ class UsageMergeApplyIT extends AbstractPostgresIT {
     linkSynonym(pid, syn, d);
     // D is the target of a name relation (usage_id side)
     createRelation(pid, d, child, "basionym");
+    // D is also the RELATED end of a name relation owned by a THIRD usage (child) -- exercises
+    // repointRelationRelated, the no-FK soft-pointer repoint (related_usage_id has no FK/cascade)
+    createRelation(pid, child, d, "spelling_correction");
     // D has a vernacular
     createVernacular(pid, d, "Lion");
 
@@ -126,6 +129,12 @@ class UsageMergeApplyIT extends AbstractPostgresIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].relatedUsageId").value(child));
+
+    // the OTHER relation's related_usage_id (soft pointer, no FK) is now repointed from D to S
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + child + "/relations"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].relatedUsageId").value(s));
 
     // the vernacular now hangs under S
     mvc.perform(get("/api/projects/" + pid + "/usages/" + s + "/vernaculars"))
@@ -172,6 +181,29 @@ class UsageMergeApplyIT extends AbstractPostgresIT {
     mvc.perform(post("/api/projects/" + pid + "/usages/merge").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
             .content(mergeRequest(s, s, d)))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void mergeRejectsNonAcceptedSurvivorThatWouldReceiveSynonyms() throws Exception {
+    ensureUser("maOwner");
+    long pid = createProject("ma3b");
+
+    // A is accepted and has a synonym (synonym_accepted.accepted_id = A) -- merging A onto a
+    // non-accepted survivor would repoint that synonym's accepted_id onto the survivor, chaining
+    // a synonym onto a synonym, which is forbidden.
+    int a = createUsage(pid, "Aus", "genus", "ACCEPTED", null);
+    int syn = createUsage(pid, "Ausyn", "genus", "SYNONYM", null);
+    linkSynonym(pid, syn, a);
+
+    // survivor S is itself a synonym of some unrelated accepted usage -- not accepted
+    int otherAcc = createUsage(pid, "Bus", "genus", "ACCEPTED", null);
+    int s = createUsage(pid, "Bxus", "genus", "SYNONYM", null);
+    linkSynonym(pid, s, otherAcc);
+
+    mvc.perform(post("/api/projects/" + pid + "/usages/merge").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mergeRequest(s, s, a)))
         .andExpect(status().isBadRequest());
   }
 
