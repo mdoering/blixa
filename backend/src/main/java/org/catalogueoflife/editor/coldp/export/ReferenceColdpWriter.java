@@ -46,10 +46,14 @@ public class ReferenceColdpWriter {
     row.put(ColdpTerm.citation, r.getCitation());
     row.put(ColdpTerm.type, r.getType());
     // author/editor are now structured CslName lists (V24__reference_csl.sql) -- ColDP's own
-    // Reference.tsv still wants the "; "-joined free-text form, exactly CLB's own
-    // CslName.toColdpString(CslName[]) produces (and ImportRunService.loadReferences' RefMapping.
-    // parseNames reads back on reimport). Task 4 (reference-model-overhaul plan) may revisit this
-    // to carry the structured form losslessly instead.
+    // Reference.tsv still wants the "; "-joined free-text form that RefMapping.parseNames reads back
+    // on reimport. We build that string ourselves below (toColdpNameString) rather than delegating to
+    // CLB's own CslName.toColdpString(CslName[]), whose row format we otherwise replicate exactly --
+    // toColdpString appends getFamily() unconditionally, so a literal-only CslName (family == null,
+    // exactly what RefMapping.parseNames produces for an institution or comma-free name, e.g. "World
+    // Flora Online") makes it write the 4 literal characters "null" into the TSV cell. Task 4
+    // (reference-model-overhaul plan) may revisit this to carry the structured form losslessly
+    // instead.
     row.put(ColdpTerm.author, toColdpNameString(r.getAuthor()));
     row.put(ColdpTerm.editor, toColdpNameString(r.getEditor()));
     row.put(ColdpTerm.title, r.getTitle());
@@ -83,7 +87,50 @@ public class ReferenceColdpWriter {
     return (values == null || values.isEmpty()) ? null : String.join(",", values);
   }
 
+  // Mirrors CLB's CslName.toColdpString(CslName[]) row format -- "[non-dropping-particle ]family
+  // [,given]" per name, joined with "; " (the separator RefMapping.parseNames splits on) -- but
+  // built by hand instead of delegated, because that CLB helper appends getFamily() unconditionally
+  // and therefore writes the string "null" for a literal-only name (see class-level comment above
+  // this method's caller). A name with neither a literal nor a family/given is skipped entirely
+  // rather than emitting an empty token.
   private static String toColdpNameString(List<CslName> names) {
-    return (names == null || names.isEmpty()) ? null : CslName.toColdpString(names.toArray(new CslName[0]));
+    if (names == null || names.isEmpty()) {
+      return null;
+    }
+    StringBuilder sb = new StringBuilder();
+    for (CslName n : names) {
+      String token = coldpToken(n);
+      if (token == null || token.isBlank()) {
+        continue;
+      }
+      if (sb.length() > 0) {
+        sb.append("; ");
+      }
+      sb.append(token);
+    }
+    return sb.isEmpty() ? null : sb.toString();
+  }
+
+  private static String coldpToken(CslName n) {
+    if (n == null) {
+      return null;
+    }
+    if (n.getLiteral() != null && !n.getLiteral().isBlank()) {
+      return n.getLiteral();
+    }
+    StringBuilder sb = new StringBuilder();
+    if (n.getNonDroppingParticle() != null && !n.getNonDroppingParticle().isBlank()) {
+      sb.append(n.getNonDroppingParticle()).append(' ');
+    }
+    if (n.getFamily() != null && !n.getFamily().isBlank()) {
+      sb.append(n.getFamily());
+    }
+    if (n.getGiven() != null && !n.getGiven().isBlank()) {
+      if (sb.length() > 0) {
+        sb.append(',');
+      }
+      sb.append(n.getGiven());
+    }
+    return sb.isEmpty() ? null : sb.toString();
   }
 }

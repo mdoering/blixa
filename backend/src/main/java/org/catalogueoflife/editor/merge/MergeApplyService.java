@@ -489,12 +489,13 @@ public class MergeApplyService {
     if (!Objects.equals(v, tgt.getCitation())) { tgt.setCitation(v); changed = true; }
     v = mergeString(tgt.getType(), src.getType(), mode);
     if (!Objects.equals(v, tgt.getType())) { tgt.setType(v); changed = true; }
-    // author/editor are structured CslName lists (see V24__reference_csl.sql), not scalar strings --
-    // mergeScalar (null-vs-non-null, same as the other non-String scalar fields below) rather than
-    // mergeString (blank-string-vs-non-blank).
-    List<CslName> vNames = mergeScalar(tgt.getAuthor(), src.getAuthor(), mode);
+    // author/editor are structured CslName lists (see V24__reference_csl.sql) -- merged with
+    // mergeList (blank-vs-non-blank, same as referenceId/environment below), not mergeScalar
+    // (null-vs-non-null): mergeScalar would treat any non-null list, even an empty one, as already
+    // "present" and never fill it from the source.
+    List<CslName> vNames = mergeList(tgt.getAuthor(), src.getAuthor(), mode);
     if (!Objects.equals(vNames, tgt.getAuthor())) { tgt.setAuthor(vNames); changed = true; }
-    vNames = mergeScalar(tgt.getEditor(), src.getEditor(), mode);
+    vNames = mergeList(tgt.getEditor(), src.getEditor(), mode);
     if (!Objects.equals(vNames, tgt.getEditor())) { tgt.setEditor(vNames); changed = true; }
     v = mergeString(tgt.getTitle(), src.getTitle(), mode);
     if (!Objects.equals(v, tgt.getTitle())) { tgt.setTitle(v); changed = true; }

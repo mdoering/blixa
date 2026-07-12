@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import life.catalogue.api.model.CslName;
 import life.catalogue.api.model.VerbatimRecord;
 import life.catalogue.coldp.ColdpTerm;
 import life.catalogue.csv.ColdpReader;
@@ -122,6 +123,55 @@ class ReferenceExportIT extends AbstractPostgresIT {
     assertThat(doiRec.get(ColdpTerm.title)).isEqualTo("A DOI title");
     assertThat(doiRec.get(ColdpTerm.type)).isEqualTo("article-journal");
     assertThat(doiRec.get(ColdpTerm.alternativeID)).isEqualTo("col:REF-2");
+  }
+
+  // Regression test for the reference-model-overhaul review: RefMapping.parseNames produces a
+  // literal-only CslName (family == null) for an institution or any comma-free author name (e.g.
+  // "World Flora Online"). CLB's own CslName.toColdpString(CslName[]) appends getFamily()
+  // unconditionally, so a literal-only name used to export as the literal string "null" -- silent
+  // data corruption. ReferenceColdpWriter now builds the ColDP author/editor string itself instead of
+  // delegating, so this must round-trip through RefMapping.parseNames unchanged.
+  @Test
+  void exportsLiteralAuthorNamesWithoutCorruption(@TempDir Path tmp) throws Exception {
+    int userId = createUser("literal-author-owner");
+    int pid = createProject("literal-author-export", userId);
+
+    CslName institution = new CslName();
+    institution.setLiteral("World Flora Online");
+    CslName person = new CslName("Olaf", "Bánki");
+
+    Reference ref = referenceService.create(userId, pid, new CreateReferenceRequest(
+        "World Flora Online & Bánki, O. 2021. A mixed-author citation.", false, "article-journal",
+        List.of(institution, person), null, "A mixed-author title", "Journal of Mixed Authors", null,
+        "2021", null, null, null, null, null, null, null, null, null, null));
+
+    Path targetZip = tmp.resolve("export.zip");
+    writer.write(pid, targetZip);
+
+    Path extractDir = tmp.resolve("extracted");
+    try (InputStream in = Files.newInputStream(targetZip)) {
+      ColdpZip.extractToTemp(in, extractDir);
+    }
+    ColdpReader reader = ColdpReader.from(extractDir);
+    List<VerbatimRecord> recs = reader.stream(ColdpTerm.Reference).toList();
+    VerbatimRecord rec = findOneById(recs, ref.getId());
+
+    String authorCell = rec.get(ColdpTerm.author);
+    assertThat(authorCell).isNotNull();
+    // The literal-only ("institution") author must never get corrupted into the literal string
+    // "null" by blindly appending CslName.getFamily() -- see ReferenceColdpWriter.coldpToken.
+    assertThat(authorCell).doesNotContain("null");
+    assertThat(authorCell).isEqualTo("World Flora Online; Bánki,Olaf");
+
+    // Round-trip: RefMapping.parseNames (what ImportRunService.loadReferences reuses on reimport)
+    // must recover the same structured names that were exported.
+    List<CslName> reparsed = RefMapping.parseNames(authorCell);
+    assertThat(reparsed).hasSize(2);
+    assertThat(reparsed.get(0).getLiteral()).isEqualTo("World Flora Online");
+    assertThat(reparsed.get(0).getFamily()).isNull();
+    assertThat(reparsed.get(1).getLiteral()).isNull();
+    assertThat(reparsed.get(1).getFamily()).isEqualTo("Bánki");
+    assertThat(reparsed.get(1).getGiven()).isEqualTo("Olaf");
   }
 
   @Test

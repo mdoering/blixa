@@ -20,10 +20,13 @@ import tools.jackson.databind.ObjectMapper;
 //
 // A plain (non-Spring-managed) ObjectMapper is used here: MyBatis TypeHandlers are instantiated by
 // the MyBatis type-handler registry, not by Spring, so there's no straightforward way to
-// @Autowire the application's shared Jackson 3 ObjectMapper bean into one. Since the SAME mapper
-// writes and reads this JSONB (it's purely internal storage), the round-trip is consistent
-// regardless of CslName being a plain POJO with Jackson-2 (`com.fasterxml.jackson`) annotations --
-// Jackson 3's default bean (getter/setter) serialization ignores those and works off the accessors.
+// @Autowire the application's shared Jackson 3 ObjectMapper bean into one. CslName is a plain POJO
+// carrying Jackson-2 (`com.fasterxml.jackson.annotation`) annotations, e.g.
+// @JsonProperty("dropping-particle") -- jackson-annotations is the one Jackson module that did NOT
+// fork for Jackson 3 (`tools.jackson`), so Jackson 3's bean introspection still honors them and this
+// JSONB is stored keyed by the CSL-JSON field names, not the Java property names. That's harmless
+// either way here since the SAME mapper writes and reads this JSONB (it's purely internal storage),
+// so the round-trip is consistent regardless.
 public class CslNameListTypeHandler extends BaseTypeHandler<List<CslName>> {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
