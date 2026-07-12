@@ -20,9 +20,6 @@ public interface ReleaseMetricsMapper {
   List<Map<String, Object>> countByRank(@Param("projectId") int projectId,
       @Param("statuses") List<String> statuses);
 
-  @Select("SELECT count(*) FROM name_usage WHERE project_id = #{projectId} AND status = 'ACCEPTED'")
-  int acceptedTotal(@Param("projectId") int projectId);
-
   @Select("SELECT count(*) FROM vernacular   WHERE project_id = #{projectId}") int vernacular(@Param("projectId") int p);
   @Select("SELECT count(*) FROM distribution WHERE project_id = #{projectId}") int distribution(@Param("projectId") int p);
   @Select("SELECT count(*) FROM media        WHERE project_id = #{projectId}") int media(@Param("projectId") int p);
@@ -41,7 +38,7 @@ public interface ReleaseMetricsMapper {
   int changesSince(@Param("projectId") int projectId, @Param("since") OffsetDateTime since);
 
   // user_id, name (display_name -> username fallback), orcid, count — since the boundary.
-  @Select("SELECT c.user_id AS userId, coalesce(u.display_name, u.username) AS name, u.orcid AS orcid, "
+  @Select("SELECT c.user_id AS \"userId\", coalesce(u.display_name, u.username) AS name, u.orcid AS orcid, "
       + "count(*) AS cnt FROM change c LEFT JOIN app_user u ON u.id = c.user_id "
       + "WHERE c.project_id = #{projectId} AND (#{since}::timestamptz IS NULL OR c.at > #{since}::timestamptz) "
       + "GROUP BY c.user_id, u.display_name, u.username, u.orcid ORDER BY count(*) DESC")

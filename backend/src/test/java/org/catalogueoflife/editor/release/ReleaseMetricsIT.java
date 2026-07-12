@@ -46,5 +46,7 @@ class ReleaseMetricsIT extends AbstractPostgresIT {
     // one contributor with >=3 edits
     assertThat(m.get("contributions").get(0).get("count").asInt()).isGreaterThanOrEqualTo(3);
     assertThat(m.get("contributions").get(0).get("name").asString()).isEqualTo("M User");
+    assertThat(m.get("contributions").get(0).get("userId").isNull()).isFalse();
+    assertThat(m.get("contributions").get(0).get("userId").asInt()).isEqualTo(u.getId());
   }
 }
