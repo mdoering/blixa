@@ -28,12 +28,12 @@ function mockProject(role = 'owner') {
   );
 }
 
-function renderPage() {
+function renderPage(route = '/projects/3/references') {
   return renderWithProviders(
     <Routes>
       <Route path="/projects/:projectId/references" element={<ReferencesPage />} />
     </Routes>,
-    { route: '/projects/3/references' },
+    { route },
   );
 }
 
@@ -87,6 +87,40 @@ test('editing a reference round-trips the accessed field', async () => {
   await userEvent.type(accessedInput, '2026-07-09');
   await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
   expect(body).toMatchObject({ accessed: '2026-07-09' });
+});
+
+test('?ref= deep-link opens that reference in the edit form', async () => {
+  mockProject();
+  server.use(
+    http.get('/api/projects/3/references/2', () =>
+      HttpResponse.json({
+        id: 2,
+        citation: 'Darwin 1859',
+        title: 'On the Origin of Species',
+        author: 'Darwin, C.',
+        issued: '1859',
+        containerTitle: null,
+        doi: null,
+        accessed: null,
+        version: 0,
+      }),
+    ),
+  );
+  renderPage('/projects/3/references?ref=2');
+  const dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getByDisplayValue('On the Origin of Species')).toBeInTheDocument();
+});
+
+test('?ref= for a deleted reference (404) fails gracefully -- no form, no crash', async () => {
+  mockProject();
+  server.use(
+    http.get('/api/projects/3/references/99', () =>
+      HttpResponse.json({ error: 'not found' }, { status: 404 }),
+    ),
+  );
+  renderPage('/projects/3/references?ref=99');
+  await screen.findByText('Systema Naturae');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
 test('a viewer sees no editing controls', async () => {

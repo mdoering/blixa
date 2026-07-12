@@ -1,6 +1,6 @@
-import { Badge, Button, Code, Group, Paper, Select, Spoiler, Stack, Text, Title } from '@mantine/core';
+import { Anchor, Badge, Button, Code, Group, Paper, Select, Spoiler, Stack, Text, Title } from '@mantine/core';
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -20,7 +20,18 @@ function prettyDiff(diff: string): string {
   }
 }
 
-function ChangeRow({ change }: { change: Change }) {
+// Where a change's entity still lives, if it's still linkable: only for entity types with their
+// own detail page, and only while the entity still exists (a DELETE means it's gone).
+function entityLink(change: Change, pid: number): string | null {
+  if (change.operation === 'DELETE') return null;
+  if (change.entityType === 'name_usage') return `/projects/${pid}/names?usage=${change.entityId}`;
+  if (change.entityType === 'reference') return `/projects/${pid}/references?ref=${change.entityId}`;
+  return null;
+}
+
+function ChangeRow({ change, pid }: { change: Change; pid: number }) {
+  const label = `${change.entityType} #${change.entityId}`;
+  const to = entityLink(change, pid);
   return (
     <Paper withBorder p="sm">
       <Group justify="space-between" wrap="nowrap">
@@ -28,9 +39,15 @@ function ChangeRow({ change }: { change: Change }) {
           <Badge size="sm" color={OP_COLOR[change.operation] ?? 'gray'}>
             {change.operation.toLowerCase()}
           </Badge>
-          <Text size="sm" fw={500}>
-            {change.entityType} #{change.entityId}
-          </Text>
+          {to ? (
+            <Anchor component={Link} to={to} size="sm" fw={500}>
+              {label}
+            </Anchor>
+          ) : (
+            <Text size="sm" fw={500}>
+              {label}
+            </Text>
+          )}
         </Group>
         <Group gap="xs" wrap="nowrap">
           <Text size="sm" c="dimmed">
@@ -97,7 +114,7 @@ export default function HistoryPage() {
       ) : (
         <Stack gap="xs">
           {rows.map((c) => (
-            <ChangeRow key={c.id} change={c} />
+            <ChangeRow key={c.id} change={c} pid={pid} />
           ))}
         </Stack>
       )}

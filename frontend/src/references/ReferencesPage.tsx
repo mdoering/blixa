@@ -16,12 +16,12 @@ import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconDotsVertical, IconFileImport, IconPlus, IconSearch, IconWorld } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { messageFor } from '../api/client';
 import MergeRecordsModal from '../merge/MergeRecordsModal';
 import { getProject } from '../api/projects';
-import { deleteReference, listReferences } from '../api/references';
+import { deleteReference, getReference, listReferences } from '../api/references';
 import type { CreateRefPayload, Reference } from '../api/types';
 import ImportBibtexModal from './ImportBibtexModal';
 import ImportDoiModal from './ImportDoiModal';
@@ -46,6 +46,23 @@ export default function ReferencesPage() {
   const [form, setForm] = useState<{ reference: Reference | null; initial?: CreateRefPayload } | null>(
     null,
   );
+
+  // Deep-link support: ?ref=<id> (e.g. from the History page) opens that reference's edit form,
+  // even if it isn't on the current filtered/paginated table page. Mirrors NameSearchPage's
+  // ?usage= handling. If the reference no longer exists (deleted), the fetch 404s and the query
+  // simply stays without data -- no form opens, no crash.
+  const [searchParams] = useSearchParams();
+  const refParam = searchParams.get('ref');
+  const { data: linkedReference } = useQuery({
+    queryKey: ['reference', pid, refParam],
+    queryFn: () => getReference(pid, Number(refParam)),
+    enabled: !!refParam,
+    retry: false,
+  });
+  useEffect(() => {
+    if (linkedReference) setForm({ reference: linkedReference });
+  }, [linkedReference]);
+
   const [importDoi, setImportDoi] = useState(false);
   const [importBib, setImportBib] = useState(false);
   const [importRis, setImportRis] = useState(false);
