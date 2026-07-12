@@ -14,7 +14,14 @@ import {
 import { modals } from '@mantine/modals';
 import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconDotsVertical, IconFileImport, IconPlus, IconSearch, IconWorld } from '@tabler/icons-react';
+import {
+  IconDotsVertical,
+  IconFileImport,
+  IconPlus,
+  IconSearch,
+  IconWand,
+  IconWorld,
+} from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -26,6 +33,7 @@ import type { CreateRefPayload, Reference } from '../api/types';
 import ImportBibtexModal from './ImportBibtexModal';
 import ImportDoiModal from './ImportDoiModal';
 import ImportRisModal from './ImportRisModal';
+import ReconcileJournalsModal from './ReconcileJournalsModal';
 import ReferenceForm from './ReferenceForm';
 
 const PAGE = 25;
@@ -66,6 +74,7 @@ export default function ReferencesPage() {
   const [importDoi, setImportDoi] = useState(false);
   const [importBib, setImportBib] = useState(false);
   const [importRis, setImportRis] = useState(false);
+  const [reconcileOpen, setReconcileOpen] = useState(false);
 
   // Multi-select for the "Merge N selected…" action (reference dedupe, reuses Task 3's
   // MergeRecordsModal with entity="reference").
@@ -137,6 +146,13 @@ export default function ReferencesPage() {
               onClick={() => setImportRis(true)}
             >
               Import RIS
+            </Button>
+            <Button
+              variant="default"
+              leftSection={<IconWand size={14} />}
+              onClick={() => setReconcileOpen(true)}
+            >
+              Reconcile journals…
             </Button>
             <Button leftSection={<IconPlus size={14} />} onClick={() => setForm({ reference: null })}>
               New reference
@@ -275,6 +291,7 @@ export default function ReferencesPage() {
       />
       <ImportBibtexModal pid={pid} opened={importBib} onClose={() => setImportBib(false)} />
       <ImportRisModal pid={pid} opened={importRis} onClose={() => setImportRis(false)} />
+      <ReconcileJournalsModal pid={pid} opened={reconcileOpen} onClose={() => setReconcileOpen(false)} />
       <MergeRecordsModal
         entity="reference"
         pid={pid}

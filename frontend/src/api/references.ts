@@ -71,3 +71,31 @@ export function attachReferencePdf(pid: number, id: number, file: File): Promise
 export function removeReferencePdf(pid: number, id: number): Promise<Reference> {
   return api<Reference>(`/api/projects/${pid}/references/${id}/pdf`, { method: 'DELETE' });
 }
+
+// -- Journal-name reconciliation (ReconcileJournalsModal): facet the distinct container_title
+// values in the project, then bulk-normalize a chosen set of variant spellings to one canonical
+// value. Field reconciliation of a single column, not a record merge -- unrelated to
+// mergeReferences (api/merge.ts).
+export interface ContainerTitleFacet {
+  value: string;
+  count: number;
+}
+
+// GET /references/facets/container-title — distinct container_title values + counts, most-cited
+// first (see ReferenceMapper.containerTitleFacet).
+export function getContainerTitleFacet(pid: number): Promise<ContainerTitleFacet[]> {
+  return api<ContainerTitleFacet[]>(`/api/projects/${pid}/references/facets/container-title`);
+}
+
+// POST /references/facets/container-title/merge — rewrites every reference whose container_title
+// is one of `variants` to `canonical`. Returns the number of rows updated.
+export function mergeContainerTitle(
+  pid: number,
+  canonical: string,
+  variants: string[],
+): Promise<{ updated: number }> {
+  return api<{ updated: number }>(`/api/projects/${pid}/references/facets/container-title/merge`, {
+    method: 'POST',
+    json: { canonical, variants },
+  });
+}
