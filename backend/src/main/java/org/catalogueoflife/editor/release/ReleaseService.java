@@ -3,6 +3,7 @@ package org.catalogueoflife.editor.release;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.OffsetDateTime;
 import java.util.List;
 import org.catalogueoflife.editor.coldp.export.ColdpWriter;
 import org.catalogueoflife.editor.project.Project;
@@ -39,6 +40,7 @@ public class ReleaseService {
   private final ProjectService projectService;
   private final ProjectMapper projects;
   private final ColdpWriter writer;
+  private final ReleaseMetricsService metrics;
   private final Path releaseDir;
 
   // Self-reference through the Spring proxy so build()'s @Async actually goes through the proxied
@@ -47,11 +49,13 @@ public class ReleaseService {
   @Autowired @Lazy private ReleaseService self;
 
   public ReleaseService(ReleaseMapper releases, ProjectService projectService, ProjectMapper projects,
-      ColdpWriter writer, @Value("${coldp.release.dir:${java.io.tmpdir}/coldp-releases}") String releaseDir) {
+      ColdpWriter writer, ReleaseMetricsService metrics,
+      @Value("${coldp.release.dir:${java.io.tmpdir}/coldp-releases}") String releaseDir) {
     this.releases = releases;
     this.projectService = projectService;
     this.projects = projects;
     this.writer = writer;
+    this.metrics = metrics;
     this.releaseDir = Path.of(releaseDir);
     try {
       Files.createDirectories(this.releaseDir);
@@ -85,8 +89,9 @@ public class ReleaseService {
     Path target = releaseDir.resolve(releaseId + ".zip");
     try {
       ColdpWriter.Counts counts = writer.write(projectId, target);
-      String metrics = "{}"; // Task 3 replaces this with the rich snapshot
-      int updated = releases.ready(releaseId, counts.nameUsageCount(), metrics, target.toString(),
+      OffsetDateTime since = releases.latestReadyCreatedAt(projectId);
+      String metricsJson = this.metrics.compute(projectId, since);
+      int updated = releases.ready(releaseId, counts.nameUsageCount(), metricsJson, target.toString(),
           downloadFileName(projectId, releaseId), Files.size(target));
       if (updated == 0) {
         // The release row was deleted (or left BUILDING) mid-build -> the zip we just wrote has no
