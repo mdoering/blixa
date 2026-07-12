@@ -50,9 +50,12 @@ export default function BlixaLogo({
       className={className}
       style={{
         display: 'inline-block',
-        flex: 'none',
+        // Desired width from the requested height; but never wider than the container -- on a narrow
+        // (mobile) viewport it caps at 100% and the aspect-ratio scales the height down in step, so
+        // the wordmark shrinks proportionally instead of overflowing.
         width,
-        height,
+        maxWidth: '100%',
+        aspectRatio: RATIO[variant],
         backgroundColor: color,
         WebkitMaskImage: url,
         WebkitMaskRepeat: 'no-repeat',
