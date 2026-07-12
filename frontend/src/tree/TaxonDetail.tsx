@@ -279,6 +279,13 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
   // demote), so their tabs only show when accepted.
   const isAccepted = usage.status === 'ACCEPTED';
 
+  // Captured once per render (rather than calling form.getInputProps(...) again inside each
+  // Select's onChange below) so the claim-wrapped onChange still delegates to the exact same
+  // value/onChange pair the spread below wires up.
+  const rankInputProps = form.getInputProps('rank');
+  const statusInputProps = form.getInputProps('status');
+  const nomStatusInputProps = form.getInputProps('nomStatus');
+
   return (
     <Box>
       {foreignLock && (
@@ -324,9 +331,28 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                     searchable
                     data={rankData}
                     autoComplete="off"
-                    {...form.getInputProps('rank')}
+                    {...rankInputProps}
+                    onChange={(v) => {
+                      // Mantine's non-searchable/click-only Select selection is a controlled-state
+                      // change with no native DOM input event, so it never bubbles to the
+                      // fieldset's onInput below -- claim() here catches that click-without-typing
+                      // edit. Safe against seeding: onChange only fires on genuine user selection,
+                      // never from the programmatic form.setValues/setFieldValue seeding effects
+                      // above (a controlled component's onChange doesn't fire when its `value` prop
+                      // changes externally).
+                      claim();
+                      rankInputProps.onChange(v);
+                    }}
                   />
-                  <Select label="Status" data={STATUS_OPTIONS} {...form.getInputProps('status')} />
+                  <Select
+                    label="Status"
+                    data={STATUS_OPTIONS}
+                    {...statusInputProps}
+                    onChange={(v) => {
+                      claim();
+                      statusInputProps.onChange(v);
+                    }}
+                  />
                 </SimpleGrid>
                 <EntitySelect
                   label="Published in reference"
@@ -335,9 +361,10 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                       ? null
                       : String(form.values.publishedInReferenceId)
                   }
-                  onChange={(v) =>
-                    form.setFieldValue('publishedInReferenceId', v ? Number(v) : '')
-                  }
+                  onChange={(v) => {
+                    claim();
+                    form.setFieldValue('publishedInReferenceId', v ? Number(v) : '');
+                  }}
                   load={referenceOptions(pid)}
                   queryKey={['refOptions', pid]}
                   current={
@@ -365,7 +392,11 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                   autoComplete="off"
                   data-1p-ignore
                   data-lpignore="true"
-                  {...form.getInputProps('nomStatus')}
+                  {...nomStatusInputProps}
+                  onChange={(v) => {
+                    claim();
+                    nomStatusInputProps.onChange(v);
+                  }}
                 />
                 {scopes.length > 0 && (
                   <SimpleGrid cols={Math.min(scopes.length, 3)}>

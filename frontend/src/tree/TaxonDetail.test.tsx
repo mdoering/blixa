@@ -568,6 +568,31 @@ test('claims the lock only on genuine user edit, not on programmatic form seedin
   await waitFor(() => expect(acquireCalls).toBeGreaterThan(0));
 });
 
+test('claims the lock on a Status-only edit (Select onChange, no native input event)', async () => {
+  mockCommon();
+  let acquired = false;
+  server.use(
+    http.post('/api/projects/4/locks', () => {
+      acquired = true;
+      return HttpResponse.json(fakeLock({ userId: 1, username: 'me', heldByMe: true }));
+    }),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await waitFor(() => expect(screen.getByLabelText('Scientific name')).toHaveValue('Panthera leo'));
+  // Form seeding (setValues) must not have triggered a claim.
+  expect(acquired).toBe(false);
+
+  // Status is a non-searchable, click-only Select: selecting an option dispatches no native DOM
+  // input event, so it never bubbles to the fieldset's onInput -- only the Select's own onChange
+  // (wired to claim() in TaxonDetail) can catch this edit.
+  const status = screen.getByRole('textbox', { name: 'Status' });
+  await userEvent.click(status);
+  await userEvent.click(await screen.findByRole('option', { name: 'Synonym' }));
+
+  await waitFor(() => expect(acquired).toBe(true));
+});
+
 test('a warning issue shows its badge and message', async () => {
   mockCommon();
   server.use(
