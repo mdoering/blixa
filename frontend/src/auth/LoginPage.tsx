@@ -27,7 +27,7 @@ export default function LoginPage() {
     try {
       await localLogin(values.username, values.password);
       await queryClient.invalidateQueries({ queryKey: ['me'] });
-      navigate('/', { replace: true });
+      navigate('/projects', { replace: true });
     } catch (e) {
       setError(e instanceof ApiError && e.status === 401 ? 'Invalid username or password' : 'Login failed');
     } finally {
