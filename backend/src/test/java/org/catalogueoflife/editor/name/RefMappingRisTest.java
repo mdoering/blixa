@@ -145,13 +145,25 @@ class RefMappingRisTest {
   }
 
   @Test
-  void unknownRisTypeCodeMapsToDocument() {
+  void dataRisTypeMapsToDataset() {
     String ris = """
         TY  - DATA
         TI  - A dataset
         ER  -\s
         """;
-    assertThat(RefMapping.fromRis(ris).get(0).type()).isEqualTo("document");
+    assertThat(RefMapping.fromRis(ris).get(0).type()).isEqualTo("dataset");
+  }
+
+  @Test
+  void unknownRisTypeCodeMapsToNull() {
+    // GEN ("generic") has no confident CSL match -- unmappable source types come back null rather
+    // than a guessed catch-all (type is optional; a null type is accepted, an invalid one 400s).
+    String ris = """
+        TY  - GEN
+        TI  - Something generic
+        ER  -\s
+        """;
+    assertThat(RefMapping.fromRis(ris).get(0).type()).isNull();
   }
 
   @Test

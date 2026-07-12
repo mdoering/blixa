@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import life.catalogue.api.model.CSLType;
 import life.catalogue.api.model.CslName;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.jbibtex.BibTeXDatabase;
@@ -55,7 +56,7 @@ public final class RefMapping {
     String isbn = text(message.path("ISBN").path(0));
     String issn = text(message.path("ISSN").path(0));
     String link = text(message.path("URL"));
-    String type = text(message.path("type"));
+    String type = crossrefType(text(message.path("type")));
     String accessed = crossrefDate(message.path("accessed"));
     String citation = citation(author, year, title, container, volume, issue, page);
     return new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
@@ -109,6 +110,29 @@ public final class RefMapping {
     return "%04d-%02d-%02d".formatted(y.asInt(), m.asInt(), d.asInt());
   }
 
+  // Crossref's own `type` vocabulary (https://api.crossref.org/types) is NOT CSL's -- e.g.
+  // "journal-article" vs CSL's "article-journal" -- so passing it straight through used to 400 the
+  // moment ReferenceService.create started validating `type` against CSLType (see that class's
+  // validateType). Maps the common Crossref types CoL actually sees onto the closest CSL wire value;
+  // anything else returns null (type is optional everywhere it's stored) rather than guessing or
+  // 400ing the whole import over one unmapped work type.
+  public static String crossrefType(String raw) {
+    if (raw == null) {
+      return null;
+    }
+    return canonicalCslType(switch (raw) {
+      case "journal-article" -> "article-journal";
+      case "book-chapter", "book-section" -> "chapter";
+      case "proceedings-article" -> "paper-conference";
+      case "posted-content" -> "article";
+      case "book", "monograph", "reference-book" -> "book";
+      case "dataset" -> "dataset";
+      case "report" -> "report";
+      case "dissertation" -> "thesis";
+      default -> null;
+    });
+  }
+
   private static String text(JsonNode n) {
     if (n == null || n.isMissingNode() || n.isNull()) {
       return null;
@@ -135,10 +159,7 @@ public final class RefMapping {
     String page = joinPage(text(container.path("firstPage")), text(container.path("lastPage")));
     String doi = text(attributes.path("doi"));
     String link = text(attributes.path("url"));
-    String type = dataciteText(attributes.path("types").path("resourceTypeGeneral"));
-    if (type != null) {
-      type = type.toLowerCase();
-    }
+    String type = dataciteType(dataciteText(attributes.path("types").path("resourceTypeGeneral")));
     String citation = citation(author, year, title, containerTitle, volume, issue, page);
     return new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
         title, containerTitle, null, year, volume, issue, page, publisher, doi, null, null, link, null,
@@ -189,6 +210,30 @@ public final class RefMapping {
     return n.isObject() ? text(n.path("name")) : text(n);
   }
 
+  // DataCite's `types.resourceTypeGeneral` is a controlled vocabulary of its own (PascalCase on the
+  // wire, e.g. "JournalArticle", "BookChapter") -- not CSL's. Lower-cases defensively (callers
+  // already lower-case, but this is also called directly by tests/other callers), maps the common
+  // DataCite resource types onto the closest CSL wire value, and returns null for anything else
+  // (type is optional) rather than 400ing the whole import over an unmapped resource type.
+  public static String dataciteType(String raw) {
+    if (raw == null) {
+      return null;
+    }
+    return canonicalCslType(switch (raw.toLowerCase()) {
+      case "dataset" -> "dataset";
+      case "text" -> "document";
+      case "journalarticle", "journal article" -> "article-journal";
+      case "book" -> "book";
+      case "bookchapter" -> "chapter";
+      case "conferencepaper" -> "paper-conference";
+      case "report" -> "report";
+      case "dissertation" -> "thesis";
+      case "preprint" -> "article";
+      case "software" -> "software";
+      default -> null;
+    });
+  }
+
   // --- BibTeX ---
 
   public static List<CreateReferenceRequest> fromBibtex(String bibtex) {
@@ -211,7 +256,7 @@ public final class RefMapping {
       String volume = field(e, "volume");
       String issue = field(e, "number");
       String page = field(e, "pages");
-      String type = e.getType() == null ? null : e.getType().getValue();
+      String type = bibtexType(e.getType() == null ? null : e.getType().getValue());
       String citation = citation(author, year, title, container, volume, issue, page);
       out.add(new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
           title, container, null, year, volume, issue, page, field(e, "publisher"), field(e, "doi"),
@@ -221,6 +266,26 @@ public final class RefMapping {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "no BibTeX entries found");
     }
     return out;
+  }
+
+  // BibTeX's `@entrytype` vocabulary -> CSL. jbibtex preserves whatever case the source .bib file
+  // used (lower-case is the near-universal convention, but not guaranteed), so normalize before
+  // matching. Unmapped/unknown entry types (misc, unpublished, booklet, proceedings, ...) return
+  // null -- type is optional -- rather than 400ing the whole import.
+  public static String bibtexType(String raw) {
+    if (raw == null) {
+      return null;
+    }
+    return canonicalCslType(switch (raw.toLowerCase()) {
+      case "article" -> "article-journal";
+      case "book" -> "book";
+      case "incollection", "inbook" -> "chapter";
+      case "inproceedings", "conference" -> "paper-conference";
+      case "phdthesis", "mastersthesis" -> "thesis";
+      case "techreport" -> "report";
+      case "manual" -> "book";
+      default -> null;
+    });
   }
 
   private static String field(BibTeXEntry e, String key) {
@@ -318,20 +383,24 @@ public final class RefMapping {
         remarks);
   }
 
+  // RIS's TY vocabulary -> CSL. Unmapped/unrecognized TY codes return null (type is optional)
+  // rather than the old blanket "document" fallback, which risked silently masking a code this
+  // mapping simply hasn't been taught yet.
   private static String risType(String risCode) {
     if (risCode == null) {
-      return "document";
+      return null;
     }
-    return switch (risCode) {
+    return canonicalCslType(switch (risCode) {
       case "JOUR" -> "article-journal";
       case "BOOK" -> "book";
       case "CHAP" -> "chapter";
       case "CONF", "CPAPER" -> "paper-conference";
       case "THES" -> "thesis";
       case "RPRT" -> "report";
+      case "DATA" -> "dataset";
       case "ELEC", "WEB" -> "webpage";
-      default -> "document";
-    };
+      default -> null;
+    });
   }
 
   // PY is plain "2020"; Y1 can be "2020/01/15/" (RIS's slash-delimited y/m/d/other-info date) --
@@ -399,6 +468,22 @@ public final class RefMapping {
   }
 
   // --- shared ---
+
+  // Tolerantly resolves `raw` into the canonical CSL-JSON wire id (e.g. "article-journal") via the
+  // exact same CSLType.fromString(...).toString() resolution ReferenceService.validateType uses for
+  // HTTP create/update -- except this never throws. Every per-source *Type mapping above already
+  // hands it a hand-picked CSL candidate, so in practice this is a defensive final canonicalization
+  // (case/separator normalization, and a safety net against ever emitting a value CSLType wouldn't
+  // itself accept); a raw source string that doesn't resolve becomes null rather than 400ing an
+  // entire import over one reference's type -- `type` is optional on CreateReferenceRequest and on
+  // the ColDP Reference.tsv `type` column alike.
+  public static String canonicalCslType(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return null;
+    }
+    CSLType type = CSLType.fromString(raw);
+    return type == null ? null : type.toString();
+  }
 
   // Splits a "; "-joined name string -- the shape crossrefNames/dataciteNames/names/risJoin above
   // all build, and also the shape CLB's CslName.toColdpString(CslName[]) emits for ColDP's own

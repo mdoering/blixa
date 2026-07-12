@@ -45,6 +45,13 @@ class ReferenceImportIT extends AbstractPostgresIT {
     return json.readTree(body).get("id").asLong();
   }
 
+  // Task 4 (reference-model-overhaul plan): before this task, RefMapping.fromBibtex passed the raw
+  // BibTeX entry type ("article") straight through into `type`, which only happened to survive
+  // Task 2's CSLType validation because "article" is coincidentally itself a valid (if semantically
+  // wrong -- generic, not journal-specific) CSL wire value. Asserts the import maps it to the
+  // correct "article-journal" instead, succeeds end-to-end with no 400, and the created reference's
+  // citation was GENERATED (via ReferenceCitationService), not the importer's hand-built fallback --
+  // see ReferenceService.applyCitation.
   @Test
   void importsBibtexAndCreatesReferences() throws Exception {
     ensureUser("refImportOwner");
@@ -57,12 +64,16 @@ class ReferenceImportIT extends AbstractPostgresIT {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$[0].title").value("A Title"))
         .andExpect(jsonPath("$[0].doi").value("10.1/x"))
+        .andExpect(jsonPath("$[0].type").value("article-journal"))
+        .andExpect(jsonPath("$[0].citationManual").value(false))
+        .andExpect(jsonPath("$[0].citation").value(org.hamcrest.Matchers.containsString("Doe")))
         .andReturn().getResponse().getContentAsString();
     long refId = json.readTree(body).get(0).get("id").asLong();
 
     mvc.perform(get("/api/projects/" + pid + "/references/" + refId))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.title").value("A Title"));
+        .andExpect(jsonPath("$.title").value("A Title"))
+        .andExpect(jsonPath("$.type").value("article-journal"));
   }
 
   @Test

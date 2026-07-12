@@ -179,13 +179,18 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
     int userId = createUser("roundtrip-owner");
     int pid = createProject("roundtrip-source", userId);
 
+    // ref1/ref2 deliberately carry a CSL `type` + structured family/given authors (RefMapping.
+    // parseNames("Family, Given") splits on the first comma) rather than citationManual=true, so
+    // the export->reimport cycle below also proves Task 4's ColDP `type` + structured-author
+    // round-trip (ReferenceColdpWriter.row / ImportRunService.loadReferences), not just the
+    // taxonomic-tree machinery the rest of this fixture targets.
     Reference ref1 = referenceService.create(userId, pid, new CreateReferenceRequest(
-        "Linnaeus, C. 1758. Systema Naturae.", false, "book", RefMapping.parseNames("C. Linnaeus"),
+        "Linnaeus, C. 1758. Systema Naturae.", false, "book", RefMapping.parseNames("Linnaeus, C."),
         null, "Systema Naturae", null, null, "1758", null, null, null, null, null, null, null, null,
         null, null));
     Reference ref2 = referenceService.create(userId, pid, new CreateReferenceRequest(
         "Pocock, R.I. 1917. On the external characters of the Felidae.", false, "article-journal",
-        RefMapping.parseNames("R.I. Pocock"), null, "On the external characters of the Felidae",
+        RefMapping.parseNames("Pocock, R.I."), null, "On the external characters of the Felidae",
         "Annals and Magazine of Natural History", null, "1917", "20", null, "329-350",
         null, null, null, null, null, null, null));
 
@@ -340,6 +345,19 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
         .findFirst().orElseThrow();
     assertThat(newFelisCatus.getPublishedInReferenceId()).isEqualTo(newRef1.getId());
     assertThat(newFelisCatus.getReferenceId()).containsExactlyInAnyOrder(newRef1.getId(), newRef2.getId());
+
+    // Task 4: the reference's CSL `type` and structured family/given author round-trip losslessly
+    // through the export->reimport cycle (ReferenceColdpWriter.row writes Reference.tsv's type/
+    // author columns; ImportRunService.loadReferences reads them back via RefMapping.
+    // canonicalCslType/parseNames).
+    assertThat(newRef1.getType()).isEqualTo("book");
+    assertThat(newRef1.getAuthor()).hasSize(1);
+    assertThat(newRef1.getAuthor().get(0).getFamily()).isEqualTo("Linnaeus");
+    assertThat(newRef1.getAuthor().get(0).getGiven()).isEqualTo("C.");
+    assertThat(newRef2.getType()).isEqualTo("article-journal");
+    assertThat(newRef2.getAuthor()).hasSize(1);
+    assertThat(newRef2.getAuthor().get(0).getFamily()).isEqualTo("Pocock");
+    assertThat(newRef2.getAuthor().get(0).getGiven()).isEqualTo("R.I.");
 
     // taxon_info round-tripped on the accepted usage.
     assertThat(newFelisCatus.getExtinct()).isTrue();

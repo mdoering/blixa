@@ -43,7 +43,9 @@ class RefMappingTest {
     assertThat(r.volume()).isEqualTo("12");
     assertThat(r.issue()).isEqualTo("3");
     assertThat(r.doi()).isEqualTo("10.1/xyz");
-    assertThat(r.type()).isEqualTo("article");
+    // BibTeX's "article" entry type maps to CSL's "article-journal" (RefMapping.bibtexType) --
+    // NOT the raw BibTeX string, which is not a valid CSLType wire value and would 400 the create.
+    assertThat(r.type()).isEqualTo("article-journal");
     assertThat(r.citation()).contains("A great paper");
   }
 
@@ -122,5 +124,63 @@ class RefMappingTest {
     JsonNode message = JSON.readTree(json);
     CreateReferenceRequest r = RefMapping.fromCrossref(message);
     assertThat(r.accessed()).isEqualTo("2026");
+  }
+
+  // Task 4 (reference-model-overhaul plan): Crossref's own type vocabulary ("journal-article") is
+  // NOT a CSL wire value ("article-journal") -- passing it straight through used to 400 the moment
+  // ReferenceService.create started validating `type` against CSLType. Confirms fromCrossref's
+  // parsed request already carries the canonicalized value, not the raw Crossref string.
+  @Test
+  void mapsCrossrefJournalArticleTypeToCanonicalArticleJournal() {
+    String json =
+        """
+        {
+          "title": ["A Paper"],
+          "type": "journal-article"
+        }
+        """;
+    JsonNode message = JSON.readTree(json);
+    CreateReferenceRequest r = RefMapping.fromCrossref(message);
+    assertThat(r.type()).isEqualTo("article-journal");
+  }
+
+  // Same for BibTeX: "@incollection" is not a CSL wire value either.
+  @Test
+  void mapsBibtexIncollectionTypeToCanonicalChapter() {
+    String bibtex =
+        """
+        @incollection{key3,
+          title = {A Chapter},
+          booktitle = {A Book}
+        }
+        """;
+    List<CreateReferenceRequest> refs = RefMapping.fromBibtex(bibtex);
+    assertThat(refs.get(0).type()).isEqualTo("chapter");
+  }
+
+  @Test
+  void typeMappingFunctionsCoverCommonSourceTypesAndUnknownsMapToNull() {
+    assertThat(RefMapping.crossrefType("journal-article")).isEqualTo("article-journal");
+    assertThat(RefMapping.crossrefType("book-chapter")).isEqualTo("chapter");
+    assertThat(RefMapping.crossrefType("proceedings-article")).isEqualTo("paper-conference");
+    assertThat(RefMapping.crossrefType("posted-content")).isEqualTo("article");
+    assertThat(RefMapping.crossrefType("not-a-real-crossref-type")).isNull();
+    assertThat(RefMapping.crossrefType(null)).isNull();
+
+    assertThat(RefMapping.bibtexType("article")).isEqualTo("article-journal");
+    assertThat(RefMapping.bibtexType("incollection")).isEqualTo("chapter");
+    assertThat(RefMapping.bibtexType("inbook")).isEqualTo("chapter");
+    assertThat(RefMapping.bibtexType("inproceedings")).isEqualTo("paper-conference");
+    assertThat(RefMapping.bibtexType("phdthesis")).isEqualTo("thesis");
+    assertThat(RefMapping.bibtexType("techreport")).isEqualTo("report");
+    assertThat(RefMapping.bibtexType("misc")).isNull();
+    assertThat(RefMapping.bibtexType("unpublished")).isNull();
+    assertThat(RefMapping.bibtexType(null)).isNull();
+
+    assertThat(RefMapping.dataciteType("dataset")).isEqualTo("dataset");
+    assertThat(RefMapping.dataciteType("JournalArticle")).isEqualTo("article-journal");
+    assertThat(RefMapping.dataciteType("BookChapter")).isEqualTo("chapter");
+    assertThat(RefMapping.dataciteType("not-a-real-datacite-type")).isNull();
+    assertThat(RefMapping.dataciteType(null)).isNull();
   }
 }

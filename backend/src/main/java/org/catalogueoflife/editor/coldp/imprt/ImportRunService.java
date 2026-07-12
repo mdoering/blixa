@@ -374,7 +374,13 @@ public class ImportRunService {
       Reference r = new Reference();
       r.setAlternativeId(alternativeIds(rec, preserveIds, idScope));
       r.setCitation(rec.get(ColdpTerm.citation));
-      r.setType(rec.get(ColdpTerm.type));
+      // A ColDP archive is not guaranteed to carry a CSL-canonical `type` (it could come from any
+      // ColDP-producing tool, not just this app's own exporter) -- canonicalize through the same
+      // CSLType resolution RefMapping's other importers use (see RefMapping.canonicalCslType),
+      // rather than storing an arbitrary string that would 400 the very next HTTP edit of this
+      // reference (ReferenceService.update re-validates `type` against CSLType). Unmappable ->
+      // null, same as everywhere else `type` is optional.
+      r.setType(RefMapping.canonicalCslType(rec.get(ColdpTerm.type)));
       // ColDP's author/editor columns are a "; "-joined CSL name string (see
       // ReferenceColdpWriter.row's inverse) -- parse them into structured CslName entries with the
       // same helper RefMapping.fromCrossref/fromBibtex/fromRis/fromDatacite use.
