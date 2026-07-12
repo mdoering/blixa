@@ -1,147 +1,134 @@
-# Intra-project reconciliation (dedupe / merge) — design
+# Merge names / references (user-selected) — design
 
-**Status:** DRAFT — designed autonomously while the owner was offline; **the merge/conflict
-semantics (esp. §Merge decisions) want the owner's confirmation before the destructive
-apply is implemented.** Detection + review UI are non-destructive and safe to build now.
+**Status:** approved direction (owner re-scoped: the value is the merge mechanics, not detection).
 **Date:** 2026-07-12
 
 ## Goal
 
-Within a **single project**, surface likely-duplicate **names** and **references**, and let a
-curator merge each duplicate group into one survivor — always behind **explicit per-group manual
-review** (nothing auto-merges). This is the intra-project counterpart to the existing project→project
-**merge** feature, reusing its matchers.
+Let an editor **merge 2+ names, or 2+ references, that they have selected** in the search tables into
+a single survivor — the duplicate's dependents (children, synonyms, links, child-entities, reference
+uses) repoint to the survivor and the duplicate is deleted. **Detection is left to the user** (they
+find the duplicates via the search table + filters); this feature provides the **merge mechanics** and
+a review step. No async scan, no auto-detection.
 
-## What exists to reuse
+## Flow
 
-- `merge/NameMatcher.canonicalKey(NameUsage)` — an author-stripped, rank-qualified key; grouping the
-  project's own usages by it yields exact-duplicate clusters. Plus `authorCompatible` + a trigram
-  fuzzy fallback (for a later phase).
-- `merge/ReferenceMatcher` — DOI-exact, normalized-citation-exact, and trigram-fuzzy citation
-  (threshold `coldp.merge.citation-similarity`, default 0.9) matching.
-- `merge/` async-job pattern (`MergeService`/`MergeAsyncConfig`/`MergeRunRecovery`, single-thread
-  executor, `@Lazy self`, status run rows, startup stale-sweep) — the template for the scan job.
-- The FK repoint targets (see §Merge mechanics) are the same columns the merge apply already knows.
+1. In the **Names search table** (`NameSearchPage`) or the **References table** (`ReferencesPage`),
+   the editor **multi-selects** rows (row checkboxes). With ≥2 selected, a **"Merge selected…"**
+   action (toolbar button / context-menu entry) opens the merge modal.
+2. The **merge modal** shows the selected records **sorted by id ascending (oldest / lowest id
+   first)**, each with its **record identifier(s)** — the per-project numeric `id`, plus its
+   `alternativeId` source CURIEs (e.g. `col:…`) when present — and its **associated-info counts** (how
+   much is linked to it — so the editor can judge which to keep). A **survivor** is chosen via a
+   radio, defaulted to the most-connected record (see §Survivor default). The editor can change the
+   survivor, then confirms **"Merge N records into <survivor>"**.
+3. The backend applies the merge in one transaction and the table refreshes (the merged rows are gone).
 
-## Scope (MVP) and decisions made autonomously
+Nothing merges without this explicit selection + confirmation.
 
-Flagged for the owner to confirm:
+## Backend
 
-1. **MVP detects exact clusters only** — names sharing a `canonicalKey`; references sharing a DOI or
-   an exact normalized citation. **Fuzzy** candidates (trigram) are a **phase-3** add (higher false-
-   positive rate → needs the review UI mature first).
-2. **Suggested survivor** = the member with the most inbound links (children + synonym links +
-   child-entity rows + reference uses), tie-broken by lowest id (stable, oldest-wins). The curator can
-   override per group.
-3. **Merge conflict semantics = "survivor scalar wins, dependents move."** The survivor keeps its own
-   scalar fields (authorship, references, publishedIn, taxon-info, status, etc.). Every *dependent*
-   of a non-survivor — accepted children, synonym links, basionym links, child entities, reference
-   uses — is **repointed to the survivor**; then the non-survivor row is deleted. **No field-level
-   merge** in MVP (predictable + reversible-in-principle; a field-merge/"fill gaps" mode is phase-3).
-4. **Dismiss is per-scan** — dismissing a cluster hides it from the current run; a re-scan re-surfaces
-   it. A persistent "confirmed not a duplicate" allowlist is phase-3.
-5. **Scan is an async persisted run** (mirrors merge) — a `reconcile_run` + its clusters, so a large
-   project's grouping doesn't block and the review survives navigation. After merges, the curator
-   re-scans.
+Two parallel surfaces — **names** and **references** — under the existing project routes.
 
-## Architecture
+### Preview (associated counts + survivor suggestion)
 
-Two independent reconcilers — **names** and **references** — of identical shape. A `reconcile_run`
-(scoped to a project + an `entity_type` of `NAME` or `REFERENCE`) is started by an owner/editor,
-runs async, and produces persisted **clusters**.
+- `POST /api/projects/{pid}/usages/merge/preview {ids:[...]}` → for each id (validated in-project),
+  return `{ id, alternativeId, scientificName, authorship, rank, status, counts }` **ordered by id
+  ascending (oldest first)**, where `counts` is:
+  - `children` — accepted children (`name_usage.parent_id = id`),
+  - `synonyms` — synonyms of it (`synonym_accepted.accepted_id = id`),
+  - `acceptedOf` — accepted targets it is a synonym of (`synonym_accepted.synonym_id = id`),
+  - `nameRelations`, `vernacular`, `distribution`, `media`, `typeMaterial`, `property`, `estimate`
+    (each child table where `usage_id = id`),
+  - `basionymOf` (`name_usage.basionym_id = id`).
+- `POST /api/projects/{pid}/references/merge/preview {ids:[...]}` → `{ id, alternativeId, citation,
+  doi, counts }` **ordered by id ascending (oldest first)**, where `counts` is the number of rows
+  pointing at the reference across every `reference_id` / `published_in_reference_id` column (usages
+  published-in + name-reference, and each child-entity).
 
-### Data model (migration `V23`)
+Preview endpoints are read-only (any member). Returned counts drive the modal's per-record summary and
+the default survivor.
 
-- `reconcile_run(id, project_id FK cascade, entity_type [NAME|REFERENCE], status
-  [RUNNING|DONE|FAILED], cluster_count, created_by, started_at, finished_at, error)`.
-- `reconcile_cluster(id, run_id FK cascade, key [the canonical/DOI/citation key], member_ids
-  [int[]], suggested_survivor_id, status [OPEN|MERGED|DISMISSED])`. `member_ids` is a Postgres
-  `integer[]` (the usage or reference ids in the cluster).
+### Merge (transactional, owner/editor)
 
-### Detection (async scan job)
+- `POST /api/projects/{pid}/usages/merge {survivorId, mergedIds:[...]}` — validates: all ids
+  (survivor + merged) are distinct usages in the project; `survivorId ∈` the full selected set;
+  ≥1 mergedId; and — because accepted children can only hang under an accepted usage — if any
+  merged usage has accepted children (or the survivor already has some), the **survivor must be
+  `ACCEPTED`** (else 400 "survivor must be an accepted name to receive children"). Then, in one
+  `@Transactional` (project tree advisory-locked first), for each `D` in `mergedIds`:
+  - `UPDATE name_usage SET parent_id = survivor WHERE parent_id = D` (reparent accepted children),
+  - `UPDATE name_usage SET basionym_id = survivor WHERE basionym_id = D`,
+  - `UPDATE synonym_accepted SET synonym_id = survivor WHERE synonym_id = D` and
+    `SET accepted_id = survivor WHERE accepted_id = D`, then **dedup**: remove rows where
+    `synonym_id = accepted_id` (self-link) and collapse duplicate `(project_id, synonym_id,
+    accepted_id)` rows,
+  - `UPDATE <child> SET usage_id = survivor WHERE usage_id = D` for `vernacular, distribution, media,
+    type_material, name_relation, property, estimate` and `taxon_info` (dedup `taxon_info` — it is
+    1-per-usage, so if the survivor already has a row, drop `D`'s),
+  - `name_relation` also has a `related_usage_id` (the other end) — `UPDATE … SET related_usage_id =
+    survivor WHERE related_usage_id = D`; then drop self-relations (`usage_id = related_usage_id`),
+  - the survivor keeps its own scalar fields, `published_in`, and reference links (no field merge);
+  - `DELETE FROM name_usage WHERE id = D`; audit a `merge` change on the survivor + a delete on `D`,
+    and publish a `ValidationEvent` for the survivor.
+- `POST /api/projects/{pid}/references/merge {survivorId, mergedIds:[...]}` — same validation shape;
+  for each `D`: repoint every `reference_id` / `published_in_reference_id` FK
+  (`name_usage` published-in + name-reference, `vernacular, distribution, media, type_material,
+  name_relation, property, estimate, synonym_accepted, author`) from `D` to `survivor`, dedup any
+  resulting duplicate m2m rows, `DELETE FROM reference WHERE id = D`, audit.
 
-- `POST /api/projects/{id}/reconcile {entityType}` (owner/editor) → inserts a RUNNING run, hands off
-  to `@Async` (dedicated single-thread executor, `@Lazy self`, `MergeRunRecovery`-style startup
-  sweep). The job:
-  - **NAME:** load the project's usages (id + atomized name parts + status + rank), compute
-    `NameMatcher.canonicalKey` for each, group; every key with ≥2 members → a cluster with a
-    suggested survivor (§decision 2).
-  - **REFERENCE:** group references by normalized DOI, then (for those without a shared DOI) by
-    normalized citation; ≥2 members → a cluster. (Reuse `ReferenceMatcher`'s normalization.)
-  - Persist clusters; finish the run.
-- `GET /api/projects/{id}/reconcile/latest?entityType=` and `GET …/reconcile/{runId}` → poll/read
-  (mirrors export/merge run polling). `GET …/reconcile/{runId}/clusters?status=OPEN&limit&offset` →
-  paged clusters, each with its members' display fields (name/authorship/rank/status, or
-  citation/doi) resolved for the review UI.
+Both merges reuse the exact FK set the project→project **merge** feature already knows; the difference
+is these repoint within one project rather than inserting new rows.
 
-### Review + merge (manual, transactional, owner/editor)
+### Survivor default
 
-- The UI (a new "Reconcile" project view, or a section) lists OPEN clusters for the latest run, per
-  entity type. Each cluster shows its members side by side with distinguishing detail and a
-  radio-selected survivor (defaulted per decision 2). Per-cluster actions:
-  - **Merge** `POST …/reconcile/clusters/{clusterId}/merge {survivorId}` → applies the merge in one
-    transaction (project tree advisory-locked), marks the cluster `MERGED`.
-  - **Dismiss** `POST …/reconcile/clusters/{clusterId}/dismiss` → marks `DISMISSED` (per decision 4).
-- The merge validates that `survivorId` and the members belong to the cluster/project, that the
-  cluster is still `OPEN`, and (for names) re-derives the current dependents under the lock
-  (avoiding a TOCTOU on concurrent edits).
+The frontend defaults the survivor to the record with the **highest total associated count** (most
+connected → least repointing), tie-broken by lowest id (stable). The editor can override.
 
-### Merge mechanics (the destructive core — the part wanting owner sign-off)
+## Frontend
 
-**Merge a NAME cluster** into survivor `S`, for each non-survivor `D` (all in one `@Transactional`,
-`tree.lockProject` first):
-- `name_usage.parent_id = S where parent_id = D` (D's accepted children reparent to S).
-- `name_usage.basionym_id = S where basionym_id = D`.
-- `synonym_accepted`: `synonym_id = S where synonym_id = D`, and `accepted_id = S where accepted_id =
-  D`; then **dedup** (a `(project_id, synonym_id, accepted_id)` may now collide — delete the
-  duplicates, and drop any self-link `synonym_id = accepted_id`).
-- Every child-entity table with `usage_id` (vernacular, distribution, media, type_material,
-  name_relation, property, estimate) and `taxon_info`: `usage_id = S where usage_id = D`. (If S is a
-  synonym, taxon_info/children semantics still hold since S is the survivor; a merge that would make
-  a synonym own accepted children is rejected — the survivor should be the accepted one, which
-  decision 2's link-count default tends to pick.)
-- `name_usage`-level references on D (published_in, reference uses) are dropped with D (S keeps its
-  own) — decision 3.
-- Delete `D`. Audit a `merge` change for S and a delete for D.
+- **Row selection** in `NameSearchPage`'s mantine-react-table (`enableRowSelection`) and in the
+  `ReferencesPage` list. A selection toolbar shows "N selected — Merge…" (owner/editor only) when ≥2
+  are selected.
+- **`MergeRecordsModal`** (one component, parameterized by entity type): on open, calls the preview
+  endpoint for the selected ids, renders a row per record **sorted by id ascending (oldest first)**,
+  each showing its **id** (and `alternativeId` CURIEs when present), name/authorship/rank/status or
+  citation/doi, and the counts as small badges; a survivor radio (defaulted per §Survivor default),
+  and a "Merge N into <survivor>" button → the merge endpoint. On success: notify, clear selection,
+  invalidate the search/tree/reference queries.
+- Guard: the "Merge…" action is owner/editor only; the modal disables merge while <2 records or (for
+  names) when the chosen survivor can't legally receive children (mirror the backend rule with a
+  clear message).
 
-**Merge a REFERENCE cluster** into survivor `S`, for each non-survivor `D`:
-- Repoint every `reference_id` / `published_in_reference_id` FK from `D` to `S`: `name_usage`
-  (published-in + name-reference), `vernacular`, `distribution`, `media`, `type_material`,
-  `name_relation`, `property`, `estimate`, `synonym_accepted`, `author` — every table the FK-map
-  grep found. Dedup any resulting duplicate m2m rows.
-- Delete `D`. Audit.
+## Testing
 
-**Reversibility note:** merges are not undoable (they delete rows). The manual-review gate is the
-safety; the change log records what happened. A future "dry-run impact preview" (like the project
-merge's impact metrics) is a strong phase-2 candidate and is recommended before this ships widely.
-
-## Testing strategy
-
-- **NAME scan:** seed exact-duplicate usages (same canonical, different ids/authorship) → a cluster
-  with the right members + suggested survivor; non-duplicates don't cluster.
-- **NAME merge:** a survivor + a dup with children, synonyms (both directions), a basionym link, and
-  a vernacular/distribution → after merge, all repoint to the survivor, the synonym_accepted dedup is
-  correct (no collisions, no self-links), the dup is gone, and no orphaned child rows remain.
-- **REFERENCE scan + merge:** duplicate refs by DOI and by citation → cluster; merge repoints all
-  `reference_id` FKs and deletes the dup; a usage that cited the dup now cites the survivor.
-- **Authz:** scan/merge/dismiss are owner/editor (viewer 403); cluster/survivor validation (foreign
-  cluster/member → 400/404); cluster must be OPEN to merge.
-- **Recovery:** stale RUNNING reconcile_run → FAILED at startup.
-- **Frontend:** the Reconcile view renders clusters, lets the user pick a survivor and merge/dismiss,
-  and refreshes; empty state ("no duplicates found").
+- **Name merge (backend IT):** a survivor + a merged name that has accepted children, synonyms (both
+  directions), a basionym link, a name-relation (both ends), and a vernacular/distribution → after
+  merge, all repoint to the survivor; the `synonym_accepted` dedup removes self-links + collisions;
+  `taxon_info` collapses to one; the merged usage is gone with no orphaned child rows; the survivor's
+  own name/fields are unchanged.
+- **Name merge validation:** survivor not accepted but a merged name has children → 400; foreign/
+  cross-project id → 400/404; <2 ids → 400; non-editor → 403.
+- **Reference merge (backend IT):** two references, one cited by a usage (published-in) and one linked
+  to a vernacular → merge repoints both to the survivor and deletes the merged ref; a usage that cited
+  the merged ref now cites the survivor.
+- **Preview (backend IT):** counts match the seeded associations for each id.
+- **Frontend:** multi-select shows the Merge action at ≥2; the modal renders per-record counts +
+  survivor radio, defaults to the most-connected, and the merge call clears selection + refreshes;
+  the survivor-can't-receive-children case is blocked with a message.
 
 ## Decomposition (phases)
 
-1. **Name reconciliation** — migration, `reconcile_run`/`cluster`, async scan (canonicalKey grouping),
-   the name-merge apply, endpoints, recovery, and the Reconcile UI (names tab).
-2. **Reference reconciliation** — the same run/cluster machinery for references (DOI/citation
-   grouping + reference-merge apply), the references tab.
-3. **Future:** fuzzy candidates; a persistent "not a duplicate" allowlist; a dry-run impact preview
-   before merge; a field-level "fill gaps" merge mode.
+1. **Name merge** — preview + merge endpoints + mechanics, `NameSearchPage` multi-select +
+   `MergeRecordsModal` (names).
+2. **Reference merge** — the reference preview + merge endpoints + mechanics, `ReferencesPage`
+   multi-select + the modal (references).
+3. **Future (owner, later):** additional search **filters** to help find duplicates (e.g. same
+   canonical name, same rank, near-duplicate citation) — the detection aids the owner asked to defer.
 
 ## Out of scope
 
-- Cross-project dedup (that is the existing project→project merge feature).
-- Automatic merging (everything is behind per-cluster manual review).
-- Undo/rollback of an applied merge (mitigated by review + the change log; a dry-run preview is the
-  planned safety upgrade).
+- Automatic duplicate **detection** (the owner drives it via search + filters).
+- Cross-project merge (that is the existing project→project merge feature).
+- Field-level "fill gaps" merge (survivor's scalar fields win; only dependents move).
+- Undo of an applied merge (mitigated by the explicit selection + review; the change log records it).
