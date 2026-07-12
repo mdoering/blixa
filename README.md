@@ -87,6 +87,15 @@ The backend reads these environment variables (defaults shown):
 | `DB_PASSWORD` | `coldp_editor` | database password |
 | `ORCID_CLIENT_ID` | `unconfigured` | ORCID OAuth2 client id (optional) |
 | `ORCID_CLIENT_SECRET` | `unconfigured` | ORCID OAuth2 client secret (optional) |
+| `COLDP_EXPORT_DIR` | `${java.io.tmpdir}/coldp-exports` | ColDP export artifact storage dir |
+| `COLDP_IMPORT_DIR` | `${java.io.tmpdir}/coldp-imports` | ColDP import upload storage dir |
+| `COLDP_PDF_DIR` | `${java.io.tmpdir}/coldp-pdfs` | reference PDF storage dir |
+| `COLDP_RELEASE_DIR` | `${java.io.tmpdir}/coldp-releases` | release snapshot storage dir |
+| `COLDP_PDF_BASE_URL` | `/pdf` | public base URL for hosted reference PDFs (set to an absolute URL when PDFs are served from a different host/vhost than the API) |
+
+In production, `COLDP_EXPORT_DIR` and `COLDP_RELEASE_DIR` should point at **persistent** storage, not `/tmp`: exports are swept on a TTL (`coldp.export.ttl`, default `P7D`) rather than immediately, and releases have **no retention sweep at all** — both need to survive host restarts and container recycles in between. `COLDP_IMPORT_DIR` and `COLDP_PDF_DIR` should be persistent too — uploaded ColDP archives and reference PDFs are served back to users after the request that wrote them.
+
+Also relevant: `coldp.clb.base-url` (env `COLDP_CLB_BASE_URL`, default `https://api.checklistbank.org`) — the ChecklistBank API used for COL name matching and merge dataset lookups; point it at `https://api.dev.checklistbank.org` for a dev deployment.
 
 The base default `DB_URL` uses port 5432, but the **`dev` profile overrides it to 5433** (the compose port) via `application-dev.yml`. The `dev` seed user is also overridable: `editor.dev.username`, `editor.dev.password`, `editor.dev.display-name`.
 
