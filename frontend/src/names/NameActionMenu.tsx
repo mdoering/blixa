@@ -1,6 +1,13 @@
 import { ActionIcon, Menu } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconArrowsMove, IconCloudDownload, IconDotsVertical, IconPlus, IconTrash } from '@tabler/icons-react';
+import {
+  IconArrowsMove,
+  IconChevronRight,
+  IconCloudDownload,
+  IconDotsVertical,
+  IconPlus,
+  IconTrash,
+} from '@tabler/icons-react';
 import MoveNameModal from '../tree/MoveNameModal';
 import DemoteModal from '../tree/DemoteModal';
 import PromoteModal from '../tree/PromoteModal';
@@ -68,6 +75,10 @@ export default function NameActionMenu({
     } else {
       actions.changeStatus(usage, target);
     }
+    // The status options live in a nested Menu (see the "Change status" submenu below), whose
+    // click-outside handling doesn't reliably reach through to close the *outer* menu too --
+    // close it explicitly so picking a status doesn't leave the outer menu stuck open.
+    onChange?.(false);
   };
 
   // Synonyms/misapplied/unassessed usages can neither be a parent nor have synonyms of their
@@ -144,19 +155,31 @@ export default function NameActionMenu({
             </Menu.Item>
           )}
           {/* Menu.Sub (nested submenu) isn't available in the installed @mantine/core version
-              (Menu.Sub / MenuSub is unwired from the package's public exports here), so this
-              falls back to a flat, labelled section -- with the current status disabled so a
-              user can't "change" to the status the usage already has. */}
-          <Menu.Label>Change status</Menu.Label>
-          {STATUS_OPTIONS.map((s) => (
-            <Menu.Item
-              key={s.value}
-              disabled={usage.status === s.value}
-              onClick={() => onStatusClick(s.value)}
-            >
-              {s.label}
-            </Menu.Item>
-          ))}
+              (Menu.Sub / MenuSub is unwired from the package's public exports here), so this is
+              a workaround: a nested <Menu> whose target is itself a Menu.Item inside the outer
+              dropdown. `trigger="click-hover"` opens it on hover *and* on click (tests drive it
+              via click); `closeMenuOnClick={false}` on the target keeps the outer menu open when
+              that item is clicked, so the click toggles the submenu instead of dismissing
+              everything. The current status is disabled so a user can't "change" to the status
+              the usage already has. */}
+          <Menu trigger="click-hover" position="right-start" offset={2} withinPortal shadow="md" closeOnItemClick>
+            <Menu.Target>
+              <Menu.Item closeMenuOnClick={false} rightSection={<IconChevronRight size={14} />}>
+                Change status
+              </Menu.Item>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {STATUS_OPTIONS.map((s) => (
+                <Menu.Item
+                  key={s.value}
+                  disabled={usage.status === s.value}
+                  onClick={() => onStatusClick(s.value)}
+                >
+                  {s.label}
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
           <Menu.Divider />
           <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={confirmDelete}>
             Delete

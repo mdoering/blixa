@@ -15,7 +15,7 @@ test('a non-editor sees no action menu at all', () => {
   expect(screen.queryByLabelText('Actions')).not.toBeInTheDocument();
 });
 
-test('an editor sees add-child/add-synonym/change-status/delete actions', async () => {
+test('an editor sees add-child/add-synonym/a single change-status entry/delete actions', async () => {
   renderWithProviders(<NameActionMenu pid={3} usage={usage} canEdit onSelect={() => {}} />);
 
   await userEvent.click(screen.getByLabelText('Actions'));
@@ -23,22 +23,25 @@ test('an editor sees add-child/add-synonym/change-status/delete actions', async 
   expect(await screen.findByText('Add child')).toBeInTheDocument();
   expect(screen.getByText('Add synonym')).toBeInTheDocument();
   expect(screen.getByText(/^Move/)).toBeInTheDocument();
+  // "Change status" is a single collapsed entry -- the 4 status options are not flat top-level
+  // items until the submenu is opened (see the next test).
   expect(screen.getByText('Change status')).toBeInTheDocument();
-  expect(screen.getByText('Accepted')).toBeInTheDocument();
-  expect(screen.getByText('Synonym')).toBeInTheDocument();
-  expect(screen.getByText('Misapplied')).toBeInTheDocument();
-  expect(screen.getByText('Unassessed')).toBeInTheDocument();
+  expect(screen.queryByText('Accepted')).not.toBeInTheDocument();
+  expect(screen.queryByText('Synonym')).not.toBeInTheDocument();
+  expect(screen.queryByText('Misapplied')).not.toBeInTheDocument();
+  expect(screen.queryByText('Unassessed')).not.toBeInTheDocument();
   expect(screen.getByText('Delete')).toBeInTheDocument();
 });
 
-test('the change-status list greys out the usage\'s current status', async () => {
+test('the change-status submenu greys out the usage\'s current status', async () => {
   renderWithProviders(<NameActionMenu pid={3} usage={usage} canEdit onSelect={() => {}} />);
 
   await userEvent.click(screen.getByLabelText('Actions'));
-  await screen.findByText('Change status');
+  await userEvent.click(await screen.findByText('Change status'));
 
   // `usage` is ACCEPTED -- that option is disabled (can't "change" to the status it already has)
   // while the others remain clickable.
+  expect(await screen.findByText('Accepted')).toBeInTheDocument();
   expect(screen.getByText('Accepted').closest('button')).toBeDisabled();
   expect(screen.getByText('Synonym').closest('button')).toBeEnabled();
   expect(screen.getByText('Misapplied').closest('button')).toBeEnabled();
@@ -103,6 +106,7 @@ test('"Synonym" on an accepted usage opens the guided Demote modal', async () =>
   renderWithProviders(<NameActionMenu pid={3} usage={usage} canEdit onSelect={() => {}} />);
 
   await userEvent.click(screen.getByLabelText('Actions'));
+  await userEvent.click(await screen.findByText('Change status'));
   await userEvent.click(await screen.findByText('Synonym'));
 
   // The Demote modal's title ("Demote <name> to a synonym") is unique to the opened modal.
