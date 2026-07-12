@@ -3,6 +3,7 @@ package org.catalogueoflife.editor.mergerecords;
 import java.util.List;
 import org.catalogueoflife.editor.auth.CurrentUser;
 import org.catalogueoflife.editor.mergerecords.dto.MergeRequest;
+import org.catalogueoflife.editor.mergerecords.dto.MergeResult;
 import org.catalogueoflife.editor.mergerecords.dto.UsageMergeCandidate;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,5 +27,11 @@ public class MergeRecordsController {
   public List<UsageMergeCandidate> previewUsages(@PathVariable int pid, @RequestBody MergeRequest req) {
     int uid = currentUser.require().getId();
     return service.previewUsages(uid, pid, req.ids());
+  }
+
+  @PostMapping("/usages/merge")
+  public MergeResult mergeUsages(@PathVariable int pid, @RequestBody MergeRequest req) {
+    int uid = currentUser.require().getId();
+    return service.mergeUsages(uid, pid, req.survivorId(), req.ids());
   }
 }
