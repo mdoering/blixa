@@ -49,12 +49,16 @@ coldp:
   col:
     match-dataset: 3LXR
     gbif-checklist-key: 7ddf754f-d193-4cc9-b351-99906754a03b
+  # export/import/release dirs mirror COLDP_EXPORT_DIR/COLDP_IMPORT_DIR/COLDP_RELEASE_DIR env vars
+  # for deploy (like pdf.dir below) -- falling back to a tmpdir subfolder for local dev.
   export:
-    dir: ${java.io.tmpdir}/coldp-exports
+    dir: ${COLDP_EXPORT_DIR:${java.io.tmpdir}/coldp-exports}
     ttl: P7D
   import:
-    dir: ${java.io.tmpdir}/coldp-imports
+    dir: ${COLDP_IMPORT_DIR:${java.io.tmpdir}/coldp-imports}
     max-bytes: 104857600
+  release:
+    dir: ${COLDP_RELEASE_DIR:${java.io.tmpdir}/coldp-releases}
   pdf:
     # Reference PDF hosting (Task 2): one file per reference, written by name/PdfService and served
     # publicly (SecurityConfig permits /pdf/**) by name/PdfController. base-url is prepended to the
