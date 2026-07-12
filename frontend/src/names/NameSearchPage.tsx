@@ -1,13 +1,19 @@
 import { Badge, Box, Button, Grid, Group, Select, Text, TextInput, Tooltip } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { IconPlus, IconSearch } from '@tabler/icons-react';
-import { MantineReactTable, useMantineReactTable, type MRT_ColumnDef } from 'mantine-react-table';
+import {
+  MantineReactTable,
+  useMantineReactTable,
+  type MRT_ColumnDef,
+  type MRT_RowSelectionState,
+} from 'mantine-react-table';
 import { useEffect, useMemo, useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getProject } from '../api/projects';
 import { searchUsages } from '../api/usages';
 import type { NameUsage } from '../api/types';
+import MergeRecordsModal from '../merge/MergeRecordsModal';
 import TaxonDetail from '../tree/TaxonDetail';
 import CreateNameModal from './CreateNameModal';
 import NameActionMenu from './NameActionMenu';
@@ -54,9 +60,16 @@ const DEFAULT_PAGE_SIZE = 10;
 export default function NameSearchPage() {
   const { projectId } = useParams();
   const pid = Number(projectId);
+  const queryClient = useQueryClient();
 
   const { data: project } = useQuery({ queryKey: ['project', pid], queryFn: () => getProject(pid) });
   const canEdit = project ? ['owner', 'editor'].includes(project.role) : false;
+
+  // Multi-select for the "Merge N selected…" action (Names dedupe) -- keyed by row id (a string,
+  // per getRowId below), so it survives across pages/filter changes rather than tracking indices.
+  const [rowSelection, setRowSelection] = useState<MRT_RowSelectionState>({});
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const selectedIds = Object.keys(rowSelection).map(Number);
 
   // Deep-link support: ?usage=<id> (e.g. from the Issues dashboard) preselects that usage's detail,
   // even if it isn't on the current filtered table page. Re-syncs when the param changes.
@@ -156,7 +169,9 @@ export default function NameSearchPage() {
     manualFiltering: true,
     rowCount: data?.total ?? 0,
     onPaginationChange: setPagination,
-    state: { pagination, isLoading, showProgressBars: isFetching },
+    onRowSelectionChange: setRowSelection,
+    state: { pagination, isLoading, showProgressBars: isFetching, rowSelection },
+    enableRowSelection: true,
     enableColumnActions: false,
     enableColumnFilters: false,
     enableSorting: false,
@@ -239,6 +254,13 @@ export default function NameSearchPage() {
           w={160}
         />
       </Group>
+      {selectedIds.length >= 2 && canEdit && (
+        <Group mb="md">
+          <Button variant="light" size="xs" onClick={() => setMergeOpen(true)}>
+            Merge {selectedIds.length} selected…
+          </Button>
+        </Group>
+      )}
       <Grid gutter="md">
         <Grid.Col span={7}>
           <MantineReactTable table={table} />
@@ -264,6 +286,19 @@ export default function NameSearchPage() {
           }}
         />
       )}
+      <MergeRecordsModal
+        entity="usage"
+        pid={pid}
+        ids={selectedIds}
+        opened={mergeOpen}
+        onClose={() => setMergeOpen(false)}
+        onDone={() => {
+          setRowSelection({});
+          queryClient.invalidateQueries({ queryKey: ['usageSearch', pid] });
+          queryClient.invalidateQueries({ queryKey: ['treeChildren', pid] });
+          queryClient.invalidateQueries({ queryKey: ['treeRoots', pid] });
+        }}
+      />
     </Box>
   );
 }

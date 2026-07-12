@@ -162,3 +162,61 @@ export function applyMerge(
     json: body,
   });
 }
+
+// -- Record-level merge (dedupe within one project): pick 2+ rows in the Names/References search
+// tables, preview each candidate's display fields + association counts, then merge everyone into
+// a chosen survivor. Unrelated to the whole-project merge above (MergeRun et al.) despite the
+// shared file -- see MergeRecordsModal.tsx. Mirrors backend UsageMergeCandidate/MergeResult (see
+// org.catalogueoflife.editor.mergerecords.dto).
+export interface MergeCandidate {
+  id: number;
+  alternativeId: string[] | null;
+  scientificName?: string | null;
+  authorship?: string | null;
+  rank?: string | null;
+  status?: string | null;
+  citation?: string | null;
+  doi?: string | null;
+  counts: Record<string, number>;
+}
+
+export interface MergeResult {
+  survivorId: number;
+  mergedCount: number;
+}
+
+export function previewUsageMerge(pid: number, ids: number[]): Promise<MergeCandidate[]> {
+  return api<MergeCandidate[]>(`/api/projects/${pid}/usages/merge/preview`, {
+    method: 'POST',
+    json: { ids },
+  });
+}
+
+export function mergeUsages(
+  pid: number,
+  survivorId: number,
+  ids: number[],
+): Promise<MergeResult> {
+  return api<MergeResult>(`/api/projects/${pid}/usages/merge`, {
+    method: 'POST',
+    json: { survivorId, ids },
+  });
+}
+
+export function previewReferenceMerge(pid: number, ids: number[]): Promise<MergeCandidate[]> {
+  return api<MergeCandidate[]>(`/api/projects/${pid}/references/merge/preview`, {
+    method: 'POST',
+    json: { ids },
+  });
+}
+
+export function mergeReferences(
+  pid: number,
+  survivorId: number,
+  ids: number[],
+): Promise<MergeResult> {
+  return api<MergeResult>(`/api/projects/${pid}/references/merge`, {
+    method: 'POST',
+    json: { survivorId, ids },
+  });
+}
