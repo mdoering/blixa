@@ -2,6 +2,7 @@ import {
   ActionIcon,
   Anchor,
   Button,
+  Checkbox,
   Group,
   Menu,
   Stack,
@@ -18,6 +19,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { messageFor } from '../api/client';
+import MergeRecordsModal from '../merge/MergeRecordsModal';
 import { getProject } from '../api/projects';
 import { deleteReference, listReferences } from '../api/references';
 import type { CreateRefPayload, Reference } from '../api/types';
@@ -47,6 +49,18 @@ export default function ReferencesPage() {
   const [importDoi, setImportDoi] = useState(false);
   const [importBib, setImportBib] = useState(false);
   const [importRis, setImportRis] = useState(false);
+
+  // Multi-select for the "Merge N selected…" action (reference dedupe, reuses Task 3's
+  // MergeRecordsModal with entity="reference").
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const toggleSelected = (id: number) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   useEffect(() => {
     setPage(0);
@@ -122,9 +136,18 @@ export default function ReferencesPage() {
         w={320}
       />
 
+      {selected.size >= 2 && canEdit && (
+        <Group>
+          <Button variant="light" size="xs" onClick={() => setMergeOpen(true)}>
+            Merge {selected.size} selected…
+          </Button>
+        </Group>
+      )}
+
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
+            {canEdit && <Table.Th />}
             <Table.Th>Author</Table.Th>
             <Table.Th>Year</Table.Th>
             <Table.Th>Title</Table.Th>
@@ -136,6 +159,15 @@ export default function ReferencesPage() {
         <Table.Tbody>
           {rows.map((r) => (
             <Table.Tr key={r.id} style={{ cursor: canEdit ? 'pointer' : 'default' }}>
+              {canEdit && (
+                <Table.Td onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    aria-label={`Select ${r.title ?? r.citation ?? `reference #${r.id}`}`}
+                    checked={selected.has(r.id)}
+                    onChange={() => toggleSelected(r.id)}
+                  />
+                </Table.Td>
+              )}
               <Table.Td onClick={() => canEdit && setForm({ reference: r })}>
                 <Text size="sm">{r.author ?? '—'}</Text>
               </Table.Td>
@@ -182,7 +214,7 @@ export default function ReferencesPage() {
           ))}
           {rows.length === 0 && (
             <Table.Tr>
-              <Table.Td colSpan={6}>
+              <Table.Td colSpan={canEdit ? 7 : 5}>
                 <Text c="dimmed" size="sm">
                   No references
                 </Text>
@@ -226,6 +258,17 @@ export default function ReferencesPage() {
       />
       <ImportBibtexModal pid={pid} opened={importBib} onClose={() => setImportBib(false)} />
       <ImportRisModal pid={pid} opened={importRis} onClose={() => setImportRis(false)} />
+      <MergeRecordsModal
+        entity="reference"
+        pid={pid}
+        ids={[...selected]}
+        opened={mergeOpen}
+        onClose={() => setMergeOpen(false)}
+        onDone={() => {
+          setSelected(new Set());
+          queryClient.invalidateQueries({ queryKey: ['references', pid] });
+        }}
+      />
     </Stack>
   );
 }

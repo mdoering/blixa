@@ -1,9 +1,10 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders } from '../test/utils';
 import { server, http, HttpResponse } from '../test/server';
+import * as mergeApi from '../api/merge';
 import ReferencesPage from './ReferencesPage';
 
 function mockProject(role = 'owner') {
@@ -114,4 +115,75 @@ test('Import RIS parses pasted text and refreshes the list', async () => {
   await userEvent.type(within(dialog).getByLabelText('RIS'), 'TY  - JOUR\nTI  - T\nER  - ');
   await userEvent.click(within(dialog).getByRole('button', { name: 'Import' }));
   expect(await screen.findByText('Imported 1 reference')).toBeInTheDocument();
+});
+
+test('selecting 2 references opens the merge modal and refreshes the list on success', async () => {
+  mockProject();
+  let listCalls = 0;
+  server.use(
+    http.get('/api/projects/3/references', () => {
+      listCalls++;
+      return HttpResponse.json([
+        {
+          id: 1,
+          citation: 'Linnaeus 1758',
+          title: 'Systema Naturae',
+          author: 'Linnaeus, C.',
+          issued: '1758',
+          containerTitle: null,
+          doi: '10.5/abc',
+          accessed: '2026-07-01',
+          version: 0,
+        },
+        {
+          id: 2,
+          citation: 'Darwin 1859',
+          title: 'On the Origin of Species',
+          author: 'Darwin, C.',
+          issued: '1859',
+          containerTitle: null,
+          doi: null,
+          accessed: null,
+          version: 0,
+        },
+      ]);
+    }),
+  );
+
+  vi.spyOn(mergeApi, 'previewReferenceMerge').mockResolvedValue([
+    { id: 1, alternativeId: null, citation: 'Linnaeus 1758', doi: '10.5/abc', counts: {} },
+    { id: 2, alternativeId: null, citation: 'Darwin 1859', doi: null, counts: {} },
+  ]);
+  const merge = vi
+    .spyOn(mergeApi, 'mergeReferences')
+    .mockResolvedValue({ survivorId: 1, mergedCount: 1 });
+
+  renderPage();
+  await screen.findByText('Systema Naturae');
+  await screen.findByText('On the Origin of Species');
+
+  // No merge button until 2+ rows are selected.
+  expect(screen.queryByRole('button', { name: /merge \d+ selected/i })).not.toBeInTheDocument();
+
+  const checkboxes = screen.getAllByRole('checkbox');
+  expect(checkboxes).toHaveLength(2);
+  await userEvent.click(checkboxes[0]);
+  await userEvent.click(checkboxes[1]);
+
+  // Clicking a checkbox toggles selection only -- it must not open the edit form.
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Merge 2 selected…' }));
+
+  const dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getByText('Linnaeus 1758')).toBeInTheDocument();
+  expect(within(dialog).getByText('Darwin 1859')).toBeInTheDocument();
+
+  await userEvent.click(within(dialog).getByRole('button', { name: /merge 2 records into/i }));
+
+  await waitFor(() => expect(merge).toHaveBeenCalledWith(3, 1, [1, 2]));
+  // onDone invalidates the references query, triggering a refetch of the list.
+  await waitFor(() => expect(listCalls).toBeGreaterThanOrEqual(2));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(screen.queryByRole('button', { name: /merge \d+ selected/i })).not.toBeInTheDocument();
 });
