@@ -1,4 +1,4 @@
-import { Alert, Anchor, Badge, Button, Center, Group, Loader, Paper, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
+import { Alert, Anchor, Badge, Button, Center, Group, Loader, Paper, Stack, Table, Text, Title } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -27,6 +27,41 @@ function asRankCounts(v: unknown): [string, number][] {
   return Object.entries(v as Record<string, unknown>).filter(
     (entry): entry is [string, number] => typeof entry[1] === 'number',
   );
+}
+
+// Canonical (taxonomic) rank ordering so the metrics table reads top-down high→low rank rather than
+// alphabetically. Ranks not listed here (rare/custom) sort after these, alphabetically among
+// themselves. Lower-case to match the stored wire form.
+const RANK_ORDER = [
+  'domain', 'realm', 'subrealm', 'superkingdom', 'kingdom', 'subkingdom', 'infrakingdom',
+  'superphylum', 'phylum', 'subphylum', 'infraphylum',
+  'superclass', 'class', 'subclass', 'infraclass', 'subterclass',
+  'superorder', 'order', 'suborder', 'infraorder', 'parvorder',
+  'megafamily', 'grandfamily', 'superfamily', 'epifamily', 'family', 'subfamily', 'infrafamily',
+  'supertribe', 'tribe', 'subtribe', 'infratribe',
+  'supergenus', 'genus', 'subgenus', 'section', 'subsection', 'series', 'subseries',
+  'superspecies', 'species', 'subspecies', 'variety', 'subvariety', 'form', 'subform',
+  'aberration', 'strain', 'cultivar', 'unranked', 'other',
+];
+
+function rankIndex(rank: string): number {
+  const i = RANK_ORDER.indexOf(rank.toLowerCase());
+  return i === -1 ? RANK_ORDER.length : i;
+}
+
+interface RankRow {
+  rank: string;
+  accepted: number;
+  synonyms: number;
+}
+
+// Merge accepted-by-rank + synonyms-by-rank into one row per rank (union), sorted by native rank.
+function rankRows(accepted: [string, number][], synonyms: [string, number][]): RankRow[] {
+  const acc = new Map(accepted);
+  const syn = new Map(synonyms);
+  const ranks = [...new Set([...acc.keys(), ...syn.keys()])];
+  ranks.sort((a, b) => rankIndex(a) - rankIndex(b) || a.localeCompare(b));
+  return ranks.map((rank) => ({ rank, accepted: acc.get(rank) ?? 0, synonyms: syn.get(rank) ?? 0 }));
 }
 
 interface Contribution {
@@ -186,50 +221,53 @@ export default function PublicProjectPage() {
               {headlineNameCount.toLocaleString()} names
             </Text>
           )}
-          <SimpleGrid cols={{ base: 1, sm: 2 }}>
-            {accepted.length > 0 && (
-              <div>
-                <Text fw={500} size="sm" mb={4}>
-                  Accepted names by rank
-                </Text>
-                <Group gap={4}>
-                  {accepted.map(([rank, count]) => (
-                    <Badge key={rank} variant="light">
-                      {rank}: {count}
-                    </Badge>
+          {(accepted.length > 0 || synonyms.length > 0) && (
+            <Table.ScrollContainer minWidth={320}>
+              <Table withTableBorder withColumnBorders striped>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Rank</Table.Th>
+                    <Table.Th ta="right">Accepted</Table.Th>
+                    <Table.Th ta="right">Synonyms</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {rankRows(accepted, synonyms).map((r) => (
+                    <Table.Tr key={r.rank}>
+                      <Table.Td>{r.rank}</Table.Td>
+                      <Table.Td ta="right">{r.accepted.toLocaleString()}</Table.Td>
+                      <Table.Td ta="right">{r.synonyms.toLocaleString()}</Table.Td>
+                    </Table.Tr>
                   ))}
-                </Group>
-              </div>
-            )}
-            {synonyms.length > 0 && (
-              <div>
-                <Text fw={500} size="sm" mb={4}>
-                  Synonyms by rank
-                </Text>
-                <Group gap={4}>
-                  {synonyms.map(([rank, count]) => (
-                    <Badge key={rank} variant="light" color="grape">
-                      {rank}: {count}
-                    </Badge>
-                  ))}
-                </Group>
-              </div>
-            )}
-            {supplementary.length > 0 && (
-              <div>
-                <Text fw={500} size="sm" mb={4}>
-                  Supplementary data
-                </Text>
-                <Group gap={4}>
-                  {supplementary.map(([key, count]) => (
-                    <Badge key={key} variant="light" color="teal">
-                      {key}: {count}
-                    </Badge>
-                  ))}
-                </Group>
-              </div>
-            )}
-          </SimpleGrid>
+                </Table.Tbody>
+                <Table.Tfoot>
+                  <Table.Tr>
+                    <Table.Th>Total</Table.Th>
+                    <Table.Th ta="right">
+                      {accepted.reduce((s, [, n]) => s + n, 0).toLocaleString()}
+                    </Table.Th>
+                    <Table.Th ta="right">
+                      {synonyms.reduce((s, [, n]) => s + n, 0).toLocaleString()}
+                    </Table.Th>
+                  </Table.Tr>
+                </Table.Tfoot>
+              </Table>
+            </Table.ScrollContainer>
+          )}
+          {supplementary.length > 0 && (
+            <div>
+              <Text fw={500} size="sm" mb={4}>
+                Supplementary data
+              </Text>
+              <Group gap={4}>
+                {supplementary.map(([key, count]) => (
+                  <Badge key={key} variant="light" color="teal">
+                    {key}: {count}
+                  </Badge>
+                ))}
+              </Group>
+            </div>
+          )}
           {changesSinceLastRelease != null && (
             <Text size="sm" c="dimmed">
               {changesSinceLastRelease} change{changesSinceLastRelease === 1 ? '' : 's'} since last release
