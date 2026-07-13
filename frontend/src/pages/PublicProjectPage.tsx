@@ -1,4 +1,4 @@
-import { Alert, Anchor, Badge, Button, Center, Group, Loader, Paper, Stack, Table, Text, Title } from '@mantine/core';
+import { Alert, Anchor, Badge, Button, Center, Container, Group, Loader, Paper, Stack, Table, Text, Title } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -139,7 +139,8 @@ export default function PublicProjectPage() {
     contributions.length > 0;
 
   return (
-    <Stack gap="xl">
+    <Container size="md" py="xl">
+      <Stack gap="xl">
       <Stack gap={4}>
         <Title order={1}>{data.title}</Title>
         {data.alias && (
@@ -324,6 +325,7 @@ export default function PublicProjectPage() {
           </Table>
         )}
       </Stack>
-    </Stack>
+      </Stack>
+    </Container>
   );
 }
