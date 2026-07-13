@@ -4,7 +4,7 @@ import { server, http, HttpResponse } from '../test/server';
 import LandingPage from './LandingPage';
 
 describe('LandingPage', () => {
-  it('lists public projects and shows a Log in link for anonymous visitors', async () => {
+  it('lists public projects; anonymous visitors get no login button (the header Sign-in is enough)', async () => {
     server.use(
       http.get('/api/me', () => new HttpResponse(null, { status: 401 })),
       http.get('/api/public/projects', () => HttpResponse.json([
@@ -14,7 +14,9 @@ describe('LandingPage', () => {
     );
     renderWithProviders(<LandingPage />);
     expect(await screen.findByRole('link', { name: /world ferns/i })).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: /log in/i })).toBeInTheDocument();
+    // No inline login on the landing anymore -- anonymous visitors use the header's "Sign in".
+    expect(screen.queryByRole('link', { name: /^log in$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^my projects$/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/username/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /sign in with orcid/i })).not.toBeInTheDocument();
   });

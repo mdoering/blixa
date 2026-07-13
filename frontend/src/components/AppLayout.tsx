@@ -31,7 +31,7 @@ export default function AppLayout() {
       await logout();
     } finally {
       queryClient.clear();
-      navigate('/login', { replace: true });
+      navigate('/signin', { replace: true });
     }
   }
 

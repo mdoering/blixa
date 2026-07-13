@@ -17,7 +17,7 @@ export default function PublicLayout() {
               My projects
             </Anchor>
           ) : (
-            <Anchor component={Link} to="/login">
+            <Anchor component={Link} to="/signin">
               Sign in
             </Anchor>
           )}

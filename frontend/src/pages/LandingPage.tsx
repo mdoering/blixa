@@ -19,13 +19,11 @@ export default function LandingPage() {
             Blixa is a lightweight editor for building and releasing taxonomic checklists in the
             Catalogue of Life Data Package (ColDP) format.
           </Text>
-          {me ? (
+          {/* Anonymous visitors use the header's "Sign in" (top-right); only signed-in users get a
+              shortcut to their projects here. */}
+          {me && (
             <Button component={Link} to="/projects">
               My projects
-            </Button>
-          ) : (
-            <Button component={Link} to="/login">
-              Log in
             </Button>
           )}
         </Stack>

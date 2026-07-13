@@ -19,7 +19,9 @@ import CurrentWorkPage from './lock/CurrentWorkPage';
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
+      {/* /login is a backend path (Spring OAuth2 callback + local-login POST, proxied to the API in
+          both dev and prod), so the SPA login page lives at /signin to avoid being shadowed. */}
+      <Route path="/signin" element={<LoginPage />} />
       <Route element={<PublicLayout />}>
         <Route index element={<LandingPage />} />
         <Route path="p/:idOrAlias" element={<PublicProjectPage />} />

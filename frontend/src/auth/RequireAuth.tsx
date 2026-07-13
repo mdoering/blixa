@@ -10,6 +10,6 @@ export default function RequireAuth() {
         <Loader />
       </Center>
     );
-  if (isError || !data) return <Navigate to="/login" replace />;
+  if (isError || !data) return <Navigate to="/signin" replace />;
   return <Outlet />;
 }
