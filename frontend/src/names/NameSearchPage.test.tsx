@@ -111,6 +111,20 @@ test('rows render from the search results', async () => {
   expect(screen.getByText('Status')).toBeInTheDocument();
 });
 
+test('the page heading is an h3, matching the References page', async () => {
+  server.use(
+    http.get('/api/projects/9', () => HttpResponse.json(project)),
+    http.get('/api/projects/9/usages', () =>
+      HttpResponse.json({ items: [abiesAlba, abiesNigra], total: 2 }),
+    ),
+  );
+  renderPage();
+
+  expect(
+    await screen.findByRole('heading', { name: 'Names', level: 3 }),
+  ).toBeInTheDocument();
+});
+
 test('setting the status filter re-queries with status= and shows the filtered set', async () => {
   const seenStatuses: (string | null)[] = [];
   server.use(

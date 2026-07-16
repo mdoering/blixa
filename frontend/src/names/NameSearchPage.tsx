@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Grid, Group, Select, Text, TextInput, ThemeIcon, Tooltip } from '@mantine/core';
+import { Badge, Box, Button, Grid, Group, Select, Text, TextInput, ThemeIcon, Title, Tooltip } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { IconLock, IconPlus, IconSearch } from '@tabler/icons-react';
 import {
@@ -252,7 +252,7 @@ export default function NameSearchPage() {
   return (
     <Box>
       <Group justify="space-between" mb="md">
-        <Text fw={600}>Names</Text>
+        <Title order={3} m={0}>Names</Title>
         {canEdit && (
           <Button leftSection={<IconPlus size={14} />} size="xs" onClick={() => actions.createRoot()}>
             New name
