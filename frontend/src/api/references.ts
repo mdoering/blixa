@@ -3,14 +3,19 @@ import type { CreateRefPayload, Reference, UpdateRefPayload } from './types';
 
 export interface ListRefsParams {
   q?: string;
+  yearFrom?: number;
+  yearTo?: number;
   limit: number;
   offset: number;
 }
 
-// GET /references?q=&limit=&offset= — q is the pg_trgm fuzzy citation search (see ReferenceMapper).
+// GET /references?q=&yearFrom=&yearTo=&limit=&offset= — q is native pg full-text over the citation;
+// yearFrom/yearTo are inclusive bounds on the reference year (see ReferenceMapper.search).
 export function listReferences(pid: number, params: ListRefsParams): Promise<Reference[]> {
   const search = new URLSearchParams();
   if (params.q) search.set('q', params.q);
+  if (params.yearFrom !== undefined) search.set('yearFrom', String(params.yearFrom));
+  if (params.yearTo !== undefined) search.set('yearTo', String(params.yearTo));
   search.set('limit', String(params.limit));
   search.set('offset', String(params.offset));
   return api<Reference[]>(`/api/projects/${pid}/references?${search.toString()}`);

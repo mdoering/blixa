@@ -75,13 +75,13 @@ public class ReferenceController {
   @GetMapping
   public List<ReferenceResponse> list(@PathVariable int pid,
       @RequestParam(required = false) String q,
+      @RequestParam(required = false) Integer yearFrom,
+      @RequestParam(required = false) Integer yearTo,
       @RequestParam(defaultValue = "50") int limit,
       @RequestParam(defaultValue = "0") int offset) {
     int uid = currentUser.require().getId();
-    List<Reference> result = (q == null || q.isBlank())
-        ? service.list(uid, pid, limit, offset)
-        : service.search(uid, pid, q, limit, offset);
-    return result.stream().map(r -> ReferenceResponse.of(r, pdfBaseUrl)).toList();
+    return service.search(uid, pid, q, yearFrom, yearTo, limit, offset).stream()
+        .map(r -> ReferenceResponse.of(r, pdfBaseUrl)).toList();
   }
 
   @PostMapping

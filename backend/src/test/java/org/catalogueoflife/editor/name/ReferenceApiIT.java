@@ -125,6 +125,57 @@ class ReferenceApiIT extends AbstractPostgresIT {
        .andExpect(status().isNotFound());
   }
 
+  private long createRef(long pid, String citation, String issued) throws Exception {
+    String body = mvc.perform(post("/api/projects/" + pid + "/references").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(java.util.Map.of("citation", citation, "issued", issued))))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    return json.readTree(body).get("id").asLong();
+  }
+
+  @Test
+  @WithMockUser(username = "refFtsOwner")
+  void fullTextSearchAndYearFilter() throws Exception {
+    ensureUser("refFtsOwner");
+    long pid = createProject("refftsproj");
+    String base = "/api/projects/" + pid + "/references";
+
+    createRef(pid, "Miller 1768, Gardeners Dictionary", "1768");
+    createRef(pid, "Darwin 1859, On the Origin of Species", "1859");
+    createRef(pid, "Smith 1942, Some Fauna", "1942");
+    createRef(pid, "Jones 1943, More Fauna", "1943");
+
+    // Full-text finds a whole-word match anywhere in a long citation -- the case where trigram
+    // similarity over the entire string fell below the threshold and returned nothing.
+    mvc.perform(get(base).param("q", "Origin"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.length()").value(1))
+       .andExpect(jsonPath("$[0].citation").value("Darwin 1859, On the Origin of Species"));
+
+    // A word shared by two citations returns both.
+    mvc.perform(get(base).param("q", "Fauna"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.length()").value(2));
+
+    // Exact-year filter (from == to).
+    mvc.perform(get(base).param("yearFrom", "1768").param("yearTo", "1768"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.length()").value(1))
+       .andExpect(jsonPath("$[0].citation").value("Miller 1768, Gardeners Dictionary"));
+
+    // Year-range filter (inclusive both ends).
+    mvc.perform(get(base).param("yearFrom", "1942").param("yearTo", "1943"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.length()").value(2));
+
+    // Full-text and year combined narrow to one.
+    mvc.perform(get(base).param("q", "Fauna").param("yearFrom", "1943"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.length()").value(1))
+       .andExpect(jsonPath("$[0].citation").value("Jones 1943, More Fauna"));
+  }
+
   @Test
   @WithMockUser(username = "refAccessedOwner")
   void accessedRoundTripsThroughCreateGetUpdate() throws Exception {

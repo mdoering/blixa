@@ -53,14 +53,15 @@ public class ReferenceService {
     this.citationService = citationService;
   }
 
-  public List<Reference> list(int userId, int projectId, int limit, int offset) {
+  // Paged reference listing: optional full-text citation search (q) and optional inclusive year
+  // range (yearFrom/yearTo, matched against the 4-digit year in `issued`). All null -> the whole
+  // project in id order. A blank q is normalized to null so the mapper drops the full-text predicate.
+  public List<Reference> search(int userId, int projectId, String q, Integer yearFrom, Integer yearTo,
+      int limit, int offset) {
     projects.requireRole(userId, projectId);
-    return references.findByProject(projectId, Pagination.clampLimit(limit), Pagination.clampOffset(offset));
-  }
-
-  public List<Reference> search(int userId, int projectId, String q, int limit, int offset) {
-    projects.requireRole(userId, projectId);
-    return references.search(projectId, q, Pagination.clampLimit(limit), Pagination.clampOffset(offset));
+    return references.search(projectId,
+        (q == null || q.isBlank()) ? null : q.trim(), yearFrom, yearTo,
+        Pagination.clampLimit(limit), Pagination.clampOffset(offset));
   }
 
   public Reference get(int userId, int projectId, int id) {

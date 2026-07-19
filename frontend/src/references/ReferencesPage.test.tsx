@@ -46,6 +46,26 @@ test('lists references', async () => {
   expect(screen.getByText('Linnaeus, C.')).toBeInTheDocument();
 });
 
+test('typing a year range re-queries with yearFrom and yearTo', async () => {
+  const seen: string[] = [];
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json({ id: 3, title: 'P', role: 'owner' })),
+    http.get('/api/projects/3/references', ({ request }) => {
+      seen.push(new URL(request.url).search);
+      return HttpResponse.json([]);
+    }),
+  );
+  renderPage();
+
+  await userEvent.type(screen.getByLabelText('Year'), '1941-1944');
+
+  await waitFor(() =>
+    expect(
+      seen.some((s) => s.includes('yearFrom=1941') && s.includes('yearTo=1944')),
+    ).toBe(true),
+  );
+});
+
 test('"New reference" opens the form', async () => {
   mockProject();
   renderPage();

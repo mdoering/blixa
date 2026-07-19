@@ -35,6 +35,7 @@ import ImportDoiModal from './ImportDoiModal';
 import ImportRisModal from './ImportRisModal';
 import ReconcileJournalsModal from './ReconcileJournalsModal';
 import ReferenceForm from './ReferenceForm';
+import { parseYearFilter } from './parseYearFilter';
 
 const PAGE = 25;
 
@@ -61,6 +62,8 @@ export default function ReferencesPage() {
 
   const [q, setQ] = useState('');
   const [debouncedQ] = useDebouncedValue(q, 300);
+  const [year, setYear] = useState('');
+  const [debouncedYear] = useDebouncedValue(year, 300);
   const [page, setPage] = useState(0);
   const [form, setForm] = useState<{ reference: Reference | null; initial?: CreateRefPayload } | null>(
     null,
@@ -101,9 +104,14 @@ export default function ReferencesPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedQ]);
+  }, [debouncedQ, debouncedYear]);
 
-  const params = { q: debouncedQ.trim() || undefined, limit: PAGE, offset: page * PAGE };
+  const params = {
+    q: debouncedQ.trim() || undefined,
+    ...parseYearFilter(debouncedYear),
+    limit: PAGE,
+    offset: page * PAGE,
+  };
   const { data: refs } = useQuery({
     queryKey: ['references', pid, params],
     queryFn: () => listReferences(pid, params),
@@ -172,13 +180,22 @@ export default function ReferencesPage() {
         )}
       </Group>
 
-      <TextInput
-        placeholder="Search citations…"
-        leftSection={<IconSearch size={14} />}
-        value={q}
-        onChange={(e) => setQ(e.currentTarget.value)}
-        w={320}
-      />
+      <Group gap="xs">
+        <TextInput
+          placeholder="Search citations…"
+          leftSection={<IconSearch size={14} />}
+          value={q}
+          onChange={(e) => setQ(e.currentTarget.value)}
+          w={320}
+        />
+        <TextInput
+          aria-label="Year"
+          placeholder="Year e.g. 1941 or 1941-1944"
+          value={year}
+          onChange={(e) => setYear(e.currentTarget.value)}
+          w={200}
+        />
+      </Group>
 
       {selected.size >= 2 && canEdit && (
         <Group>

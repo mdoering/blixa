@@ -47,14 +47,6 @@ public interface ReferenceMapper {
   })
   Reference findByIdInProject(@Param("projectId") int projectId, @Param("id") int id);
 
-  @Select("""
-      SELECT * FROM reference WHERE project_id = #{projectId}
-      ORDER BY id LIMIT #{limit} OFFSET #{offset}
-      """)
-  @ResultMap("referenceResult")
-  List<Reference> findByProject(@Param("projectId") int projectId, @Param("limit") int limit,
-      @Param("offset") int offset);
-
   // Unpaginated: all of a project's references in one go, ORDER BY id -- for the ColDP export
   // (ReferenceColdpWriter), which needs every row rather than a UI page. Don't reuse
   // findByProject/LIMIT for this: a project with more references than any reasonable page size
@@ -63,14 +55,43 @@ public interface ReferenceMapper {
   @ResultMap("referenceResult")
   List<Reference> findAllByProject(@Param("projectId") int projectId);
 
+  // Paged reference listing with optional full-text citation search and an optional year range.
+  // Backs both the bare list (all filters null -> every reference, id order) and the search box.
+  //  * q: native pg full-text over the citation (websearch_to_tsquery, 'simple' config) -- matches
+  //    whole words anywhere in the citation, ranked by ts_rank. Replaces the old trigram `%`, which
+  //    returned nothing for ordinary queries (a short term's similarity to a long citation is below
+  //    the pg_trgm threshold). See V26__reference_citation_fts.sql.
+  //  * yearFrom/yearTo: inclusive bounds on the 4-digit year parsed out of the free-text `issued`
+  //    (CSL date). A reference whose `issued` has no 4-digit run is excluded once a year bound is
+  //    set. Service passes a blank q as null so the <if> drops the full-text predicate entirely.
   @Select("""
+      <script>
       SELECT * FROM reference
-      WHERE project_id = #{projectId} AND citation % #{q}
-      ORDER BY similarity(citation, #{q}) DESC
+      WHERE project_id = #{projectId}
+      <if test="q != null and q != ''">
+        AND to_tsvector('simple', coalesce(citation, '')) @@ websearch_to_tsquery('simple', #{q})
+      </if>
+      <if test="yearFrom != null">
+        AND substring(issued from '\\d{4}')::int &gt;= #{yearFrom}
+      </if>
+      <if test="yearTo != null">
+        AND substring(issued from '\\d{4}')::int &lt;= #{yearTo}
+      </if>
+      <choose>
+        <when test="q != null and q != ''">
+          ORDER BY ts_rank(to_tsvector('simple', coalesce(citation, '')),
+                           websearch_to_tsquery('simple', #{q})) DESC, id
+        </when>
+        <otherwise>
+          ORDER BY id
+        </otherwise>
+      </choose>
       LIMIT #{limit} OFFSET #{offset}
+      </script>
       """)
   @ResultMap("referenceResult")
   List<Reference> search(@Param("projectId") int projectId, @Param("q") String q,
+      @Param("yearFrom") Integer yearFrom, @Param("yearTo") Integer yearTo,
       @Param("limit") int limit, @Param("offset") int offset);
 
   // Best trigram-similar target reference by citation, for merge.ReferenceMatcher's POSSIBLE
