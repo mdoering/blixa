@@ -1,9 +1,11 @@
 package org.catalogueoflife.editor.name.homotypy;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -68,6 +70,12 @@ class ConsolidationApiIT extends AbstractPostgresIT {
     return json.readTree(resp).get("id").asLong();
   }
 
+  private void link(long pid, long synId, long acceptedId) throws Exception {
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + synId + "/synonym-of/" + acceptedId).with(csrf())
+            .with(user("consOwner")))
+        .andExpect(status().isNoContent());
+  }
+
   @Test
   void scanFindsConflictAndEnforcesAuthz() throws Exception {
     ensureUser("consOwner");
@@ -101,5 +109,45 @@ class ConsolidationApiIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + pid + "/usages/" + familyId + "/homotypic/conflicts")
             .with(user("consNonMember")))
         .andExpect(status().isNotFound());
+  }
+
+  // Regression for the bug where scan() built its candidate set purely from
+  // findSubtreeIds (a parent_id walk), which never reaches synonyms: they carry
+  // parent_id = null and link to their accepted usage only via synonym_accepted. Here the
+  // conflicting name is a SYNONYM of one accepted (Festuca foo) that is homotypic with a
+  // second, unrelated accepted (Poa annua) elsewhere in the same family. Before the fix,
+  // the synonym never entered `candidates`, so this cluster -- and its conflict -- could
+  // never be detected; the scan returned zero conflicts for this fixture.
+  @Test
+  void scanFindsConflictInvolvingASynonym() throws Exception {
+    ensureUser("consOwner");
+    long pid = createProjectOwnedBy("consOwner");
+
+    long familyId = createUsage(pid, "Poaceae", "", "family", "accepted", null);
+    long poaId = createUsage(pid, "Poa annua", "L.", "species", "accepted", familyId);
+    long festucaId = createUsage(pid, "Festuca foo", "Bar", "species", "accepted", familyId);
+    // Root usage (no parentId -> parent_id stays null, as real synonyms have), then linked to
+    // its accepted via the synonym-of endpoint -- never reachable through findSubtreeIds(familyId).
+    long ochlopoaSynId = createUsage(pid, "Ochlopoa annua", "(L.) H.Scholz", "species", "synonym", null);
+    link(pid, ochlopoaSynId, festucaId);
+
+    String body = mvc.perform(
+            get("/api/projects/" + pid + "/usages/" + familyId + "/homotypic/conflicts").with(user("consOwner")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].accepted[?(@.id == " + poaId + ")]").exists())
+        .andExpect(jsonPath("$[0].accepted[?(@.id == " + festucaId + ")]").exists())
+        .andExpect(jsonPath("$[0].members[?(@.id == " + ochlopoaSynId + ")]").exists())
+        .andReturn().getResponse().getContentAsString();
+
+    var conflict = json.readTree(body).get(0);
+    var acceptedIds = java.util.stream.StreamSupport.stream(conflict.get("accepted").spliterator(), false)
+        .map(a -> a.get("id").asLong()).toList();
+    assertThat(acceptedIds).containsExactlyInAnyOrder(poaId, festucaId);
+
+    var synMember = java.util.stream.StreamSupport.stream(conflict.get("members").spliterator(), false)
+        .filter(m -> m.get("id").asLong() == ochlopoaSynId)
+        .findFirst().orElseThrow(() -> new AssertionError("Ochlopoa synonym missing from members"));
+    assertThat(synMember.get("status").asString()).isEqualTo("SYNONYM");
   }
 }

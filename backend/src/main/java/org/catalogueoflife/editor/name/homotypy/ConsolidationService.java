@@ -3,13 +3,10 @@ package org.catalogueoflife.editor.name.homotypy;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.catalogueoflife.editor.child.NameRelationMapper;
-import org.catalogueoflife.editor.child.dto.NameRelationResponse;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.Status;
@@ -30,17 +27,14 @@ public class ConsolidationService {
 
   private final NameUsageMapper usages;
   private final SynonymAcceptedMapper synonymAccepted;
-  private final NameRelationMapper nameRelations;
   private final HomotypyDetector detector;
   private final ProjectService projects;
   private final NameParserService parser;
 
   public ConsolidationService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted,
-      NameRelationMapper nameRelations, HomotypyDetector detector, ProjectService projects,
-      NameParserService parser) {
+      HomotypyDetector detector, ProjectService projects, NameParserService parser) {
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
-    this.nameRelations = nameRelations;
     this.detector = detector;
     this.projects = projects;
     this.parser = parser;
@@ -50,9 +44,17 @@ public class ConsolidationService {
     Project project = projects.requireVisible(userId, projectId);
     requireUsage(projectId, rootId);
 
-    // Load clusterable usages in the subtree: ACCEPTED + SYNONYM, excluding supraspecific + autonyms.
-    List<NameUsage> candidates = new ArrayList<>();
+    // Collect every name taxonomically in the subtree: the accepted classification (a parent_id
+    // walk via findSubtreeIds) PLUS each accepted usage's synonyms. Synonyms carry parent_id = null
+    // and link via synonym_accepted, so findSubtreeIds alone would miss them. findSynonymsOf on a
+    // non-accepted id simply returns empty, so calling it for every subtree id is harmless.
+    LinkedHashSet<Integer> candidateIds = new LinkedHashSet<>();
     for (Integer id : usages.findSubtreeIds(projectId, rootId)) {
+      candidateIds.add(id);
+      candidateIds.addAll(synonymAccepted.findSynonymsOf(projectId, id));
+    }
+    List<NameUsage> candidates = new ArrayList<>();
+    for (Integer id : candidateIds) {
       NameUsage u = usages.findByIdInProject(projectId, id);
       if (u == null) continue;
       if (u.getStatus() != Status.ACCEPTED && u.getStatus() != Status.SYNONYM) continue;
