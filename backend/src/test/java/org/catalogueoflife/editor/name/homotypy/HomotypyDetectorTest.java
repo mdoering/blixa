@@ -84,6 +84,32 @@ class HomotypyDetectorTest {
   }
 
   @Test
+  void multipleRecombinationsAllGroupTogether() {
+    // Poa annua L. (accepted basionym) + two independent recombinations, both authored by L.,
+    // both without a year of their own (null year is compatible with the anchor's 1753).
+    NameUsage accepted = usage(1, Status.ACCEPTED, "Poa", "annua", null, "L.", "1753", null, null);
+    NameUsage recomb1 = usage(2, Status.SYNONYM, "Ochlopoa", "annua", null, "H.Scholz", null, "L.", null);
+    NameUsage recomb2 = usage(3, Status.SYNONYM, "Ochlopoa", "annua", null, "Tzvelev", null, "L.", null);
+
+    HomotypyProposal p = detector.detect(accepted, List.of(recomb1, recomb2), Set.of());
+
+    assertThat(p.groups()).anySatisfy(g -> {
+      assertThat(g.basionymUsageId()).isEqualTo(1);
+      assertThat(g.memberUsageIds()).containsExactlyInAnyOrder(1, 2, 3);
+      assertThat(g.relations()).anySatisfy(r -> {
+        assertThat(r.usageId()).isEqualTo(2);
+        assertThat(r.relatedUsageId()).isEqualTo(1);
+        assertThat(r.type()).isEqualTo("basionym");
+      });
+      assertThat(g.relations()).anySatisfy(r -> {
+        assertThat(r.usageId()).isEqualTo(3);
+        assertThat(r.relatedUsageId()).isEqualTo(1);
+        assertThat(r.type()).isEqualTo("basionym");
+      });
+    });
+  }
+
+  @Test
   void misappliedIsExcluded() {
     NameUsage accepted = usage(1, Status.ACCEPTED, "Poa", "annua", null, "L.", "1753", null, null);
     NameUsage misapplied = usage(9, Status.MISAPPLIED, "Poa", "annua", null, "auct.", null, null, null);

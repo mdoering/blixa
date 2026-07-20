@@ -56,6 +56,12 @@ public class HomotypyDetector {
         clusters.get(clusters.size() - 1).members.add(u);
       } else {
         match.members.add(u);
+        // The group year is established from the first member that has one, so later year-less
+        // members still match against it. When the anchor lacks a year and later members carry
+        // different years, which member ends up "the" group year (and thus the split between
+        // clusters) is order-dependent. Accepted as a v1 limitation: Side 1 is curator-confirmed,
+        // and a genuine different-year-same-author case is a data contradiction the curator
+        // resolves, not something the detector needs to disambiguate automatically.
         if (match.year == null) match.year = yr;
       }
     }
@@ -64,14 +70,15 @@ public class HomotypyDetector {
     for (Cluster c : clusters) {
       NameUsage basionym = null;
       for (NameUsage m : c.members) {
-        if (isBlank(m.getBasionymAuthorship())) { basionym = m; break; }
+        if (!hasBasionymAuthorship(m)) { basionym = m; break; }
       }
       List<Integer> memberIds = c.members.stream().map(NameUsage::getId).toList();
       List<ProposedRelation> relations = new ArrayList<>();
       if (basionym != null) {
         for (NameUsage m : c.members) {
           if (m == basionym) continue;
-          relations.add(rel(m.getId(), basionym.getId(), "basionym", existingKeys));
+          String type = hasBasionymAuthorship(m) ? "basionym" : "homotypic";
+          relations.add(rel(m.getId(), basionym.getId(), type, existingKeys));
         }
       } else if (c.members.size() > 1) {
         NameUsage head = c.members.get(0);
@@ -101,7 +108,7 @@ public class HomotypyDetector {
   // Basionym-or-combination author: the basionym (in-parentheses) author if the name has one, else
   // the combination author. Normalized + alias-resolved so spelling variants of one author match.
   private static String authorKey(NameUsage u) {
-    String team = notBlank(u.getBasionymAuthorship()) ? u.getBasionymAuthorship() : u.getCombinationAuthorship();
+    String team = hasBasionymAuthorship(u) ? u.getBasionymAuthorship() : u.getCombinationAuthorship();
     if (isBlank(team)) return "";
     String normalized = AuthorshipNormalizer.normalize(team);
     if (normalized == null || normalized.isBlank()) return "";
@@ -110,12 +117,16 @@ public class HomotypyDetector {
   }
 
   private static String yearOf(NameUsage u) {
-    return notBlank(u.getBasionymAuthorship()) ? u.getBasionymAuthorshipYear() : u.getCombinationAuthorshipYear();
+    return hasBasionymAuthorship(u) ? u.getBasionymAuthorshipYear() : u.getCombinationAuthorshipYear();
   }
 
   private static boolean yearCompatible(String a, String b) {
     return a == null || a.isBlank() || b == null || b.isBlank() || a.equals(b);
   }
+
+  // Whether this usage carries parenthetical basionym authorship, i.e. is itself a recombination
+  // (as opposed to being the original combination / the cluster's basionym).
+  private static boolean hasBasionymAuthorship(NameUsage u) { return notBlank(u.getBasionymAuthorship()); }
 
   private static boolean isBlank(String s) { return s == null || s.isBlank(); }
   private static boolean notBlank(String s) { return !isBlank(s); }

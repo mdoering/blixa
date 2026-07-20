@@ -12,7 +12,7 @@ public final class HomotypicRelations {
       "basionym", "homotypic", "spelling correction", "based on", "replacement name", "superfluous");
 
   public static String normalize(String type) {
-    return type == null ? "" : type.trim().toLowerCase(java.util.Locale.ROOT).replaceAll("[_-]", " ");
+    return type == null ? "" : type.toLowerCase(java.util.Locale.ROOT).replaceAll("[_-]", " ");
   }
 
   public static boolean isHomotypic(String type) {
