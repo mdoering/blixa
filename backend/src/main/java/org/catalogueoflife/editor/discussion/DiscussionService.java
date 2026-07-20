@@ -26,13 +26,17 @@ public class DiscussionService {
   private final IdSeqMapper idSeq;
   private final ProjectService projects;
   private final AppUserMapper users;
+  private final DiscussionMentionService mentions;
+  private final DiscussionLinkService links;
 
   public DiscussionService(DiscussionMapper discussions, IdSeqMapper idSeq, ProjectService projects,
-      AppUserMapper users) {
+      AppUserMapper users, DiscussionMentionService mentions, DiscussionLinkService links) {
     this.discussions = discussions;
     this.idSeq = idSeq;
     this.projects = projects;
     this.users = users;
+    this.mentions = mentions;
+    this.links = links;
   }
 
   // Any member may list/read. q = full-text over title+body; status/authorId are optional filters;
@@ -56,6 +60,13 @@ public class DiscussionService {
     return requireInProject(projectId, id);
   }
 
+  // Detail view: the discussion plus its resolved #nameID / @orcid mentions.
+  public DiscussionResponse getDetail(int userId, int projectId, int id) {
+    projects.requireRole(userId, projectId);
+    Discussion d = requireInProject(projectId, id);
+    return DiscussionResponse.of(d, mentions.resolve(projectId, d.getBody()));
+  }
+
   @Transactional
   public Discussion create(int userId, int projectId, CreateDiscussionRequest req) {
     projects.requireRole(userId, projectId); // any member may start a discussion
@@ -71,6 +82,7 @@ public class DiscussionService {
     d.setAuthorOrcid(author == null ? null : author.getOrcid());
     d.setCreatedVia("UI");
     discussions.insert(d);
+    links.reconcile(projectId, d.getId()); // #nameID refs in the body -> reverse-links
     // re-read to pick up the DB defaults (created_at/updated_at, version) + the joined authorName
     return requireInProject(projectId, d.getId());
   }
@@ -84,6 +96,7 @@ public class DiscussionService {
     if (updated == 0) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
     }
+    links.reconcile(projectId, id); // body may have gained/lost #nameID refs
     return requireInProject(projectId, id);
   }
 

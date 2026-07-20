@@ -67,6 +67,12 @@ public interface NameUsageMapper {
   })
   NameUsage findByIdInProject(@Param("projectId") int projectId, @Param("id") int id);
 
+  // Scientific name of a single usage, or null if it doesn't exist in this project. Used by
+  // discussion.DiscussionMentionService to resolve #nameID mentions to a label and to gate
+  // reverse-links to existing usages only.
+  @Select("SELECT scientific_name FROM name_usage WHERE project_id = #{projectId} AND id = #{id}")
+  String findScientificName(@Param("projectId") int projectId, @Param("id") int id);
+
   // The same full-row projection findByIdInProject uses (including the taxon_info LEFT JOIN), but
   // for every usage in the project rather than a single id, id-ordered for a stable/deterministic
   // file -- ColDP export's NameUsage.tsv source (coldp/export/NameUsageColdpWriter.write).

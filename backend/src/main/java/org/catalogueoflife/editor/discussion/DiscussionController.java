@@ -55,7 +55,7 @@ public class DiscussionController {
   @GetMapping("/{id}")
   public DiscussionResponse get(@PathVariable int pid, @PathVariable int id) {
     int uid = currentUser.require().getId();
-    return DiscussionResponse.of(service.get(uid, pid, id));
+    return service.getDetail(uid, pid, id);
   }
 
   @PutMapping("/{id}")

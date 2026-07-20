@@ -16,11 +16,18 @@ public record DiscussionResponse(
     String createdVia,
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt,
-    Integer version) {
+    Integer version,
+    Mentions mentions) {
 
+  // List/reverse-link rows: no resolved mentions (the body isn't rendered there).
   public static DiscussionResponse of(Discussion d) {
+    return of(d, null);
+  }
+
+  // Detail view: mentions resolved from the body (#nameID / @orcid).
+  public static DiscussionResponse of(Discussion d, Mentions mentions) {
     return new DiscussionResponse(d.getId(), d.getProjectId(), d.getTitle(), d.getBody(),
         d.getStatus(), d.getVisibility(), d.getAuthorId(), d.getAuthorOrcid(), d.getAuthorName(),
-        d.getCreatedVia(), d.getCreatedAt(), d.getUpdatedAt(), d.getVersion());
+        d.getCreatedVia(), d.getCreatedAt(), d.getUpdatedAt(), d.getVersion(), mentions);
   }
 }
