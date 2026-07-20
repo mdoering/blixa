@@ -14,6 +14,7 @@ import {
   type Comment,
   type DiscussionStatus,
 } from '../api/discussions';
+import UserAvatar from '../components/UserAvatar';
 import MentionMarkdown from './MentionMarkdown';
 import CommentItem from './CommentItem';
 import DiscussionForm from './DiscussionForm';
@@ -96,6 +97,7 @@ export default function DiscussionDetailPage() {
         <Badge color={STATUS_COLOR[discussion.status]} variant="light">
           {titleCase(discussion.status)}
         </Badge>
+        <UserAvatar name={discussion.authorName ?? discussion.authorOrcid} size="sm" />
         <Text size="sm" c="dimmed">
           #{discussion.id} · {discussion.authorName ?? discussion.authorOrcid ?? 'Unknown'} ·{' '}
           {new Date(discussion.createdAt).toLocaleString()}

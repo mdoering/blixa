@@ -22,7 +22,7 @@ const discussion = {
   createdAt: '2026-07-20T00:00:00Z',
   updatedAt: '2026-07-20T00:00:00Z',
   version: 0,
-  mentions: { usages: { '7': 'Panthera leo' }, orcids: {} },
+  mentions: { usages: { '7': 'Panthera leo' }, users: {} },
 };
 
 const comment = {
@@ -36,7 +36,7 @@ const comment = {
   createdAt: '2026-07-20T00:00:00Z',
   updatedAt: '2026-07-20T00:00:00Z',
   version: 0,
-  mentions: { usages: {}, orcids: {} },
+  mentions: { usages: {}, users: {} },
 };
 
 function renderDetail() {

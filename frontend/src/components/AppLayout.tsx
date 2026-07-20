@@ -1,6 +1,6 @@
 import { Anchor, AppShell, Burger, Group, Menu, UnstyledButton } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
-import { IconLogout } from '@tabler/icons-react';
+import { IconLogout, IconUser } from '@tabler/icons-react';
 import { Link, Outlet, useMatch, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMe } from '../auth/useMe';
@@ -8,8 +8,10 @@ import { logout } from '../api/auth';
 import CurrentProjectName from './CurrentProjectName';
 import AppSidebar from './AppSidebar';
 import AppFooter from './AppFooter';
+import AccountModal from './AccountModal';
 import BlixaLogo from './BlixaLogo';
 import ColorSchemeToggle from './ColorSchemeToggle';
+import UserAvatar from './UserAvatar';
 
 export default function AppLayout() {
   const { data: me } = useMe();
@@ -17,6 +19,7 @@ export default function AppLayout() {
   const queryClient = useQueryClient();
 
   const [mobileOpened, { toggle: toggleMobile, close: closeMobile }] = useDisclosure(false);
+  const [accountOpened, { open: openAccount, close: closeAccount }] = useDisclosure(false);
   const [collapsed, setCollapsed] = useLocalStorage<boolean>({
     key: 'coldp-nav-collapsed',
     defaultValue: false,
@@ -68,14 +71,23 @@ export default function AppLayout() {
             <ColorSchemeToggle />
             <Menu position="bottom-end" withinPortal>
               <Menu.Target>
-                <UnstyledButton>{me?.displayName || me?.username}</UnstyledButton>
+                <UnstyledButton>
+                  <Group gap="xs" wrap="nowrap">
+                    <UserAvatar name={me?.displayName || me?.username} size="sm" />
+                    <span>{me?.displayName || me?.username}</span>
+                  </Group>
+                </UnstyledButton>
               </Menu.Target>
               <Menu.Dropdown>
+                <Menu.Item leftSection={<IconUser size={14} />} onClick={openAccount}>
+                  Account
+                </Menu.Item>
                 <Menu.Item leftSection={<IconLogout size={14} />} onClick={onLogout}>
                   Logout
                 </Menu.Item>
               </Menu.Dropdown>
             </Menu>
+            <AccountModal opened={accountOpened} onClose={closeAccount} />
           </Group>
         </Group>
       </AppShell.Header>

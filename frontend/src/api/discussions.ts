@@ -3,10 +3,17 @@ import { api } from './client';
 export type DiscussionStatus = 'REVIEW' | 'OPEN' | 'REJECTED' | 'RESOLVED';
 export type DiscussionVisibility = 'INTERNAL' | 'PUBLIC';
 
-// Resolved inline mentions for a body: #nameID -> scientific name, @orcid -> display name.
+// A resolved @-mention: label to show + the user's ORCID (nullable) for linking out.
+export interface UserMention {
+  label: string;
+  orcid: string | null;
+}
+
+// Resolved inline mentions for a body: #nameID -> scientific name; @orcid/@username -> user
+// (keyed by the token as written).
 export interface Mentions {
   usages: Record<string, string>;
-  orcids: Record<string, string>;
+  users: Record<string, UserMention>;
 }
 
 export interface Discussion {

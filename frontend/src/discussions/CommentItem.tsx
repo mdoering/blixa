@@ -6,6 +6,7 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { messageFor } from '../api/client';
 import { deleteComment, updateComment, type Comment } from '../api/discussions';
+import UserAvatar from '../components/UserAvatar';
 import MentionMarkdown from './MentionMarkdown';
 
 interface Props {
@@ -53,9 +54,12 @@ export default function CommentItem({ pid, comment, canManage }: Props) {
   return (
     <Paper withBorder p="sm" radius="md">
       <Group justify="space-between" mb={4}>
-        <Text size="sm" fw={600}>
-          {comment.authorName ?? comment.authorOrcid ?? 'Unknown'}
-        </Text>
+        <Group gap="xs">
+          <UserAvatar name={comment.authorName ?? comment.authorOrcid} size="sm" />
+          <Text size="sm" fw={600}>
+            {comment.authorName ?? comment.authorOrcid ?? 'Unknown'}
+          </Text>
+        </Group>
         <Group gap="xs">
           <Text size="xs" c="dimmed">
             {new Date(comment.createdAt).toLocaleString()}

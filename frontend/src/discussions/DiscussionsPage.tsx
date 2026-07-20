@@ -7,6 +7,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { getProject, listMembers } from '../api/projects';
 import { useMe } from '../auth/useMe';
 import { listDiscussions, type Discussion, type DiscussionStatus } from '../api/discussions';
+import UserAvatar from '../components/UserAvatar';
 import DiscussionForm from './DiscussionForm';
 
 const PAGE = 25;
@@ -149,7 +150,12 @@ export default function DiscussionsPage() {
                   {titleCase(d.status)}
                 </Badge>
               </Table.Td>
-              <Table.Td>{d.authorName ?? d.authorOrcid ?? '—'}</Table.Td>
+              <Table.Td>
+                <Group gap="xs" wrap="nowrap">
+                  <UserAvatar name={d.authorName ?? d.authorOrcid} size="sm" />
+                  <Text size="sm">{d.authorName ?? d.authorOrcid ?? '—'}</Text>
+                </Group>
+              </Table.Td>
               <Table.Td>{new Date(d.updatedAt).toLocaleDateString()}</Table.Td>
             </Table.Tr>
           ))}
