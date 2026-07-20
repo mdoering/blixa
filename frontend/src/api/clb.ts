@@ -77,6 +77,56 @@ export function resolveClbTaxon(datasetKey: string, taxonId: string): Promise<Cl
   );
 }
 
+// --- comparison (mirrors ClbComparison / ClbGlobalUsageHit) ----------------------------------
+
+export interface ClbRankName {
+  rank: string | null;
+  name: string | null;
+}
+
+export interface ClbComparisonSynonym {
+  scientificName: string | null;
+  authorship: string | null;
+  status: string | null;
+}
+
+export interface ClbComparison {
+  datasetKey: string;
+  datasetTitle: string | null;
+  taxonId: string;
+  link: string;
+  scientificName: string | null;
+  authorship: string | null;
+  rank: string | null;
+  status: string | null;
+  classification: ClbRankName[];
+  synonyms: ClbComparisonSynonym[];
+}
+
+export interface ClbGlobalUsageHit {
+  datasetKey: string;
+  datasetTitle: string | null;
+  id: string;
+  scientificName: string | null;
+  authorship: string | null;
+  rank: string | null;
+  status: string | null;
+}
+
+// Global name search across all CLB datasets (each hit carries its dataset).
+export function searchClbAllDatasets(q: string, rank?: string): Promise<ClbGlobalUsageHit[]> {
+  const search = new URLSearchParams();
+  if (q) search.set('q', q);
+  if (rank) search.set('rank', rank);
+  return api<ClbGlobalUsageHit[]>(`/api/clb/usages?${search.toString()}`);
+}
+
+export function compareClbTaxon(datasetKey: string, taxonId: string): Promise<ClbComparison> {
+  return api<ClbComparison>(
+    `/api/clb/${encodeURIComponent(datasetKey)}/compare/${encodeURIComponent(taxonId)}`,
+  );
+}
+
 // --- the import call itself (mirrors ClbImportRequest/ClbImportSummary) ----------------------
 
 export type ClbImportMode = 'TAXON_SUBTREE' | 'CHILDREN_ONLY' | 'UPDATE_FOCAL';

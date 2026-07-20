@@ -16,7 +16,7 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconLock, IconPencil } from '@tabler/icons-react';
+import { IconLock, IconPencil, IconWorld } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
@@ -32,6 +32,7 @@ import { colIdFrom, scopedId, withScopedId } from '../child/map/mapUrls';
 import ReferencesTab from '../child/ReferencesTab';
 import TypeMaterialTab from '../child/TypeMaterialTab';
 import UsageDiscussionsTab from '../discussions/UsageDiscussionsTab';
+import CompareClbModal from '../child/clb/CompareClbModal';
 import {
   DistributionTab,
   EstimateTab,
@@ -118,6 +119,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
   // back to view mode on a successful save (see the mutation's onSuccess) so the freshly-saved
   // identifiers immediately show as resolved chips again.
   const [editingIds, setEditingIds] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const form = useForm<EditableFields>({
     initialValues: {
@@ -308,6 +310,22 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
 
   return (
     <Box>
+      <Group justify="flex-end" mb="xs">
+        <Button
+          variant="default"
+          size="xs"
+          leftSection={<IconWorld size={14} />}
+          onClick={() => setCompareOpen(true)}
+        >
+          Compare with CLB…
+        </Button>
+      </Group>
+      <CompareClbModal
+        pid={pid}
+        usageId={usageId}
+        opened={compareOpen}
+        onClose={() => setCompareOpen(false)}
+      />
       {foreignLock && (
         <Alert color="orange" variant="light" mb="sm" icon={<IconLock size={16} />}>
           {foreignLock.username} is editing this name — your changes may conflict.
