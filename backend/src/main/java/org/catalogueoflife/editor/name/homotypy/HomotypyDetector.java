@@ -37,7 +37,12 @@ public class HomotypyDetector {
     for (NameUsage s : synonyms) {
       if (s.getStatus() != Status.MISAPPLIED) candidates.add(s);
     }
+    return group(candidates, existingKeys);
+  }
 
+  // Status-agnostic clustering: clusters exactly the usages passed (callers pre-filter). Side 1
+  // passes an accepted + its non-misapplied synonyms; Side 2 passes a whole subtree's usages.
+  public HomotypyProposal group(List<NameUsage> candidates, Set<String> existingKeys) {
     List<Cluster> clusters = new ArrayList<>();
     for (NameUsage u : candidates) {
       String ek = epithetKey(u);
@@ -56,12 +61,6 @@ public class HomotypyDetector {
         clusters.get(clusters.size() - 1).members.add(u);
       } else {
         match.members.add(u);
-        // The group year is established from the first member that has one, so later year-less
-        // members still match against it. When the anchor lacks a year and later members carry
-        // different years, which member ends up "the" group year (and thus the split between
-        // clusters) is order-dependent. Accepted as a v1 limitation: Side 1 is curator-confirmed,
-        // and a genuine different-year-same-author case is a data contradiction the curator
-        // resolves, not something the detector needs to disambiguate automatically.
         if (match.year == null) match.year = yr;
       }
     }

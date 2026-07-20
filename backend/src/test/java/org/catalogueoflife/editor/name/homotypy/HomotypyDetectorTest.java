@@ -116,4 +116,21 @@ class HomotypyDetectorTest {
     HomotypyProposal p = detector.detect(accepted, List.of(misapplied), Set.of());
     assertThat(p.groups()).noneSatisfy(g -> assertThat(g.memberUsageIds()).contains(9));
   }
+
+  @Test
+  void groupClustersFlatListLikeDetect() {
+    // group() over [accepted, recomb] gives the same single-group result as detect()
+    NameUsage accepted = usage(1, Status.ACCEPTED, "Poa", "annua", null, "L.", "1753", null, null);
+    NameUsage recomb = usage(2, Status.SYNONYM, "Ochlopoa", "annua", null, "H.Scholz", null, "L.", null);
+    HomotypyProposal viaGroup = detector.group(java.util.List.of(accepted, recomb), java.util.Set.of());
+    assertThat(viaGroup.groups()).anySatisfy(g -> {
+      assertThat(g.basionymUsageId()).isEqualTo(1);
+      assertThat(g.memberUsageIds()).containsExactlyInAnyOrder(1, 2);
+      assertThat(g.relations()).anySatisfy(r -> {
+        assertThat(r.usageId()).isEqualTo(2);
+        assertThat(r.relatedUsageId()).isEqualTo(1);
+        assertThat(r.type()).isEqualTo("basionym");
+      });
+    });
+  }
 }
