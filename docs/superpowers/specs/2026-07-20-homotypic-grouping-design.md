@@ -1,6 +1,7 @@
 # Homotypic grouping — Side 1: in-taxon grouping & nested synonymy
 
 *Design spec — 2026-07-20*
+**Status:** Side 1 implemented 2026-07-20 (plan: docs/superpowers/plans/2026-07-20-homotypic-grouping-side1.md).
 
 ## Context
 

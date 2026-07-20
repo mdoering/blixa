@@ -96,7 +96,13 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 ## Tools & import
 
 - **DwC-A import adapter** — map Darwin Core terms → ColDP into the shared staging path (reuse GBIF `dwca-io` / CLB readers). *(ColDP and TextTree adapters already exist.)*
-- **Homotypic grouping** — select a taxon and group its species/infraspecies homotypically (see CLB backend).
+- **Homotypic grouping** — *Side 1 shipped:* in-taxon detection + nested synonymy. Select an accepted
+  taxon, auto-detect basionym-anchored homotypic groups among its synonyms (BasionymSorter-lite over
+  parsed authorship), confirm, and persist as `name_relation` rows; the synonymy renders nested (≡/=)
+  like the COL portal. `name_relation` is now the single source of truth for basionym (the
+  `basionym_id` column was dropped; import/export go through the relation). *Side 2 (pending):*
+  cross-dataset consolidation of accepted names over the focal taxon's subtree (a family) — pick the
+  single survivor per homotypic group, demote the rest (see CLB `HomotypicConsolidator`).
 - **GBIF occurrence import into TypeMaterial** — by `occurrenceId` (the field is already carried).
 - **Distribution map preview** — via portal-components, using the gazetteer `areaId`.
 
