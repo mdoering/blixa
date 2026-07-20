@@ -14,8 +14,9 @@ mostly self-contained follow-ups.
 
 ## Big features (new — each needs its own design pass)
 
-### 1. Issue tracker  *(next up)*
-A GitHub-like issue tracker keyed on **ORCIDs**.
+### 1. Discussions  *(in progress — see `docs/superpowers/specs/2026-07-20-discussions-design.md`)*
+A forum-style, per-project discussion tracker keyed on **ORCIDs** (formerly "issue tracker" —
+renamed to avoid collision with the validation *Issues*, and because the shape is a conversation thread).
 - Issues are **project-internal or public**; public ones render on a **public URL route**.
 - **Tabular** search within a project: sort by created & last-modified, **full-text search**, filter by owning user.
 - **Follow** an issue (heart) → change notifications by **email**.
