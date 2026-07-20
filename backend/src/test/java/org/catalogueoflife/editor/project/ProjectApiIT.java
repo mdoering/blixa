@@ -128,6 +128,40 @@ class ProjectApiIT extends AbstractPostgresIT {
   }
 
   @Test
+  @WithMockUser(username = "favClbOwner")
+  void favoriteClbDatasetsRoundTrip() throws Exception {
+    ensureUser("favClbOwner");
+
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Fav\",\"nomCode\":\"zoological\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.favoriteClbDatasets").value(nullValue()))
+        .andReturn().getResponse().getContentAsString();
+    long projectId = json.readTree(body).get("id").asLong();
+
+    mvc.perform(put("/api/projects/" + projectId + "/metadata").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Fav\",\"favoriteClbDatasets\":"
+                + "[{\"key\":\"3LXR\",\"title\":\"Catalogue of Life\"}]}"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.favoriteClbDatasets[0].key").value("3LXR"))
+       .andExpect(jsonPath("$.favoriteClbDatasets[0].title").value("Catalogue of Life"));
+
+    // omitted from a later save -> carried over unchanged (same contract as identifierScopes)
+    mvc.perform(put("/api/projects/" + projectId + "/metadata").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Fav 2\"}"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.title").value("Fav 2"))
+       .andExpect(jsonPath("$.favoriteClbDatasets[0].key").value("3LXR"));
+
+    mvc.perform(get("/api/projects/" + projectId))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.favoriteClbDatasets[0].title").value("Catalogue of Life"));
+  }
+
+  @Test
   @WithMockUser(username = "idScopesOwner")
   void identifierScopesRoundTrip() throws Exception {
     ensureUser("idScopesOwner");

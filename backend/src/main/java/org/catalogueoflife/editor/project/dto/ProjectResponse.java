@@ -3,6 +3,7 @@ package org.catalogueoflife.editor.project.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Locale;
+import org.catalogueoflife.editor.project.FavoriteClbDataset;
 import org.catalogueoflife.editor.project.IdentifierScope;
 import org.catalogueoflife.editor.project.Licenses;
 import org.catalogueoflife.editor.project.Project;
@@ -12,6 +13,7 @@ public record ProjectResponse(
     String nomCode, String license,
     String geographicScope, String taxonomicScope, String role,
     boolean gbifOccurrenceLayer, List<IdentifierScope> identifierScopes,
+    List<FavoriteClbDataset> favoriteClbDatasets,
     // Named "isPublic" (not "public", a reserved word) on the wire as "public" via @JsonProperty,
     // same reserved-word dodge as MergeRunResponse.MergeMetrics.NameCounts#newCount -> "new".
     @JsonProperty("public") boolean isPublic,
@@ -26,6 +28,6 @@ public record ProjectResponse(
         p.getNomCode() == null ? null : p.getNomCode().name().toLowerCase(Locale.ROOT),
         Licenses.toWire(p.getLicense()),
         p.getGeographicScope(), p.getTaxonomicScope(), role, p.getGbifOccurrenceLayer(),
-        p.getIdentifierScopes(), p.isPublic(), p.getCslStyle());
+        p.getIdentifierScopes(), p.getFavoriteClbDatasets(), p.isPublic(), p.getCslStyle());
   }
 }

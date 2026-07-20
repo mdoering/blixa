@@ -125,6 +125,10 @@ public class ProjectService {
     if (req.identifierScopes() != null) {
       p.setIdentifierScopes(req.identifierScopes());
     }
+    // Same null-safe carry-over: favoriteClbDatasets is only sent by the Project settings save.
+    if (req.favoriteClbDatasets() != null) {
+      p.setFavoriteClbDatasets(req.favoriteClbDatasets());
+    }
     // Same null-safe carry-over again: a non-null cslStyle must be one of CslFormatter.STYLE
     // (case-insensitive) -- reject anything else with 400 rather than silently storing a value
     // ReferenceCitationService would then quietly fall back to APA for.

@@ -20,6 +20,7 @@ public class Project {
   // ProjectMapper's @Results/UPDATE (both wire the JSONB typeHandler); see
   // ProjectResponse/UpdateProjectMetadataRequest for the wire-facing read/write shape.
   private List<IdentifierScope> identifierScopes;
+  private List<FavoriteClbDataset> favoriteClbDatasets;
   private boolean isPublic;
   // Which CSL citation style (life.catalogue.common.csl.CslFormatter.STYLE, lower-cased, e.g.
   // "apa"/"harvard") this project's GENERATED reference citations render in -- see
@@ -51,6 +52,8 @@ public class Project {
   public void setGbifOccurrenceLayer(boolean gbifOccurrenceLayer) { this.gbifOccurrenceLayer = gbifOccurrenceLayer; }
   public List<IdentifierScope> getIdentifierScopes() { return identifierScopes; }
   public void setIdentifierScopes(List<IdentifierScope> identifierScopes) { this.identifierScopes = identifierScopes; }
+  public List<FavoriteClbDataset> getFavoriteClbDatasets() { return favoriteClbDatasets; }
+  public void setFavoriteClbDatasets(List<FavoriteClbDataset> favoriteClbDatasets) { this.favoriteClbDatasets = favoriteClbDatasets; }
   public boolean isPublic() { return isPublic; }
   public void setPublic(boolean isPublic) { this.isPublic = isPublic; }
   public String getCslStyle() { return cslStyle; }

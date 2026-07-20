@@ -28,7 +28,9 @@ public interface ProjectMapper {
   @Select("SELECT * FROM project WHERE id = #{id}")
   @Results(id = "projectResult", value = {
       @Result(property = "identifierScopes", column = "identifier_scopes",
-          typeHandler = IdentifierScopeListTypeHandler.class)
+          typeHandler = IdentifierScopeListTypeHandler.class),
+      @Result(property = "favoriteClbDatasets", column = "favorite_clb_datasets",
+          typeHandler = FavoriteClbDatasetListTypeHandler.class)
   })
   Project findById(int id);
 
@@ -48,6 +50,7 @@ public interface ProjectMapper {
           geographic_scope = #{geographicScope}, taxonomic_scope = #{taxonomicScope},
           metadata = #{metadata}::jsonb, gbif_occurrence_layer = #{gbifOccurrenceLayer},
           identifier_scopes = #{identifierScopes,typeHandler=org.catalogueoflife.editor.project.IdentifierScopeListTypeHandler,jdbcType=OTHER},
+          favorite_clb_datasets = #{favoriteClbDatasets,typeHandler=org.catalogueoflife.editor.project.FavoriteClbDatasetListTypeHandler,jdbcType=OTHER},
           csl_style = #{cslStyle},
           updated_at = now()
       WHERE id = #{id}
