@@ -18,6 +18,7 @@ import ReferencesPage from './references/ReferencesPage';
 import DiscussionsPage from './discussions/DiscussionsPage';
 import DiscussionDetailPage from './discussions/DiscussionDetailPage';
 import CurrentWorkPage from './lock/CurrentWorkPage';
+import AdminUsersPage from './admin/AdminUsersPage';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route path="projects" element={<ProjectListPage />} />
+          <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="projects/:projectId" element={<ProjectLayout />}>
             <Route index element={<Navigate to="metadata" replace />} />
             <Route path="tree" element={<TreePage />} />

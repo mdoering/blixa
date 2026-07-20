@@ -5,6 +5,8 @@ export interface Me {
   username: string;
   orcid: string;
   displayName: string;
+  admin: boolean;
+  state: string; // PENDING | ACTIVE | DISABLED
 }
 
 export interface Project {

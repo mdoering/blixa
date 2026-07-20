@@ -9,6 +9,7 @@ import {
   IconLock,
   IconMessages,
   IconSettings,
+  IconShieldLock,
   IconUsers,
 } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
@@ -16,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { joinRequestCount } from '../api/join';
 import { getProject } from '../api/projects';
+import { useMe } from '../auth/useMe';
 import NavItem from './NavItem';
 
 const ICON = 18;
@@ -40,6 +42,7 @@ export interface AppSidebarProps {
 export default function AppSidebar({ projectId, collapsed, onNavigate }: AppSidebarProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { data: me } = useMe();
   const go = (to: string) => {
     navigate(to);
     onNavigate?.();
@@ -90,6 +93,15 @@ export default function AppSidebar({ projectId, collapsed, onNavigate }: AppSide
         collapsed={collapsed}
         onClick={() => go('/')}
       />
+      {me?.admin && (
+        <NavItem
+          icon={<IconShieldLock size={ICON} />}
+          label="Users"
+          active={pathname.startsWith('/admin/users')}
+          collapsed={collapsed}
+          onClick={() => go('/admin/users')}
+        />
+      )}
       {projectId != null && (
         <>
           {!collapsed && (

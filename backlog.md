@@ -72,10 +72,10 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 ### 4. Delete options  *(shipped)*
 - [x] Deleting a taxon asks what to remove: **focal only**, **focal + synonyms**, or **entire subtree** (DeleteNameModal + `DELETE /usages/{id}?mode=&reparentTo=`); non-subtree modes reparent children to the grandparent (default) or a searched-for new parent.
 
-### 5. Global admin & user lifecycle
-- A global **admin** role (distinct from per-project owner/editor/viewer).
-- User **states**: pending → active → disabled.
-- Admin screens to list users, approve pending signups, toggle the admin flag.
+### 5. Global admin & user lifecycle  *(shipped)*
+- [x] A global **admin** role (distinct from per-project owner/editor/viewer): `app_user.admin` flag → `ROLE_ADMIN`; bootstrapped from the `editor.admin.orcids` allowlist (and the dev login).
+- [x] User **states** PENDING → ACTIVE → DISABLED (`app_user.state`): new ORCID self-signups land PENDING; local/allowlisted logins are ACTIVE. `ActiveUserFilter` 403s non-ACTIVE users on all protected routes; the SPA shows an "awaiting approval" / "account disabled" gate (RequireAuth → PendingApprovalPage).
+- [x] Admin **Users** page (`/admin/users`, admin-only nav): list users, approve pending signups, disable/reactivate, toggle the admin flag (`GET/POST /api/admin/users…`); self-lockout guarded (can't demote or disable yourself).
 - (The lighter public **join-request** flow already exists; this is the account-level layer above it.)
 
 ---
