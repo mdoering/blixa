@@ -9,6 +9,8 @@ public class AppUser {
   private String given;
   private String family;
   private String passwordHash;
+  private boolean admin;
+  private String state;
 
   public Integer getId() { return id; }
   public void setId(Integer id) { this.id = id; }
@@ -26,4 +28,8 @@ public class AppUser {
   public void setFamily(String family) { this.family = family; }
   public String getPasswordHash() { return passwordHash; }
   public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+  public boolean isAdmin() { return admin; }
+  public void setAdmin(boolean admin) { this.admin = admin; }
+  public String getState() { return state; }
+  public void setState(String state) { this.state = state; }
 }

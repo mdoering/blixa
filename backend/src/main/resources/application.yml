@@ -38,6 +38,12 @@ mybatis:
     map-underscore-to-camel-case: true
 server:
   port: 8080
+editor:
+  admin:
+    # Comma-separated ORCIDs that auto-become global admin + ACTIVE on login (bootstrap the first
+    # admin in production). The dev-profile local login is always an admin (see DevBootstrap).
+    orcids: ${EDITOR_ADMIN_ORCIDS:}
+
 coldp:
   # Outgoing email for discussion-follow notifications. Sending is best-effort and only happens when
   # `from` is set AND Spring's mail sender is configured (spring.mail.host); otherwise it's logged.

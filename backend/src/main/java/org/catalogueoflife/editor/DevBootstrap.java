@@ -41,10 +41,12 @@ public class DevBootstrap implements ApplicationRunner {
   @Override
   public void run(ApplicationArguments args) {
     if (users.requireByUsernameOrNull(username) != null) {
+      users.markAdmin(username); // keep the dev login a global admin across restarts/migrations
       log.info("Dev login user '{}' already present", username);
       return;
     }
     users.createLocal(username, password, displayName);
+    users.markAdmin(username); // the dev login is a global admin
     log.warn("DEV PROFILE: seeded local login user '{}' (password '{}'). "
         + "Never enable the 'dev' profile in production.", username, password);
   }

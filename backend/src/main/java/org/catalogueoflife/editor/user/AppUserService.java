@@ -22,10 +22,15 @@ public class AppUserService implements UserDetailsService {
 
   private final AppUserMapper mapper;
   private final PasswordEncoder encoder;
+  // ORCIDs that auto-become admin + ACTIVE on login (bootstrap; editor.admin.orcids config).
+  private final java.util.Set<String> adminOrcids;
 
-  public AppUserService(AppUserMapper mapper, PasswordEncoder encoder) {
+  public AppUserService(AppUserMapper mapper, PasswordEncoder encoder,
+      @org.springframework.beans.factory.annotation.Value("${editor.admin.orcids:}") String adminOrcidsCsv) {
     this.mapper = mapper;
     this.encoder = encoder;
+    this.adminOrcids = java.util.Arrays.stream(adminOrcidsCsv.split(","))
+        .map(String::trim).filter(s -> !s.isEmpty()).collect(java.util.stream.Collectors.toSet());
   }
 
   // Let a user pick a custom, unique username (their display handle; also the login name for local
@@ -55,11 +60,14 @@ public class AppUserService implements UserDetailsService {
     u.setUsername(username);
     u.setDisplayName(displayName);
     u.setPasswordHash(encoder.encode(rawPassword));
+    // Local accounts are created by an owner (member add) or the dev bootstrap -- already vouched for.
+    u.setState(UserState.ACTIVE.name());
     mapper.insert(u);
     return u;
   }
 
   public AppUser upsertFromOrcid(String orcid, String displayName, String given, String family) {
+    boolean bootstrap = adminOrcids.contains(orcid);
     AppUser u = mapper.findByOrcid(orcid);
     if (u == null) {
       u = new AppUser();
@@ -68,14 +76,31 @@ public class AppUserService implements UserDetailsService {
       u.setDisplayName(displayName);
       u.setGiven(given);
       u.setFamily(family);
+      // ORCID self-signups start PENDING (await approval); an allowlisted ORCID bootstraps as admin.
+      u.setAdmin(bootstrap);
+      u.setState((bootstrap ? UserState.ACTIVE : UserState.PENDING).name());
       mapper.insert(u);
     } else {
       u.setDisplayName(displayName);
       u.setGiven(given);
       u.setFamily(family);
+      if (bootstrap && (!u.isAdmin() || !UserState.ACTIVE.name().equals(u.getState()))) {
+        u.setAdmin(true);
+        u.setState(UserState.ACTIVE.name());
+      }
       mapper.update(u);
     }
     return u;
+  }
+
+  // Bootstrap helper (DevBootstrap): make an existing account a global admin + ACTIVE.
+  public void markAdmin(String username) {
+    AppUser u = mapper.findByUsername(username);
+    if (u != null && (!u.isAdmin() || !UserState.ACTIVE.name().equals(u.getState()))) {
+      u.setAdmin(true);
+      u.setState(UserState.ACTIVE.name());
+      mapper.update(u);
+    }
   }
 
   public AppUser requireByUsername(String username) {
@@ -96,7 +121,8 @@ public class AppUserService implements UserDetailsService {
     if (u == null || u.getPasswordHash() == null) {
       throw new UsernameNotFoundException(username);
     }
-    return new User(u.getUsername(), u.getPasswordHash(),
-        List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    boolean enabled = UserState.ACTIVE.name().equals(u.getState());
+    return new User(u.getUsername(), u.getPasswordHash(), enabled, true, true, true,
+        List.of(new SimpleGrantedAuthority(u.isAdmin() ? "ROLE_ADMIN" : "ROLE_USER")));
   }
 }

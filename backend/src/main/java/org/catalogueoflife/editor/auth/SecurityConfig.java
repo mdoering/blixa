@@ -20,7 +20,8 @@ public class SecurityConfig {
 
   @Bean
   SecurityFilterChain filterChain(HttpSecurity http,
-                                  org.catalogueoflife.editor.user.OrcidUserService orcidUserService) throws Exception {
+                                  org.catalogueoflife.editor.user.OrcidUserService orcidUserService,
+                                  org.catalogueoflife.editor.user.AppUserMapper appUserMapper) throws Exception {
     http
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/ping").permitAll()
@@ -41,6 +42,9 @@ public class SecurityConfig {
             .ignoringRequestMatchers("/api/public/**"))
         .addFilterAfter(new CsrfCookieFilter(),
             org.springframework.security.web.authentication.www.BasicAuthenticationFilter.class)
+        // After auth is established, block non-ACTIVE accounts from the protected API (403), except
+        // /api/me + logout so a pending user can still load the SPA and see the approval screen.
+        .addFilterAfter(new ActiveUserFilter(appUserMapper), CsrfCookieFilter.class)
         .formLogin(form -> form
             .loginProcessingUrl("/api/auth/login")
             .successHandler((req, res, a) -> res.setStatus(HttpStatus.OK.value()))

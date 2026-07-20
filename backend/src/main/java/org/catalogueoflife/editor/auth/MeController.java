@@ -36,6 +36,8 @@ public class MeController {
         "id", u.getId(),
         "username", u.getUsername(),
         "orcid", u.getOrcid() == null ? "" : u.getOrcid(),
-        "displayName", u.getDisplayName() == null ? "" : u.getDisplayName());
+        "displayName", u.getDisplayName() == null ? "" : u.getDisplayName(),
+        "admin", u.isAdmin(),
+        "state", u.getState() == null ? "ACTIVE" : u.getState());
   }
 }
