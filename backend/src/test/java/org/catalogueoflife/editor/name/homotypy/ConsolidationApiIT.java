@@ -95,13 +95,15 @@ class ConsolidationApiIT extends AbstractPostgresIT {
     // suggestedSurvivorId deterministic.
     createUsage(pid, "Poa infirma", "Kunth", "species", "accepted", poaId);
 
-    mvc.perform(get("/api/projects/" + pid + "/usages/" + familyId + "/homotypic/conflicts").with(user("consOwner")))
+    String scanBody = mvc.perform(
+            get("/api/projects/" + pid + "/usages/" + familyId + "/homotypic/conflicts").with(user("consOwner")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].accepted[?(@.id == " + poaId + ")]").exists())
         .andExpect(jsonPath("$[0].accepted[?(@.id == " + ochlopoaId + ")]").exists())
         .andExpect(jsonPath("$[0].suggestedSurvivorId").value((int) poaId))
-        .andExpect(jsonPath("$[0].hasExceptions").value(false));
+        .andExpect(jsonPath("$[0].hasExceptions").value(false))
+        .andReturn().getResponse().getContentAsString();
 
     // authz: viewer may GET conflicts (200); non-member gets 404.
     mvc.perform(get("/api/projects/" + pid + "/usages/" + familyId + "/homotypic/conflicts").with(user("consViewer")))
@@ -109,6 +111,34 @@ class ConsolidationApiIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + pid + "/usages/" + familyId + "/homotypic/conflicts")
             .with(user("consNonMember")))
         .andExpect(status().isNotFound());
+
+    // read the loser's version off the conflict's accepted-candidate list (freshly created -> 0)
+    var conflict = json.readTree(scanBody).get(0);
+    long ochlopoaVersion = java.util.stream.StreamSupport.stream(conflict.get("accepted").spliterator(), false)
+        .filter(a -> a.get("id").asLong() == ochlopoaId)
+        .findFirst().orElseThrow(() -> new AssertionError("Ochlopoa annua missing from accepted candidates"))
+        .get("version").asLong();
+
+    // consolidate: sink Ochlopoa annua into Poa annua
+    String body = "{\"losers\":[{\"acceptedId\":" + ochlopoaId + ",\"version\":" + ochlopoaVersion + "}],"
+        + "\"relations\":[{\"usageId\":" + ochlopoaId + ",\"relatedUsageId\":" + poaId + ",\"type\":\"basionym\"}]}";
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + poaId + "/homotypic/consolidate")
+            .with(user("consOwner")).with(csrf())
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(body))
+       .andExpect(status().isOk())
+       // Ochlopoa annua now appears under Poa annua's homotypic synonyms
+       .andExpect(jsonPath("$.homotypic[?(@.id == " + ochlopoaId + ")]").exists());
+
+    // re-scan: the conflict is gone
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + familyId + "/homotypic/conflicts").with(user("consOwner")))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.length()").value(0));
+
+    // authz: viewer cannot consolidate
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + poaId + "/homotypic/consolidate")
+            .with(user("consViewer")).with(csrf())
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(body))
+       .andExpect(status().isForbidden());
   }
 
   // Regression for the bug where scan() built its candidate set purely from

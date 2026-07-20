@@ -30,14 +30,19 @@ public class ConsolidationService {
   private final HomotypyDetector detector;
   private final ProjectService projects;
   private final NameParserService parser;
+  private final org.catalogueoflife.editor.name.NameUsageService nameUsages;
+  private final HomotypyService homotypy;
 
   public ConsolidationService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted,
-      HomotypyDetector detector, ProjectService projects, NameParserService parser) {
+      HomotypyDetector detector, ProjectService projects, NameParserService parser,
+      org.catalogueoflife.editor.name.NameUsageService nameUsages, HomotypyService homotypy) {
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
     this.detector = detector;
     this.projects = projects;
     this.parser = parser;
+    this.nameUsages = nameUsages;
+    this.homotypy = homotypy;
   }
 
   public List<ConflictCluster> scan(int userId, int projectId, int rootId) {
@@ -128,6 +133,38 @@ public class ConsolidationService {
       conflicts.add(new ConflictCluster(accepted, members, suggested, hasExceptions, g.relations()));
     }
     return conflicts;
+  }
+
+  // Demote each loser accepted name to a SYNONYM of the survivor (reusing demote(): children +
+  // synonyms -> survivor), then persist the cluster's homotypic relations and return the
+  // survivor's synonymy. @Transactional so a stale loser version (409 from demote) rolls back the
+  // whole consolidation, not just the failed loser.
+  @org.springframework.transaction.annotation.Transactional
+  public org.catalogueoflife.editor.name.homotypy.dto.Synonymy consolidate(int userId, int projectId,
+      int survivorId, org.catalogueoflife.editor.name.homotypy.dto.ConsolidateRequest req) {
+    requireEditor(userId, projectId);
+    requireUsage(projectId, survivorId);
+    if (req != null && req.losers() != null) {
+      for (var loser : req.losers()) {
+        if (loser.acceptedId() == survivorId) continue; // never demote the survivor
+        // Reuse the demote path: loser -> SYNONYM of survivor, children + synonyms -> survivor.
+        nameUsages.demote(userId, projectId, loser.acceptedId(),
+            new org.catalogueoflife.editor.name.dto.DemoteRequest(
+                survivorId, "SYNONYM", "new-accepted", "new-accepted", loser.version()));
+      }
+    }
+    // Persist the cluster's homotypic relations (idempotent) and return the survivor's synonymy.
+    var relations = req == null || req.relations() == null ? java.util.List.<org.catalogueoflife.editor.name.homotypy.dto.ApplyHomotypicRequest.ApplyRelation>of() : req.relations();
+    return homotypy.apply(userId, projectId, survivorId,
+        new org.catalogueoflife.editor.name.homotypy.dto.ApplyHomotypicRequest(relations));
+  }
+
+  private void requireEditor(int userId, int projectId) {
+    String role = projects.requireRole(userId, projectId);
+    if (!role.equals(org.catalogueoflife.editor.project.Role.OWNER.dbValue())
+        && !role.equals(org.catalogueoflife.editor.project.Role.EDITOR.dbValue())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner or editor required");
+    }
   }
 
   // Combination-authorship year as an int; unparsable/absent sorts last (newest) so it loses the

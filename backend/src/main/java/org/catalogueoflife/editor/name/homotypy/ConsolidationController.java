@@ -24,4 +24,11 @@ public class ConsolidationController {
   public List<ConflictCluster> conflicts(@PathVariable int pid, @PathVariable int id) {
     return service.scan(currentUser.require().getId(), pid, id);
   }
+
+  @org.springframework.web.bind.annotation.PostMapping("/homotypic/consolidate")
+  public org.catalogueoflife.editor.name.homotypy.dto.Synonymy consolidate(@PathVariable int pid,
+      @PathVariable int id,
+      @org.springframework.web.bind.annotation.RequestBody org.catalogueoflife.editor.name.homotypy.dto.ConsolidateRequest req) {
+    return service.consolidate(currentUser.require().getId(), pid, id, req);
+  }
 }
