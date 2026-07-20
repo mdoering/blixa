@@ -21,19 +21,20 @@ renamed to avoid collision with the validation *Issues*, and because the shape i
 - [x] **Phase 1 — foundation** *(shipped: V27 table, `discussion` API + `DiscussionsPage`)*: per-project
   discussions with **full-text search**, status + author filters, created/modified **sort**, paged;
   **states** for-review → open → rejected/resolved; create (any member), edit/status/delete (author or editor).
-- [ ] **Phase 2 — comments + inline links**: markdown comments (author-editable) with `@orcid`,
-  `#Genus_species`, `#nameID` rendered as labels; reverse-link from a name to its discussions.
+- [x] **Phase 2 — comments + inline links** *(shipped)*: markdown comments (author-editable) with
+  `@orcid`/`@username` + `#nameID` rendered as links; reverse-link from a name to its discussions
+  (Discussions tab on TaxonDetail). *(`#Genus_species` fuzzy name mentions still deferred.)*
 - [ ] **Phase 3 — public visibility + public URL route**: editor marks a discussion PUBLIC; unauthenticated read.
 - [ ] **Phase 4 — external API + per-project token**: submissions arrive `state=review`; editors accept → `open`
   (turns COL user comments into discussions).
 - [ ] **Phase 5 — follow (heart) + email notifications** (needs SMTP config).
 - [ ] **Phase 6 — link (closed) discussions to changes & work locks.**
 
-**Discussions — user identity polish (after Phase 2):**
-- [ ] **Avatars** on users, shown in comments and everywhere a user appears. (ORCID's public API exposes
-  no profile photo, so use initials-based avatars.)
-- [ ] **Custom, unique username** users can set, so we rarely show the raw ORCID. Prefer avatar + username.
-- [ ] **`@username`** as an additional comment mention syntax (alongside `@orcid`).
+**Discussions — user identity polish (after Phase 2):** *(all shipped)*
+- [x] **Avatars** — initials-based `UserAvatar` (ORCID exposes no photo) next to authors in the list,
+  detail, comments, and the header user menu.
+- [x] **Custom, unique username** — `PUT /api/me/username` + Account modal (header → Account).
+- [x] **`@username`** mention syntax, alongside `@orcid`.
 
 Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 
