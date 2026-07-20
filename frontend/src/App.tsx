@@ -14,6 +14,7 @@ import NameSearchPage from './names/NameSearchPage';
 import IssuesPage from './issues/IssuesPage';
 import HistoryPage from './history/HistoryPage';
 import ReferencesPage from './references/ReferencesPage';
+import DiscussionsPage from './discussions/DiscussionsPage';
 import CurrentWorkPage from './lock/CurrentWorkPage';
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="names" element={<NameSearchPage />} />
             <Route path="references" element={<ReferencesPage />} />
             <Route path="issues" element={<IssuesPage />} />
+            <Route path="discussions" element={<DiscussionsPage />} />
             <Route path="history" element={<HistoryPage />} />
             <Route path="activity" element={<CurrentWorkPage />} />
             <Route path="metadata" element={<ProjectMetadataPage />} />
