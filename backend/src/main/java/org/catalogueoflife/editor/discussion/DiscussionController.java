@@ -7,6 +7,7 @@ import org.catalogueoflife.editor.discussion.dto.DiscussionPage;
 import org.catalogueoflife.editor.discussion.dto.DiscussionResponse;
 import org.catalogueoflife.editor.discussion.dto.StatusRequest;
 import org.catalogueoflife.editor.discussion.dto.UpdateDiscussionRequest;
+import org.catalogueoflife.editor.discussion.dto.VisibilityRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -70,6 +71,14 @@ public class DiscussionController {
       @RequestBody StatusRequest req) {
     int uid = currentUser.require().getId();
     return DiscussionResponse.of(service.setStatus(uid, pid, id, req.status()));
+  }
+
+  // Editor-only: mark a discussion INTERNAL or PUBLIC (PUBLIC = readable via the public route).
+  @PostMapping("/{id}/visibility")
+  public DiscussionResponse setVisibility(@PathVariable int pid, @PathVariable int id,
+      @RequestBody VisibilityRequest req) {
+    int uid = currentUser.require().getId();
+    return DiscussionResponse.of(service.setVisibility(uid, pid, id, req.visibility()));
   }
 
   @DeleteMapping("/{id}")

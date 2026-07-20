@@ -123,6 +123,48 @@ public class DiscussionService {
     discussions.delete(projectId, id);
   }
 
+  @Transactional
+  public Discussion setVisibility(int userId, int projectId, int id, String visRaw) {
+    String role = projects.requireRole(userId, projectId);
+    if (!isEditor(role)) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "editor required to change visibility");
+    }
+    requireInProject(projectId, id);
+    discussions.updateVisibility(projectId, id, normalizeVisibility(visRaw));
+    return requireInProject(projectId, id);
+  }
+
+  // -- public (unauthenticated) reads: only PUBLIC discussions are ever returned --------------------
+
+  public List<DiscussionResponse> publicList(int projectId) {
+    return discussions.findPublicByProject(projectId).stream().map(DiscussionResponse::of).toList();
+  }
+
+  public DiscussionResponse publicDetail(int projectId, int id) {
+    Discussion d = requirePublic(projectId, id);
+    return DiscussionResponse.of(d, mentions.resolve(projectId, d.getBody()));
+  }
+
+  // The discussion iff it is PUBLIC, else 404 -- gates the public comments endpoint too.
+  public Discussion requirePublic(int projectId, int id) {
+    Discussion d = discussions.findPublicByIdInProject(projectId, id);
+    if (d == null) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "discussion not found");
+    }
+    return d;
+  }
+
+  private static String normalizeVisibility(String raw) {
+    if (raw == null || raw.isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "visibility is required");
+    }
+    try {
+      return DiscussionVisibility.valueOf(raw.trim().toUpperCase(Locale.ROOT)).name();
+    } catch (IllegalArgumentException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown visibility: " + raw);
+    }
+  }
+
   private Discussion requireInProject(int projectId, int id) {
     Discussion d = discussions.findByIdInProject(projectId, id);
     if (d == null) {

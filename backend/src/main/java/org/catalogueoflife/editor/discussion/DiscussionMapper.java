@@ -28,6 +28,22 @@ public interface DiscussionMapper {
       """)
   Discussion findByIdInProject(@Param("projectId") int projectId, @Param("id") int id);
 
+  // Public (unauthenticated) reads: only PUBLIC discussions are ever returned.
+  @Select("""
+      SELECT d.*, COALESCE(u.display_name, u.username) AS author_name
+      FROM discussion d LEFT JOIN app_user u ON u.id = d.author_id
+      WHERE d.project_id = #{projectId} AND d.visibility = 'PUBLIC'
+      ORDER BY d.updated_at DESC, d.id DESC
+      """)
+  List<Discussion> findPublicByProject(@Param("projectId") int projectId);
+
+  @Select("""
+      SELECT d.*, COALESCE(u.display_name, u.username) AS author_name
+      FROM discussion d LEFT JOIN app_user u ON u.id = d.author_id
+      WHERE d.project_id = #{projectId} AND d.id = #{id} AND d.visibility = 'PUBLIC'
+      """)
+  Discussion findPublicByIdInProject(@Param("projectId") int projectId, @Param("id") int id);
+
   // Paged listing with optional full-text search (q, over title+body), status filter, author filter,
   // and created|modified sort. q-present orders by ts_rank; otherwise by the chosen timestamp.
   @Select("""
@@ -96,6 +112,13 @@ public interface DiscussionMapper {
       WHERE project_id = #{projectId} AND id = #{id}
       """)
   int updateStatus(@Param("projectId") int projectId, @Param("id") int id, @Param("status") String status);
+
+  @Update("""
+      UPDATE discussion SET visibility = #{visibility}, updated_at = now(), version = version + 1
+      WHERE project_id = #{projectId} AND id = #{id}
+      """)
+  int updateVisibility(@Param("projectId") int projectId, @Param("id") int id,
+      @Param("visibility") String visibility);
 
   @Delete("DELETE FROM discussion WHERE project_id = #{projectId} AND id = #{id}")
   int delete(@Param("projectId") int projectId, @Param("id") int id);
