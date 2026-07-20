@@ -76,8 +76,12 @@ class HomotypyApiIT extends AbstractPostgresIT {
     long acceptedId = createUsage(pid, "Poa annua", "L.", "species", "accepted");
     long recombId = createUsage(pid, "Ochlopoa annua", "(L.) H.Scholz", "species", "synonym");
     long airaId = createUsage(pid, "Aira pumila", "Pursh", "species", "synonym");
+    // Catabrosa pumila (Pursh) Roem. & Schult. is a recombination of Aira pumila: a second member
+    // of the same heterotypic group, added below via an explicit basionym relation.
+    long catabrosaId = createUsage(pid, "Catabrosa pumila", "(Pursh) Roem. & Schult.", "species", "synonym");
     link(pid, recombId, acceptedId);
     link(pid, airaId, acceptedId);
+    link(pid, catabrosaId, acceptedId);
 
     // 1. detect returns a group anchored on the accepted with a basionym relation, alreadyExists=false.
     String detectBody = mvc.perform(
@@ -115,14 +119,32 @@ class HomotypyApiIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.homotypic.length()").value(1))
         .andExpect(jsonPath("$.homotypic[?(@.id == " + recombId + ")]").exists());
 
-    // 3. synonymy returns the recomb under `homotypic` and Aira pumila under `heterotypicGroups`.
-    mvc.perform(get("/api/projects/" + pid + "/usages/" + acceptedId + "/synonymy").with(user("homoOwner")))
+    // 2b. link Catabrosa pumila (recombination of Aira pumila) into the same heterotypic group via
+    // an explicit basionym relation: Catabrosa -> Aira.
+    String basionymBody = "{\"relations\":[{\"usageId\":" + catabrosaId + ",\"relatedUsageId\":" + airaId
+        + ",\"type\":\"basionym\"}]}";
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + acceptedId + "/homotypic/apply").with(user("homoOwner"))
+            .with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content(basionymBody))
+        .andExpect(status().isOk());
+
+    // 3. synonymy returns the recomb under `homotypic` and Aira pumila + Catabrosa pumila together
+    // under `heterotypicGroups`, basionym (Aira, no parenthetical authorship) sorting first.
+    String synonymyBody = mvc.perform(
+            get("/api/projects/" + pid + "/usages/" + acceptedId + "/synonymy").with(user("homoOwner")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.homotypic.length()").value(1))
         .andExpect(jsonPath("$.homotypic[0].id").value((int) recombId))
         .andExpect(jsonPath("$.heterotypicGroups.length()").value(1))
         .andExpect(jsonPath("$.heterotypicGroups[0][?(@.id == " + airaId + ")]").exists())
-        .andExpect(jsonPath("$.misapplied.length()").value(0));
+        .andExpect(jsonPath("$.heterotypicGroups[0][?(@.id == " + catabrosaId + ")]").exists())
+        .andExpect(jsonPath("$.misapplied.length()").value(0))
+        .andReturn().getResponse().getContentAsString();
+
+    var heterotypicGroup0 = json.readTree(synonymyBody).get("heterotypicGroups").get(0);
+    assertThat(heterotypicGroup0).hasSize(2);
+    assertThat(heterotypicGroup0.get(0).get("id").asLong()).isEqualTo(airaId);
+    assertThat(heterotypicGroup0.get(1).get("id").asLong()).isEqualTo(catabrosaId);
 
     // authz: viewer may GET synonymy (200) but POST apply is 403; non-member gets 404 everywhere.
     mvc.perform(get("/api/projects/" + pid + "/usages/" + acceptedId + "/synonymy").with(user("homoViewer")))

@@ -78,7 +78,7 @@ public class HomotypyService {
 
   public Synonymy synonymy(int userId, int projectId, int acceptedId) {
     Project project = projects.requireVisible(userId, projectId);
-    NameUsage accepted = requireUsage(projectId, acceptedId);
+    requireUsage(projectId, acceptedId);
     List<NameUsage> synonyms = loadSynonyms(projectId, acceptedId);
 
     List<SynonymEntry> misapplied = new ArrayList<>();
@@ -112,10 +112,16 @@ public class HomotypyService {
     return new Synonymy(homotypic, heterotypicGroups, misapplied);
   }
 
-  // A recombination has parenthetical basionym authorship; the basionym does not -> basionym sorts
-  // first, then by name.
+  // Basionym (authorship without a leading parenthesis) sorts before recombinations (which carry a
+  // parenthetical basionym author), then alphabetically by name.
   private static java.util.Comparator<SynonymEntry> basionymFirst() {
-    return java.util.Comparator.comparing((SynonymEntry e) -> e.scientificName() == null ? "" : e.scientificName());
+    return java.util.Comparator
+        .comparingInt((SynonymEntry e) -> isRecombination(e) ? 1 : 0)
+        .thenComparing(e -> e.scientificName() == null ? "" : e.scientificName());
+  }
+
+  private static boolean isRecombination(SynonymEntry e) {
+    return e.authorship() != null && e.authorship().stripLeading().startsWith("(");
   }
 
   private List<NameUsage> loadSynonyms(int projectId, int acceptedId) {
