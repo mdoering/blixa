@@ -1,4 +1,0 @@
-ALTER TABLE type_material ADD COLUMN latitude  DOUBLE PRECISION;
-ALTER TABLE type_material ADD COLUMN longitude DOUBLE PRECISION;
-
-ALTER TABLE project ADD COLUMN gbif_occurrence_layer BOOLEAN NOT NULL DEFAULT true;
