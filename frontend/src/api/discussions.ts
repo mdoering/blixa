@@ -156,6 +156,24 @@ export function listUsageDiscussions(pid: number, usageId: number): Promise<Disc
   return api<Discussion[]>(`/api/projects/${pid}/usages/${usageId}/discussions`);
 }
 
+// -- External-submission API token (editor-only) -------------------------------------------------
+
+export interface DiscussionToken {
+  token: string | null;
+}
+
+export function getDiscussionToken(pid: number): Promise<DiscussionToken> {
+  return api<DiscussionToken>(`/api/projects/${pid}/discussion-token`);
+}
+
+export function generateDiscussionToken(pid: number): Promise<DiscussionToken> {
+  return api<DiscussionToken>(`/api/projects/${pid}/discussion-token`, { method: 'POST' });
+}
+
+export function revokeDiscussionToken(pid: number): Promise<void> {
+  return api<void>(`/api/projects/${pid}/discussion-token`, { method: 'DELETE' });
+}
+
 // -- Public (unauthenticated) reads of PUBLIC discussions ----------------------------------------
 
 export function getPublicDiscussion(pid: number, id: number): Promise<Discussion> {

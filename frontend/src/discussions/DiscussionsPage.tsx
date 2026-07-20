@@ -1,6 +1,6 @@
-import { Badge, Box, Button, Group, Pagination, Select, Table, Text, TextInput, Title } from '@mantine/core';
+import { ActionIcon, Badge, Box, Button, Group, Pagination, Select, Table, Text, TextInput, Title } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
-import { IconPlus, IconSearch } from '@tabler/icons-react';
+import { IconPlus, IconSearch, IconSettings } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { useMe } from '../auth/useMe';
 import { listDiscussions, type Discussion, type DiscussionStatus } from '../api/discussions';
 import UserAvatar from '../components/UserAvatar';
 import DiscussionForm from './DiscussionForm';
+import DiscussionSettingsModal from './DiscussionSettingsModal';
 
 const PAGE = 25;
 const STATUS_COLOR: Record<DiscussionStatus, string> = {
@@ -39,6 +40,7 @@ export default function DiscussionsPage() {
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(0);
   const [form, setForm] = useState<{ discussion: Discussion | null } | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => setPage(0), [debouncedQ, statusFilter, authorFilter, sort, order]);
 
@@ -68,10 +70,24 @@ export default function DiscussionsPage() {
         <Title order={3} m={0}>
           Discussions
         </Title>
-        <Button leftSection={<IconPlus size={14} />} onClick={() => setForm({ discussion: null })}>
-          New discussion
-        </Button>
+        <Group gap="xs">
+          {isEditor && (
+            <ActionIcon
+              variant="default"
+              size="lg"
+              aria-label="Discussion settings"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <IconSettings size={16} />
+            </ActionIcon>
+          )}
+          <Button leftSection={<IconPlus size={14} />} onClick={() => setForm({ discussion: null })}>
+            New discussion
+          </Button>
+        </Group>
       </Group>
+
+      <DiscussionSettingsModal pid={pid} opened={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <Group mb="md">
         <TextInput

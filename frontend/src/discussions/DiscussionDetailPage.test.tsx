@@ -79,6 +79,26 @@ test('a public discussion shows the Public badge and a public-page link', async 
   expect(link).toHaveAttribute('href', '/p/3/discussions/1');
 });
 
+test('a REVIEW discussion can be accepted', async () => {
+  let statusBody: unknown = null;
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    http.get('/api/projects/3/discussions/1', () =>
+      HttpResponse.json({ ...discussion, status: 'REVIEW' }),
+    ),
+    http.get('/api/projects/3/discussions/1/comments', () => HttpResponse.json([])),
+    http.post('/api/projects/3/discussions/1/status', async ({ request }) => {
+      statusBody = await request.json();
+      return HttpResponse.json({ ...discussion, status: 'OPEN' });
+    }),
+  );
+  renderDetail();
+
+  await screen.findByRole('heading', { name: 'Placement of cats' });
+  await userEvent.click(screen.getByRole('button', { name: 'Accept' }));
+  await waitFor(() => expect(statusBody).toEqual({ status: 'OPEN' }));
+});
+
 test('posting a comment sends the body', async () => {
   let posted: unknown = null;
   server.use(

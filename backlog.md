@@ -27,8 +27,9 @@ renamed to avoid collision with the validation *Issues*, and because the shape i
 - [x] **Phase 3 — public visibility + public URL route** *(shipped)*: editor toggles INTERNAL/PUBLIC;
   unauthenticated `/api/public/projects/{pid}/discussions[/{id}[/comments]]` (INTERNAL → 404); public
   read-only page at `/p/:pid/discussions/:id` (name mentions render as plain text there).
-- [ ] **Phase 4 — external API + per-project token**: submissions arrive `state=review`; editors accept → `open`
-  (turns COL user comments into discussions).
+- [x] **Phase 4 — external API + per-project token** *(shipped)*: editor-managed API token (settings
+  modal); token-gated `POST /api/public/projects/{pid}/discussions` (X-Api-Token) creates a `REVIEW`
+  submission; editors Accept → `OPEN` / Reject on the detail page (turns COL user comments into discussions).
 - [ ] **Phase 5 — follow (heart) + email notifications** (needs SMTP config).
 - [ ] **Phase 6 — link (closed) discussions to changes & work locks.**
 - [x] **Mention autocomplete** *(shipped — `MentionTextarea`)*: in the discussion/comment composer,

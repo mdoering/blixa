@@ -11,6 +11,7 @@ import {
   createComment,
   getDiscussion,
   listComments,
+  setDiscussionStatus,
   type Comment,
   type DiscussionStatus,
 } from '../api/discussions';
@@ -60,6 +61,14 @@ export default function DiscussionDetailPage() {
       await qc.invalidateQueries({ queryKey: ['comments', pid, did] });
     },
     onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Could not comment') }),
+  });
+
+  const changeStatus = useMutation({
+    mutationFn: (s: DiscussionStatus) => setDiscussionStatus(pid, did, s),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['discussion', pid, did] });
+    },
+    onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Could not update') }),
   });
 
   // deleted (or not found) -> back to the list
@@ -121,6 +130,30 @@ export default function DiscussionDetailPage() {
           {new Date(discussion.createdAt).toLocaleString()}
         </Text>
       </Group>
+
+      {discussion.status === 'REVIEW' && canManageDiscussion && (
+        <Group gap="xs" mb="md">
+          <Text size="sm" c="dimmed">
+            Submitted for review.
+          </Text>
+          <Button
+            size="xs"
+            color="green"
+            onClick={() => changeStatus.mutate('OPEN')}
+            loading={changeStatus.isPending}
+          >
+            Accept
+          </Button>
+          <Button
+            size="xs"
+            variant="default"
+            onClick={() => changeStatus.mutate('REJECTED')}
+            loading={changeStatus.isPending}
+          >
+            Reject
+          </Button>
+        </Group>
+      )}
 
       <Paper withBorder p="md" radius="md" mb="lg">
         {discussion.body ? (
