@@ -72,16 +72,19 @@ class HomotypyApiIT extends AbstractPostgresIT {
     members.upsert(new ProjectMember((int) pid, viewer.getId(), Role.VIEWER.dbValue()));
 
     // Poa annua L. (accepted, basionym) + Ochlopoa annua (L.) H.Scholz (recombination synonym)
-    // + Aira pumila Pursh (heterotypic synonym, unrelated epithet/authorship).
+    // + Aira pumila (Ronniger) Pursh (heterotypic synonym, recombination of Zophora pumila below).
+    // Aira/Zophora is chosen deliberately so the basionym's scientificName ("Zophora pumila")
+    // sorts alphabetically AFTER its recombination's ("Aira pumila"): this makes the
+    // basionym-first ordering assertion below discriminate from a pure-alphabetical sort.
     long acceptedId = createUsage(pid, "Poa annua", "L.", "species", "accepted");
     long recombId = createUsage(pid, "Ochlopoa annua", "(L.) H.Scholz", "species", "synonym");
-    long airaId = createUsage(pid, "Aira pumila", "Pursh", "species", "synonym");
-    // Catabrosa pumila (Pursh) Roem. & Schult. is a recombination of Aira pumila: a second member
-    // of the same heterotypic group, added below via an explicit basionym relation.
-    long catabrosaId = createUsage(pid, "Catabrosa pumila", "(Pursh) Roem. & Schult.", "species", "synonym");
+    long airaId = createUsage(pid, "Aira pumila", "(Ronniger) Pursh", "species", "synonym");
+    // Zophora pumila Ronniger is the basionym of Aira pumila: a second member of the same
+    // heterotypic group, added below via an explicit basionym relation.
+    long zophoraId = createUsage(pid, "Zophora pumila", "Ronniger", "species", "synonym");
     link(pid, recombId, acceptedId);
     link(pid, airaId, acceptedId);
-    link(pid, catabrosaId, acceptedId);
+    link(pid, zophoraId, acceptedId);
 
     // 1. detect returns a group anchored on the accepted with a basionym relation, alreadyExists=false.
     String detectBody = mvc.perform(
@@ -119,17 +122,19 @@ class HomotypyApiIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.homotypic.length()").value(1))
         .andExpect(jsonPath("$.homotypic[?(@.id == " + recombId + ")]").exists());
 
-    // 2b. link Catabrosa pumila (recombination of Aira pumila) into the same heterotypic group via
-    // an explicit basionym relation: Catabrosa -> Aira.
-    String basionymBody = "{\"relations\":[{\"usageId\":" + catabrosaId + ",\"relatedUsageId\":" + airaId
+    // 2b. link Aira pumila (recombination of Zophora pumila) into the same heterotypic group via
+    // an explicit basionym relation: Aira -> Zophora.
+    String basionymBody = "{\"relations\":[{\"usageId\":" + airaId + ",\"relatedUsageId\":" + zophoraId
         + ",\"type\":\"basionym\"}]}";
     mvc.perform(post("/api/projects/" + pid + "/usages/" + acceptedId + "/homotypic/apply").with(user("homoOwner"))
             .with(csrf())
             .contentType(MediaType.APPLICATION_JSON).content(basionymBody))
         .andExpect(status().isOk());
 
-    // 3. synonymy returns the recomb under `homotypic` and Aira pumila + Catabrosa pumila together
-    // under `heterotypicGroups`, basionym (Aira, no parenthetical authorship) sorting first.
+    // 3. synonymy returns the recomb under `homotypic` and Zophora pumila + Aira pumila together
+    // under `heterotypicGroups`, basionym (Zophora, no parenthetical authorship) sorting first
+    // even though "Zophora" sorts alphabetically AFTER "Aira" — this is what distinguishes the
+    // basionym-first comparator from a pure-alphabetical one.
     String synonymyBody = mvc.perform(
             get("/api/projects/" + pid + "/usages/" + acceptedId + "/synonymy").with(user("homoOwner")))
         .andExpect(status().isOk())
@@ -137,14 +142,14 @@ class HomotypyApiIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.homotypic[0].id").value((int) recombId))
         .andExpect(jsonPath("$.heterotypicGroups.length()").value(1))
         .andExpect(jsonPath("$.heterotypicGroups[0][?(@.id == " + airaId + ")]").exists())
-        .andExpect(jsonPath("$.heterotypicGroups[0][?(@.id == " + catabrosaId + ")]").exists())
+        .andExpect(jsonPath("$.heterotypicGroups[0][?(@.id == " + zophoraId + ")]").exists())
         .andExpect(jsonPath("$.misapplied.length()").value(0))
         .andReturn().getResponse().getContentAsString();
 
     var heterotypicGroup0 = json.readTree(synonymyBody).get("heterotypicGroups").get(0);
     assertThat(heterotypicGroup0).hasSize(2);
-    assertThat(heterotypicGroup0.get(0).get("id").asLong()).isEqualTo(airaId);
-    assertThat(heterotypicGroup0.get(1).get("id").asLong()).isEqualTo(catabrosaId);
+    assertThat(heterotypicGroup0.get(0).get("id").asLong()).isEqualTo(zophoraId);
+    assertThat(heterotypicGroup0.get(1).get("id").asLong()).isEqualTo(airaId);
 
     // authz: viewer may GET synonymy (200) but POST apply is 403; non-member gets 404 everywhere.
     mvc.perform(get("/api/projects/" + pid + "/usages/" + acceptedId + "/synonymy").with(user("homoViewer")))
