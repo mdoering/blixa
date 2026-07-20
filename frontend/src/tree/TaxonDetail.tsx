@@ -43,6 +43,7 @@ import {
 import { useUsageLock } from '../lock/useUsageLock';
 import IssueList from './IssueList';
 import SynonymList from './SynonymList';
+import Synonymy from './Synonymy';
 
 const STATUS_OPTIONS = [
   { value: 'ACCEPTED', label: 'Accepted' },
@@ -541,7 +542,11 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
         )}
 
         <Tabs.Panel value="synonyms" pt="md">
-          <SynonymList pid={pid} usageId={usageId} status={usage.status} canEdit={canEdit} />
+          {(usage.status ?? '').toUpperCase() === 'ACCEPTED' ? (
+            <Synonymy pid={pid} usageId={usageId} canEdit={canEdit} />
+          ) : (
+            <SynonymList pid={pid} usageId={usageId} status={usage.status} canEdit={canEdit} />
+          )}
         </Tabs.Panel>
 
         <Tabs.Panel value="issues" pt="md">

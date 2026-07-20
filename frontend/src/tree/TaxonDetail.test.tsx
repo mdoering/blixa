@@ -290,13 +290,19 @@ test('a viewer role sees a disabled Save button', async () => {
 });
 
 test('an accepted usage with two synonyms renders both', async () => {
+  // Accepted usages render the nested Synonymy view (off GET .../synonymy), not the flat
+  // SynonymList (which stays for synonym/misapplied usages) -- see TaxonDetail's synonyms panel.
   mockCommon();
   server.use(
-    http.get('/api/projects/4/usages/10/synonyms', () =>
-      HttpResponse.json([
-        baseUsage({ id: 11, scientificName: 'Felis leo', authorship: 'Linnaeus, 1758' }),
-        baseUsage({ id: 12, scientificName: 'Panthera leo persica', authorship: null }),
-      ]),
+    http.get('/api/projects/4/usages/10/synonymy', () =>
+      HttpResponse.json({
+        homotypic: [
+          { id: 11, scientificName: 'Felis leo', authorship: 'Linnaeus, 1758', rank: 'species', status: 'SYNONYM', formattedName: null },
+          { id: 12, scientificName: 'Panthera leo persica', authorship: null, rank: 'species', status: 'SYNONYM', formattedName: null },
+        ],
+        heterotypicGroups: [],
+        misapplied: [],
+      }),
     ),
   );
   renderWithProviders(<TaxonDetail pid={4} usageId={10} />);

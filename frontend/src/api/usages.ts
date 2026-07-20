@@ -163,3 +163,50 @@ export function addWebReference(pid: number, id: number, url: string): Promise<N
     json: { url },
   });
 }
+
+// --- Homotypic grouping (see backend name/homotypy) ---
+export interface SynEntry {
+  id: number;
+  scientificName: string | null;
+  authorship: string | null;
+  rank: string | null;
+  status: string | null;
+  formattedName: string | null;
+}
+export interface Synonymy {
+  homotypic: SynEntry[];
+  heterotypicGroups: SynEntry[][];
+  misapplied: SynEntry[];
+}
+export interface ProposedRelation {
+  usageId: number;
+  relatedUsageId: number;
+  type: string;
+  alreadyExists: boolean;
+}
+export interface ProposedGroup {
+  basionymUsageId: number | null;
+  memberUsageIds: number[];
+  relations: ProposedRelation[];
+}
+export interface HomotypyProposal {
+  groups: ProposedGroup[];
+}
+export interface ApplyRelation {
+  usageId: number;
+  relatedUsageId: number;
+  type: string;
+}
+
+export function getSynonymy(pid: number, id: number): Promise<Synonymy> {
+  return api<Synonymy>(`/api/projects/${pid}/usages/${id}/synonymy`);
+}
+export function detectHomotypic(pid: number, id: number): Promise<HomotypyProposal> {
+  return api<HomotypyProposal>(`/api/projects/${pid}/usages/${id}/homotypic/detect`);
+}
+export function applyHomotypic(pid: number, id: number, relations: ApplyRelation[]): Promise<Synonymy> {
+  return api<Synonymy>(`/api/projects/${pid}/usages/${id}/homotypic/apply`, {
+    method: 'POST',
+    json: { relations },
+  });
+}
