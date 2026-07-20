@@ -100,9 +100,10 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
   taxon, auto-detect basionym-anchored homotypic groups among its synonyms (BasionymSorter-lite over
   parsed authorship), confirm, and persist as `name_relation` rows; the synonymy renders nested (≡/=)
   like the COL portal. `name_relation` is now the single source of truth for basionym (the
-  `basionym_id` column was dropped; import/export go through the relation). *Side 2 (pending):*
-  cross-dataset consolidation of accepted names over the focal taxon's subtree (a family) — pick the
-  single survivor per homotypic group, demote the rest (see CLB `HomotypicConsolidator`).
+  `basionym_id` column was dropped; import/export go through the relation). *Side 2 shipped:* scan a focal taxon's accepted subtree for homotypic clusters resolving to >1
+  accepted name (incl. via synonyms), pick a survivor (most descendants suggested), and demote the
+  others to homotypic synonyms; pro-parte / dual-status flagged. Consolidation page + `GET/POST
+  …/usages/{id}/homotypic/{conflicts,consolidate}`.
 - **GBIF occurrence import into TypeMaterial** — by `occurrenceId` (the field is already carried).
 - **Distribution map preview** — via portal-components, using the gazetteer `areaId`.
 

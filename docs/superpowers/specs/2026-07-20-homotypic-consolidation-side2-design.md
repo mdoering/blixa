@@ -1,6 +1,7 @@
 # Homotypic grouping — Side 2: cross-dataset consolidation of accepted names
 
 *Design spec — 2026-07-20*
+**Status:** Implemented 2026-07-20 (plan: docs/superpowers/plans/2026-07-20-homotypic-consolidation-side2.md).
 
 ## Context
 
