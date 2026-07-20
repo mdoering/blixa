@@ -69,8 +69,8 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
   managed in ProjectMetadataPage → Settings; favorite chips in the compare modal's "by dataset" mode).
 - Note: the all-datasets search JSON parsing needs a live-CLB check (the by-dataset path reuses proven endpoints).
 
-### 4. Delete options
-When deleting a focal taxon, ask what to remove: the focal taxon **only**, the taxon **and its synonyms**, or the **entire subtree**.
+### 4. Delete options  *(shipped)*
+- [x] Deleting a taxon asks what to remove: **focal only**, **focal + synonyms**, or **entire subtree** (DeleteNameModal + `DELETE /usages/{id}?mode=&reparentTo=`); non-subtree modes reparent children to the grandparent (default) or a searched-for new parent.
 
 ### 5. Global admin & user lifecycle
 - A global **admin** role (distinct from per-project owner/editor/viewer).
