@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { deleteProject, getProject, setPublic, updateMetadata } from '../api/projects';
+import FavoriteClbDatasetsEditor, { type FavoriteRow } from './FavoriteClbDatasetsEditor';
 import { getIdScopes } from '../api/coldp';
 import { getColMatchRun, getLatestColMatch, startColMatch } from '../api/col';
 import { exportFileUrl, getExportRun, getLatestExport, startExport } from '../api/export';
@@ -91,6 +92,7 @@ export default function ProjectMetadataPage() {
       taxonomicScope: undefined,
       gbifOccurrenceLayer: true,
       identifierScopes: [],
+      favoriteClbDatasets: [] as FavoriteRow[],
       cslStyle: 'apa',
     },
     validate: {
@@ -120,6 +122,10 @@ export default function ProjectMetadataPage() {
       values.identifierScopes = (data.identifierScopes ?? []).map((s) => ({
         scope: s.scope,
         datasetKey: s.datasetKey ?? '',
+      }));
+      values.favoriteClbDatasets = (data.favoriteClbDatasets ?? []).map((f) => ({
+        key: f.key,
+        title: f.title,
       }));
       // cslStyle defaults to 'apa' (mirrors the backend's default) rather than falling through to
       // the `?? undefined` mapping above, which would leave the Select blank on legacy projects.
@@ -358,7 +364,8 @@ export default function ProjectMetadataPage() {
           const identifierScopes = (v.identifierScopes ?? [])
             .map((s) => ({ scope: s.scope.trim(), datasetKey: (s.datasetKey ?? '').trim() || undefined }))
             .filter((s) => s.scope !== '');
-          mutation.mutate({ ...v, identifierScopes });
+          const favoriteClbDatasets = (v.favoriteClbDatasets ?? []).filter((f) => f.key.trim() !== '');
+          mutation.mutate({ ...v, identifierScopes, favoriteClbDatasets });
         })}
       >
         <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
@@ -546,6 +553,20 @@ export default function ProjectMetadataPage() {
               >
                 Add scope
               </Button>
+            </Stack>
+            <Stack gap="xs">
+              <Stack gap={2}>
+                <Text size="sm" fw={500}>
+                  Favorite CLB datasets
+                </Text>
+                <Text size="xs" c="dimmed">
+                  Starred datasets appear as quick picks in “Compare with CLB”.
+                </Text>
+              </Stack>
+              <FavoriteClbDatasetsEditor
+                value={form.values.favoriteClbDatasets ?? []}
+                onChange={(v) => form.setFieldValue('favoriteClbDatasets', v)}
+              />
             </Stack>
           </Stack>
         </fieldset>

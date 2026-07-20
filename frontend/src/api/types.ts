@@ -26,6 +26,7 @@ export interface Project {
   // scope carries an optional CLB dataset key -- a scope is matchable (eligible for "match all
   // identifiers") iff datasetKey is set.
   identifierScopes: IdentifierScope[] | null;
+  favoriteClbDatasets: FavoriteClbDataset[] | null;
   // Lower-case CSL style id (e.g. "apa", "chicago") used to render generated citations for this
   // project's references -- see CslFormatter.STYLE on the backend. Null on legacy/uninitialized
   // projects; the UI defaults to 'apa' when seeding the metadata form.
@@ -35,6 +36,13 @@ export interface Project {
 export interface IdentifierScope {
   scope: string;
   datasetKey?: string | null;
+}
+
+// A starred ChecklistBank dataset (project.favorite_clb_datasets) offered as a quick pick in the
+// compare-with-CLB flow.
+export interface FavoriteClbDataset {
+  key: string;
+  title: string | null;
 }
 
 // One entry from the backend's ColDP identifier-scope vocab (GET /api/coldp/id-scopes, see
@@ -84,6 +92,7 @@ export interface UpdateMetadataPayload {
   taxonomicScope?: string;
   gbifOccurrenceLayer?: boolean;
   identifierScopes?: IdentifierScope[];
+  favoriteClbDatasets?: FavoriteClbDataset[];
   cslStyle?: string;
 }
 

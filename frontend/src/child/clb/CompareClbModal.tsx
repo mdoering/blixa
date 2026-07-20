@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import { getSynonyms, getUsage } from '../../api/usages';
+import { getProject } from '../../api/projects';
 import { getPath } from '../../api/tree';
 import {
   compareClbTaxon,
@@ -62,6 +63,12 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
     queryFn: () => getSynonyms(pid, usageId),
     enabled: opened && isAccepted,
   });
+  const { data: project } = useQuery({
+    queryKey: ['project', pid],
+    queryFn: () => getProject(pid),
+    enabled: opened,
+  });
+  const favorites = project?.favoriteClbDatasets ?? [];
 
   const focalName = usage?.scientificName ?? '';
 
@@ -144,6 +151,26 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
 
             {mode === 'dataset' && !datasetKey && (
               <>
+                {favorites.length > 0 && (
+                  <Group gap="xs">
+                    <Text size="sm" c="dimmed">
+                      Favorites:
+                    </Text>
+                    {favorites.map((f) => (
+                      <Button
+                        key={f.key}
+                        size="xs"
+                        variant="light"
+                        onClick={() => {
+                          setDatasetKey(f.key);
+                          setDatasetLabel(f.title ?? f.key);
+                        }}
+                      >
+                        {f.title ?? f.key}
+                      </Button>
+                    ))}
+                  </Group>
+                )}
                 <TextInput
                   aria-label="Search datasets"
                   placeholder="Search CLB datasets…"

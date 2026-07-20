@@ -60,13 +60,13 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
   - The **nomenclatural** reference (for the exact combination) goes on the **name**.
   - The **basionym**'s reference goes on the **basionym**, not the current combination.
 
-### 3. Compare focal taxon with CLB  *(core shipped; spec `docs/superpowers/specs/2026-07-20-clb-comparison-design.md`)*
+### 3. Compare focal taxon with CLB  *(shipped; spec `docs/superpowers/specs/2026-07-20-clb-comparison-design.md`)*
 - [x] Compare the focal taxon against one in ChecklistBank — side-by-side (name/authorship/rank/status
   + classification + synonyms, differences highlighted): `CompareClbModal` + `ClbComparisonView`,
   `GET /api/clb/{key}/compare/{id}`.
 - [x] Pick a **dataset**, or **search the name across all datasets** (`GET /api/clb/usages`).
-- [ ] Keep a list of **favorite CLB datasets** in project settings *(not yet built — a project-settings
-  JSONB mirror of identifierScopes + favorite chips in the compare modal)*.
+- [x] Keep a list of **favorite CLB datasets** in project settings (`project.favorite_clb_datasets` JSONB;
+  managed in ProjectMetadataPage → Settings; favorite chips in the compare modal's "by dataset" mode).
 - Note: the all-datasets search JSON parsing needs a live-CLB check (the by-dataset path reuses proven endpoints).
 
 ### 4. Delete options

@@ -29,6 +29,9 @@ const clbComparison = {
 
 test('picks a global CLB hit and shows the side-by-side comparison', async () => {
   server.use(
+    http.get('/api/projects/3', () =>
+      HttpResponse.json({ id: 3, title: 'P', role: 'owner', favoriteClbDatasets: [] }),
+    ),
     http.get('/api/projects/3/usages/5', () => HttpResponse.json(usage)),
     http.get('/api/projects/3/tree/path/5', () =>
       HttpResponse.json([
