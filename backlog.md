@@ -17,14 +17,19 @@ mostly self-contained follow-ups.
 ### 1. Discussions  *(in progress — see `docs/superpowers/specs/2026-07-20-discussions-design.md`)*
 A forum-style, per-project discussion tracker keyed on **ORCIDs** (formerly "issue tracker" —
 renamed to avoid collision with the validation *Issues*, and because the shape is a conversation thread).
-- Issues are **project-internal or public**; public ones render on a **public URL route**.
-- **Tabular** search within a project: sort by created & last-modified, **full-text search**, filter by owning user.
-- **Follow** an issue (heart) → change notifications by **email**.
-- **States**: for-review → open → rejected / resolved.
-- **External API** to create issues (arrive as `state=review`; editors accept → `open`). Per-project API auth token. Lets us turn COL user comments into issues.
-- **Comments**: markdown with inline links — `@orcid`, `#Genus_species`, `#nameID` (int) — rendered as the user's name / full-name label. Author-editable.
-- **Reverse-link** from a name to its linked issues.
-- **Link** (closed) issues to changes and work locks.
+
+- [x] **Phase 1 — foundation** *(shipped: V27 table, `discussion` API + `DiscussionsPage`)*: per-project
+  discussions with **full-text search**, status + author filters, created/modified **sort**, paged;
+  **states** for-review → open → rejected/resolved; create (any member), edit/status/delete (author or editor).
+- [ ] **Phase 2 — comments + inline links**: markdown comments (author-editable) with `@orcid`,
+  `#Genus_species`, `#nameID` rendered as labels; reverse-link from a name to its discussions.
+- [ ] **Phase 3 — public visibility + public URL route**: editor marks a discussion PUBLIC; unauthenticated read.
+- [ ] **Phase 4 — external API + per-project token**: submissions arrive `state=review`; editors accept → `open`
+  (turns COL user comments into discussions).
+- [ ] **Phase 5 — follow (heart) + email notifications** (needs SMTP config).
+- [ ] **Phase 6 — link (closed) discussions to changes & work locks.**
+
+Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 
 ### 2. AI-assisted curation
 - Ask AI to gather info for the **focal taxon**, its **children**, or run a **review**.
