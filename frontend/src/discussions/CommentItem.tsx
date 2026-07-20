@@ -1,4 +1,4 @@
-import { ActionIcon, Box, Button, Group, Menu, Paper, Stack, Text, Textarea } from '@mantine/core';
+import { ActionIcon, Box, Button, Group, Menu, Paper, Stack, Text } from '@mantine/core';
 import { IconDots, IconPencil, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,6 +8,7 @@ import { messageFor } from '../api/client';
 import { deleteComment, updateComment, type Comment } from '../api/discussions';
 import UserAvatar from '../components/UserAvatar';
 import MentionMarkdown from './MentionMarkdown';
+import MentionTextarea from './MentionTextarea';
 
 interface Props {
   pid: number;
@@ -95,7 +96,7 @@ export default function CommentItem({ pid, comment, canManage }: Props) {
       </Group>
       {editing ? (
         <Stack gap="xs">
-          <Textarea autosize minRows={2} value={body} onChange={(e) => setBody(e.currentTarget.value)} />
+          <MentionTextarea pid={pid} autosize minRows={2} value={body} onChange={setBody} />
           <Group justify="flex-end" gap="xs">
             <Button variant="default" size="xs" onClick={() => setEditing(false)}>
               Cancel

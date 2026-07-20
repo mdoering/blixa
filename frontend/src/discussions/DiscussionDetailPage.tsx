@@ -1,4 +1,4 @@
-import { Anchor, Badge, Box, Button, Group, Paper, Stack, Text, Textarea, Title } from '@mantine/core';
+import { Anchor, Badge, Box, Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { IconArrowLeft, IconPencil } from '@tabler/icons-react';
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -16,6 +16,7 @@ import {
 } from '../api/discussions';
 import UserAvatar from '../components/UserAvatar';
 import MentionMarkdown from './MentionMarkdown';
+import MentionTextarea from './MentionTextarea';
 import CommentItem from './CommentItem';
 import DiscussionForm from './DiscussionForm';
 
@@ -146,13 +147,14 @@ export default function DiscussionDetailPage() {
       </Stack>
 
       <Paper withBorder p="sm" radius="md">
-        <Textarea
+        <MentionTextarea
+          pid={pid}
           aria-label="Add a comment"
-          placeholder="Add a comment…  (markdown; #nameID and @orcid supported)"
+          placeholder="Add a comment…  (markdown; #Name and @user autocomplete)"
           autosize
           minRows={2}
           value={newComment}
-          onChange={(e) => setNewComment(e.currentTarget.value)}
+          onChange={setNewComment}
         />
         <Group justify="flex-end" mt="xs">
           <Button size="xs" onClick={() => post.mutate()} loading={post.isPending} disabled={!newComment.trim()}>

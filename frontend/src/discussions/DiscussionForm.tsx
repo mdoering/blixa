@@ -1,4 +1,5 @@
-import { Button, Group, Modal, Select, Stack, Textarea, TextInput } from '@mantine/core';
+import { Button, Group, Modal, Select, Stack, TextInput } from '@mantine/core';
+import MentionTextarea from './MentionTextarea';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { useEffect, useState } from 'react';
@@ -118,13 +119,14 @@ export default function DiscussionForm({
           onChange={(e) => setTitle(e.currentTarget.value)}
           readOnly={readOnly}
         />
-        <Textarea
+        <MentionTextarea
+          pid={pid}
           label="Body"
-          description="Markdown supported"
+          description="Markdown supported — #Name and @user autocomplete"
           autosize
           minRows={4}
           value={body}
-          onChange={(e) => setBody(e.currentTarget.value)}
+          onChange={setBody}
           readOnly={readOnly}
         />
         {isEdit && (

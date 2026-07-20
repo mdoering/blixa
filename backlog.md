@@ -31,11 +31,11 @@ renamed to avoid collision with the validation *Issues*, and because the shape i
   (turns COL user comments into discussions).
 - [ ] **Phase 5 — follow (heart) + email notifications** (needs SMTP config).
 - [ ] **Phase 6 — link (closed) discussions to changes & work locks.**
-- [ ] **Mention autocomplete** (replaces fuzzy `#Genus_species`): in the discussion/comment composer,
-  typing `#` immediately followed by a **capital letter** and 3+ letters (`#Xyz…`) opens a **name
-  suggest/autocomplete**; selecting a name inserts `#<id>` (the stable usage id), never the typed
-  name string. Same idea for `@` → username autocomplete → inserts `@username`. Every mention stays
-  precise, so `#Genus_species` fuzzy resolution isn't needed.
+- [x] **Mention autocomplete** *(shipped — `MentionTextarea`)*: in the discussion/comment composer,
+  `#` + a **capital letter** + 3+ letters (`#Xyz…`) opens a **name autocomplete** (reuses usage
+  search) that inserts `#<id>` (the stable usage id), never the typed string; `@` + letters opens a
+  member-username autocomplete inserting `@username`. Every mention stays precise, so fuzzy
+  `#Genus_species` resolution isn't needed.
 
 **Discussions — user identity polish (after Phase 2):** *(all shipped)*
 - [x] **Avatars** — initials-based `UserAvatar` (ORCID exposes no photo) next to authors in the list,
