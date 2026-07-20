@@ -67,4 +67,13 @@ describe('HomotypicConflictsPage', () => {
       }),
     );
   });
+
+  it('shows the empty state when the scan finds no conflicts', async () => {
+    server.use(
+      http.get('/api/projects/7/usages/100/homotypic/conflicts', () => HttpResponse.json([])),
+      http.get('/api/projects/7', () => HttpResponse.json({ id: 7, title: 'P', role: 'owner' })),
+    );
+    renderPage();
+    expect(await screen.findByText('No homotypic conflicts found in this subtree.')).toBeInTheDocument();
+  });
 });

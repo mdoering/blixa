@@ -61,7 +61,7 @@ function ConflictCard({
         <Text size="xs" c="dimmed">Members</Text>
         {cluster.members.map((m) => (
           <Text key={m.id} size="sm">
-            <span dangerouslySetInnerHTML={{ __html: m.formattedName ?? '' }} />{' '}
+            <span>{m.formattedName}</span>{' '}
             <Text span c="dimmed" size="xs">
               {m.status}
               {m.proParte ? ' · pro parte' : ''}
@@ -78,7 +78,7 @@ function ConflictCard({
                 value={String(a.id)}
                 label={
                   <span>
-                    <span dangerouslySetInnerHTML={{ __html: a.formattedName ?? '' }} />{' '}
+                    <span>{a.formattedName}</span>{' '}
                     <Text span c="dimmed" size="xs">({a.descendantCount} descendants)</Text>
                   </span>
                 }
