@@ -119,11 +119,32 @@ The backend test suite spins up its own throwaway PostgreSQL via Testcontainers 
 
 ## Reset the database
 
+**Docker (local):**
+
 ```bash
 docker compose down -v      # drops the data volume
 docker compose up -d        # fresh database
 # restart the backend — Flyway re-migrates from scratch
 ```
+
+**External PostgreSQL** (a deploy server, or any non-Docker instance) — drop and recreate
+the database, then let the backend rebuild it on startup:
+
+```bash
+# stop the backend first so there are no active connections, then:
+sudo -u postgres psql <<'SQL'
+DROP DATABASE IF EXISTS coldp_editor;
+CREATE DATABASE coldp_editor OWNER coldp_editor;
+SQL
+# start the backend — Flyway builds the fresh schema from V1__initial_schema.sql
+```
+
+> **After a migration squash you *must* recreate the database, not migrate in place.** When
+> the incremental migrations are collapsed into a new `V1__initial_schema.sql` baseline, the
+> `flyway_schema_history` recorded in an existing database no longer matches the migrations on
+> disk (old versions are "applied but missing", `V1`'s checksum changed), so Flyway refuses to
+> start. Dropping and recreating the database as above clears that history and applies the
+> single baseline cleanly.
 
 ---
 
@@ -141,6 +162,53 @@ Two supported ways to run the whole stack — both documented in [`deploy/`](dep
 - **Server deployment** (production-style, e.g. GBIF dev) — three separate components: native **PostgreSQL 17**, the **backend jar** under systemd, and the **Vite bundle served by Apache2**, which reverse-proxies `/api` to the backend (same-origin, so ORCID works). Deployed login is **ORCID**; the `dev` profile is not used. Ready-to-adapt templates (DB init, env file, systemd unit, Apache vhost) + step-by-step instructions are in [`deploy/`](deploy/README.md). Domains: `blixa.dev.catalogueoflife.org` (dev) / `blixa.catalogueoflife.org` (prod).
 
 The backend is a plain Spring Boot jar configured entirely through environment variables (see [Configuration](#configuration)), so any container or VM host works — the two setups above are just the supported defaults. `backend/Dockerfile` and `frontend/Dockerfile` build the two images.
+
+### External PostgreSQL 17 (non-Docker)
+
+For a server deployment the backend talks to a native PostgreSQL 17 instance. It creates and
+migrates its own schema on boot (Flyway) — there is **no manual schema step** and no ORM
+`ddl-auto`.
+
+**1. Install PostgreSQL 17** (Debian/Ubuntu, via the PGDG apt repo — `pg_trgm` ships with the
+standard server packages):
+
+```bash
+sudo apt install -y curl ca-certificates
+sudo install -d /usr/share/postgresql-common/pgdg
+sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+  https://www.postgresql.org/media/keys/ACCC4CF8.asc
+echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+  | sudo tee /etc/apt/sources.list.d/pgdg.list
+sudo apt update && sudo apt install -y postgresql-17
+```
+
+**2. Create the role and database.** Make the app user the database **owner** — `pg_trgm` is a
+*trusted* extension, so a database owner (no superuser needed) can let the migration create it,
+along with every table and index:
+
+```bash
+sudo -u postgres psql <<'SQL'
+CREATE ROLE coldp_editor LOGIN PASSWORD 'CHANGE_ME';
+CREATE DATABASE coldp_editor OWNER coldp_editor;
+SQL
+```
+
+To reach it from another host, also open `listen_addresses` in `postgresql.conf` and add a
+`pg_hba.conf` line for the backend host (e.g. `host coldp_editor coldp_editor <backend-ip>/32 scram-sha-256`), then `sudo systemctl restart postgresql`. For a same-host backend the default
+local socket / `127.0.0.1` is enough.
+
+**3. Point the backend at it** — set the three `DB_*` variables (in the systemd unit's env file;
+templates in [`deploy/`](deploy/README.md)):
+
+```bash
+DB_URL=jdbc:postgresql://localhost:5432/coldp_editor
+DB_USER=coldp_editor
+DB_PASSWORD=CHANGE_ME
+```
+
+On the next backend start, Flyway runs `V1__initial_schema.sql` against the empty database
+(creating `pg_trgm` and all 32 tables). To reset later, see [Reset the database](#reset-the-database).
 
 ---
 
