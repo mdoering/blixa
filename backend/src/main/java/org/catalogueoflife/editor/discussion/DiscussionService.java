@@ -87,6 +87,25 @@ public class DiscussionService {
     return requireInProject(projectId, d.getId());
   }
 
+  // Token-gated external submission (no session user): arrives as REVIEW/API for editor triage.
+  // Access control is the API token (see DiscussionApiTokenService), so there is no role check here.
+  @Transactional
+  public Discussion createExternal(int projectId, String title, String body, String authorOrcid) {
+    Discussion d = new Discussion();
+    d.setProjectId(projectId);
+    d.setId(idSeq.allocate(projectId, ENTITY));
+    d.setTitle(title);
+    d.setBody(body);
+    d.setStatus(DiscussionStatus.REVIEW.name());
+    d.setVisibility(DiscussionVisibility.INTERNAL.name());
+    d.setAuthorId(null);
+    d.setAuthorOrcid(authorOrcid);
+    d.setCreatedVia("API");
+    discussions.insert(d);
+    links.reconcile(projectId, d.getId());
+    return requireInProject(projectId, d.getId());
+  }
+
   @Transactional
   public Discussion update(int userId, int projectId, int id, UpdateDiscussionRequest req) {
     String role = projects.requireRole(userId, projectId);
