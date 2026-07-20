@@ -216,7 +216,6 @@ export interface AcceptedCandidate {
   id: number;
   formattedName: string | null;
   descendantCount: number;
-  version: number;
 }
 export interface ConflictMember {
   id: number;
@@ -225,6 +224,7 @@ export interface ConflictMember {
   acceptedTargetIds: number[];
   proParte: boolean;
   dualStatus: boolean;
+  version: number;
 }
 export interface ConflictCluster {
   accepted: AcceptedCandidate[];
@@ -244,7 +244,7 @@ export function getHomotypicConflicts(pid: number, rootId: number): Promise<Conf
 export function consolidateHomotypic(
   pid: number,
   survivorId: number,
-  body: { losers: LoserRef[]; relations: ApplyRelation[] },
+  body: { losers: LoserRef[]; repoint: number[]; relations: ApplyRelation[] },
 ): Promise<Synonymy> {
   return api<Synonymy>(`/api/projects/${pid}/usages/${survivorId}/homotypic/consolidate`, {
     method: 'POST',

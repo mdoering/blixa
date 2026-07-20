@@ -31,18 +31,27 @@ function ConflictCard({
 
   const consolidate = useMutation({
     mutationFn: () => {
-      const losers = cluster.accepted
-        .filter((a) => a.id !== survivor)
-        .map((a) => ({ acceptedId: a.id, version: a.version }));
+      const acceptedMembers = cluster.members.filter((m) => m.status === 'ACCEPTED');
+      const losers = acceptedMembers
+        .filter((m) => m.id !== survivor)
+        .map((m) => ({ acceptedId: m.id, version: m.version }));
+      const repoint = cluster.members
+        .filter(
+          (m) =>
+            m.status === 'SYNONYM' &&
+            !(m.acceptedTargetIds.length === 1 && m.acceptedTargetIds[0] === survivor),
+        )
+        .map((m) => m.id);
       const relations = cluster.relations.map((r) => ({
         usageId: r.usageId,
         relatedUsageId: r.relatedUsageId,
         type: r.type,
       }));
-      return consolidateHomotypic(pid, survivor, { losers, relations });
+      return consolidateHomotypic(pid, survivor, { losers, repoint, relations });
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['tree', pid] });
+      await qc.invalidateQueries({ queryKey: ['synonymy', pid, survivor] });
       notifications.show({ message: 'Consolidated' });
       onDone();
     },
@@ -103,7 +112,7 @@ export default function HomotypicConflictsPage() {
   const { projectId, rootId } = useParams();
   const pid = Number(projectId);
   const root = Number(rootId);
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['homotypicConflicts', pid, root],
     queryFn: () => getHomotypicConflicts(pid, root),
   });
@@ -111,6 +120,7 @@ export default function HomotypicConflictsPage() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   if (isLoading) return <Loader />;
+  if (isError) return <Text c="red">Could not load conflicts.</Text>;
   const clusters = (data ?? []).filter((c) => !dismissed.has(clusterKey(c)));
 
   return (
