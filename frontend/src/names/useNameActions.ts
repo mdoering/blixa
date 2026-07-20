@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
 import { ApiError, messageFor } from '../api/client';
-import { deleteUsage, getUsage, updateUsage } from '../api/usages';
+import { deleteUsage, getUsage, updateUsage, type DeleteMode } from '../api/usages';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import type { CreateNameAnchor, CreateNameMode } from './CreateNameModal';
 
@@ -104,9 +104,10 @@ export function useNameActions(pid: number) {
   });
 
   const removeMutation = useMutation({
-    mutationFn: (usage: ActionableUsage) => deleteUsage(pid, usage.id),
-    onSuccess: async (_data, usage) => {
-      await invalidate(usage.id);
+    mutationFn: (vars: { usage: ActionableUsage; mode?: DeleteMode; reparentTo?: number | null }) =>
+      deleteUsage(pid, vars.usage.id, { mode: vars.mode, reparentTo: vars.reparentTo }),
+    onSuccess: async (_data, vars) => {
+      await invalidate(vars.usage.id);
       notifications.show({ message: 'Deleted' });
     },
     onError: (e) => {
@@ -153,7 +154,14 @@ export function useNameActions(pid: number) {
     // `onSuccess` here (rather than baked into removeMutation above) lets callers react to a
     // specific delete -- e.g. NameActionMenu's onAfterDelete clearing the selection if the
     // deleted usage was the one selected -- without every caller needing its own mutation.
-    remove: (usage: ActionableUsage, options?: { onSuccess?: () => void }) =>
-      removeMutation.mutate(usage, options),
+    remove: (
+      usage: ActionableUsage,
+      options?: { mode?: DeleteMode; reparentTo?: number | null; onSuccess?: () => void },
+    ) =>
+      removeMutation.mutate(
+        { usage, mode: options?.mode, reparentTo: options?.reparentTo },
+        { onSuccess: options?.onSuccess },
+      ),
+    removing: removeMutation.isPending,
   };
 }

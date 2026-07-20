@@ -63,6 +63,8 @@ export const server = setupServer(
   // Discussion detail page fetches these (linked changes + recent changes for the editor picker).
   http.get('/api/projects/:pid/discussions/:did/changes', () => HttpResponse.json([])),
   http.get('/api/projects/:pid/changes', () => HttpResponse.json([])),
+  // DeleteNameModal checks for accepted children before offering the reparent options.
+  http.get('/api/projects/:pid/tree/children/:id', () => HttpResponse.json([])),
 );
 
 export { http, HttpResponse };

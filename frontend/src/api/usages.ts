@@ -39,8 +39,20 @@ export function updateUsage(
   return api<NameUsage>(`/api/projects/${pid}/usages/${id}`, { method: 'PUT', json: payload });
 }
 
-export function deleteUsage(pid: number, id: number): Promise<void> {
-  return api<void>(`/api/projects/${pid}/usages/${id}`, { method: 'DELETE' });
+export type DeleteMode = 'FOCAL_ONLY' | 'WITH_SYNONYMS' | 'SUBTREE';
+
+// mode: FOCAL_ONLY (default) | WITH_SYNONYMS | SUBTREE; reparentTo optionally overrides where the
+// focal's accepted children move on the non-subtree modes (default = the grandparent).
+export function deleteUsage(
+  pid: number,
+  id: number,
+  opts?: { mode?: DeleteMode; reparentTo?: number | null },
+): Promise<void> {
+  const search = new URLSearchParams();
+  if (opts?.mode) search.set('mode', opts.mode);
+  if (opts?.reparentTo != null) search.set('reparentTo', String(opts.reparentTo));
+  const qs = search.toString();
+  return api<void>(`/api/projects/${pid}/usages/${id}${qs ? `?${qs}` : ''}`, { method: 'DELETE' });
 }
 
 // acc -> syn (see backend NameUsageService.demote): turn an accepted usage into a synonym/misapplied

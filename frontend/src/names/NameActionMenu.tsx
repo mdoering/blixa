@@ -1,5 +1,5 @@
 import { ActionIcon, Menu } from '@mantine/core';
-import { modals } from '@mantine/modals';
+import { useState } from 'react';
 import {
   IconArrowsMove,
   IconChevronRight,
@@ -14,6 +14,7 @@ import PromoteModal from '../tree/PromoteModal';
 import LinkAcceptedModal from '../tree/LinkAcceptedModal';
 import CreateNameModal from './CreateNameModal';
 import { useNameActions } from './useNameActions';
+import DeleteNameModal from './DeleteNameModal';
 import ClbImportModal from '../clb/ClbImportModal';
 import BulkAddModal from './BulkAddModal';
 
@@ -61,6 +62,7 @@ export default function NameActionMenu({
   onAfterDelete,
 }: NameActionMenuProps) {
   const actions = useNameActions(pid);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   if (!canEdit) return null;
 
@@ -85,15 +87,7 @@ export default function NameActionMenu({
   // own -- the backend 400s both attempts -- so only offer these for accepted usages.
   const canHaveChildrenOrSynonyms = usage.status === 'ACCEPTED';
 
-  const confirmDelete = () => {
-    modals.openConfirmModal({
-      title: 'Delete this name?',
-      children: `This permanently deletes "${usage.scientificName ?? 'this name'}".`,
-      labels: { confirm: 'Delete', cancel: 'Cancel' },
-      confirmProps: { color: 'red' },
-      onConfirm: () => actions.remove(usage, { onSuccess: () => onAfterDelete?.(usage.id) }),
-    });
-  };
+  const confirmDelete = () => setDeleteOpen(true);
 
   return (
     <>
@@ -199,6 +193,23 @@ export default function NameActionMenu({
           }}
         />
       )}
+      <DeleteNameModal
+        pid={pid}
+        usage={usage}
+        opened={deleteOpen}
+        deleting={actions.removing}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={(mode, reparentTo) =>
+          actions.remove(usage, {
+            mode,
+            reparentTo,
+            onSuccess: () => {
+              onAfterDelete?.(usage.id);
+              setDeleteOpen(false);
+            },
+          })
+        }
+      />
       {actions.moveTarget && (
         <MoveNameModal
           pid={pid}
