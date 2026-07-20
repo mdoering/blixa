@@ -89,6 +89,10 @@ public class ClbImportClient {
 
   public record ClbUsageHit(String id, String scientificName, String rank, String status) {}
 
+  // A name hit from the global (all-datasets) search, carrying the dataset it belongs to.
+  public record ClbGlobalUsageHit(String datasetKey, String datasetTitle, String id,
+      String scientificName, String authorship, String rank, String status) {}
+
   /** GET /dataset/{key}, returning its title (null if unavailable) — for showing what a pasted URL points at. */
   public String datasetTitle(String key) {
     JsonNode ds = getPage(UriComponentsBuilder.fromPath("/dataset/{ds}"), key);
@@ -124,6 +128,31 @@ public class ClbImportClient {
     for (JsonNode n : page.path("result")) {
       JsonNode name = n.path("name");
       out.add(new ClbUsageHit(text(n, "id"), text(name, "scientificName"), text(name, "rank"), text(n, "status")));
+    }
+    return out;
+  }
+
+  // Global name search across ALL datasets (CLB /nameusage/search), each hit carrying its datasetKey.
+  // Defensive parsing: the ES search may nest the usage under "usage" or flatten it, and the dataset
+  // key may sit on the hit or the usage. datasetTitle is left null here (the UI shows the key) to
+  // avoid a per-hit dataset lookup; NOTE: the exact response shape needs a live-CLB check.
+  public List<ClbGlobalUsageHit> searchUsagesAllDatasets(String q, String rank) {
+    var uri = UriComponentsBuilder.fromPath("/nameusage/search")
+        .queryParam("q", q)
+        .queryParam("content", "SCIENTIFIC_NAME")
+        .queryParam("limit", 20);
+    if (rank != null && !rank.isBlank()) {
+      uri.queryParam("rank", rank);
+    }
+    JsonNode page = getPage(uri);
+    List<ClbGlobalUsageHit> out = new ArrayList<>();
+    for (JsonNode hit : page.path("result")) {
+      JsonNode usage = hit.has("usage") ? hit.path("usage") : hit;
+      JsonNode name = usage.path("name");
+      String dk = text(hit, "datasetKey");
+      if (dk == null || dk.isBlank()) dk = text(usage, "datasetKey");
+      out.add(new ClbGlobalUsageHit(dk, null, text(usage, "id"), text(name, "scientificName"),
+          text(name, "authorship"), text(name, "rank"), text(usage, "status")));
     }
     return out;
   }

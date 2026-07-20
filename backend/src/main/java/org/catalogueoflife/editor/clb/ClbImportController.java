@@ -7,7 +7,9 @@ import life.catalogue.api.model.NameUsageBase;
 import life.catalogue.api.model.UsageInfo;
 import org.catalogueoflife.editor.auth.CurrentUser;
 import org.catalogueoflife.editor.clb.ClbImportClient.ClbDatasetHit;
+import org.catalogueoflife.editor.clb.ClbImportClient.ClbGlobalUsageHit;
 import org.catalogueoflife.editor.clb.ClbImportClient.ClbUsageHit;
+import org.catalogueoflife.editor.clb.dto.ClbComparison;
 import org.catalogueoflife.editor.clb.dto.ClbImportRequest;
 import org.catalogueoflife.editor.clb.dto.ClbImportSummary;
 import org.catalogueoflife.editor.clb.dto.ClbResolvedTaxon;
@@ -35,11 +37,14 @@ public class ClbImportController {
 
   private final ClbImportService service;
   private final ClbImportClient client;
+  private final ClbCompareService compareService;
   private final CurrentUser currentUser;
 
-  public ClbImportController(ClbImportService service, ClbImportClient client, CurrentUser currentUser) {
+  public ClbImportController(ClbImportService service, ClbImportClient client,
+      ClbCompareService compareService, CurrentUser currentUser) {
     this.service = service;
     this.client = client;
+    this.compareService = compareService;
     this.currentUser = currentUser;
   }
 
@@ -60,6 +65,22 @@ public class ClbImportController {
       @RequestParam(defaultValue = "") String q, @RequestParam(required = false) String rank) {
     currentUser.require();
     return client.searchUsages(datasetKey, q, rank);
+  }
+
+  // Global name search across ALL datasets (each hit carries its dataset) -- the "search everywhere"
+  // mode of the compare picker. Single-segment /usages, distinct from /{datasetKey}/usages above.
+  @GetMapping("/api/clb/usages")
+  public List<ClbGlobalUsageHit> searchAllDatasets(@RequestParam(defaultValue = "") String q,
+      @RequestParam(required = false) String rank) {
+    currentUser.require();
+    return compareService.searchAllDatasets(q, rank);
+  }
+
+  // The CLB side of a focal-taxon comparison: name/authorship/rank/status + classification + synonyms.
+  @GetMapping("/api/clb/{datasetKey}/compare/{taxonId}")
+  public ClbComparison compare(@PathVariable String datasetKey, @PathVariable String taxonId) {
+    currentUser.require();
+    return compareService.compare(datasetKey, taxonId);
   }
 
   // Resolves a pasted URL's (datasetKey, taxonId) (see ClbTaxonUrl.parse, run client-side first for
