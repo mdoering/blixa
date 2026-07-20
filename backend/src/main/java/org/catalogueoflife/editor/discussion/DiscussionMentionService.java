@@ -8,22 +8,27 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.catalogueoflife.editor.discussion.dto.Mentions;
+import org.catalogueoflife.editor.discussion.dto.Mentions.UserMention;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.user.AppUser;
 import org.catalogueoflife.editor.user.AppUserMapper;
 import org.springframework.stereotype.Service;
 
 // Resolves inline mentions in discussion/comment markdown:
-//   #<int>   -> a name_usage in the project (label = scientific name)
-//   @<orcid> -> a known user           (label = display name)
+//   #<int>    -> a name_usage in the project (label = scientific name)
+//   @<orcid>  -> a known user by ORCID       (label = display name)
+//   @<username> -> a known user by username  (label = display name)
 // `#Genus_species` (a name string) is intentionally NOT matched here -- fuzzy name resolution is
 // deferred; only the numeric #id form is handled (which also drives the reverse-link table).
 @Service
 public class DiscussionMentionService {
 
   private static final Pattern USAGE_REF = Pattern.compile("#(\\d+)");
-  private static final Pattern ORCID_REF =
-      Pattern.compile("@(\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dXx])");
+  // A @-token is an ORCID or a username: letters/digits then letters/digits/_/-. (ORCIDs are digits
+  // and hyphens, so they match too.) Trailing punctuation like a period is excluded.
+  private static final Pattern USER_REF = Pattern.compile("@([A-Za-z0-9][A-Za-z0-9_-]*)");
+  private static final Pattern ORCID_FORMAT =
+      Pattern.compile("\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dXx]");
 
   private final NameUsageMapper usages;
   private final AppUserMapper users;
@@ -48,10 +53,10 @@ public class DiscussionMentionService {
     return ids;
   }
 
-  // Resolve #nameID -> scientific name and @orcid -> display name across the given texts.
+  // Resolve #nameID -> scientific name and @orcid/@username -> user across the given texts.
   public Mentions resolve(int projectId, String... texts) {
     Map<String, String> usageLabels = new LinkedHashMap<>();
-    Map<String, String> orcidLabels = new LinkedHashMap<>();
+    Map<String, UserMention> userMentions = new LinkedHashMap<>();
     for (String t : texts) {
       if (t == null) continue;
       Matcher mu = USAGE_REF.matcher(t);
@@ -62,16 +67,17 @@ public class DiscussionMentionService {
           if (name != null) usageLabels.put(key, name);
         }
       }
-      Matcher mo = ORCID_REF.matcher(t);
+      Matcher mo = USER_REF.matcher(t);
       while (mo.find()) {
-        String orcid = mo.group(1);
-        if (!orcidLabels.containsKey(orcid)) {
-          AppUser u = users.findByOrcid(orcid);
-          if (u != null) orcidLabels.put(orcid, displayLabel(u));
+        String token = mo.group(1);
+        if (!userMentions.containsKey(token)) {
+          AppUser u = ORCID_FORMAT.matcher(token).matches()
+              ? users.findByOrcid(token) : users.findByUsername(token);
+          if (u != null) userMentions.put(token, new UserMention(displayLabel(u), u.getOrcid()));
         }
       }
     }
-    return new Mentions(usageLabels, orcidLabels);
+    return new Mentions(usageLabels, userMentions);
   }
 
   private static String displayLabel(AppUser u) {

@@ -78,16 +78,17 @@ class DiscussionCommentIT extends AbstractPostgresIT {
     olaf.setDisplayName("Olaf Banki");
     userMapper.insert(olaf);
 
-    // discussion body references #<leo> and @<orcid>
+    // discussion body references #<leo>, an @<orcid>, and an @<username>
     long did = createDiscussion(pid, "Placement of the cats",
-        "The parent of #" + leo + " looks wrong, per @0000-0001-2345-6789.");
+        "The parent of #" + leo + " looks wrong, per @0000-0001-2345-6789 (aka @olaf).");
     String base = "/api/projects/" + pid + "/discussions/" + did;
 
-    // GET discussion resolves mentions: #id -> scientific name, @orcid -> display name
+    // GET discussion resolves mentions: #id -> scientific name, @orcid/@username -> display name
     mvc.perform(get(base))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.mentions.usages['" + leo + "']").value("Panthera leo"))
-       .andExpect(jsonPath("$.mentions.orcids['0000-0001-2345-6789']").value("Olaf Banki"));
+       .andExpect(jsonPath("$.mentions.users['0000-0001-2345-6789'].label").value("Olaf Banki"))
+       .andExpect(jsonPath("$.mentions.users['olaf'].label").value("Olaf Banki"));
 
     // reverse-link: the mentioned name lists this discussion
     mvc.perform(get("/api/projects/" + pid + "/usages/" + leo + "/discussions"))
