@@ -114,16 +114,18 @@ import path unchanged; only the `basionymID`-column channel is redirected.
 
 ### Export (`NameUsageColdpWriter` / `ChildColdpWriter`)
 
-- `NameUsageColdpWriter`: emit ColDP `basionymID` by looking up the usage's **`basionym`
-  relation** (its `related_usage_id`), instead of reading the dropped column. One basionym per
-  name; if multiple `basionym` relations somehow exist, take the first deterministically.
-- `ChildColdpWriter` (`NameRelation.tsv`): emit all homotypic/name relations **except `basionym`**
-  (those are represented canonically by `basionymID` on the Name row), so a basionym is never
-  double-emitted. Round-trip is lossless: `basionymID` → `basionym` relation → `basionymID`.
+Basionym is exported **only as a `name_relation` row**, never via the `basionymID` Name column:
 
-To avoid an N+1 per usage, `NameRelationMapper` gains a bulk `findBasionymTargets(projectId)`
-returning `(usageId → relatedUsageId)` for `type = 'basionym'`, consumed by the export writer the
-same way `SynAccLink`s are pre-loaded today.
+- `NameUsageColdpWriter`: stop emitting `ColdpTerm.basionymID` (the source column is dropped, and
+  we no longer represent basionym on the Name row). The column is left empty in `NameUsage.tsv`.
+- `ChildColdpWriter` (`NameRelation.tsv`): emit **all** name relations, including `basionym` —
+  which now flows through the existing child-entity export path with **no special-casing**. This
+  is the natural consequence of `name_relation` being the single source of truth: a basionym is
+  just another relation.
+
+Round-trip is lossless: an inbound ColDP `basionymID` **or** `NameRelation.tsv` basionym row →
+`basionym` relation → exported `NameRelation.tsv` basionym row. No bulk export helper is needed —
+the writer already loads and emits `name_relation` rows.
 
 ## Detection engine (backend)
 
@@ -233,8 +235,9 @@ untouched):
   404).
 - `ImportBasionymRelationIT` (or an assertion added to the existing import IT): a ColDP package
   with `basionymID` yields a `basionym` name_relation (not a column), deduped against an explicit
-  `NameRelation.tsv` basionym for the same pair; export round-trips `basionymID` from the relation
-  and does not double-emit it in `NameRelation.tsv`.
+  `NameRelation.tsv` basionym for the same pair; export emits that basionym **as a
+  `NameRelation.tsv` row** and leaves the `NameUsage.tsv` `basionymID` column empty (round-trip
+  lossless via the relation).
 
 **Frontend**
 
@@ -253,8 +256,8 @@ untouched):
   `npx tsc -b` + `npm run build`.
 - Manual: import a small ColDP with basionym links → open the accepted taxon → confirm the nested
   synonymy renders; run "Group synonyms" on a taxon with un-grouped recombinations → confirm →
-  see the nesting update; export → confirm `basionymID` round-trips and `NameRelation.tsv` omits
-  basionym rows.
+  see the nesting update; export → confirm the basionym appears as a `NameRelation.tsv` row and
+  the `NameUsage.tsv` `basionymID` column is empty.
 - Commit per logical unit (migration + column drop, import/export redirect, detection engine +
   API, frontend), directly to `main` per repo convention. Mark the backlog "Homotypic grouping"
   item's Side 1 shipped.
