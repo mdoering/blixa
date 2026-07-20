@@ -1,4 +1,5 @@
 import { api } from './client';
+import type { Change } from './types';
 
 export type DiscussionStatus = 'REVIEW' | 'OPEN' | 'REJECTED' | 'RESOLVED';
 export type DiscussionVisibility = 'INTERNAL' | 'PUBLIC';
@@ -164,6 +165,25 @@ export function deleteComment(pid: number, did: number, cid: number): Promise<vo
 // Reverse links: the discussions that mention a given name_usage (#nameID).
 export function listUsageDiscussions(pid: number, usageId: number): Promise<Discussion[]> {
   return api<Discussion[]>(`/api/projects/${pid}/usages/${usageId}/discussions`);
+}
+
+// -- Linked changes (Phase 6): changelog entries linked to a discussion --------------------------
+
+export function listDiscussionChanges(pid: number, did: number): Promise<Change[]> {
+  return api<Change[]>(`/api/projects/${pid}/discussions/${did}/changes`);
+}
+
+export function linkDiscussionChange(pid: number, did: number, changeId: number): Promise<void> {
+  return api<void>(`/api/projects/${pid}/discussions/${did}/changes`, {
+    method: 'POST',
+    json: { changeId },
+  });
+}
+
+export function unlinkDiscussionChange(pid: number, did: number, changeId: number): Promise<void> {
+  return api<void>(`/api/projects/${pid}/discussions/${did}/changes/${changeId}`, {
+    method: 'DELETE',
+  });
 }
 
 // -- External-submission API token (editor-only) -------------------------------------------------

@@ -60,6 +60,9 @@ export const server = setupServer(
     });
   }),
   http.delete('/api/projects/:pid/locks/:id', () => new HttpResponse(null, { status: 204 })),
+  // Discussion detail page fetches these (linked changes + recent changes for the editor picker).
+  http.get('/api/projects/:pid/discussions/:did/changes', () => HttpResponse.json([])),
+  http.get('/api/projects/:pid/changes', () => HttpResponse.json([])),
 );
 
 export { http, HttpResponse };

@@ -14,7 +14,7 @@ mostly self-contained follow-ups.
 
 ## Big features (new — each needs its own design pass)
 
-### 1. Discussions  *(in progress — see `docs/superpowers/specs/2026-07-20-discussions-design.md`)*
+### 1. Discussions  *(feature-complete — all 6 phases + identity polish + mention autocomplete shipped; see `docs/superpowers/specs/2026-07-20-discussions-design.md`)*
 A forum-style, per-project discussion tracker keyed on **ORCIDs** (formerly "issue tracker" —
 renamed to avoid collision with the validation *Issues*, and because the shape is a conversation thread).
 
@@ -34,7 +34,10 @@ renamed to avoid collision with the validation *Issues*, and because the shape i
   the detail page (following + follower count); authors/commenters auto-follow; new comments email
   followers (minus the actor) best-effort via `spring-boot-starter-mail` (sends only when
   `spring.mail.host` + `coldp.mail.from` are set, else logs).
-- [ ] **Phase 6 — link (closed) discussions to changes & work locks.**
+- [x] **Phase 6 — link discussions to changes & work locks** *(shipped)*: `discussion_change` links a
+  discussion to audit changelog entries (each carries its `task_id`, so the work session/lock is
+  referenced too); "Linked changes" section on the detail page (editors link a recent change / unlink).
+  *(Reverse indicator on the History page + explicit task/lock linking are optional follow-ups.)*
 - [x] **Mention autocomplete** *(shipped — `MentionTextarea`)*: in the discussion/comment composer,
   `#` + a **capital letter** + 3+ letters (`#Xyz…`) opens a **name autocomplete** (reuses usage
   search) that inserts `#<id>` (the stable usage id), never the typed string; `@` + letters opens a

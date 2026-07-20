@@ -1,4 +1,4 @@
-import { Anchor, Badge, Box, Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
+import { Anchor, Badge, Box, Button, Divider, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { IconArrowLeft, IconHeart, IconHeartFilled, IconPencil } from '@tabler/icons-react';
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,6 +22,7 @@ import MentionMarkdown from './MentionMarkdown';
 import MentionTextarea from './MentionTextarea';
 import CommentItem from './CommentItem';
 import DiscussionForm from './DiscussionForm';
+import LinkedChangesSection from './LinkedChangesSection';
 
 const STATUS_COLOR: Record<DiscussionStatus, string> = {
   REVIEW: 'yellow',
@@ -219,6 +220,9 @@ export default function DiscussionDetailPage() {
           </Button>
         </Group>
       </Paper>
+
+      <Divider my="lg" />
+      <LinkedChangesSection pid={pid} did={did} canEdit={isEditor} />
 
       {editOpen && (
         <DiscussionForm
