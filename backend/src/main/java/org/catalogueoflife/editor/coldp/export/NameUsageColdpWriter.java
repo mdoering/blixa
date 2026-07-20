@@ -100,7 +100,6 @@ public class NameUsageColdpWriter {
   private static Map<ColdpTerm, String> nameFields(NameUsage u, String code) {
     Map<ColdpTerm, String> row = new LinkedHashMap<>();
     row.put(ColdpTerm.alternativeID, join(u.getAlternativeId()));
-    row.put(ColdpTerm.basionymID, str(u.getBasionymId()));
     row.put(ColdpTerm.status, coldpStatus(u.getStatus()));
     row.put(ColdpTerm.scientificName, u.getScientificName());
     row.put(ColdpTerm.authorship, u.getAuthorship());

@@ -458,15 +458,18 @@ public class ImportRunService {
   // shape (readSplitFormRows) so every row from here on is processed identically regardless of
   // archive shape (Step 7 in the design brief).
   //
-  // Two-phase insert: name_usage.parent_id/basionym_id are non-deferrable self-referencing compound
-  // FKs (V3__name_core.sql/V8), so a row referencing a not-yet-inserted parent/basionym would fail
-  // at insert, and import can't assume the archive lists parents before their children. Pass 1
-  // (insertPrimaryUsage) therefore inserts every row with parent_id/basionym_id left NULL --
+  // Two-phase insert: name_usage.parent_id is a non-deferrable self-referencing compound FK
+  // (V3__name_core.sql/V8), so a row referencing a not-yet-inserted parent would fail at insert,
+  // and import can't assume the archive lists parents before their children. A forward basionym
+  // reference has the exact same problem (the referenced usage may not exist yet either), even
+  // though basionym itself is a name_relation row, not a column -- see below. Pass 1
+  // (insertPrimaryUsage) therefore inserts every row with parent_id left NULL --
   // published_in_reference_id/reference_id[] CAN be set already since References were loaded
   // earlier in this same transaction (Task 3) -- while allocating the row's id and recording the
   // source-id -> new-id mapping in ctx.usageIds. Only once every row has been inserted and
-  // ctx.usageIds is complete does Pass 2 resolve parent_id/basionym_id via the new
-  // NameUsageMapper.updateHierarchy and create synonym_accepted links.
+  // ctx.usageIds is complete does Pass 2 resolve parent_id via the new NameUsageMapper.
+  // updateHierarchy, create synonym_accepted links, and insert each row's basionym (if any) as a
+  // `basionym` name_relation.
   //
   // Status inverse: a NON-accepted row's parentID is a synonym_accepted LINK, not a parent_id --
   // the exact inverse of NameUsageColdpWriter.synonymRows, including the UNASSESSED case (exported
@@ -515,7 +518,7 @@ public class ImportRunService {
       (isProParteExtra ? proParteExtra : primaryRows).add(row);
     }
 
-    // Pass 1: insert every primary row with parent_id/basionym_id NULL, remembering (usage, row)
+    // Pass 1: insert every primary row with parent_id NULL, remembering (usage, row)
     // pairs for Pass 2 below. insertPrimaryUsage returns null (having already recorded its own
     // ctx.issue) for a row it refuses to insert at all -- e.g. a blank/missing scientificName --
     // which must NOT enter Pass 2's pending list or ctx.usageIds, so neither Pass 2 nor the
@@ -541,12 +544,12 @@ public class ImportRunService {
       }
     }
 
-    // Pass 2: every usage now exists, so parent_id/basionym_id (accepted) or a synonym_accepted
-    // link (non-accepted) can finally be resolved; a dangling reference is surfaced as an
-    // ImportIssue rather than failing the whole import. basionymID additionally falls back to
-    // nameIdToUsage (split form only -- see above); parentID never does, since a split-form
-    // parentID/taxonID is already a Taxon/Synonym id, resolved by ctx.usageIds directly exactly
-    // like the combined form.
+    // Pass 2: every usage now exists, so parent_id (accepted) or a synonym_accepted link
+    // (non-accepted) can finally be resolved, and basionymID can finally be resolved into a
+    // `basionym` name_relation; a dangling reference is surfaced as an ImportIssue rather than
+    // failing the whole import. basionymID additionally falls back to nameIdToUsage (split form
+    // only -- see above); parentID never does, since a split-form parentID/taxonID is already a
+    // Taxon/Synonym id, resolved by ctx.usageIds directly exactly like the combined form.
     for (Pending p : pending) {
       Map<ColdpTerm, String> row = p.row();
       String rowId = row.get(ColdpTerm.ID);
@@ -554,13 +557,20 @@ public class ImportRunService {
           resolveUsageRef(ctx, nameIdToUsage, row.get(ColdpTerm.basionymID), "basionym", rowId);
       if (p.usage().getStatus() == Status.ACCEPTED) {
         Integer parentNewId = resolveUsageRef(ctx, null, row.get(ColdpTerm.parentID), "parent", rowId);
-        usages.updateHierarchy(ctx.projectId, p.usage().getId(), parentNewId, basionymNewId, userId);
+        usages.updateHierarchy(ctx.projectId, p.usage().getId(), parentNewId, userId);
       } else {
         Integer acceptedNewId = resolveUsageRef(ctx, null, row.get(ColdpTerm.parentID), "parent", rowId);
-        usages.updateHierarchy(ctx.projectId, p.usage().getId(), null, basionymNewId, userId);
+        usages.updateHierarchy(ctx.projectId, p.usage().getId(), null, userId);
         if (acceptedNewId != null) {
           synonymAccepted.link(ctx.projectId, p.usage().getId(), acceptedNewId, 0);
         }
+      }
+      // basionymID is now a `basionym` name_relation (recombination -> basionym), not a column.
+      if (basionymNewId != null && !basionymNewId.equals(p.usage().getId())) {
+        int relId = idSeq.allocate(ctx.projectId, NAME_RELATION_ENTITY);
+        NameRelationRequest r =
+            new NameRelationRequest(basionymNewId, "basionym", null, null, null, null);
+        nameRelations.insert(ctx.projectId, relId, p.usage().getId(), r, userId);
       }
     }
 
@@ -816,6 +826,9 @@ public class ImportRunService {
           rec.get(ColdpTerm.page),
           rec.get(ColdpTerm.remarks),
           null);
+      if (nameRelations.exists(ctx.projectId, usageId, relatedUsageId, r.type())) {
+        return; // already created (e.g. the basionymID column redirect above) -- don't duplicate
+      }
       int id = idSeq.allocate(ctx.projectId, NAME_RELATION_ENTITY);
       nameRelations.insert(ctx.projectId, id, usageId, r, userId);
     });
@@ -869,7 +882,7 @@ public class ImportRunService {
   }
 
   // Pass 1 for one primary row: allocates the id, builds + parses the NameUsage, inserts it with
-  // parent_id/basionym_id left null, upserts taxon_info for an accepted row carrying any of
+  // parent_id left null, upserts taxon_info for an accepted row carrying any of
   // extinct/environment/temporalRange, and records the source-id -> new-id mapping Pass 2 (and any
   // later task consuming ctx.usageIds) resolves everything else through. Returns null (having
   // already recorded a ctx.issue and inserted NOTHING) for a row this import cannot possibly use --
@@ -974,8 +987,9 @@ public class ImportRunService {
     // taxonomic references; both export as null anyway (NameUsageColdpWriter).
     u.setReferenceId(refIdList.isEmpty() ? null : refIdList);
 
-    // parent_id/basionym_id stay null here -- Pass 2 in loadNameUsages sets them via
-    // NameUsageMapper.updateHierarchy once every usage in the archive has been inserted.
+    // parent_id stays null here -- Pass 2 in loadNameUsages sets it via NameUsageMapper.
+    // updateHierarchy (and inserts the basionym `name_relation`, if any) once every usage in the
+    // archive has been inserted.
 
     // Archive atomized columns set above are advisory: parseInto unconditionally clears and
     // re-derives them (plus sanctioningAuthor -- a known loss) from scientificName/authorship/rank,

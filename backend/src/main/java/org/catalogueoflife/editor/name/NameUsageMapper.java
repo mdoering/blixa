@@ -23,7 +23,7 @@ public interface NameUsageMapper {
   // an explicit NULL and violate the NOT NULL constraint instead of using the default.
   @Insert("""
       INSERT INTO name_usage (
-          project_id, id, alternative_id, parent_id, basionym_id, ordinal,
+          project_id, id, alternative_id, parent_id, ordinal,
           status, name_phrase, reference_id,
           scientific_name, authorship, rank, uninomial, genus, infrageneric_epithet,
           specific_epithet, infraspecific_epithet, cultivar_epithet, notho,
@@ -35,7 +35,7 @@ public interface NameUsageMapper {
       VALUES (
           #{projectId}, #{id},
           #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
-          #{parentId}, #{basionymId}, #{ordinal},
+          #{parentId}, #{ordinal},
           #{status}, #{namePhrase},
           #{referenceId,typeHandler=org.catalogueoflife.editor.name.IntegerArrayTypeHandler},
           #{scientificName}, #{authorship}, #{rank}, #{uninomial}, #{genus}, #{infragenericEpithet},
@@ -358,25 +358,24 @@ public interface NameUsageMapper {
   int setStatus(@Param("projectId") int projectId, @Param("id") int id,
       @Param("status") String status, @Param("modifiedBy") int modifiedBy);
 
-  // Pass-2 write of the ColDP import job (coldp/imprt/ImportRunService.loadNameUsages): parent_id/
-  // basionym_id are non-deferrable self-referencing compound FKs (V3__name_core.sql/V8), so a
-  // Pass-1 insert can never set them for a forward reference -- this narrow update sets just those
-  // two columns (plus the usual version/modified bookkeeping) once every usage in the archive has
-  // been inserted and the import job's source-id -> new-id map is complete. Unlike update()/
-  // reparentChildren above, this is NOT CAS-guarded on version: nothing else can be racing this
-  // usage mid-import (the whole load runs in one transaction, see loadTransactional's javadoc).
+  // Pass-2 write of the ColDP import job (coldp/imprt/ImportRunService.loadNameUsages): parent_id is
+  // a non-deferrable self-referencing compound FK (V3__name_core.sql/V8), so a Pass-1 insert can
+  // never set it for a forward reference -- this narrow update sets just that column (plus the
+  // usual version/modified bookkeeping) once every usage in the archive has been inserted and the
+  // import job's source-id -> new-id map is complete. Unlike update()/reparentChildren above, this
+  // is NOT CAS-guarded on version: nothing else can be racing this usage mid-import (the whole load
+  // runs in one transaction, see loadTransactional's javadoc).
   @Update("""
-      UPDATE name_usage SET parent_id = #{parentId}, basionym_id = #{basionymId},
+      UPDATE name_usage SET parent_id = #{parentId},
          version = version + 1, modified = now(), modified_by = #{modifiedBy}
       WHERE project_id = #{projectId} AND id = #{id}""")
   int updateHierarchy(@Param("projectId") int projectId, @Param("id") int id,
-      @Param("parentId") Integer parentId, @Param("basionymId") Integer basionymId,
-      @Param("modifiedBy") int modifiedBy);
+      @Param("parentId") Integer parentId, @Param("modifiedBy") int modifiedBy);
 
   @Update("""
       UPDATE name_usage
       SET alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
-          parent_id = #{parentId}, basionym_id = #{basionymId}, ordinal = #{ordinal},
+          parent_id = #{parentId}, ordinal = #{ordinal},
           status = #{status}, name_phrase = #{namePhrase},
           reference_id = #{referenceId,typeHandler=org.catalogueoflife.editor.name.IntegerArrayTypeHandler},
           scientific_name = #{scientificName}, authorship = #{authorship}, rank = #{rank},

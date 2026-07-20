@@ -63,7 +63,7 @@ public final class ClbUsageMapper {
    * CLB nameID, see {@link #toTypeMaterial} / {@link #toNameRelations}) can be attached to whichever
    * usage this is once Task 2 has inserted it and knows its own new id; {@code clbPublishedInReferenceId}
    * / {@code clbReferenceIds} so Task 2 can resolve them against the ids it gets back from inserting
-   * {@link #toReferences}. {@code usage.getId()/getProjectId()/getParentId()/getBasionymId()} are left
+   * {@link #toReferences}. {@code usage.getId()/getProjectId()/getParentId()} are left
    * unset -- Task 2's insert allocates the id; NameParserService.parseInto (its own safety net,
    * exactly like ColDP import -- see ImportRunService.insertPrimaryUsage) re-derives the atomized
    * name fields, so this mapper only carries the handful the brief calls out explicitly, not a full

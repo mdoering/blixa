@@ -73,8 +73,8 @@ public class MergeRecordsService {
 
   // Destructive apply: repoints every FK pointing at each merged (duplicate) usage onto the
   // survivor, then deletes the duplicates -- one transaction under the project advisory lock.
-  // Every repoint runs BEFORE the delete: name_usage.parent_id/basionym_id are ON DELETE SET
-  // NULL, and synonym_accepted/taxon_info/children's usage_id are ON DELETE CASCADE, so deleting
+  // Every repoint runs BEFORE the delete: name_usage.parent_id is ON DELETE SET NULL, and
+  // synonym_accepted/taxon_info/children's usage_id are ON DELETE CASCADE, so deleting
   // first would null out or cascade-destroy the very links this is supposed to preserve.
   @Transactional
   public MergeResult mergeUsages(int userId, int projectId, Integer survivorId, List<Integer> ids) {
@@ -109,7 +109,6 @@ public class MergeRecordsService {
       NameUsage du = usages.findByIdInProject(projectId, d);
       // repoint EVERY fk before deleting (SET NULL / CASCADE would otherwise lose the links)
       usages.reparentChildren(projectId, d, survivorId, userId);
-      merge.repointBasionym(projectId, d, survivorId);
       merge.deleteSynonymCollisions(projectId, d, survivorId);
       merge.repointSynonymId(projectId, d, survivorId);
       merge.deleteAcceptedCollisions(projectId, d, survivorId);

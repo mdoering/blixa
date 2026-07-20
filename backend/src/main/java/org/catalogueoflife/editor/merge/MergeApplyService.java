@@ -543,7 +543,7 @@ public class MergeApplyService {
   // Name-usages
   // ---------------------------------------------------------------------------------------------
 
-  // One pending NEW usage awaiting Pass 2 (parent_id/basionym_id resolution) -- see
+  // One pending NEW usage awaiting Pass 2 (parent_id resolution) -- see
   // applyOneUsagePass1/applyOneUsagePass2.
   private record Pending(NameUsage source, NameUsage target) {}
 
@@ -584,8 +584,8 @@ public class MergeApplyService {
 
   // Pass 1 for one source usage: MATCHED -> maps to the EXISTING target id (no insert) and, for
   // mode != NEW_ONLY, reconciles its scalars/provenance via reconcileMatchedUsage; anything else IN
-  // THE PLAN (NEW, or an un-reviewed POSSIBLE_*) -> inserted with parent_id/basionym_id left NULL
-  // (Pass 2 resolves them once usageIdMap is complete for every source usage), returned as a Pending
+  // THE PLAN (NEW, or an un-reviewed POSSIBLE_*) -> inserted with parent_id left NULL (Pass 2
+  // resolves it once usageIdMap is complete for every source usage), returned as a Pending
   // for Pass 2. Returns null for a MATCHED row (nothing left to do in Pass 2 for it) or a skipped
   // row. A source usage with NO plan entry at all (Fix 3, final-review -- see applyOneReference's
   // identical comment) is issue+skipped rather than silently inserted as an unreviewed NEW: it has
@@ -634,15 +634,14 @@ public class MergeApplyService {
     }
   }
 
-  // Pass 2 for one NEW (pending) usage: resolves basionym_id/parent_id (or, for a non-accepted
-  // usage, its synonym_accepted link(s)) now that usageIdMap covers every source usage. Unchanged
+  // Pass 2 for one NEW (pending) usage: resolves parent_id (or, for a non-accepted usage, its
+  // synonym_accepted link(s)) now that usageIdMap covers every source usage. Basionym rides along
+  // as a name_relation, already copied by nameRelationOps -- nothing to resolve here. Unchanged
   // from Task 6 -- MATCHED usages never reach Pass 2 (applyOneUsagePass1 returns null for them).
   private void applyOneUsagePass2(int targetId, int userId, Map<String, Integer> usageIdMap,
       Map<Integer, List<Integer>> sourceSynonymLinks, List<MergeIssue> issues, Pending p) {
     NameUsage src = p.source();
     NameUsage tgt = p.target();
-    Integer basionymNewId = src.getBasionymId() == null ? null
-        : usageIdMap.get(String.valueOf(src.getBasionymId()));
 
     if (tgt.getStatus() == Status.ACCEPTED) {
       Integer parentNewId = src.getParentId() == null ? null
@@ -651,9 +650,9 @@ public class MergeApplyService {
         issues.add(new MergeIssue("name_usage", String.valueOf(src.getId()),
             "unanchored: " + tgt.getScientificName()));
       }
-      usages.updateHierarchy(targetId, tgt.getId(), parentNewId, basionymNewId, userId);
+      usages.updateHierarchy(targetId, tgt.getId(), parentNewId, userId);
     } else {
-      usages.updateHierarchy(targetId, tgt.getId(), null, basionymNewId, userId);
+      usages.updateHierarchy(targetId, tgt.getId(), null, userId);
       int ordinal = 0;
       for (Integer acceptedSrcId : sourceSynonymLinks.getOrDefault(src.getId(), List.of())) {
         Integer acceptedNewId = usageIdMap.get(String.valueOf(acceptedSrcId));
@@ -704,7 +703,7 @@ public class MergeApplyService {
   }
 
   // Builds a brand-new target NameUsage from a NEW source usage. Unchanged from Task 6 -- see its
-  // original javadoc: parent_id/basionym_id deliberately left unset (Pass 2 resolves them),
+  // original javadoc: parent_id deliberately left unset (Pass 2 resolves it),
   // parseInto is authoritative over every atomized field regardless of what was just copied.
   private NameUsage buildNewUsage(NameUsage src, int targetId, int userId, String srcId,
       Map<String, Integer> refIdMap, NomCode targetNomCode, List<MergeIssue> issues) {

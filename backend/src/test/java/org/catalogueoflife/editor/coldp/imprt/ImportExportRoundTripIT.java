@@ -18,6 +18,7 @@ import org.catalogueoflife.editor.child.TypeMaterialMapper;
 import org.catalogueoflife.editor.child.TypeMaterialService;
 import org.catalogueoflife.editor.child.dto.DistributionRequest;
 import org.catalogueoflife.editor.child.dto.DistributionResponse;
+import org.catalogueoflife.editor.child.dto.NameRelationRequest;
 import org.catalogueoflife.editor.child.dto.TypeMaterialRequest;
 import org.catalogueoflife.editor.child.dto.TypeMaterialResponse;
 import org.catalogueoflife.editor.coldp.export.ColdpWriter;
@@ -69,9 +70,9 @@ import tools.jackson.databind.ObjectMapper;
 //    {Felis catus, Felis silvestris}(species) -- proves the parent_id chain resolves end-to-end
 //    to the NEW project's own ids, not just one level deep.
 //  - a plain synonym, Felis domesticus, of Felis catus -- and simultaneously Felis catus's
-//    BASIONYM (set via NameUsageMapper.updateHierarchy once the synonym exists, since
-//    basionym_id/parent_id are non-deferrable self-referencing FKs -- see that mapper method's
-//    own javadoc) -- proves basionym_id round-trips through the export->reimport cycle.
+//    BASIONYM (a `basionym` name_relation, created once the synonym exists -- name_relation is
+//    the single source of truth, see NameRelationMapper) -- proves the basionym relation
+//    round-trips through the export->reimport cycle.
 //  - a pro-parte synonym, Felis vulgaris, linked to BOTH accepted species -- must collapse back to
 //    ONE new_usage row carrying TWO synonym_accepted links, not two rows.
 //  - an UNASSESSED usage WITH a parent link, Felis dubia (synonym_accepted -> Felis catus) --
@@ -95,6 +96,7 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
 
   private static final String USAGE_ENTITY = "name_usage";
   private static final String AUTHOR_ENTITY = "author";
+  private static final String NAME_RELATION_ENTITY = "name_relation";
   private static final Duration TIMEOUT = Duration.ofSeconds(10);
   private static final Duration POLL_INTERVAL = Duration.ofMillis(100);
 
@@ -105,6 +107,7 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
   @Autowired AppUserMapper users;
   @Autowired NameUsageMapper usages;
   @Autowired SynonymAcceptedMapper synonymAccepted;
+  @Autowired org.catalogueoflife.editor.child.NameRelationMapper nameRelations;
   @Autowired TaxonInfoMapper taxonInfo;
   @Autowired IdSeqMapper idSeq;
   @Autowired ReferenceService referenceService;
@@ -226,13 +229,15 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
     NameUsage felisSilvestris =
         createUsage(pid, "Felis silvestris", "species", Status.ACCEPTED, felidae.getId(), userId);
 
-    // Plain synonym, and Felis catus's basionym -- set via updateHierarchy AFTER the synonym
-    // exists (basionym_id is a non-deferrable self-referencing FK; see that mapper method's
-    // javadoc), matching how Task 4's own Pass 2 resolves a forward basionym reference.
+    // Plain synonym, and Felis catus's basionym -- the basionym is a `basionym` name_relation
+    // (name_relation is the single source of truth; see NameRelationMapper), created AFTER the
+    // synonym exists, matching how Task 4's own Pass 2 resolves a forward basionym reference.
     NameUsage plainSynonym =
         createUsage(pid, "Felis domesticus", "species", Status.SYNONYM, null, userId);
     synonymAccepted.link(pid, plainSynonym.getId(), felisCatus.getId(), 0);
-    usages.updateHierarchy(pid, felisCatus.getId(), felidae.getId(), plainSynonym.getId(), userId);
+    usages.updateHierarchy(pid, felisCatus.getId(), felidae.getId(), userId);
+    nameRelations.insert(pid, idSeq.allocate(pid, NAME_RELATION_ENTITY), felisCatus.getId(),
+        new NameRelationRequest(plainSynonym.getId(), "basionym", null, null, null, null), userId);
 
     // Pro-parte synonym: ONE usage linked to BOTH accepted species.
     NameUsage proParteSynonym =
@@ -335,8 +340,12 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
     assertThat(synonymAccepted.findAcceptedFor((int) pid2, newUnassessed.getId()))
         .containsExactly(newFelisCatus.getId());
 
-    // Basionym resolved to the new plain-synonym id.
-    assertThat(newFelisCatus.getBasionymId()).isEqualTo(newPlainSynonym.getId());
+    // Basionym resolved to the new plain-synonym id, as a `basionym` name_relation.
+    assertThat(nameRelations.findByUsage(newFelisCatus.getProjectId(), newFelisCatus.getId()))
+        .anySatisfy(r -> {
+          assertThat(r.type()).isEqualToIgnoringCase("basionym");
+          assertThat(r.relatedUsageId()).isEqualTo(newPlainSynonym.getId());
+        });
 
     // Reference remap: ref1 cited BOTH as publishedInReferenceId AND inside referenceID[].
     Reference newRef1 = newRefs.stream().filter(r -> ref1.getCitation().equals(r.getCitation()))

@@ -13,7 +13,7 @@ import org.gbif.nameparser.api.NameType;
 // classification tree link (self-referencing); synonyms link to their accepted
 // usage via the separate synonym_accepted table, NOT via parentId.
 //
-// id/parentId/basionymId/publishedInReferenceId/referenceId are all scoped to `projectId`:
+// id/parentId/publishedInReferenceId/referenceId are all scoped to `projectId`:
 // name_usage uses a per-project compound (project_id, id) primary key (see V3__name_core.sql),
 // so an id alone is only meaningful together with the project it belongs to.
 public class NameUsage {
@@ -21,7 +21,6 @@ public class NameUsage {
   private Integer projectId;
   private List<String> alternativeId;
   private Integer parentId;
-  private Integer basionymId;
   private Integer ordinal;
   // taxonomic
   private Status status;
@@ -71,8 +70,6 @@ public class NameUsage {
   public void setAlternativeId(List<String> alternativeId) { this.alternativeId = alternativeId; }
   public Integer getParentId() { return parentId; }
   public void setParentId(Integer parentId) { this.parentId = parentId; }
-  public Integer getBasionymId() { return basionymId; }
-  public void setBasionymId(Integer basionymId) { this.basionymId = basionymId; }
   public Integer getOrdinal() { return ordinal; }
   public void setOrdinal(Integer ordinal) { this.ordinal = ordinal; }
   public Status getStatus() { return status; }

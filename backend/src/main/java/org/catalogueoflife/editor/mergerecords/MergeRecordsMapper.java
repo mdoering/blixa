@@ -17,7 +17,6 @@ public interface MergeRecordsMapper {
         (SELECT count(*) FROM name_usage       WHERE project_id = #{pid} AND parent_id = #{id})                       AS children,
         (SELECT count(*) FROM synonym_accepted WHERE project_id = #{pid} AND accepted_id = #{id})                     AS synonyms,
         (SELECT count(*) FROM synonym_accepted WHERE project_id = #{pid} AND synonym_id = #{id})                      AS "acceptedOf",
-        (SELECT count(*) FROM name_usage       WHERE project_id = #{pid} AND basionym_id = #{id})                     AS "basionymOf",
         (SELECT count(*) FROM name_relation    WHERE project_id = #{pid} AND (usage_id = #{id} OR related_usage_id = #{id})) AS "nameRelations",
         (SELECT count(*) FROM vernacular       WHERE project_id = #{pid} AND usage_id = #{id})                        AS vernacular,
         (SELECT count(*) FROM distribution     WHERE project_id = #{pid} AND usage_id = #{id})                        AS distribution,
@@ -29,8 +28,6 @@ public interface MergeRecordsMapper {
   Map<String, Object> usageCounts(@Param("pid") int pid, @Param("id") int id);
 
   // --- name-usage FK repoints (merged -> survivor). Order-independent; run all BEFORE deleting merged. ---
-  @Update("UPDATE name_usage SET basionym_id = #{survivor} WHERE project_id = #{pid} AND basionym_id = #{merged}")
-  int repointBasionym(@Param("pid") int pid, @Param("merged") int merged, @Param("survivor") int survivor);
 
   // synonym_accepted: pre-delete rows that would collide with an existing (survivor,x) pair, then repoint.
   @Delete("""

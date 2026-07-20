@@ -58,6 +58,7 @@ class ImportSplitFormIT extends AbstractPostgresIT {
   @Autowired NameUsageMapper usages;
   @Autowired SynonymAcceptedMapper synonymAccepted;
   @Autowired ReferenceMapper references;
+  @Autowired org.catalogueoflife.editor.child.NameRelationMapper nameRelations;
 
   private void ensureUser(String username) {
     AppUser existing = users.requireByUsernameOrNull(username);
@@ -243,9 +244,13 @@ class ImportSplitFormIT extends AbstractPostgresIT {
     NameUsage pantheraLeo = byName(all, "Panthera leo");
     NameUsage felisLeo = byName(all, "Felis leo");
 
-    // The whole point of the fix: basionym_id resolves to Panthera leo's usage id, even though
+    // The whole point of the fix: basionym resolves to Panthera leo's usage id, even though
     // Felis leo's Name.basionymID="n1" is a Name-id, not a Taxon-id.
-    assertThat(felisLeo.getBasionymId()).isEqualTo(pantheraLeo.getId());
+    assertThat(nameRelations.findByUsage(felisLeo.getProjectId(), felisLeo.getId()))
+        .anySatisfy(r -> {
+          assertThat(r.type()).isEqualToIgnoringCase("basionym");
+          assertThat(r.relatedUsageId()).isEqualTo(pantheraLeo.getId());
+        });
 
     // ...and no false-positive "basionym not found" issue was raised for it.
     JsonNode issues = done.get("issues");

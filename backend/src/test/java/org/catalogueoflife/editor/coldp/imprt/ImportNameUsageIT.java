@@ -71,6 +71,7 @@ class ImportNameUsageIT extends AbstractPostgresIT {
   @Autowired NameUsageMapper usages;
   @Autowired SynonymAcceptedMapper synonymAccepted;
   @Autowired ReferenceMapper references;
+  @Autowired org.catalogueoflife.editor.child.NameRelationMapper nameRelations;
 
   private void ensureUser(String username) {
     AppUser existing = users.requireByUsernameOrNull(username);
@@ -209,8 +210,13 @@ class ImportNameUsageIT extends AbstractPostgresIT {
     assertThat(panthera.getParentId()).isEqualTo(felidae.getId());
     assertThat(pantheraLeo.getParentId()).isEqualTo(panthera.getId());
 
-    // Forward basionym reference (row 4 -> row 10, which appears LATER in the file) resolved.
-    assertThat(pantheraLeo.getBasionymId()).isEqualTo(felisLeo.getId());
+    // Forward basionym reference (row 4 -> row 10) resolved into a `basionym` name_relation
+    // (the basionym_id column was dropped; name_relation is the single source of truth).
+    assertThat(nameRelations.findByUsage(pantheraLeo.getProjectId(), pantheraLeo.getId()))
+        .anySatisfy(r -> {
+          assertThat(r.type()).isEqualToIgnoringCase("basionym");
+          assertThat(r.relatedUsageId()).isEqualTo(felisLeo.getId());
+        });
 
     // Published-in single reference + taxonomic reference_id[] remapped to the new reference ids.
     List<Reference> refs = references.findAllByProject(projectId);

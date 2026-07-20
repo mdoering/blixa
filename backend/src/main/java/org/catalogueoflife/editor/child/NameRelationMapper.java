@@ -29,6 +29,18 @@ public interface NameRelationMapper {
   @Select(SELECT + " WHERE nr.project_id = #{projectId} AND nr.id = #{id}")
   NameRelationResponse findById(@Param("projectId") int projectId, @Param("id") int id);
 
+  // True if a relation with this exact (usage_id, related_usage_id, type) already exists, comparing
+  // type case-insensitively with _/- normalized to spaces (import stores raw ColDP type values, so
+  // the same relation may read as 'basionym' or 'BASIONYM'). Used to dedup import + apply.
+  @Select("""
+      SELECT count(*) > 0 FROM name_relation
+      WHERE project_id = #{projectId} AND usage_id = #{usageId}
+        AND related_usage_id = #{relatedUsageId}
+        AND lower(regexp_replace(type, '[_-]', ' ', 'g')) = lower(regexp_replace(#{type}, '[_-]', ' ', 'g'))
+      """)
+  boolean exists(@Param("projectId") int projectId, @Param("usageId") int usageId,
+      @Param("relatedUsageId") int relatedUsageId, @Param("type") String type);
+
   @Insert("""
       INSERT INTO name_relation (project_id, id, usage_id, related_usage_id, type, reference_id,
           page, remarks, modified_by)
