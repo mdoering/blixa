@@ -3,7 +3,7 @@ import { useDebouncedValue } from '@mantine/hooks';
 import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getProject, listMembers } from '../api/projects';
 import { useMe } from '../auth/useMe';
 import { listDiscussions, type Discussion, type DiscussionStatus } from '../api/discussions';
@@ -24,6 +24,7 @@ const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 export default function DiscussionsPage() {
   const { projectId } = useParams();
   const pid = Number(projectId);
+  const navigate = useNavigate();
   const { data: me } = useMe();
   const { data: project } = useQuery({ queryKey: ['project', pid], queryFn: () => getProject(pid) });
   const isEditor = project ? ['owner', 'editor'].includes(project.role) : false;
@@ -136,7 +137,11 @@ export default function DiscussionsPage() {
         </Table.Thead>
         <Table.Tbody>
           {rows.map((d) => (
-            <Table.Tr key={d.id} style={{ cursor: 'pointer' }} onClick={() => setForm({ discussion: d })}>
+            <Table.Tr
+              key={d.id}
+              style={{ cursor: 'pointer' }}
+              onClick={() => navigate(`/projects/${pid}/discussions/${d.id}`)}
+            >
               <Table.Td>{d.id}</Table.Td>
               <Table.Td>{d.title}</Table.Td>
               <Table.Td>

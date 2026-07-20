@@ -15,6 +15,7 @@ import IssuesPage from './issues/IssuesPage';
 import HistoryPage from './history/HistoryPage';
 import ReferencesPage from './references/ReferencesPage';
 import DiscussionsPage from './discussions/DiscussionsPage';
+import DiscussionDetailPage from './discussions/DiscussionDetailPage';
 import CurrentWorkPage from './lock/CurrentWorkPage';
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="references" element={<ReferencesPage />} />
             <Route path="issues" element={<IssuesPage />} />
             <Route path="discussions" element={<DiscussionsPage />} />
+            <Route path="discussions/:id" element={<DiscussionDetailPage />} />
             <Route path="history" element={<HistoryPage />} />
             <Route path="activity" element={<CurrentWorkPage />} />
             <Route path="metadata" element={<ProjectMetadataPage />} />

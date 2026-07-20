@@ -3,6 +3,12 @@ import { api } from './client';
 export type DiscussionStatus = 'REVIEW' | 'OPEN' | 'REJECTED' | 'RESOLVED';
 export type DiscussionVisibility = 'INTERNAL' | 'PUBLIC';
 
+// Resolved inline mentions for a body: #nameID -> scientific name, @orcid -> display name.
+export interface Mentions {
+  usages: Record<string, string>;
+  orcids: Record<string, string>;
+}
+
 export interface Discussion {
   id: number;
   projectId: number;
@@ -17,6 +23,21 @@ export interface Discussion {
   createdAt: string;
   updatedAt: string;
   version: number;
+  mentions?: Mentions | null; // present on the detail GET
+}
+
+export interface Comment {
+  id: number;
+  projectId: number;
+  discussionId: number;
+  body: string;
+  authorId: number | null;
+  authorOrcid: string | null;
+  authorName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+  mentions?: Mentions | null;
 }
 
 export interface DiscussionPage {
@@ -80,4 +101,38 @@ export function setDiscussionStatus(
 
 export function deleteDiscussion(pid: number, id: number): Promise<void> {
   return api<void>(`/api/projects/${pid}/discussions/${id}`, { method: 'DELETE' });
+}
+
+// -- Comments (Phase 2) --------------------------------------------------------------------------
+
+export function listComments(pid: number, did: number): Promise<Comment[]> {
+  return api<Comment[]>(`/api/projects/${pid}/discussions/${did}/comments`);
+}
+
+export function createComment(pid: number, did: number, body: string): Promise<Comment> {
+  return api<Comment>(`/api/projects/${pid}/discussions/${did}/comments`, {
+    method: 'POST',
+    json: { body },
+  });
+}
+
+export function updateComment(
+  pid: number,
+  did: number,
+  cid: number,
+  payload: { body: string; version: number },
+): Promise<Comment> {
+  return api<Comment>(`/api/projects/${pid}/discussions/${did}/comments/${cid}`, {
+    method: 'PUT',
+    json: payload,
+  });
+}
+
+export function deleteComment(pid: number, did: number, cid: number): Promise<void> {
+  return api<void>(`/api/projects/${pid}/discussions/${did}/comments/${cid}`, { method: 'DELETE' });
+}
+
+// Reverse links: the discussions that mention a given name_usage (#nameID).
+export function listUsageDiscussions(pid: number, usageId: number): Promise<Discussion[]> {
+  return api<Discussion[]>(`/api/projects/${pid}/usages/${usageId}/discussions`);
 }

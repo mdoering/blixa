@@ -31,6 +31,7 @@ import NameRelationsTab, { referenceOptions } from '../child/NameRelationsTab';
 import { colIdFrom, scopedId, withScopedId } from '../child/map/mapUrls';
 import ReferencesTab from '../child/ReferencesTab';
 import TypeMaterialTab from '../child/TypeMaterialTab';
+import UsageDiscussionsTab from '../discussions/UsageDiscussionsTab';
 import {
   DistributionTab,
   EstimateTab,
@@ -325,6 +326,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
           {isAccepted && <Tabs.Tab value="properties">Properties</Tabs.Tab>}
           <Tabs.Tab value="issues">Issues</Tabs.Tab>
           <Tabs.Tab value="references">References</Tabs.Tab>
+          <Tabs.Tab value="discussions">Discussions</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="details" pt="md">
@@ -488,6 +490,10 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
             version={usage.version}
             canEdit={canEdit}
           />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="discussions" pt="md">
+          <UsageDiscussionsTab pid={pid} usageId={usageId} />
         </Tabs.Panel>
 
         {isAccepted && (

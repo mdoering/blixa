@@ -40,7 +40,10 @@ export default function DiscussionForm({ pid, discussion, opened, canManage, onC
     setStatus(discussion?.status ?? 'OPEN');
   }, [discussion, opened]);
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['discussions', pid] });
+  const invalidate = async () => {
+    await qc.invalidateQueries({ queryKey: ['discussions', pid] });
+    if (discussion) await qc.invalidateQueries({ queryKey: ['discussion', pid, discussion.id] });
+  };
 
   const save = useMutation({
     mutationFn: async () => {
