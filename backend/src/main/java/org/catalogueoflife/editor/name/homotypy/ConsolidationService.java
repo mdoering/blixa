@@ -146,7 +146,13 @@ public class ConsolidationService {
   public org.catalogueoflife.editor.name.homotypy.dto.Synonymy consolidate(int userId, int projectId,
       int survivorId, org.catalogueoflife.editor.name.homotypy.dto.ConsolidateRequest req) {
     requireEditor(userId, projectId);
-    requireUsage(projectId, survivorId);
+    NameUsage survivor = usages.findByIdInProject(projectId, survivorId);
+    if (survivor == null) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "name usage not found");
+    }
+    if (survivor.getStatus() != Status.ACCEPTED) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "survivor must be an accepted name");
+    }
     if (req != null && req.losers() != null) {
       for (var loser : req.losers()) {
         if (loser.acceptedId() == survivorId) continue; // never demote the survivor

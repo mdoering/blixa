@@ -211,4 +211,25 @@ class ConsolidationApiIT extends AbstractPostgresIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));
   }
+
+  // Defense-in-depth: the repoint-only path never calls demote(), which was the only place that
+  // incidentally validated the survivor is ACCEPTED. Reuse a SYNONYM usage's id as survivorId and
+  // assert consolidate rejects it with 400, regardless of what the request body contains -- the
+  // status check must run before any losers/repoint processing.
+  @Test
+  void consolidateRejectsNonAcceptedSurvivor() throws Exception {
+    ensureUser("consOwner");
+    long pid = createProjectOwnedBy("consOwner");
+
+    long familyId = createUsage(pid, "Poaceae", "", "family", "accepted", null);
+    long poaId = createUsage(pid, "Poa annua", "L.", "species", "accepted", familyId);
+    long synId = createUsage(pid, "Poa annua var. foo", "Bar", "species", "synonym", null);
+    link(pid, synId, poaId);
+
+    String body = "{\"losers\":[],\"repoint\":[],\"relations\":[]}";
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + synId + "/homotypic/consolidate")
+            .with(user("consOwner")).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content(body))
+        .andExpect(status().isBadRequest());
+  }
 }
