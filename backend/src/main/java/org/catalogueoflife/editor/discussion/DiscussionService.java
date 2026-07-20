@@ -28,15 +28,18 @@ public class DiscussionService {
   private final AppUserMapper users;
   private final DiscussionMentionService mentions;
   private final DiscussionLinkService links;
+  private final DiscussionFollowMapper follows;
 
   public DiscussionService(DiscussionMapper discussions, IdSeqMapper idSeq, ProjectService projects,
-      AppUserMapper users, DiscussionMentionService mentions, DiscussionLinkService links) {
+      AppUserMapper users, DiscussionMentionService mentions, DiscussionLinkService links,
+      DiscussionFollowMapper follows) {
     this.discussions = discussions;
     this.idSeq = idSeq;
     this.projects = projects;
     this.users = users;
     this.mentions = mentions;
     this.links = links;
+    this.follows = follows;
   }
 
   // Any member may list/read. q = full-text over title+body; status/authorId are optional filters;
@@ -60,11 +63,25 @@ public class DiscussionService {
     return requireInProject(projectId, id);
   }
 
-  // Detail view: the discussion plus its resolved #nameID / @orcid mentions.
+  // Detail view: the discussion, its resolved mentions, and the caller's follow state + count.
   public DiscussionResponse getDetail(int userId, int projectId, int id) {
     projects.requireRole(userId, projectId);
     Discussion d = requireInProject(projectId, id);
-    return DiscussionResponse.of(d, mentions.resolve(projectId, d.getBody()));
+    return DiscussionResponse.ofDetail(d, mentions.resolve(projectId, d.getBody()),
+        follows.isFollowing(projectId, id, userId), follows.countFollowers(projectId, id));
+  }
+
+  @Transactional
+  public void follow(int userId, int projectId, int id) {
+    projects.requireRole(userId, projectId);
+    requireInProject(projectId, id);
+    follows.follow(projectId, id, userId);
+  }
+
+  @Transactional
+  public void unfollow(int userId, int projectId, int id) {
+    projects.requireRole(userId, projectId);
+    follows.unfollow(projectId, id, userId);
   }
 
   @Transactional
@@ -83,6 +100,7 @@ public class DiscussionService {
     d.setCreatedVia("UI");
     discussions.insert(d);
     links.reconcile(projectId, d.getId()); // #nameID refs in the body -> reverse-links
+    follows.follow(projectId, d.getId(), userId); // the author auto-follows their own discussion
     // re-read to pick up the DB defaults (created_at/updated_at, version) + the joined authorName
     return requireInProject(projectId, d.getId());
   }
@@ -161,7 +179,8 @@ public class DiscussionService {
 
   public DiscussionResponse publicDetail(int projectId, int id) {
     Discussion d = requirePublic(projectId, id);
-    return DiscussionResponse.of(d, mentions.resolve(projectId, d.getBody()));
+    return DiscussionResponse.ofDetail(d, mentions.resolve(projectId, d.getBody()), null,
+        follows.countFollowers(projectId, id));
   }
 
   // The discussion iff it is PUBLIC, else 404 -- gates the public comments endpoint too.

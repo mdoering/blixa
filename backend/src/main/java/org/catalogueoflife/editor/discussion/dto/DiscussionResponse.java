@@ -17,17 +17,25 @@ public record DiscussionResponse(
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt,
     Integer version,
-    Mentions mentions) {
+    Mentions mentions,
+    Boolean following, // whether the requesting user follows it (null on list/public rows)
+    Integer followerCount) {
 
-  // List/reverse-link rows: no resolved mentions (the body isn't rendered there).
+  // List/reverse-link rows: no resolved mentions (the body isn't rendered there), no follow state.
   public static DiscussionResponse of(Discussion d) {
     return of(d, null);
   }
 
-  // Detail view: mentions resolved from the body (#nameID / @orcid).
   public static DiscussionResponse of(Discussion d, Mentions mentions) {
+    return ofDetail(d, mentions, null, null);
+  }
+
+  // Detail view: mentions resolved from the body + the requesting user's follow state + count.
+  public static DiscussionResponse ofDetail(Discussion d, Mentions mentions, Boolean following,
+      Integer followerCount) {
     return new DiscussionResponse(d.getId(), d.getProjectId(), d.getTitle(), d.getBody(),
         d.getStatus(), d.getVisibility(), d.getAuthorId(), d.getAuthorOrcid(), d.getAuthorName(),
-        d.getCreatedVia(), d.getCreatedAt(), d.getUpdatedAt(), d.getVersion(), mentions);
+        d.getCreatedVia(), d.getCreatedAt(), d.getUpdatedAt(), d.getVersion(), mentions, following,
+        followerCount);
   }
 }

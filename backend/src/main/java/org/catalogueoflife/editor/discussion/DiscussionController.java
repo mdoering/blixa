@@ -87,4 +87,16 @@ public class DiscussionController {
     int uid = currentUser.require().getId();
     service.delete(uid, pid, id);
   }
+
+  // Follow ("heart") this discussion to get change notifications by email.
+  @PostMapping("/{id}/follow")
+  public void follow(@PathVariable int pid, @PathVariable int id) {
+    service.follow(currentUser.require().getId(), pid, id);
+  }
+
+  @DeleteMapping("/{id}/follow")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void unfollow(@PathVariable int pid, @PathVariable int id) {
+    service.unfollow(currentUser.require().getId(), pid, id);
+  }
 }

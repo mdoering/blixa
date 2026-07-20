@@ -24,10 +24,13 @@ public class DiscussionCommentService {
   private final AppUserMapper users;
   private final DiscussionMentionService mentions;
   private final DiscussionLinkService links;
+  private final DiscussionFollowMapper follows;
+  private final DiscussionNotifier notifier;
 
   public DiscussionCommentService(DiscussionCommentMapper comments, DiscussionMapper discussions,
       IdSeqMapper idSeq, ProjectService projects, AppUserMapper users,
-      DiscussionMentionService mentions, DiscussionLinkService links) {
+      DiscussionMentionService mentions, DiscussionLinkService links, DiscussionFollowMapper follows,
+      DiscussionNotifier notifier) {
     this.comments = comments;
     this.discussions = discussions;
     this.idSeq = idSeq;
@@ -35,6 +38,8 @@ public class DiscussionCommentService {
     this.users = users;
     this.mentions = mentions;
     this.links = links;
+    this.follows = follows;
+    this.notifier = notifier;
   }
 
   public List<CommentResponse> list(int userId, int projectId, int discussionId) {
@@ -48,7 +53,7 @@ public class DiscussionCommentService {
   @Transactional
   public CommentResponse create(int userId, int projectId, int discussionId, String body) {
     projects.requireRole(userId, projectId); // any member may comment
-    requireDiscussion(projectId, discussionId);
+    Discussion discussion = requireDiscussion(projectId, discussionId);
     AppUser author = users.findById(userId);
     DiscussionComment c = new DiscussionComment();
     c.setProjectId(projectId);
@@ -59,7 +64,15 @@ public class DiscussionCommentService {
     c.setAuthorOrcid(author == null ? null : author.getOrcid());
     comments.insert(c);
     links.reconcile(projectId, discussionId);
+    follows.follow(projectId, discussionId, userId); // commenting follows the thread
+    notifier.notifyNewComment(projectId, discussionId, discussion.getTitle(), userId, displayName(author));
     return response(projectId, c.getId());
+  }
+
+  private static String displayName(AppUser u) {
+    if (u == null) return null;
+    return u.getDisplayName() != null && !u.getDisplayName().isBlank()
+        ? u.getDisplayName() : u.getUsername();
   }
 
   @Transactional
@@ -90,10 +103,12 @@ public class DiscussionCommentService {
     return CommentResponse.of(saved, mentions.resolve(projectId, saved.getBody()));
   }
 
-  private void requireDiscussion(int projectId, int discussionId) {
-    if (discussions.findByIdInProject(projectId, discussionId) == null) {
+  private Discussion requireDiscussion(int projectId, int discussionId) {
+    Discussion d = discussions.findByIdInProject(projectId, discussionId);
+    if (d == null) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "discussion not found");
     }
+    return d;
   }
 
   private DiscussionComment requireComment(int projectId, int discussionId, int id) {

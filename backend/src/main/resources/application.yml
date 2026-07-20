@@ -39,6 +39,11 @@ mybatis:
 server:
   port: 8080
 coldp:
+  # Outgoing email for discussion-follow notifications. Sending is best-effort and only happens when
+  # `from` is set AND Spring's mail sender is configured (spring.mail.host); otherwise it's logged.
+  mail:
+    from: ${COLDP_MAIL_FROM:}
+    base-url: ${COLDP_BASE_URL:http://localhost:5173}
   clb:
     base-url: https://api.checklistbank.org
   clb-import:
