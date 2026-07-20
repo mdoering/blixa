@@ -1,5 +1,5 @@
 import { Anchor, Badge, Box, Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
-import { IconArrowLeft, IconPencil } from '@tabler/icons-react';
+import { IconArrowLeft, IconHeart, IconHeartFilled, IconPencil } from '@tabler/icons-react';
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Navigate, useParams } from 'react-router-dom';
@@ -9,9 +9,11 @@ import { getProject } from '../api/projects';
 import { useMe } from '../auth/useMe';
 import {
   createComment,
+  followDiscussion,
   getDiscussion,
   listComments,
   setDiscussionStatus,
+  unfollowDiscussion,
   type Comment,
   type DiscussionStatus,
 } from '../api/discussions';
@@ -71,6 +73,15 @@ export default function DiscussionDetailPage() {
     onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Could not update') }),
   });
 
+  const toggleFollow = useMutation({
+    mutationFn: () =>
+      discussion?.following ? unfollowDiscussion(pid, did) : followDiscussion(pid, did),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['discussion', pid, did] });
+    },
+    onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Could not update follow') }),
+  });
+
   // deleted (or not found) -> back to the list
   if (isError) return <Navigate to={`/projects/${pid}/discussions`} replace />;
   if (!discussion) return null;
@@ -92,6 +103,19 @@ export default function DiscussionDetailPage() {
           {discussion.title}
         </Title>
         <Group gap="xs">
+          <Button
+            size="xs"
+            variant={discussion.following ? 'light' : 'default'}
+            color="pink"
+            leftSection={
+              discussion.following ? <IconHeartFilled size={14} /> : <IconHeart size={14} />
+            }
+            onClick={() => toggleFollow.mutate()}
+            loading={toggleFollow.isPending}
+          >
+            {discussion.following ? 'Following' : 'Follow'}
+            {discussion.followerCount ? ` (${discussion.followerCount})` : ''}
+          </Button>
           {discussion.visibility === 'PUBLIC' && (
             <Anchor
               href={`/p/${pid}/discussions/${did}`}

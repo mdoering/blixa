@@ -31,6 +31,8 @@ export interface Discussion {
   updatedAt: string;
   version: number;
   mentions?: Mentions | null; // present on the detail GET
+  following?: boolean | null; // detail GET: whether the current user follows it
+  followerCount?: number | null;
 }
 
 export interface Comment {
@@ -104,6 +106,14 @@ export function setDiscussionStatus(
     method: 'POST',
     json: { status },
   });
+}
+
+export function followDiscussion(pid: number, id: number): Promise<void> {
+  return api<void>(`/api/projects/${pid}/discussions/${id}/follow`, { method: 'POST' });
+}
+
+export function unfollowDiscussion(pid: number, id: number): Promise<void> {
+  return api<void>(`/api/projects/${pid}/discussions/${id}/follow`, { method: 'DELETE' });
 }
 
 // Editor-only: mark a discussion INTERNAL or PUBLIC.

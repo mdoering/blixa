@@ -63,6 +63,26 @@ test('renders the body with a mention link and the comments', async () => {
   expect(screen.getByText('bob')).toBeInTheDocument();
 });
 
+test('the Follow button follows the discussion', async () => {
+  let followed = false;
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    http.get('/api/projects/3/discussions/1', () =>
+      HttpResponse.json({ ...discussion, following: false, followerCount: 1 }),
+    ),
+    http.get('/api/projects/3/discussions/1/comments', () => HttpResponse.json([])),
+    http.post('/api/projects/3/discussions/1/follow', () => {
+      followed = true;
+      return new HttpResponse(null, { status: 200 });
+    }),
+  );
+  renderDetail();
+
+  await screen.findByRole('heading', { name: 'Placement of cats' });
+  await userEvent.click(screen.getByRole('button', { name: /Follow/ }));
+  await waitFor(() => expect(followed).toBe(true));
+});
+
 test('a public discussion shows the Public badge and a public-page link', async () => {
   server.use(
     http.get('/api/projects/3', () => HttpResponse.json(project)),

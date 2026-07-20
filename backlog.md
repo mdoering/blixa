@@ -30,7 +30,10 @@ renamed to avoid collision with the validation *Issues*, and because the shape i
 - [x] **Phase 4 — external API + per-project token** *(shipped)*: editor-managed API token (settings
   modal); token-gated `POST /api/public/projects/{pid}/discussions` (X-Api-Token) creates a `REVIEW`
   submission; editors Accept → `OPEN` / Reject on the detail page (turns COL user comments into discussions).
-- [ ] **Phase 5 — follow (heart) + email notifications** (needs SMTP config).
+- [x] **Phase 5 — follow (heart) + email notifications** *(shipped)*: follow/unfollow with a heart on
+  the detail page (following + follower count); authors/commenters auto-follow; new comments email
+  followers (minus the actor) best-effort via `spring-boot-starter-mail` (sends only when
+  `spring.mail.host` + `coldp.mail.from` are set, else logs).
 - [ ] **Phase 6 — link (closed) discussions to changes & work locks.**
 - [x] **Mention autocomplete** *(shipped — `MentionTextarea`)*: in the discussion/comment composer,
   `#` + a **capital letter** + 3+ letters (`#Xyz…`) opens a **name autocomplete** (reuses usage
