@@ -31,7 +31,7 @@ From the repo root:
 docker compose up -d
 ```
 
-This starts PostgreSQL 17 with database `coldp_editor` (user/password `coldp_editor`) on host port **5433**. Port 5433 (not the standard 5432) avoids clashing with any PostgreSQL you may already run on 5432. The backend's `dev` profile is preconfigured for this port, and Flyway runs the migrations automatically on startup, so there is **no manual schema step**.
+This starts PostgreSQL 17 with database `blixa` (user/password `blixa`) on host port **5433**. Port 5433 (not the standard 5432) avoids clashing with any PostgreSQL you may already run on 5432. The backend's `dev` profile is preconfigured for this port, and Flyway runs the migrations automatically on startup, so there is **no manual schema step**.
 
 ### 2. Run the backend
 
@@ -82,9 +82,9 @@ The backend reads these environment variables (defaults shown):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DB_URL` | `jdbc:postgresql://localhost:5432/coldp_editor` | JDBC URL |
-| `DB_USER` | `coldp_editor` | database user |
-| `DB_PASSWORD` | `coldp_editor` | database password |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/blixa` | JDBC URL |
+| `DB_USER` | `blixa` | database user |
+| `DB_PASSWORD` | `blixa` | database password |
 | `ORCID_CLIENT_ID` | `unconfigured` | ORCID OAuth2 client id (optional) |
 | `ORCID_CLIENT_SECRET` | `unconfigured` | ORCID OAuth2 client secret (optional) |
 | `COLDP_EXPORT_DIR` | `${java.io.tmpdir}/coldp-exports` | ColDP export artifact storage dir |
@@ -99,7 +99,7 @@ Also relevant: `coldp.clb.base-url` (env `COLDP_CLB_BASE_URL`, default `https://
 
 The base default `DB_URL` uses port 5432, but the **`dev` profile overrides it to 5433** (the compose port) via `application-dev.yml`. The `dev` seed user is also overridable: `editor.dev.username`, `editor.dev.password`, `editor.dev.display-name`.
 
-To point at your own PostgreSQL instead of Docker, create the `coldp_editor` database and set the three `DB_*` variables accordingly (e.g. `DB_URL=jdbc:postgresql://localhost:5432/coldp_editor`), then run the backend (Flyway handles the schema). The `pg_trgm` extension is created automatically by a migration.
+To point at your own PostgreSQL instead of Docker, create the `blixa` database and set the three `DB_*` variables accordingly (e.g. `DB_URL=jdbc:postgresql://localhost:5432/blixa`), then run the backend (Flyway handles the schema). The `pg_trgm` extension is created automatically by a migration.
 
 ---
 
@@ -133,8 +133,8 @@ the database, then let the backend rebuild it on startup:
 ```bash
 # stop the backend first so there are no active connections, then:
 sudo -u postgres psql <<'SQL'
-DROP DATABASE IF EXISTS coldp_editor;
-CREATE DATABASE coldp_editor OWNER coldp_editor;
+DROP DATABASE IF EXISTS blixa;
+CREATE DATABASE blixa OWNER blixa;
 SQL
 # start the backend — Flyway builds the fresh schema from V1__initial_schema.sql
 ```
@@ -189,21 +189,21 @@ along with every table and index:
 
 ```bash
 sudo -u postgres psql <<'SQL'
-CREATE ROLE coldp_editor LOGIN PASSWORD 'CHANGE_ME';
-CREATE DATABASE coldp_editor OWNER coldp_editor;
+CREATE ROLE blixa LOGIN PASSWORD 'CHANGE_ME';
+CREATE DATABASE blixa OWNER blixa;
 SQL
 ```
 
 To reach it from another host, also open `listen_addresses` in `postgresql.conf` and add a
-`pg_hba.conf` line for the backend host (e.g. `host coldp_editor coldp_editor <backend-ip>/32 scram-sha-256`), then `sudo systemctl restart postgresql`. For a same-host backend the default
+`pg_hba.conf` line for the backend host (e.g. `host blixa blixa <backend-ip>/32 scram-sha-256`), then `sudo systemctl restart postgresql`. For a same-host backend the default
 local socket / `127.0.0.1` is enough.
 
 **3. Point the backend at it** — set the three `DB_*` variables (in the systemd unit's env file;
 templates in [`deploy/`](deploy/README.md)):
 
 ```bash
-DB_URL=jdbc:postgresql://localhost:5432/coldp_editor
-DB_USER=coldp_editor
+DB_URL=jdbc:postgresql://localhost:5432/blixa
+DB_USER=blixa
 DB_PASSWORD=CHANGE_ME
 ```
 

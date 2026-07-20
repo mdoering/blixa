@@ -2,9 +2,9 @@ spring:
   application:
     name: coldp-editor
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/coldp_editor}
-    username: ${DB_USER:coldp_editor}
-    password: ${DB_PASSWORD:coldp_editor}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/blixa}
+    username: ${DB_USER:blixa}
+    password: ${DB_PASSWORD:blixa}
   flyway:
     enabled: true
   servlet:
