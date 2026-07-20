@@ -29,6 +29,12 @@ renamed to avoid collision with the validation *Issues*, and because the shape i
 - [ ] **Phase 5 — follow (heart) + email notifications** (needs SMTP config).
 - [ ] **Phase 6 — link (closed) discussions to changes & work locks.**
 
+**Discussions — user identity polish (after Phase 2):**
+- [ ] **Avatars** on users, shown in comments and everywhere a user appears. (ORCID's public API exposes
+  no profile photo, so use initials-based avatars.)
+- [ ] **Custom, unique username** users can set, so we rarely show the raw ORCID. Prefer avatar + username.
+- [ ] **`@username`** as an additional comment mention syntax (alongside `@orcid`).
+
 Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 
 ### 2. AI-assisted curation
