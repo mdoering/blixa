@@ -19,6 +19,7 @@ import DiscussionsPage from './discussions/DiscussionsPage';
 import DiscussionDetailPage from './discussions/DiscussionDetailPage';
 import CurrentWorkPage from './lock/CurrentWorkPage';
 import AdminUsersPage from './admin/AdminUsersPage';
+import HomotypicConflictsPage from './homotypy/HomotypicConflictsPage';
 
 export default function App() {
   return (
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="issues" element={<IssuesPage />} />
             <Route path="discussions" element={<DiscussionsPage />} />
             <Route path="discussions/:id" element={<DiscussionDetailPage />} />
+            <Route path="homotypic-conflicts/:rootId" element={<HomotypicConflictsPage />} />
             <Route path="history" element={<HistoryPage />} />
             <Route path="activity" element={<CurrentWorkPage />} />
             <Route path="metadata" element={<ProjectMetadataPage />} />

@@ -210,3 +210,44 @@ export function applyHomotypic(pid: number, id: number, relations: ApplyRelation
     json: { relations },
   });
 }
+
+// --- Side 2: homotypic consolidation ---
+export interface AcceptedCandidate {
+  id: number;
+  formattedName: string | null;
+  descendantCount: number;
+  version: number;
+}
+export interface ConflictMember {
+  id: number;
+  formattedName: string | null;
+  status: string;
+  acceptedTargetIds: number[];
+  proParte: boolean;
+  dualStatus: boolean;
+}
+export interface ConflictCluster {
+  accepted: AcceptedCandidate[];
+  members: ConflictMember[];
+  suggestedSurvivorId: number | null;
+  hasExceptions: boolean;
+  relations: ProposedRelation[];
+}
+export interface LoserRef {
+  acceptedId: number;
+  version: number;
+}
+
+export function getHomotypicConflicts(pid: number, rootId: number): Promise<ConflictCluster[]> {
+  return api<ConflictCluster[]>(`/api/projects/${pid}/usages/${rootId}/homotypic/conflicts`);
+}
+export function consolidateHomotypic(
+  pid: number,
+  survivorId: number,
+  body: { losers: LoserRef[]; relations: ApplyRelation[] },
+): Promise<Synonymy> {
+  return api<Synonymy>(`/api/projects/${pid}/usages/${survivorId}/homotypic/consolidate`, {
+    method: 'POST',
+    json: body,
+  });
+}

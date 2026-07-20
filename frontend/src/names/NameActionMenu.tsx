@@ -1,10 +1,12 @@
 import { ActionIcon, Menu } from '@mantine/core';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   IconArrowsMove,
   IconChevronRight,
   IconCloudDownload,
   IconDotsVertical,
+  IconGitMerge,
   IconPlus,
   IconTrash,
 } from '@tabler/icons-react';
@@ -62,6 +64,7 @@ export default function NameActionMenu({
   onAfterDelete,
 }: NameActionMenuProps) {
   const actions = useNameActions(pid);
+  const navigate = useNavigate();
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   if (!canEdit) return null;
@@ -135,6 +138,12 @@ export default function NameActionMenu({
                 onClick={() => actions.startBulk(usage)}
               >
                 Bulk add…
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<IconGitMerge size={14} />}
+                onClick={() => navigate(`/projects/${pid}/homotypic-conflicts/${usage.id}`)}
+              >
+                Find homotypic conflicts
               </Menu.Item>
             </>
           )}
