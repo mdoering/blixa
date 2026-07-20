@@ -103,7 +103,7 @@ public class ConsolidationService {
         boolean proParte = u.getStatus() == Status.SYNONYM && targets.size() > 1;
         boolean dualStatus = Boolean.TRUE.equals(hasAccepted.get(sn)) && Boolean.TRUE.equals(hasSynonym.get(sn));
         members.add(new ConflictMember(u.getId(), formatted(u, project), u.getStatus().name(),
-            targets, proParte, dualStatus));
+            targets, u.getVersion(), proParte, dualStatus));
       }
 
       if (distinctAccepted.size() <= 1) continue; // not a conflict
@@ -116,7 +116,7 @@ public class ConsolidationService {
         NameUsage a = usages.findByIdInProject(projectId, aid);
         if (a == null) continue;
         int descendants = Math.max(0, usages.findSubtreeIds(projectId, aid).size() - 1);
-        accepted.add(new AcceptedCandidate(a.getId(), formatted(a, project), descendants, a.getVersion()));
+        accepted.add(new AcceptedCandidate(a.getId(), formatted(a, project), descendants));
         yearByAccepted.put(a.getId(), parseYear(a.getCombinationAuthorshipYear()));
       }
       if (accepted.size() <= 1) continue; // all targets resolved to the same/one loadable accepted
@@ -135,10 +135,13 @@ public class ConsolidationService {
     return conflicts;
   }
 
-  // Demote each loser accepted name to a SYNONYM of the survivor (reusing demote(): children +
-  // synonyms -> survivor), then persist the cluster's homotypic relations and return the
-  // survivor's synonymy. @Transactional so a stale loser version (409 from demote) rolls back the
-  // whole consolidation, not just the failed loser.
+  // Demote each loser accepted MEMBER to a SYNONYM of the survivor (reusing demote(): children +
+  // synonyms -> survivor), re-point each synonym MEMBER to the survivor (unlinking its other
+  // accepted targets), then persist the cluster's homotypic relations and return the survivor's
+  // synonymy. An accepted name reached only as a synonym's target -- never itself a homotypic
+  // cluster member -- is neither a loser nor touched here; only the re-pointed synonym moves.
+  // @Transactional so a stale loser version (409 from demote) rolls back the whole consolidation,
+  // not just the failed loser.
   @org.springframework.transaction.annotation.Transactional
   public org.catalogueoflife.editor.name.homotypy.dto.Synonymy consolidate(int userId, int projectId,
       int survivorId, org.catalogueoflife.editor.name.homotypy.dto.ConsolidateRequest req) {
@@ -151,6 +154,15 @@ public class ConsolidationService {
         nameUsages.demote(userId, projectId, loser.acceptedId(),
             new org.catalogueoflife.editor.name.dto.DemoteRequest(
                 survivorId, "SYNONYM", "new-accepted", "new-accepted", loser.version()));
+      }
+    }
+    if (req != null && req.repoint() != null) {
+      for (Integer synId : req.repoint()) {
+        // link to survivor first (never orphan the synonym), then unlink its other accepted targets
+        nameUsages.linkSynonym(userId, projectId, synId, survivorId);
+        for (Integer t : synonymAccepted.findAcceptedFor(projectId, synId)) {
+          if (t != survivorId) nameUsages.unlinkSynonym(userId, projectId, synId, t);
+        }
       }
     }
     // Persist the cluster's homotypic relations (idempotent) and return the survivor's synonymy.

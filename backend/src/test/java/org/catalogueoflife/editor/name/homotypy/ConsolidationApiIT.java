@@ -112,15 +112,18 @@ class ConsolidationApiIT extends AbstractPostgresIT {
             .with(user("consNonMember")))
         .andExpect(status().isNotFound());
 
-    // read the loser's version off the conflict's accepted-candidate list (freshly created -> 0)
+    // read the loser's version off the conflict's member list (accepted candidates no longer carry
+    // a version -- only cluster MEMBERS can be losers; freshly created -> 0)
     var conflict = json.readTree(scanBody).get(0);
-    long ochlopoaVersion = java.util.stream.StreamSupport.stream(conflict.get("accepted").spliterator(), false)
-        .filter(a -> a.get("id").asLong() == ochlopoaId)
-        .findFirst().orElseThrow(() -> new AssertionError("Ochlopoa annua missing from accepted candidates"))
+    long ochlopoaVersion = java.util.stream.StreamSupport.stream(conflict.get("members").spliterator(), false)
+        .filter(m -> m.get("id").asLong() == ochlopoaId)
+        .findFirst().orElseThrow(() -> new AssertionError("Ochlopoa annua missing from members"))
         .get("version").asLong();
 
-    // consolidate: sink Ochlopoa annua into Poa annua
+    // consolidate: sink Ochlopoa annua into Poa annua (an accepted MEMBER of the cluster, so it's
+    // a loser to demote; nothing to re-point here)
     String body = "{\"losers\":[{\"acceptedId\":" + ochlopoaId + ",\"version\":" + ochlopoaVersion + "}],"
+        + "\"repoint\":[],"
         + "\"relations\":[{\"usageId\":" + ochlopoaId + ",\"relatedUsageId\":" + poaId + ",\"type\":\"basionym\"}]}";
     mvc.perform(post("/api/projects/" + pid + "/usages/" + poaId + "/homotypic/consolidate")
             .with(user("consOwner")).with(csrf())
@@ -179,5 +182,33 @@ class ConsolidationApiIT extends AbstractPostgresIT {
         .filter(m -> m.get("id").asLong() == ochlopoaSynId)
         .findFirst().orElseThrow(() -> new AssertionError("Ochlopoa synonym missing from members"));
     assertThat(synMember.get("status").asString()).isEqualTo("SYNONYM");
+
+    // Consolidate with survivor = Poa annua. Poa annua is the ONLY accepted MEMBER of this cluster
+    // (Festuca foo is a survivor CANDIDATE -- the synonym's current accepted target -- but not
+    // itself a homotypic member), so there is nothing to demote; the misplaced synonym
+    // (Ochlopoa annua, currently a synonym of Festuca foo) is re-pointed to Poa annua instead.
+    // This is the corrected consolidation behavior: the old model would have wrongly demoted
+    // Festuca foo (an accepted name only ever reached as this synonym's target) just because it
+    // was a non-survivor accepted candidate.
+    String consolidateBody = "{\"losers\":[],"
+        + "\"repoint\":[" + ochlopoaSynId + "],"
+        + "\"relations\":[{\"usageId\":" + ochlopoaSynId + ",\"relatedUsageId\":" + poaId + ",\"type\":\"basionym\"}]}";
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + poaId + "/homotypic/consolidate")
+            .with(user("consOwner")).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content(consolidateBody))
+        .andExpect(status().isOk())
+        // Ochlopoa annua now appears under Poa annua's homotypic synonyms
+        .andExpect(jsonPath("$.homotypic[?(@.id == " + ochlopoaSynId + ")]").exists());
+
+    // Festuca foo must still be ACCEPTED -- it was never a homotypic cluster member, only the
+    // re-pointed synonym's former (heterotypic) target.
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + festucaId).with(user("consOwner")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("ACCEPTED"));
+
+    // re-scan: the conflict is gone
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + familyId + "/homotypic/conflicts").with(user("consOwner")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
   }
 }
