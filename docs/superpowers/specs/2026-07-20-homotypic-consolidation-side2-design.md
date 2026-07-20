@@ -41,9 +41,16 @@ duplicate-label losers — the curator supplies the judgment those encode.
 4. **Suggested survivor = most descendants.** Default the survivor to the accepted name with the
    largest accepted subtree (fewest taxa move), ties broken by combination-authorship year then
    name. The curator can pick any of the cluster's accepted names.
-5. **Reuse `demote()` for the mutation.** Each losing accepted name is demoted to a `SYNONYM` of
-   the survivor with children → survivor and synonyms → survivor, then the cluster's homotypic
-   `name_relation`s are persisted so the survivor's Side-1 synonymy renders the losers as `≡`.
+5. **Re-point synonyms; demote only homotypic accepted names.** The survivor is the accepted name
+   that owns the type. Every OTHER accepted name that is itself a homotypic **member** of the
+   cluster is demoted to a `SYNONYM` of the survivor (via `demote()`, children + synonyms →
+   survivor). Every **synonym member** of the cluster is re-pointed to the survivor (link to
+   survivor, unlink from its other accepted targets). An accepted name reached **only** as a
+   synonym's target (heterotypically related — e.g. `Festuca foo` when a misplaced synonym under it
+   is homotypic to the survivor) is **never** demoted; it simply loses the re-pointed synonym. The
+   cluster's homotypic `name_relation`s are then persisted so the survivor's Side-1 synonymy renders
+   the homotypic names as `≡`. *(This is why demoting every non-survivor accepted candidate is wrong:
+   a synonym-target accepted taxon is not itself homotypic — only its synonym is.)*
 
 ## Detection
 
@@ -55,13 +62,17 @@ duplicate-label losers — the curator supplies the judgment those encode.
   `[accepted] + synonyms`. Side 2 passes the subtree's usages. No change to the clustering logic
   (epithet-bucket + basionym-or-combination author key); it still designates a basionym per cluster
   and proposes `basionym`/`homotypic` relations.
-- `NameUsageMapper.findSubtreeIds(pid, rootId)` (existing) — every id in the accepted subtree.
-- `SynonymAcceptedMapper.findAcceptedFor(pid, synonymId)` (existing) — a synonym's accepted
-  target ids (empty for unlinked; several for pro parte).
+- `NameUsageMapper.findSubtreeIds(pid, rootId)` (existing) — every id in the accepted classification
+  subtree (a `parent_id` walk; synonyms have `parent_id = null` and are **not** returned).
+- `SynonymAcceptedMapper.findSynonymsOf(pid, acceptedId)` / `findAcceptedFor(pid, synonymId)`
+  (existing) — an accepted usage's synonym ids / a synonym's accepted target ids (empty for
+  unlinked; several for pro parte).
 
 ### Scan algorithm (`ConsolidationService.scan(userId, pid, rootId)`)
 
-1. `requireRole`; `findSubtreeIds(rootId)`; load each as `NameUsage`.
+1. `requireRole`; collect candidate ids = every `findSubtreeIds(rootId)` id **unioned with each
+   id's `findSynonymsOf`** (synonyms carry `parent_id = null`, so the subtree walk alone misses
+   them); load each as `NameUsage`.
 2. **Pre-filter** to clusterable usages: keep `ACCEPTED` and `SYNONYM`; drop `MISAPPLIED` and
    `UNASSESSED`; drop supraspecific (blank `specificEpithet`) and autonyms
    (`infraspecificEpithet` equals `specificEpithet`). *(OTU/NameType filtering is unnecessary —
@@ -92,36 +103,44 @@ can badge it and the curator treats it with extra care.
 ### `ConsolidationService.consolidate(userId, pid, ConsolidateRequest)`
 
 `requireEditor`, `@Transactional` (one cluster resolves atomically). Request carries the chosen
-`survivorId`, the `losers` (each `{acceptedId, version}` — the *accepted names* being sunk, with
-their optimistic-lock versions), and the cluster's `relations` (the detector's proposed homotypic
-relations for the cluster).
+`survivorId`, the `losers` (each `{acceptedId, version}` — the accepted **members** of the cluster
+other than the survivor, with their optimistic-lock versions), the `repoint` (ids of the cluster's
+**synonym members** that must move to the survivor), and the cluster's `relations` (the detector's
+proposed homotypic relations).
 
-For each loser accepted name, reuse the existing demote path with survivor-directed placement:
+1. **Demote each loser accepted member** to the survivor:
+   `demote(userId, pid, loser.acceptedId, new DemoteRequest(survivorId, "SYNONYM", "new-accepted",
+   "new-accepted", loser.version))` — sets the loser to `SYNONYM` of the survivor, reparents its
+   accepted children to the survivor, and re-points its own synonyms to the survivor. A stale
+   version → 409 (the whole cluster transaction rolls back; the curator re-scans).
+2. **Re-point each synonym member** to the survivor: `linkSynonym(userId, pid, synonymId,
+   survivorId)` then, for every current accepted target `t ≠ survivorId` of that synonym
+   (`findAcceptedFor`), `unlinkSynonym(userId, pid, synonymId, t)`. Link-before-unlink so the
+   synonym is never momentarily orphaned; both ops are idempotent, so a synonym a step-1 demote
+   already moved is a no-op here.
+3. **Persist** the cluster's homotypic `name_relation`s through Side-1's idempotent apply
+   (`nameRelations.exists` guard + `insert`), so the survivor's synonymy renders the homotypic
+   names as `≡`, and return the survivor's refreshed `Synonymy`.
 
-- `demote(userId, pid, loser.acceptedId, new DemoteRequest(survivorId, "SYNONYM", "new-accepted",
-  "new-accepted", loser.version))` — sets the loser to `SYNONYM` of the survivor, reparents its
-  accepted children to the survivor, and re-points its own synonyms to the survivor. A stale
-  version → 409 (the whole cluster transaction rolls back; the curator re-scans).
-
-Then persist the cluster's homotypic `name_relation`s through Side-1's idempotent apply
-(`nameRelations.exists` guard + `insert`), so the survivor's synonymy renders the sunk names and
-their recombinations as `≡`.
-
-Return the survivor's refreshed `Synonymy` (Side-1 read model) so the page can show the resolved
-state.
+The frontend computes `losers`/`repoint` from the chosen survivor: `losers` = cluster members with
+status `ACCEPTED` and id ≠ survivor; `repoint` = cluster members with status `SYNONYM` not already
+pointing solely at the survivor. So which accepted names get demoted depends on which candidate the
+curator picks: picking an accepted member `A` demotes the *other* accepted members and re-points the
+synonym members to `A` (leaving synonym-target accepteds like `Festuca foo` alone); picking a
+synonym-target accepted `F` demotes the accepted members into `F` and leaves `F` accepted.
 
 ### Guards / edge behavior
 
-- A loser must currently be `ACCEPTED` and not the survivor (enforced by `demote()`'s own checks:
-  only accepted usages demote; target must be accepted; target not a descendant of the loser).
+- A demoted loser must currently be `ACCEPTED` and not the survivor (enforced by `demote()`'s own
+  checks). Only accepted **members** of the cluster are ever demoted — never an accepted name
+  reached solely as a synonym's target.
 - Rank safety is automatic: the scan only clusters species/infraspecific usages, so losers are
   never genus-or-above (CLB's explicit rank guard is unnecessary here).
 - Duplicate-label losers are **kept as synonyms** (no auto-delete); the curator removes true
   duplicates separately.
-- Pro-parte collapse: consolidating a cluster with a pro-parte member re-points that member to the
-  survivor (its other accepted links are dropped by `demote`'s synonym handling / dedup). Because
-  this is lossy for a legitimate pro parte, such clusters are flagged and the curator chooses to
-  proceed or skip.
+- Pro-parte collapse: re-pointing a pro-parte synonym member drops its other accepted links. Because
+  this is lossy for a legitimate pro parte, such clusters are flagged (`hasExceptions`) and the
+  curator chooses to proceed or skip.
 
 ## API
 
@@ -130,18 +149,20 @@ Under the usage controller, package `…name.homotypy`:
 - `GET /api/projects/{pid}/usages/{id}/homotypic/conflicts` → `List<ConflictCluster>`. Scans the
   accepted subtree rooted at `{id}`. Any member may read.
 - `POST /api/projects/{pid}/usages/{survivorId}/homotypic/consolidate` — body `ConsolidateRequest`
-  `{ losers: [{acceptedId, version}], relations: [{usageId, relatedUsageId, type}] }`. Owner/editor.
-  Returns the survivor's `Synonymy`.
+  `{ losers: [{acceptedId, version}], repoint: [synonymId…], relations: [{usageId, relatedUsageId,
+  type}] }`. Owner/editor. Returns the survivor's `Synonymy`.
 
 DTOs (`…name.homotypy/dto/`):
 
 - `ConflictCluster(List<AcceptedCandidate> accepted, List<ConflictMember> members,
   Integer suggestedSurvivorId, boolean hasExceptions, List<ProposedRelation> relations)`
-- `AcceptedCandidate(int id, String formattedName, int descendantCount)` — the survivor choices.
+- `AcceptedCandidate(int id, String formattedName, int descendantCount)` — the survivor choices
+  (all the distinct accepted names the cluster resolves to — accepted members plus synonym targets).
 - `ConflictMember(int id, String formattedName, String status, List<Integer> acceptedTargetIds,
-  boolean proParte, boolean dualStatus)` — every clustered name, for display.
-- `ConsolidateRequest(List<LoserRef> losers, List<ApplyRelation> relations)` with
-  `LoserRef(int acceptedId, int version)`.
+  int version, boolean proParte, boolean dualStatus)` — every clustered name, for display; `version`
+  is the usage's optimistic-lock version (used when an accepted member is demoted).
+- `ConsolidateRequest(List<LoserRef> losers, List<Integer> repoint, List<ApplyRelation> relations)`
+  with `LoserRef(int acceptedId, int version)`.
 
 `descendantCount` per candidate comes from the `findSubtreeIds` CTE size (minus self); a subtree
 scan is small enough that per-candidate counts are cheap. Suggested survivor = max
