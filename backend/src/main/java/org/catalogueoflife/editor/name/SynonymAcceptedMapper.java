@@ -49,6 +49,18 @@ public interface SynonymAcceptedMapper {
       """)
   List<Integer> findSynonymsOf(@Param("projectId") int projectId, @Param("acceptedId") int acceptedId);
 
+  // Distinct synonym ids linked to ANY of the given accepted usages -- for the WITH_SYNONYMS /
+  // SUBTREE deletes (a synonym linked pro-parte to an accepted outside the set is still removed).
+  @Select("""
+      <script>
+      SELECT DISTINCT synonym_id FROM synonym_accepted
+      WHERE project_id = #{projectId} AND accepted_id IN
+      <foreach collection='acceptedIds' item='a' open='(' separator=',' close=')'>#{a}</foreach>
+      </script>
+      """)
+  List<Integer> synonymIdsForAccepted(@Param("projectId") int projectId,
+      @Param("acceptedIds") List<Integer> acceptedIds);
+
   // Every (synonym_id, accepted_id) link in the project, ordered by synonym_id then accepted_id --
   // coldp/export/NameUsageColdpWriter groups these per synonym (ascending by acceptedId, the
   // group's natural order here) to place the primary NameUsage.tsv row on the lowest accepted id

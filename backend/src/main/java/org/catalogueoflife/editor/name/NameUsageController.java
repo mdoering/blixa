@@ -108,11 +108,22 @@ public class NameUsageController {
     return service.listAccepted(uid, pid, id);
   }
 
+  // mode = FOCAL_ONLY (default) | WITH_SYNONYMS | SUBTREE; reparentTo optionally overrides where the
+  // focal's accepted children move on the non-subtree modes (default = the grandparent).
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void delete(@PathVariable int pid, @PathVariable int id) {
+  public void delete(@PathVariable int pid, @PathVariable int id,
+      @RequestParam(defaultValue = "FOCAL_ONLY") String mode,
+      @RequestParam(required = false) Integer reparentTo) {
     int uid = currentUser.require().getId();
-    service.delete(uid, pid, id);
+    DeleteMode deleteMode;
+    try {
+      deleteMode = DeleteMode.valueOf(mode.trim().toUpperCase(java.util.Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "invalid delete mode: " + mode);
+    }
+    service.delete(uid, pid, id, deleteMode, reparentTo);
   }
 
   @PutMapping("/{id}/synonym-of/{acceptedId}")

@@ -1,6 +1,7 @@
 package org.catalogueoflife.editor.name;
 
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -427,21 +428,61 @@ public class NameUsageService {
 
   @Transactional
   public void delete(int userId, int projectId, int id) {
+    delete(userId, projectId, id, DeleteMode.FOCAL_ONLY, null);
+  }
+
+  // Delete a taxon with a chosen scope (see DeleteMode). Non-subtree modes reparent the focal's
+  // accepted children to `reparentTo` (or the grandparent) so they stay connected.
+  @Transactional
+  public void delete(int userId, int projectId, int id, DeleteMode mode, Integer reparentTo) {
     requireEditor(userId, projectId);
-    NameUsage before = requireInProject(projectId, id);
-    if (usages.delete(projectId, id) == 0) {
+    NameUsage focal = requireInProject(projectId, id);
+
+    List<Integer> toDelete = new ArrayList<>();
+    if (mode == DeleteMode.SUBTREE) {
+      List<Integer> subtree = usages.findSubtreeIds(projectId, id); // incl. the focal
+      toDelete.addAll(subtree);
+      if (!subtree.isEmpty()) {
+        toDelete.addAll(synonymAccepted.synonymIdsForAccepted(projectId, subtree));
+      }
+    } else {
+      usages.reparentChildren(projectId, id,
+          resolveReparent(projectId, id, focal.getParentId(), reparentTo), userId);
+      toDelete.add(id);
+      if (mode == DeleteMode.WITH_SYNONYMS) {
+        toDelete.addAll(synonymAccepted.findSynonymsOf(projectId, id));
+      }
+    }
+    List<Integer> ids = toDelete.stream().distinct().toList();
+    if (usages.deleteByIds(projectId, ids) == 0) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "name usage not found");
     }
-    // entity_id is polymorphic (no cascade FK to name_usage): clean up this usage's own issue rows
-    // now, or they'd reference a nonexistent entity forever (see validation/IssueMapper.deleteByEntity).
-    issues.deleteByEntity(projectId, ENTITY, id);
-    locks.deleteByEntity(projectId, ENTITY, id); // advisory lock is meaningless once the usage is gone
-    audit.record(projectId, userId, ENTITY, id, Operation.DELETE, before, null);
-    // The usage itself is gone by the time this fires (AFTER_COMMIT), so
-    // ValidationService.revalidateUsage will find nothing and no-op -- published anyway per the
-    // plan's create/update/delete symmetry; a later plan may extend this to re-check usages that
-    // referenced the deleted one (e.g. former synonym links), which is out of scope here.
-    events.publishEvent(ValidationEvent.forUsage(projectId, id));
+    // entity_id is polymorphic (no cascade FK to name_usage): clean up issues/locks for every removed
+    // usage now, or they'd reference nonexistent entities forever.
+    for (int removed : ids) {
+      issues.deleteByEntity(projectId, ENTITY, removed);
+      locks.deleteByEntity(projectId, ENTITY, removed);
+      // AFTER_COMMIT the usage is gone, so revalidation no-ops -- published per create/update/delete symmetry.
+      events.publishEvent(ValidationEvent.forUsage(projectId, removed));
+    }
+    audit.record(projectId, userId, ENTITY, id, Operation.DELETE, focal, null);
+  }
+
+  // Where the focal's accepted children go on a FOCAL_ONLY / WITH_SYNONYMS delete: the chosen target,
+  // else the focal's parent (grandparent; null -> children become roots). A chosen target must exist
+  // and lie OUTSIDE the focal's subtree (else it would create a cycle / dangle into deleted rows).
+  private Integer resolveReparent(int projectId, int focalId, Integer grandparentId, Integer reparentTo) {
+    if (reparentTo == null) {
+      return grandparentId;
+    }
+    if (usages.findByIdInProject(projectId, reparentTo) == null) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "reparent target not found");
+    }
+    if (usages.findSubtreeIds(projectId, focalId).contains(reparentTo)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "reparent target must be outside the deleted subtree");
+    }
+    return reparentTo;
   }
 
   @Transactional

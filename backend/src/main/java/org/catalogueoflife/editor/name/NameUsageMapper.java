@@ -211,6 +211,28 @@ public interface NameUsageMapper {
   @Select("SELECT id FROM name_usage WHERE project_id = #{projectId} AND parent_id = #{parentId}")
   List<Integer> findChildIds(@Param("projectId") int projectId, @Param("parentId") int parentId);
 
+  // Every id in the subtree rooted at `id` (the focal itself included), following parent_id. Same
+  // depth guard as the ancestor CTEs. Drives the SUBTREE delete + reparent-target validation.
+  @Select("""
+      WITH RECURSIVE sub AS (
+        SELECT project_id, id, 0 AS depth FROM name_usage WHERE project_id = #{projectId} AND id = #{id}
+        UNION ALL
+        SELECT n.project_id, n.id, sub.depth + 1 FROM name_usage n
+          JOIN sub ON n.project_id = sub.project_id AND n.parent_id = sub.id
+        WHERE sub.depth < 10000
+      )
+      SELECT id FROM sub
+      """)
+  List<Integer> findSubtreeIds(@Param("projectId") int projectId, @Param("id") int id);
+
+  @Delete("""
+      <script>
+      DELETE FROM name_usage WHERE project_id = #{projectId} AND id IN
+      <foreach collection='ids' item='i' open='(' separator=',' close=')'>#{i}</foreach>
+      </script>
+      """)
+  int deleteByIds(@Param("projectId") int projectId, @Param("ids") List<Integer> ids);
+
   // Direct accepted children of a usage, full row (same projection/mapping as findByIdInProject) --
   // bulk-insert's (BulkInsertService, CHILDREN mode) source of existing usages to canonical-key
   // against, so authorship on either side never masks a duplicate (see NameMatcher.canonicalKey).
