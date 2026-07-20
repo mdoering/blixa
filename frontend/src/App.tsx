@@ -5,6 +5,7 @@ import AppLayout from './components/AppLayout';
 import PublicLayout from './components/PublicLayout';
 import LandingPage from './pages/LandingPage';
 import PublicProjectPage from './pages/PublicProjectPage';
+import PublicDiscussionPage from './pages/PublicDiscussionPage';
 import ProjectListPage from './projects/ProjectListPage';
 import ProjectLayout from './projects/ProjectLayout';
 import ProjectMetadataPage from './projects/ProjectMetadataPage';
@@ -27,6 +28,7 @@ export default function App() {
       <Route element={<PublicLayout />}>
         <Route index element={<LandingPage />} />
         <Route path="p/:idOrAlias" element={<PublicProjectPage />} />
+        <Route path="p/:pid/discussions/:id" element={<PublicDiscussionPage />} />
       </Route>
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>

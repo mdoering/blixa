@@ -24,11 +24,18 @@ renamed to avoid collision with the validation *Issues*, and because the shape i
 - [x] **Phase 2 — comments + inline links** *(shipped)*: markdown comments (author-editable) with
   `@orcid`/`@username` + `#nameID` rendered as links; reverse-link from a name to its discussions
   (Discussions tab on TaxonDetail). *(`#Genus_species` fuzzy name mentions still deferred.)*
-- [ ] **Phase 3 — public visibility + public URL route**: editor marks a discussion PUBLIC; unauthenticated read.
+- [x] **Phase 3 — public visibility + public URL route** *(shipped)*: editor toggles INTERNAL/PUBLIC;
+  unauthenticated `/api/public/projects/{pid}/discussions[/{id}[/comments]]` (INTERNAL → 404); public
+  read-only page at `/p/:pid/discussions/:id` (name mentions render as plain text there).
 - [ ] **Phase 4 — external API + per-project token**: submissions arrive `state=review`; editors accept → `open`
   (turns COL user comments into discussions).
 - [ ] **Phase 5 — follow (heart) + email notifications** (needs SMTP config).
 - [ ] **Phase 6 — link (closed) discussions to changes & work locks.**
+- [ ] **Mention autocomplete** (replaces fuzzy `#Genus_species`): in the discussion/comment composer,
+  typing `#` immediately followed by a **capital letter** and 3+ letters (`#Xyz…`) opens a **name
+  suggest/autocomplete**; selecting a name inserts `#<id>` (the stable usage id), never the typed
+  name string. Same idea for `@` → username autocomplete → inserts `@username`. Every mention stays
+  precise, so `#Genus_species` fuzzy resolution isn't needed.
 
 **Discussions — user identity polish (after Phase 2):** *(all shipped)*
 - [x] **Avatars** — initials-based `UserAvatar` (ORCID exposes no photo) next to authors in the list,

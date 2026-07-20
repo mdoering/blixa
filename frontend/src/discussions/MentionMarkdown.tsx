@@ -7,6 +7,8 @@ interface Props {
   pid: number;
   text: string | null | undefined;
   mentions?: Mentions | null;
+  // Public pages can't link into the authenticated name view -> render name mentions as plain italic.
+  linkUsages?: boolean;
 }
 
 const USAGE_RE = /#(\d+)/g;
@@ -31,7 +33,7 @@ function withMentionLinks(text: string, mentions?: Mentions | null): string {
 
 // Renders discussion/comment markdown, linkifying #nameID mentions (→ the name, italic) and
 // @orcid/@username mentions (→ the person; links out to orcid.org when the user has an ORCID).
-export default function MentionMarkdown({ pid, text, mentions }: Props) {
+export default function MentionMarkdown({ pid, text, mentions, linkUsages = true }: Props) {
   if (!text) return null;
   return (
     <TypographyStylesProvider>
@@ -46,6 +48,7 @@ export default function MentionMarkdown({ pid, text, mentions }: Props) {
           a({ href, children }) {
             if (href?.startsWith(USAGE_SCHEME)) {
               const id = href.slice(USAGE_SCHEME.length);
+              if (!linkUsages) return <i>{children}</i>;
               return (
                 <Anchor component={Link} to={`/projects/${pid}/names?usage=${id}`}>
                   <i>{children}</i>

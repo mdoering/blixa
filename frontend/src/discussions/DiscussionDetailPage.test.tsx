@@ -63,6 +63,22 @@ test('renders the body with a mention link and the comments', async () => {
   expect(screen.getByText('bob')).toBeInTheDocument();
 });
 
+test('a public discussion shows the Public badge and a public-page link', async () => {
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    http.get('/api/projects/3/discussions/1', () =>
+      HttpResponse.json({ ...discussion, visibility: 'PUBLIC' }),
+    ),
+    http.get('/api/projects/3/discussions/1/comments', () => HttpResponse.json([])),
+  );
+  renderDetail();
+
+  await screen.findByRole('heading', { name: 'Placement of cats' });
+  expect(screen.getByText('Public')).toBeInTheDocument();
+  const link = screen.getByRole('link', { name: /View public page/ });
+  expect(link).toHaveAttribute('href', '/p/3/discussions/1');
+});
+
 test('posting a comment sends the body', async () => {
   let posted: unknown = null;
   server.use(

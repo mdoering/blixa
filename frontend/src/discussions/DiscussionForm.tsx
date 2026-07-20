@@ -8,9 +8,11 @@ import {
   createDiscussion,
   deleteDiscussion,
   setDiscussionStatus,
+  setDiscussionVisibility,
   updateDiscussion,
   type Discussion,
   type DiscussionStatus,
+  type DiscussionVisibility,
 } from '../api/discussions';
 
 const STATUSES: DiscussionStatus[] = ['REVIEW', 'OPEN', 'REJECTED', 'RESOLVED'];
@@ -21,6 +23,7 @@ interface Props {
   discussion: Discussion | null; // null = create
   opened: boolean;
   canManage: boolean;
+  isEditor?: boolean; // only editors may toggle PUBLIC visibility
   onClose: () => void;
 }
 
@@ -28,16 +31,25 @@ interface Props {
 // title/body, change the status, or delete it; everyone else sees it read-only (the backend enforces
 // this too). Status changes go through the dedicated /status endpoint when they differ from the
 // loaded value, so a plain edit doesn't need to resend the status.
-export default function DiscussionForm({ pid, discussion, opened, canManage, onClose }: Props) {
+export default function DiscussionForm({
+  pid,
+  discussion,
+  opened,
+  canManage,
+  isEditor = false,
+  onClose,
+}: Props) {
   const qc = useQueryClient();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [status, setStatus] = useState<DiscussionStatus>('OPEN');
+  const [visibility, setVisibility] = useState<DiscussionVisibility>('INTERNAL');
 
   useEffect(() => {
     setTitle(discussion?.title ?? '');
     setBody(discussion?.body ?? '');
     setStatus(discussion?.status ?? 'OPEN');
+    setVisibility(discussion?.visibility ?? 'INTERNAL');
   }, [discussion, opened]);
 
   const invalidate = async () => {
@@ -54,6 +66,9 @@ export default function DiscussionForm({ pid, discussion, opened, canManage, onC
           version: discussion.version,
         });
         if (status !== discussion.status) await setDiscussionStatus(pid, discussion.id, status);
+        if (isEditor && visibility !== discussion.visibility) {
+          await setDiscussionVisibility(pid, discussion.id, visibility);
+        }
       } else {
         await createDiscussion(pid, { title, body: body || null });
       }
@@ -119,6 +134,19 @@ export default function DiscussionForm({ pid, discussion, opened, canManage, onC
             value={status}
             onChange={(v) => v && setStatus(v as DiscussionStatus)}
             disabled={readOnly}
+            allowDeselect={false}
+          />
+        )}
+        {isEdit && isEditor && (
+          <Select
+            label="Visibility"
+            description="Public discussions are readable by anyone via a public link."
+            data={[
+              { value: 'INTERNAL', label: 'Internal (members only)' },
+              { value: 'PUBLIC', label: 'Public' },
+            ]}
+            value={visibility}
+            onChange={(v) => v && setVisibility(v as DiscussionVisibility)}
             allowDeselect={false}
           />
         )}

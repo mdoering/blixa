@@ -81,22 +81,39 @@ export default function DiscussionDetailPage() {
         <Title order={3} m={0}>
           {discussion.title}
         </Title>
-        {canManageDiscussion && (
-          <Button
-            variant="default"
-            size="xs"
-            leftSection={<IconPencil size={14} />}
-            onClick={() => setEditOpen(true)}
-          >
-            Edit
-          </Button>
-        )}
+        <Group gap="xs">
+          {discussion.visibility === 'PUBLIC' && (
+            <Anchor
+              href={`/p/${pid}/discussions/${did}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              size="sm"
+            >
+              View public page ↗
+            </Anchor>
+          )}
+          {canManageDiscussion && (
+            <Button
+              variant="default"
+              size="xs"
+              leftSection={<IconPencil size={14} />}
+              onClick={() => setEditOpen(true)}
+            >
+              Edit
+            </Button>
+          )}
+        </Group>
       </Group>
 
       <Group gap="xs" mb="md">
         <Badge color={STATUS_COLOR[discussion.status]} variant="light">
           {titleCase(discussion.status)}
         </Badge>
+        {discussion.visibility === 'PUBLIC' && (
+          <Badge color="teal" variant="outline">
+            Public
+          </Badge>
+        )}
         <UserAvatar name={discussion.authorName ?? discussion.authorOrcid} size="sm" />
         <Text size="sm" c="dimmed">
           #{discussion.id} · {discussion.authorName ?? discussion.authorOrcid ?? 'Unknown'} ·{' '}
@@ -150,6 +167,7 @@ export default function DiscussionDetailPage() {
           discussion={discussion}
           opened
           canManage={canManageDiscussion}
+          isEditor={isEditor}
           onClose={() => setEditOpen(false)}
         />
       )}

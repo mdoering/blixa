@@ -106,6 +106,18 @@ export function setDiscussionStatus(
   });
 }
 
+// Editor-only: mark a discussion INTERNAL or PUBLIC.
+export function setDiscussionVisibility(
+  pid: number,
+  id: number,
+  visibility: DiscussionVisibility,
+): Promise<Discussion> {
+  return api<Discussion>(`/api/projects/${pid}/discussions/${id}/visibility`, {
+    method: 'POST',
+    json: { visibility },
+  });
+}
+
 export function deleteDiscussion(pid: number, id: number): Promise<void> {
   return api<void>(`/api/projects/${pid}/discussions/${id}`, { method: 'DELETE' });
 }
@@ -142,4 +154,14 @@ export function deleteComment(pid: number, did: number, cid: number): Promise<vo
 // Reverse links: the discussions that mention a given name_usage (#nameID).
 export function listUsageDiscussions(pid: number, usageId: number): Promise<Discussion[]> {
   return api<Discussion[]>(`/api/projects/${pid}/usages/${usageId}/discussions`);
+}
+
+// -- Public (unauthenticated) reads of PUBLIC discussions ----------------------------------------
+
+export function getPublicDiscussion(pid: number, id: number): Promise<Discussion> {
+  return api<Discussion>(`/api/public/projects/${pid}/discussions/${id}`);
+}
+
+export function listPublicComments(pid: number, id: number): Promise<Comment[]> {
+  return api<Comment[]>(`/api/public/projects/${pid}/discussions/${id}/comments`);
 }

@@ -186,6 +186,7 @@ export default function DiscussionsPage() {
           discussion={form.discussion}
           opened
           canManage={form.discussion ? canManage(form.discussion) : true}
+          isEditor={isEditor}
           onClose={() => setForm(null)}
         />
       )}
