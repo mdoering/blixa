@@ -99,7 +99,7 @@ Also relevant: `coldp.clb.base-url` (env `COLDP_CLB_BASE_URL`, default `https://
 
 The base default `DB_URL` uses port 5432, but the **`dev` profile overrides it to 5433** (the compose port) via `application-dev.yml`. The `dev` seed user is also overridable: `editor.dev.username`, `editor.dev.password`, `editor.dev.display-name`.
 
-To point at your own PostgreSQL instead of Docker, create the `blixa` database and set the three `DB_*` variables accordingly (e.g. `DB_URL=jdbc:postgresql://localhost:5432/blixa`), then run the backend (Flyway handles the schema). The `pg_trgm` extension is created automatically by a migration.
+To point at your own PostgreSQL instead of Docker, create the `blixa` role + database and set the three `DB_*` variables accordingly (e.g. `DB_URL=jdbc:postgresql://localhost:5432/blixa`), then run the backend (Flyway handles the tables). If the DB role is **not** a superuser it must own the `public` schema and have `pg_trgm` pre-created — see [External PostgreSQL 17](#external-postgresql-17-non-docker) for the exact steps.
 
 ---
 
@@ -131,10 +131,14 @@ docker compose up -d        # fresh database
 the database, then let the backend rebuild it on startup:
 
 ```bash
-# stop the backend first so there are no active connections, then:
+# stop the backend first so there are no active connections, then (schema-owner + pg_trgm are
+# per-database, so DROP loses them — recreate exactly like the initial provisioning):
 sudo -u postgres psql <<'SQL'
 DROP DATABASE IF EXISTS blixa;
 CREATE DATABASE blixa OWNER blixa;
+\connect blixa
+ALTER SCHEMA public OWNER TO blixa;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 SQL
 # start the backend — Flyway builds the fresh schema from V1__initial_schema.sql
 ```
@@ -165,9 +169,10 @@ The backend is a plain Spring Boot jar configured entirely through environment v
 
 ### External PostgreSQL 17 (non-Docker)
 
-For a server deployment the backend talks to a native PostgreSQL 17 instance. It creates and
-migrates its own schema on boot (Flyway) — there is **no manual schema step** and no ORM
-`ddl-auto`.
+For a server deployment the backend talks to a native PostgreSQL 17 instance. It **migrates its
+own tables** on boot (Flyway, no ORM `ddl-auto`) — but the role, database, and two superuser
+prerequisites must exist first (step 2), because the app's DB role is deliberately **not** a
+superuser.
 
 **1. Install PostgreSQL 17** (Debian/Ubuntu, via the PGDG apt repo — `pg_trgm` ships with the
 standard server packages):
@@ -183,14 +188,20 @@ https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
 sudo apt update && sudo apt install -y postgresql-17
 ```
 
-**2. Create the role and database.** Make the app user the database **owner** — `pg_trgm` is a
-*trusted* extension, so a database owner (no superuser needed) can let the migration create it,
-along with every table and index:
+**2. Create the role, database, and prerequisites** — as a superuser. Two of these steps exist
+*because* the `blixa` role isn't a superuser (this mirrors [`deploy/blixa/db-init.sql`](deploy/blixa/db-init.sql)):
 
 ```bash
 sudo -u postgres psql <<'SQL'
 CREATE ROLE blixa LOGIN PASSWORD 'CHANGE_ME';
 CREATE DATABASE blixa OWNER blixa;
+\connect blixa
+-- PG15+ no longer grants CREATE on schema `public` to the DB owner, so Flyway would otherwise
+-- fail with "permission denied for schema public".
+ALTER SCHEMA public OWNER TO blixa;
+-- Created here by the superuser because the blixa role can't create extensions; the migration's
+-- own `CREATE EXTENSION IF NOT EXISTS pg_trgm` then becomes a no-op.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 SQL
 ```
 
@@ -207,8 +218,9 @@ DB_USER=blixa
 DB_PASSWORD=CHANGE_ME
 ```
 
-On the next backend start, Flyway runs `V1__initial_schema.sql` against the empty database
-(creating `pg_trgm` and all 32 tables). To reset later, see [Reset the database](#reset-the-database).
+On the next backend start, Flyway runs `V1__initial_schema.sql` against the database, creating all
+32 tables and their indexes (`pg_trgm` already exists from step 2). To reset later, see
+[Reset the database](#reset-the-database).
 
 ### Logs
 
