@@ -38,14 +38,25 @@ public class ClbImportController {
   private final ClbImportService service;
   private final ClbImportClient client;
   private final ClbCompareService compareService;
+  private final ClbDatasetLabelService datasetLabels;
   private final CurrentUser currentUser;
 
   public ClbImportController(ClbImportService service, ClbImportClient client,
-      ClbCompareService compareService, CurrentUser currentUser) {
+      ClbCompareService compareService, ClbDatasetLabelService datasetLabels, CurrentUser currentUser) {
     this.service = service;
     this.client = client;
     this.compareService = compareService;
+    this.datasetLabels = datasetLabels;
     this.currentUser = currentUser;
+  }
+
+  // Resolve one or more CLB dataset keys to their human-readable label (alias, else title) for
+  // display in place of the opaque key. Cached server-side (ClbDatasetLabelService); an unresolvable
+  // key maps to itself. Returns {key: label} for every non-blank key requested.
+  @GetMapping("/api/clb/dataset-labels")
+  public java.util.Map<String, String> datasetLabels(@RequestParam(name = "key") List<String> keys) {
+    currentUser.require();
+    return datasetLabels.labels(keys);
   }
 
   @PostMapping("/api/projects/{pid}/usages/{focalId}/clb-import")

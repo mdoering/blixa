@@ -99,6 +99,17 @@ public class ClbImportClient {
     return text(ds, "title");
   }
 
+  /**
+   * GET /dataset/{key}, returning a human-readable label to show in place of the opaque key: the
+   * dataset's short {@code alias} when set, else its {@code title} (null if neither / unavailable).
+   * Reads only those two fields off the response, not the full dataset metadata.
+   */
+  public String datasetLabel(String key) {
+    JsonNode ds = getPage(UriComponentsBuilder.fromPath("/dataset/{ds}"), key);
+    String alias = text(ds, "alias");
+    return alias != null && !alias.isBlank() ? alias : text(ds, "title");
+  }
+
   /** GET /dataset?q={q}&limit=20, parsing the ResultPage's {@code .result[]} into hits. */
   public List<ClbDatasetHit> searchDatasets(String q) {
     JsonNode page = getPage(UriComponentsBuilder.fromPath("/dataset")

@@ -64,6 +64,14 @@ export function searchClbDatasets(q: string): Promise<ClbDatasetHit[]> {
   return api<ClbDatasetHit[]>(`/api/clb/datasets?${search.toString()}`);
 }
 
+// Resolve CLB dataset keys to their human-readable label (alias, else title). Server-side cached;
+// an unresolvable key maps to itself. Returns { key: label } for every non-blank key requested.
+export function getClbDatasetLabels(keys: string[]): Promise<Record<string, string>> {
+  const search = new URLSearchParams();
+  for (const k of keys) if (k) search.append('key', k);
+  return api<Record<string, string>>(`/api/clb/dataset-labels?${search.toString()}`);
+}
+
 export function searchClbUsages(datasetKey: string, q: string, rank?: string): Promise<ClbUsageHit[]> {
   const search = new URLSearchParams();
   if (q) search.set('q', q);

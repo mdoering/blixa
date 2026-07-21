@@ -27,6 +27,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { deleteProject, getProject, setPublic, updateMetadata } from '../api/projects';
 import FavoriteClbDatasetsEditor, { type FavoriteRow } from './FavoriteClbDatasetsEditor';
+import DatasetLabel from '../clb/DatasetLabel';
 import { getIdScopes } from '../api/coldp';
 import { getColMatchRun, getLatestColMatch, startColMatch } from '../api/col';
 import { exportFileUrl, getExportRun, getLatestExport, startExport } from '../api/export';
@@ -505,7 +506,8 @@ export default function ProjectMetadataPage() {
                 </Text>
               </Stack>
               {form.values.identifierScopes?.map((row, index) => (
-                <Group key={index} align="flex-end" gap="xs" wrap="nowrap">
+                <Stack key={index} gap={2}>
+                <Group align="flex-end" gap="xs" wrap="nowrap">
                   <Autocomplete
                     aria-label={`Scope ${index + 1}`}
                     placeholder="e.g. ipni"
@@ -538,6 +540,12 @@ export default function ProjectMetadataPage() {
                     <IconTrash size={16} />
                   </ActionIcon>
                 </Group>
+                {(row.datasetKey ?? '').trim() && (
+                  <Text size="xs" c="dimmed" pl={4}>
+                    → <DatasetLabel datasetKey={(row.datasetKey ?? '').trim()} size="xs" c="dimmed" />
+                  </Text>
+                )}
+                </Stack>
               ))}
               {form.values.identifierScopes?.some((s) => s.scope.trim().toLowerCase() === 'col') && (
                 <Text size="xs" c="dimmed">

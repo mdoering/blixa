@@ -1,5 +1,6 @@
 import { Anchor, Badge, Group, Stack, Table, Text } from '@mantine/core';
 import type { ClbComparison } from '../../api/clb';
+import DatasetLabel from '../../clb/DatasetLabel';
 
 // The "editor" side of the comparison, shaped to line up with ClbComparison.
 export interface OursSide {
@@ -102,7 +103,7 @@ export default function ClbComparisonView({ ours, clb }: { ours: OursSide; clb: 
           <Table.Th>
             CLB{' '}
             <Anchor href={clb.link} target="_blank" rel="noopener noreferrer" size="sm">
-              {clb.datasetTitle ?? `dataset ${clb.datasetKey}`} ↗
+              <DatasetLabel datasetKey={clb.datasetKey} /> ↗
             </Anchor>
           </Table.Th>
         </Table.Tr>

@@ -4,6 +4,7 @@ import { IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { searchClbDatasets } from '../api/clb';
+import DatasetLabel from '../clb/DatasetLabel';
 
 export interface FavoriteRow {
   key: string;
@@ -33,7 +34,7 @@ export default function FavoriteClbDatasetsEditor({
       {value.map((f, i) => (
         <Group key={f.key} gap="xs" wrap="nowrap">
           <Text size="sm" style={{ flex: 1 }}>
-            {f.title || f.key}
+            <DatasetLabel datasetKey={f.key} />
           </Text>
           <ActionIcon
             type="button"
