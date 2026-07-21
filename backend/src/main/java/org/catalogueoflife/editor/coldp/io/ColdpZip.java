@@ -6,6 +6,8 @@ import java.io.OutputStream;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -25,7 +27,32 @@ public final class ColdpZip {
   // realistic limit for a genuine archive.
   private static final int MAX_ENTRIES = 10_000;
 
+  // Filesystem/VCS artefacts that OSes and tools inject into archives (esp. macOS Finder's
+  // "Compress" and Windows Explorer). Non-dot-prefixed junk directory/file names, matched
+  // case-insensitively; dot-prefixed names (.git, .svn, .hg, .DS_Store, ._AppleDouble, .gitignore,
+  // .idea, ...) and MS Office lock files (~$...) are handled by prefix checks in isJunk.
+  private static final Set<String> JUNK_NAMES =
+      Set.of("__macosx", "$recycle.bin", "system volume information", "thumbs.db", "desktop.ini");
+
   private ColdpZip() {}
+
+  // True if any path segment of the zip entry is OS/VCS cruft -- so nested copies like
+  // __MACOSX/wrapper/._Foo.csv or wrapper/.DS_Store are caught too, not just top-level ones.
+  private static boolean isJunk(String entryName) {
+    for (String segment : entryName.split("[/\\\\]")) {
+      if (segment.isEmpty()) {
+        continue;
+      }
+      // dotfiles/dot-dirs (.git, .DS_Store, ._AppleDouble, ...) -- but NOT the "." / ".." path
+      // components, which the zip-slip guard must still see and reject.
+      boolean dotfile = segment.startsWith(".") && !segment.equals(".") && !segment.equals("..");
+      if (dotfile || segment.startsWith("~$")
+          || JUNK_NAMES.contains(segment.toLowerCase(Locale.ROOT))) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /**
    * Zips every regular file directly under {@code folder} (flat, non-recursive) into {@code
@@ -96,6 +123,11 @@ public final class ColdpZip {
         if (entry.isDirectory()) {
           continue;
         }
+        if (isJunk(entry.getName())) {
+          continue; // OS/VCS cruft -- dropped so a lone data subfolder stays detectable (a
+                    // __MACOSX/ or .git/ sibling would otherwise leave two top-level dirs and
+                    // defeat the reader's single-subfolder descent) and doesn't count toward the cap.
+        }
         if (++entryCount > MAX_ENTRIES) {
           throw new IOException("archive exceeds " + MAX_ENTRIES + " entries");
         }
@@ -111,7 +143,38 @@ public final class ColdpZip {
         zis.closeEntry();
       }
     }
+    flattenSingleWrapper(normalizedTarget);
     return targetDir;
+  }
+
+  // If everything extracted into a single wrapper directory -- as when an archive zips the folder
+  // rather than its contents (`hominidae/NameUsage.tsv` instead of `NameUsage.tsv`) -- promote that
+  // directory's contents to the root, since the reader expects the data files at the extract root.
+  // Loops to unwrap nested single-folder wrappers; stops as soon as the root holds a file or more
+  // than one entry (i.e. the actual flat set of ColDP files).
+  private static void flattenSingleWrapper(Path root) throws IOException {
+    while (true) {
+      Path only = null;
+      int count = 0;
+      try (DirectoryStream<Path> children = Files.newDirectoryStream(root)) {
+        for (Path child : children) {
+          count++;
+          only = child;
+          if (count > 1) {
+            break;
+          }
+        }
+      }
+      if (count != 1 || only == null || !Files.isDirectory(only)) {
+        return;
+      }
+      try (DirectoryStream<Path> grandChildren = Files.newDirectoryStream(only)) {
+        for (Path g : grandChildren) {
+          Files.move(g, root.resolve(g.getFileName().toString()));
+        }
+      }
+      Files.delete(only);
+    }
   }
 
   // Streams one zip entry to disk in fixed-size chunks, checking the running cross-entry total
