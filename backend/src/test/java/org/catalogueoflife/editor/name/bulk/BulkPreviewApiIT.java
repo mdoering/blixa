@@ -31,10 +31,13 @@ class BulkPreviewApiIT extends AbstractPostgresIT {
   }
 
   // Creates a project + one accepted genus, returns [projectId, genusId].
+  private static final java.util.concurrent.atomic.AtomicInteger SEQ =
+      new java.util.concurrent.atomic.AtomicInteger();
+
   private int[] seed() throws Exception {
     ensureUser("bulkPrev");
     String pj = mvc.perform(post("/api/projects").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-            .content("{\"title\":\"BulkP\",\"nomCode\":\"zoological\"}"))
+            .content("{\"title\":\"BulkP " + SEQ.incrementAndGet() + "\",\"nomCode\":\"zoological\"}"))
         .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
     int pid = json.readTree(pj).get("id").asInt();
     String gj = mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())

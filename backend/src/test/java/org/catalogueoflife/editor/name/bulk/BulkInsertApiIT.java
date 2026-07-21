@@ -34,11 +34,16 @@ class BulkInsertApiIT extends AbstractPostgresIT {
     if (users.requireByUsernameOrNull(u) == null) users.createLocal(u, "pw", u);
   }
 
+  // Unique per call: titles are unique per owner and this IT (shared DB) seeds a project in more
+  // than one test method under the same user.
+  private static final java.util.concurrent.atomic.AtomicInteger SEQ =
+      new java.util.concurrent.atomic.AtomicInteger();
+
   private int[] seed(String owner) throws Exception {
     ensureUser(owner);
     String pj = mvc.perform(post("/api/projects").with(csrf()).with(user(owner))
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"title\":\"BulkI\",\"nomCode\":\"zoological\"}"))
+            .content("{\"title\":\"BulkI " + SEQ.incrementAndGet() + "\",\"nomCode\":\"zoological\"}"))
         .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
     int pid = json.readTree(pj).get("id").asInt();
     String gj = mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf()).with(user(owner))

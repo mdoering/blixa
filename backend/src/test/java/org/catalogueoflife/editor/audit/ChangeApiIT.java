@@ -139,14 +139,16 @@ class ChangeApiIT extends AbstractPostgresIT {
     assertThat(all.get(7).get("operation").asString()).isEqualTo("CREATE");
     assertThat(all.get(7).get("entityId").asLong()).isEqualTo(refId);
 
-    // the reference-update entry's diff carries the title from/to, and nothing else (diff is
-    // stored/returned as raw JSON text -- parse it as a second JSON document).
+    // the reference-update entry's diff carries the title from/to. This reference is structured
+    // (it has a title) and non-manual, so its citation is derived from its fields, not the resent
+    // value -- changing the title therefore also regenerates the citation ("Original title." ->
+    // "Revised title."), so both fields show in the diff.
     JsonNode refUpdateDiff = json.readTree(all.get(6).get("diff").asString());
     assertThat(refUpdateDiff.get("title").get("from").asString()).isEqualTo("Original title");
     assertThat(refUpdateDiff.get("title").get("to").asString()).isEqualTo("Revised title");
-    // citation was resent unchanged -- must NOT show up as a spurious diff entry.
-    assertThat(refUpdateDiff.has("citation")).isFalse();
-    assertThat(refUpdateDiff.size()).isEqualTo(1);
+    assertThat(refUpdateDiff.get("citation").get("from").asString()).isEqualTo("Original title.");
+    assertThat(refUpdateDiff.get("citation").get("to").asString()).isEqualTo("Revised title.");
+    assertThat(refUpdateDiff.size()).isEqualTo(2);
 
     // the move's diff isolates just the parentId change (version/modified churn is excluded).
     JsonNode moveDiff = json.readTree(all.get(3).get("diff").asString());

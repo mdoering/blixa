@@ -40,11 +40,14 @@ class ConsolidationApiIT extends AbstractPostgresIT {
     if (users.requireByUsernameOrNull(username) == null) users.createLocal(username, "pw", username);
   }
 
+  private static final java.util.concurrent.atomic.AtomicInteger SEQ =
+      new java.util.concurrent.atomic.AtomicInteger();
+
   private long createProjectOwnedBy(String owner) throws Exception {
     ensureUser(owner);
     String body = mvc.perform(post("/api/projects").with(csrf()).with(user(owner))
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"title\":\"consproj\",\"nomCode\":\"botanical\"}"))
+            .content("{\"title\":\"consproj " + SEQ.incrementAndGet() + "\",\"nomCode\":\"botanical\"}"))
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     return json.readTree(body).get("id").asLong();

@@ -68,10 +68,16 @@ class ReleaseApiIT extends AbstractPostgresIT {
     return pid;
   }
 
+  // Unique per call: titles are unique per owner and this IT (shared DB) creates a project in more
+  // than one test method under the same user.
+  private static final java.util.concurrent.atomic.AtomicInteger SEQ =
+      new java.util.concurrent.atomic.AtomicInteger();
+
   private int projectNoLicense(String owner) throws Exception {
     ensureUser(owner);
     String b = mvc.perform(post("/api/projects").with(csrf()).with(user(owner))
-            .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"Rel\"}"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Rel " + SEQ.incrementAndGet() + "\"}"))
         .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
     int pid = json.readTree(b).get("id").asInt();
     mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf()).with(user(owner))
@@ -82,9 +88,12 @@ class ReleaseApiIT extends AbstractPostgresIT {
   }
 
   private void setLicense(int pid, String owner) throws Exception {
+    // Re-send the project's existing (unique) title so the update doesn't rename it onto another's.
+    String title = json.readTree(mvc.perform(get("/api/projects/" + pid).with(user(owner)))
+        .andReturn().getResponse().getContentAsString()).get("title").asString();
     mvc.perform(put("/api/projects/" + pid + "/metadata").with(csrf()).with(user(owner))
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"title\":\"Rel\",\"license\":\"CC0-1.0\"}"))
+            .content("{\"title\":\"" + title + "\",\"license\":\"CC0-1.0\"}"))
        .andExpect(status().isOk());
   }
 

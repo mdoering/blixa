@@ -1,6 +1,15 @@
 # ORCID registration uses explicit endpoints (no issuer discovery) so the context
 # loads with dummy credentials and never hits the network at startup.
 spring:
+  # The whole IT suite shares one Postgres container (AbstractPostgresIT). Spring caches many
+  # distinct test contexts, each with its own Hikari pool; keeping their connections open exhausts
+  # the container's max_connections ("FATAL: sorry, too many clients"). Let idle connections drop so
+  # only the actively-running context holds any, and keep the active pool small.
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 0
+      idle-timeout: 10000
   security:
     oauth2:
       client:
