@@ -368,3 +368,52 @@ test('the row action menu opens', async () => {
   expect(screen.getByText('Add synonym')).toBeInTheDocument();
   expect(screen.getByText('Delete')).toBeInTheDocument();
 });
+
+test('bulk status change: a same-status selection posts the parent-preserving target', async () => {
+  let posted: unknown = null;
+  const abiesNigraAccepted = { ...abiesNigra, status: 'ACCEPTED' };
+  server.use(
+    http.get('/api/projects/9', () => HttpResponse.json(project)),
+    http.get('/api/projects/9/usages', () =>
+      HttpResponse.json({ items: [abiesAlba, abiesNigraAccepted], total: 2 }),
+    ),
+    http.post('/api/projects/9/usages/bulk-status', async ({ request }) => {
+      posted = await request.json();
+      return HttpResponse.json({ changed: 2 });
+    }),
+  );
+  renderPage();
+  await screen.findByText('Abies alba');
+
+  // Select both rows (both ACCEPTED) via their row checkboxes ([0] is the header select-all).
+  const checkboxes = screen.getAllByRole('checkbox');
+  await userEvent.click(checkboxes[1]);
+  await userEvent.click(checkboxes[2]);
+
+  // Uniform status -> the button offers the single parent-preserving target (accepted -> unassessed).
+  const btn = await screen.findByRole('button', { name: /mark 2 as unassessed/i });
+  expect(btn).toBeEnabled();
+  await userEvent.click(btn);
+  await waitFor(() => expect(posted).toEqual({ ids: [1, 2], status: 'UNASSESSED' }));
+});
+
+test('bulk status change is greyed out when the selection mixes statuses', async () => {
+  server.use(
+    http.get('/api/projects/9', () => HttpResponse.json(project)),
+    // abiesAlba is ACCEPTED, abiesNigra is SYNONYM -> a mixed selection
+    http.get('/api/projects/9/usages', () =>
+      HttpResponse.json({ items: [abiesAlba, abiesNigra], total: 2 }),
+    ),
+  );
+  renderPage();
+  await screen.findByText('Abies alba');
+
+  const checkboxes = screen.getAllByRole('checkbox');
+  await userEvent.click(checkboxes[1]);
+  await userEvent.click(checkboxes[2]);
+
+  // The Merge action is available (2 selected), but the status-change control is greyed out because
+  // the selected rows don't share a single status.
+  expect(await screen.findByRole('button', { name: /merge 2 selected/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /change status/i })).toBeDisabled();
+});

@@ -186,4 +186,48 @@ class AccSynWorkflowIT extends AbstractPostgresIT {
             .content("{\"parentId\":null,\"version\":" + version(pid, b) + "}"))
         .andExpect(status().isBadRequest());
   }
+
+  @Test
+  void bulkStatusChangeStaysWithinParentPreservingGroups() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("bulkstatus");
+    long g = createUsage(pid, "Genusb", "genus", "accepted", null);
+    long sp1 = createUsage(pid, "Genusb speciesa", "species", "accepted", g);
+    long sp2 = createUsage(pid, "Genusb speciesb", "species", "accepted", g);
+    long syn1 = createUsage(pid, "Synonyma", "genus", "synonym", null);
+    long syn2 = createUsage(pid, "Synonymb", "genus", "synonym", null);
+    link(pid, syn1, g);
+    link(pid, syn2, g);
+
+    // accepted -> unassessed for both species; the taxonomic parent (g) is preserved.
+    mvc.perform(post("/api/projects/" + pid + "/usages/bulk-status").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"ids\":[" + sp1 + "," + sp2 + "],\"status\":\"UNASSESSED\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.changed").value(2));
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + sp1))
+        .andExpect(jsonPath("$.status").value("UNASSESSED"))
+        .andExpect(jsonPath("$.parentId").value((int) g));
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + sp2))
+        .andExpect(jsonPath("$.status").value("UNASSESSED"))
+        .andExpect(jsonPath("$.parentId").value((int) g));
+
+    // synonym -> misapplied for both synonyms; the accepted name they hang under (g) is preserved.
+    mvc.perform(post("/api/projects/" + pid + "/usages/bulk-status").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"ids\":[" + syn1 + "," + syn2 + "],\"status\":\"MISAPPLIED\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.changed").value(2));
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + syn1))
+        .andExpect(jsonPath("$.status").value("MISAPPLIED"))
+        .andExpect(jsonPath("$.acceptedParentIds[0]").value((int) g));
+
+    // A cross-group transition (unassessed -> synonym) would change the parent -> 400, all-or-nothing.
+    mvc.perform(post("/api/projects/" + pid + "/usages/bulk-status").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"ids\":[" + sp1 + "],\"status\":\"SYNONYM\"}"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + sp1))
+        .andExpect(jsonPath("$.status").value("UNASSESSED"));
+  }
 }

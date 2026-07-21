@@ -2,10 +2,13 @@ package org.catalogueoflife.editor.name;
 
 import java.util.Comparator;
 import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import life.catalogue.api.vocab.Environment;
 import life.catalogue.api.vocab.Gender;
 import life.catalogue.api.vocab.NomStatus;
@@ -269,6 +272,60 @@ public class NameUsageService {
     audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
     events.publishEvent(ValidationEvent.forUsage(projectId, id));
     return toResponse(after, project);
+  }
+
+  // The two "parent-preserving" status groups: a change WITHIN a group keeps the usage's parent, so
+  // it needs no per-usage parent decision and is safe to apply in bulk. accepted<->unassessed keep
+  // the taxonomic parent; synonym<->misapplied keep the accepted name they hang under. Crossing
+  // groups (e.g. accepted->synonym) is what Demote/Promote handle, one usage at a time.
+  private static final Set<Status> TAXON_STATUSES = EnumSet.of(Status.ACCEPTED, Status.UNASSESSED);
+  private static final Set<Status> SYNONYM_STATUSES = EnumSet.of(Status.SYNONYM, Status.MISAPPLIED);
+
+  private static boolean parentPreserving(Status from, Status to) {
+    return (TAXON_STATUSES.contains(from) && TAXON_STATUSES.contains(to))
+        || (SYNONYM_STATUSES.contains(from) && SYNONYM_STATUSES.contains(to));
+  }
+
+  // Bulk status change (POST /usages/bulk-status): set several usages to {@code statusStr} at once.
+  // Only parent-preserving transitions are allowed (see parentPreserving) -- one that would move a
+  // usage between the taxon and synonym groups rejects the whole request with 400, so the batch is
+  // all-or-nothing and never leaves a half-applied change. Usages already at the target status are
+  // silently skipped. Each actual change mirrors a single update: it re-uses writeTaxonInfo (so
+  // e.g. accepted->unassessed drops the now-orphaned taxon-level children just as the per-row edit
+  // does), records an audit entry, and republishes the usage's validation. Returns how many changed.
+  @Transactional
+  public int bulkChangeStatus(int userId, int projectId, List<Integer> ids, String statusStr) {
+    requireEditor(userId, projectId);
+    requireProject(projectId);
+    Status target = VocabParsing.requireParse(Status.class, statusStr, "status");
+    List<NameUsage> toChange = new ArrayList<>();
+    for (int id : new LinkedHashSet<>(ids)) {
+      NameUsage u = requireInProject(projectId, id);
+      if (u.getStatus() == target) {
+        continue; // already there -- nothing to do for this one
+      }
+      if (!parentPreserving(u.getStatus(), target)) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "cannot change " + u.getStatus() + " to " + target + " in bulk: only accepted<->unassessed"
+                + " and synonym<->misapplied keep the parent");
+      }
+      toChange.add(u);
+    }
+    for (NameUsage u : toChange) {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> before = objectMapper.convertValue(u, Map.class);
+      u.setStatus(target);
+      u.setModifiedBy(userId);
+      if (usages.update(u) == 0) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT,
+            "conflict: a selected name was modified concurrently");
+      }
+      writeTaxonInfo(u);
+      NameUsage after = requireInProject(projectId, u.getId());
+      audit.record(projectId, userId, ENTITY, u.getId(), Operation.UPDATE, before, after);
+      events.publishEvent(ValidationEvent.forUsage(projectId, u.getId()));
+    }
+    return toChange.size();
   }
 
   // Narrow write of just alternative_id (PUT /usages/{id}/identifiers): a full replace of the

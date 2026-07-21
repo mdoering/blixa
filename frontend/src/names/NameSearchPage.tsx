@@ -7,12 +7,14 @@ import {
   type MRT_ColumnDef,
   type MRT_RowSelectionState,
 } from 'mantine-react-table';
+import { notifications } from '@mantine/notifications';
 import { useEffect, useMemo, useState } from 'react';
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getProject } from '../api/projects';
 import { listLocks } from '../api/locks';
-import { searchUsages } from '../api/usages';
+import { bulkChangeStatus, searchUsages } from '../api/usages';
+import { messageFor } from '../api/client';
 import type { Lock, NameUsage } from '../api/types';
 import MergeRecordsModal from '../merge/MergeRecordsModal';
 import TaxonDetail from '../tree/TaxonDetail';
@@ -49,6 +51,18 @@ const STATUS_META: Record<string, { abbr: string; color: string; label: string }
   SYNONYM: { abbr: 'Syn', color: 'gray', label: 'Synonym' },
   MISAPPLIED: { abbr: 'Mis', color: 'orange', label: 'Misapplied' },
   UNASSESSED: { abbr: 'Una', color: 'blue', label: 'Unassessed' },
+};
+
+// The parent-preserving partner status for a bulk change: staying inside a pair keeps every usage's
+// parent (accepted<->unassessed keep the taxonomic parent; synonym<->misapplied keep the accepted
+// name they hang under), so no per-row parent decision is needed. A status not in a shared pair (or
+// a mixed selection) can't be bulk-changed -- the control is greyed out. Mirrors the backend's
+// NameUsageService.parentPreserving.
+const STATUS_PARTNER: Record<string, string> = {
+  ACCEPTED: 'UNASSESSED',
+  UNASSESSED: 'ACCEPTED',
+  SYNONYM: 'MISAPPLIED',
+  MISAPPLIED: 'SYNONYM',
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -128,6 +142,48 @@ export default function NameSearchPage() {
     }
     return map;
   }, [locks]);
+
+  // Track each selected row's status. Selection persists across pages but paging is server-side, so
+  // an off-page selected row isn't in `data` -- capture a row's status while it's on the current
+  // page and remember it. This drives the bulk status-change control below.
+  const [selectedStatuses, setSelectedStatuses] = useState<Record<number, string>>({});
+  useEffect(() => {
+    setSelectedStatuses((prev) => {
+      const next: Record<number, string> = {};
+      for (const id of Object.keys(rowSelection).map(Number)) {
+        const onPage = (data?.items ?? []).find((r) => r.id === id)?.status ?? undefined;
+        const s = onPage ?? prev[id];
+        if (s != null) next[id] = s;
+      }
+      return next;
+    });
+  }, [rowSelection, data]);
+
+  // The bulk status change is offered only when every selected row shares one status, so the single
+  // parent-preserving target (its STATUS_PARTNER) is unambiguous. A mixed selection -> null -> the
+  // button is greyed out.
+  const bulkStatusTarget = useMemo(() => {
+    const ids = Object.keys(rowSelection).map(Number);
+    if (ids.length < 2) return null;
+    const statuses = ids.map((id) => selectedStatuses[id]);
+    if (statuses.some((s) => s == null)) return null; // a selected row's status isn't known yet
+    if (new Set(statuses).size !== 1) return null; // different statuses selected
+    return STATUS_PARTNER[statuses[0] as string] ?? null;
+  }, [rowSelection, selectedStatuses]);
+
+  const bulkStatusMutation = useMutation({
+    mutationFn: (status: string) =>
+      bulkChangeStatus(pid, Object.keys(rowSelection).map(Number), status),
+    onSuccess: async (res) => {
+      notifications.show({ message: `${res.changed} name${res.changed === 1 ? '' : 's'} updated` });
+      setRowSelection({});
+      await queryClient.invalidateQueries({ queryKey: ['usageSearch', pid] });
+      await queryClient.invalidateQueries({ queryKey: ['treeRoots', pid] });
+      await queryClient.invalidateQueries({ queryKey: ['treeChildren', pid] });
+    },
+    onError: (e) =>
+      notifications.show({ color: 'red', message: messageFor(e, 'Status change failed') }),
+  });
 
   const columns = useMemo<MRT_ColumnDef<NameUsage>[]>(
     () => [
@@ -288,6 +344,19 @@ export default function NameSearchPage() {
         <Group mb="md">
           <Button variant="light" size="xs" onClick={() => setMergeOpen(true)}>
             Merge {selectedIds.length} selected…
+          </Button>
+          {/* Bulk status change: enabled only when the selected rows share one status (so the single
+              parent-preserving target is unambiguous); greyed out for a mixed selection. */}
+          <Button
+            variant="light"
+            size="xs"
+            disabled={!bulkStatusTarget}
+            loading={bulkStatusMutation.isPending}
+            onClick={() => bulkStatusTarget && bulkStatusMutation.mutate(bulkStatusTarget)}
+          >
+            {bulkStatusTarget
+              ? `Mark ${selectedIds.length} as ${STATUS_META[bulkStatusTarget].label}`
+              : 'Change status'}
           </Button>
         </Group>
       )}

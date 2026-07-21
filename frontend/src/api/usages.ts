@@ -39,6 +39,20 @@ export function updateUsage(
   return api<NameUsage>(`/api/projects/${pid}/usages/${id}`, { method: 'PUT', json: payload });
 }
 
+// POST /usages/bulk-status -- change the taxonomic status of several usages at once. The backend
+// only accepts parent-preserving transitions (accepted<->unassessed, synonym<->misapplied) and
+// rejects anything else with 400; returns how many usages were actually changed.
+export function bulkChangeStatus(
+  pid: number,
+  ids: number[],
+  status: string,
+): Promise<{ changed: number }> {
+  return api<{ changed: number }>(`/api/projects/${pid}/usages/bulk-status`, {
+    method: 'POST',
+    json: { ids, status },
+  });
+}
+
 export type DeleteMode = 'FOCAL_ONLY' | 'WITH_SYNONYMS' | 'SUBTREE';
 
 // mode: FOCAL_ONLY (default) | WITH_SYNONYMS | SUBTREE; reparentTo optionally overrides where the
