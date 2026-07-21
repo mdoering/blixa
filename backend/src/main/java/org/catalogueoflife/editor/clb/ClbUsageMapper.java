@@ -34,6 +34,7 @@ import org.catalogueoflife.editor.child.dto.VernacularRequest;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.Reference;
 import org.catalogueoflife.editor.name.Status;
+import org.catalogueoflife.editor.parse.ParsedNameMapping;
 
 // Pure mapping from the CLB api model (life.catalogue.api.model.UsageInfo, as fetched by
 // ClbImportClient.usageInfo) into our own model's shapes -- no DB, no Spring, no I/O, mirroring
@@ -143,10 +144,12 @@ public final class ClbUsageMapper {
     u.setSpecificEpithet(n.getSpecificEpithet());
     u.setInfraspecificEpithet(n.getInfraspecificEpithet());
     u.setCultivarEpithet(n.getCultivarEpithet());
-    // notho/gender/nomStatus are the exact same life.catalogue.api.vocab/org.gbif.nameparser.api
-    // enum classes on both this app's NameUsage and CLB's Name -- see NameUsage.java's own imports
-    // -- so these are direct object assignments, never a lower()/string round-trip.
-    u.setNotho(n.getNotho());
+    // gender/nomStatus are the exact same life.catalogue.api.vocab/org.gbif.nameparser.api enum
+    // classes on both this app's NameUsage and CLB's Name -- see NameUsage.java's own imports -- so
+    // these are direct object assignments, never a lower()/string round-trip. notho is the same
+    // NamePart enum, but CLB's Name (like the 5.0.0 parser) models it as a Set while NameUsage keeps
+    // a single scalar, so reduce it the same way ParsedNameMapping does.
+    u.setNotho(ParsedNameMapping.firstNotho(n.getNotho()));
     u.setGender(n.getGender());
     u.setNomStatus(n.getNomStatus());
     u.setEtymology(n.getEtymology());

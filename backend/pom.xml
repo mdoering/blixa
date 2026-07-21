@@ -18,6 +18,7 @@
   <properties>
     <java.version>25</java.version>
     <mybatis-starter.version>4.0.1</mybatis-starter.version>
+    <name-parser-rust.version>0.1.0</name-parser-rust.version>
   </properties>
 
   <dependencies>
@@ -105,15 +106,35 @@
       <scope>test</scope>
     </dependency>
 
-    <dependency>
-      <groupId>org.gbif</groupId>
-      <artifactId>name-parser</artifactId>
-      <version>4.2.0</version>
-    </dependency>
+    <!-- GBIF name parser 5.0.0: the API module (NameParser interface, ParseResult, enums like
+         Rank/NomCode/NameType) is separate from the implementation. The reference Java impl
+         (NameParserImpl) was dropped at 5.0.0; the sole implementation is now a Rust core reached
+         over the JDK Foreign Function and Memory API (java.lang.foreign), which requires JDK 25. -->
     <dependency>
       <groupId>org.gbif</groupId>
       <artifactId>name-parser-api</artifactId>
-      <version>4.2.0</version>
+      <version>5.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.gbif.nameparser</groupId>
+      <artifactId>name-parser-rust</artifactId>
+      <version>${name-parser-rust.version}</version>
+    </dependency>
+    <!-- Native FFI libraries, one classifier jar per platform. Both are bundled so the SAME
+         fat jar runs on the deploy/CI host (Linux x86_64) and local dev (macOS Apple Silicon);
+         NameParserRust extracts and loads whichever matches the running os+arch at startup. Add a
+         classifier here if the parser must run on another platform (e.g. osx-x86_64, linux-aarch_64). -->
+    <dependency>
+      <groupId>org.gbif.nameparser</groupId>
+      <artifactId>name-parser-rust</artifactId>
+      <version>${name-parser-rust.version}</version>
+      <classifier>linux-x86_64</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.gbif.nameparser</groupId>
+      <artifactId>name-parser-rust</artifactId>
+      <version>${name-parser-rust.version}</version>
+      <classifier>osx-aarch_64</classifier>
     </dependency>
     <dependency>
       <groupId>org.gbif</groupId>
@@ -123,7 +144,7 @@
     <dependency>
       <groupId>org.catalogueoflife</groupId>
       <artifactId>vocab</artifactId>
-      <version>1.3.0-SNAPSHOT</version>
+      <version>1.4.0-SNAPSHOT</version>
     </dependency>
     <!-- ColDP io (ColdpTerm, ColdpReader, TabWriter); pulls in the CLB `api` module
          (Jackson 2 `com.fasterxml`, guava, commons, httpclient5, mapdb, kryo, fastutil) -
@@ -131,7 +152,7 @@
     <dependency>
       <groupId>org.catalogueoflife</groupId>
       <artifactId>reader</artifactId>
-      <version>1.3.0-SNAPSHOT</version>
+      <version>1.4.0-SNAPSHOT</version>
       <exclusions>
         <!-- test engines / logging brought transitively; Spring Boot manages logback + JUnit 5 already -->
         <exclusion><groupId>org.junit.vintage</groupId><artifactId>junit-vintage-engine</artifactId></exclusion>
@@ -145,7 +166,7 @@
     <dependency>
       <groupId>org.catalogueoflife</groupId>
       <artifactId>reference</artifactId>
-      <version>1.3.0-SNAPSHOT</version>
+      <version>1.4.0-SNAPSHOT</version>
       <exclusions>
         <exclusion><groupId>org.junit.vintage</groupId><artifactId>junit-vintage-engine</artifactId></exclusion>
         <exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId></exclusion>

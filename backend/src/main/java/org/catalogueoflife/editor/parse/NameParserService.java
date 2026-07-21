@@ -3,36 +3,45 @@ package org.catalogueoflife.editor.parse;
 import java.util.Locale;
 import javax.annotation.Nullable;
 import org.catalogueoflife.editor.name.NameUsage;
-import org.gbif.nameparser.NameParserImpl;
 import org.gbif.nameparser.api.NameParser;
 import org.gbif.nameparser.api.NomCode;
-import org.gbif.nameparser.api.ParsedName;
+import org.gbif.nameparser.api.ParseResult;
 import org.gbif.nameparser.api.Rank;
-import org.gbif.nameparser.api.UnparsableNameException;
+import org.gbif.nameparser.rust.NameParserRust;
 import org.gbif.nameparser.util.NameFormatter;
 import org.springframework.stereotype.Service;
 
 /**
- * Wraps the GBIF name-parser 4.2.0 {@link NameParser} to atomize a {@link NameUsage}'s scientific
+ * Wraps the GBIF name-parser 5.0.0 {@link NameParser} to atomize a {@link NameUsage}'s scientific
  * name + authorship, and to render formatted display names, per design-spec Appendix A.
  *
- * <p>{@link NameParserImpl} is thread-safe and reusable, so a single instance is held for the
+ * <p>At 5.0.0 the reference Java parser was dropped; the sole implementation is {@link
+ * NameParserRust}, a binding over a Rust core reached through the JDK Foreign Function &amp; Memory
+ * API (requires JDK 25). It is thread-safe and reusable, so a single instance is held for the
  * lifetime of this service.
+ *
+ * <p>Also at 5.0.0, {@link NameParser#parse} no longer throws {@code UnparsableNameException};
+ * it returns a sealed {@link ParseResult} that is one of {@code Parsed} (a full {@link
+ * org.gbif.nameparser.api.ParsedName}), {@code Informal} (a semi-structured name with no atomized
+ * {@code ParsedName}), or {@code Unparsable} (not a name at all -- virus, formula, placeholder,
+ * identifier, ...). Only {@code Parsed} carries atomized fields; the other two are treated here as
+ * un-atomizable.
  */
 @Service
 public class NameParserService {
 
-  private final NameParser parser = new NameParserImpl();
+  private final NameParser parser = new NameParserRust();
 
   /**
    * Parses {@code u.getScientificName()} + {@code u.getAuthorship()} using the usage's own {@code
    * rank} and the project's nomenclatural code, and populates the atomized name fields, {@code
    * nameType} and {@code parseState} on {@code u} in place.
    *
-   * <p>Never throws: on {@link UnparsableNameException} (virus names, BOLD BINs, hybrid formulas,
-   * placeholders, ...) {@code u.parseState} is set to {@code "UNPARSABLE"} and {@code u.nameType}
-   * to the exception's {@link org.gbif.nameparser.api.NameType}; the caller always gets back a
-   * usable, if unparsed, {@link NameUsage}.
+   * <p>Never throws: when the parser yields no atomized {@link org.gbif.nameparser.api.ParsedName}
+   * -- an {@code Unparsable} name (virus names, BOLD BINs, hybrid formulas, placeholders, ...) or a
+   * semi-structured {@code Informal} name -- {@code u.parseState} is set to {@code "UNPARSABLE"} and
+   * {@code u.nameType} to the result's {@link org.gbif.nameparser.api.NameType}; the caller always
+   * gets back a usable, if unparsed, {@link NameUsage}.
    *
    * @param nomCode the project's nomenclatural code, or {@code null} if unknown
    */
@@ -43,12 +52,12 @@ public class NameParserService {
     // the failure path below they must reflect the now-unparsable name, i.e. all null.
     clearParsedFields(u);
     Rank rank = parseRank(u.getRank());
-    try {
-      ParsedName pn = parser.parse(u.getScientificName(), u.getAuthorship(), rank, nomCode);
-      ParsedNameMapping.applyTo(pn, u);
-    } catch (UnparsableNameException e) {
+    ParseResult result = parser.parse(u.getScientificName(), u.getAuthorship(), rank, nomCode);
+    if (result.parsed().isPresent()) {
+      ParsedNameMapping.applyTo(result.parsed().get(), u);
+    } else {
       u.setParseState("UNPARSABLE");
-      u.setNameType(e.getType());
+      u.setNameType(result.type());
     }
   }
 
@@ -81,16 +90,19 @@ public class NameParserService {
    */
   public String formatName(NameUsage u, @Nullable NomCode nomCode, boolean html) {
     Rank rank = parseRank(u.getRank());
-    try {
-      ParsedName pn = parser.parse(u.getScientificName(), u.getAuthorship(), rank, nomCode);
-      return html ? NameFormatter.canonicalCompleteHtml(pn) : NameFormatter.canonicalComplete(pn);
-    } catch (UnparsableNameException e) {
-      String name = u.getScientificName();
-      if (u.getAuthorship() != null && !u.getAuthorship().isBlank()) {
-        return name + " " + u.getAuthorship();
-      }
-      return name;
+    ParseResult result = parser.parse(u.getScientificName(), u.getAuthorship(), rank, nomCode);
+    return result.parsed()
+        .map(pn -> html ? NameFormatter.canonicalCompleteHtml(pn) : NameFormatter.canonicalComplete(pn))
+        .orElseGet(() -> rawName(u));
+  }
+
+  /** The raw {@code scientificName}, with authorship appended when present -- the unparsable fallback. */
+  private static String rawName(NameUsage u) {
+    String name = u.getScientificName();
+    if (u.getAuthorship() != null && !u.getAuthorship().isBlank()) {
+      return name + " " + u.getAuthorship();
     }
+    return name;
   }
 
   /** Tolerant string -> Rank, falling back to {@link Rank#UNRANKED} rather than throwing. */

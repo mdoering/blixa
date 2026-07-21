@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Plain unit test (no Spring, no DB) for {@link NameParserService}, exercising the GBIF
- * name-parser 4.2.0 integration described in design-spec Appendix A.
+ * name-parser 5.0.0 integration described in design-spec Appendix A.
  */
 class NameParserServiceTest {
 
@@ -58,7 +58,8 @@ class NameParserServiceTest {
 
   @Test
   void parseIntoUnparsableNameNeverThrows() {
-    // A BOLD BIN identifier - not a scientific name at all - is unparsable.
+    // A BOLD BIN identifier - not a scientific name at all - is unparsable. Under name-parser 5.0.0
+    // it is recognised specifically as an IDENTIFIER (4.2.0 classified it as the catch-all OTHER).
     NameUsage u = new NameUsage();
     u.setScientificName("BOLD:AAA0001");
     u.setRank("unranked");
@@ -66,7 +67,7 @@ class NameParserServiceTest {
     service.parseInto(u, null);
 
     assertEquals("UNPARSABLE", u.getParseState());
-    assertEquals(NameType.OTHER, u.getNameType());
+    assertEquals(NameType.IDENTIFIER, u.getNameType());
   }
 
   @Test
