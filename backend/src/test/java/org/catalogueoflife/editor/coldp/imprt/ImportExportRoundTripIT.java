@@ -76,11 +76,10 @@ import tools.jackson.databind.ObjectMapper;
 //    round-trips through the export->reimport cycle.
 //  - a pro-parte synonym, Felis vulgaris, linked to BOTH accepted species -- must collapse back to
 //    ONE new_usage row carrying TWO synonym_accepted links, not two rows.
-//  - an UNASSESSED usage WITH a parent link, Felis dubia (synonym_accepted -> Felis catus) --
-//    exported as parentID=<Felis catus> + status "provisionally accepted" (see
-//    NameUsageColdpWriter.coldpStatus), which on reimport must become a synonym_accepted link
-//    again, NEVER a classification parent_id -- the status-inverse critical path. (Distinct from
-//    ExportRoundTripIT's own UNASSESSED-with-NO-link fixture, which exercises a different branch.)
+//  - an UNASSESSED ("provisionally accepted") taxon under an accepted parent, Felis dubia (parent
+//    Felidae) -- exported as a taxon row (parentID=<Felidae> + status "provisionally accepted", see
+//    NameUsageColdpWriter.coldpStatus), which on reimport must round-trip back to a real
+//    classification parent_id, NEVER a synonym_accepted link.
 //  - Felis catus also carries publishedInReferenceId=ref1 AND referenceID=[ref1, ref2] -- the SAME
 //    reference cited both ways -- proving both remap paths land on the same new reference id.
 //  - taxon_info (extinct/environment/temporalRange) on the accepted Felis catus.
@@ -248,12 +247,10 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
     synonymAccepted.link(pid, proParteSynonym.getId(), felisCatus.getId(), 0);
     synonymAccepted.link(pid, proParteSynonym.getId(), felisSilvestris.getId(), 1);
 
-    // UNASSESSED usage WITH a parent (accepted) link -- exports as parentID=<Felis catus> +
-    // status "provisionally accepted"; on reimport this MUST become a synonym_accepted link
-    // again, never a classification parent_id (the status-inverse critical path).
-    NameUsage unassessedWithParent =
-        createUsage(pid, "Felis dubia", "species", Status.UNASSESSED, null, userId);
-    synonymAccepted.link(pid, unassessedWithParent.getId(), felisCatus.getId(), 0);
+    // UNASSESSED ("provisionally accepted") taxon under an accepted parent (Felidae) -- exports as a
+    // taxon row (parentID=<Felidae>, status "provisionally accepted"), and on reimport must round-trip
+    // back to a real classification parent_id, never a synonym_accepted link.
+    createUsage(pid, "Felis dubia", "species", Status.UNASSESSED, felidae.getId(), userId);
 
     distributionService.create(userId, pid, felisCatus.getId(),
         new DistributionRequest(null, "tdwg:AB", "tdwg", "native", null, ref1.getId(),
@@ -341,12 +338,11 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
     assertThat(synonymAccepted.findAcceptedFor((int) pid2, newProParte.getId()))
         .containsExactlyInAnyOrder(newFelisCatus.getId(), newFelisSilvestris.getId());
 
-    // UNASSESSED-with-parent: status-inverse critical path -- parent_id stays null, the parentID
-    // the export wrote instead became a synonym_accepted link.
+    // UNASSESSED taxon: round-trips as a taxon, keeping its status AND a real classification
+    // parent_id (Felidae) -- never demoted to a synonym_accepted link.
     assertThat(newUnassessed.getStatus()).isEqualTo(Status.UNASSESSED);
-    assertThat(newUnassessed.getParentId()).isNull();
-    assertThat(synonymAccepted.findAcceptedFor((int) pid2, newUnassessed.getId()))
-        .containsExactly(newFelisCatus.getId());
+    assertThat(newUnassessed.getParentId()).isEqualTo(newFelidae.getId());
+    assertThat(synonymAccepted.findAcceptedFor((int) pid2, newUnassessed.getId())).isEmpty();
 
     // Basionym resolved to the new plain-synonym id, as a `basionym` name_relation.
     assertThat(nameRelations.findByUsage(newFelisCatus.getProjectId(), newFelisCatus.getId()))

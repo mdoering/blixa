@@ -326,7 +326,7 @@ class ClbImportServiceIT extends AbstractPostgresIT {
   }
 
   @Test
-  void taxonScopedChildIsSkippedForANonAcceptedUsage() {
+  void taxonScopedChildIsKeptForAProvisionallyAcceptedUsage() {
     int userId = createUser("clb-import-guard");
     int pid = createProject(userId, "clb-import-guard-project");
     int focalId = createFocalUsage(pid, userId);
@@ -335,8 +335,8 @@ class ClbImportServiceIT extends AbstractPostgresIT {
     when(clb.childrenIds(ds, "GEN")).thenReturn(List.of("SP1"));
     when(clb.childrenIds(ds, "SP1")).thenReturn(List.of());
     when(clb.usageInfo(ds, "GEN")).thenReturn(genusInfo("GEN", "Guardus"));
-    // PROVISIONALLY_ACCEPTED collapses to our UNASSESSED status -- its distribution must be
-    // skipped even though CLB itself still calls this a "taxon".
+    // PROVISIONALLY_ACCEPTED collapses to our UNASSESSED status, which is a TAXON -- so its
+    // taxon-level data (here, a distribution) is kept, exactly like an accepted taxon's.
     when(clb.usageInfo(ds, "SP1"))
         .thenReturn(speciesInfo("SP1", "Guardus unus", TaxonomicStatus.PROVISIONALLY_ACCEPTED));
 
@@ -344,14 +344,14 @@ class ClbImportServiceIT extends AbstractPostgresIT {
         new ClbImportRequest(ds, "GEN", ImportMode.TAXON_SUBTREE, null));
 
     assertThat(summary.nameUsages()).isEqualTo(2);
-    // the provisional species' own distribution never landed anywhere.
-    assertThat(summary.children().get("distribution")).isEqualTo(0);
-    assertThat(summary.issues()).anySatisfy(i -> assertThat(i.message()).contains("not accepted"));
+    // the provisional species' distribution is kept (it is a taxon) -- no "not accepted" skip.
+    assertThat(summary.children().get("distribution")).isEqualTo(1);
+    assertThat(summary.issues()).noneSatisfy(i -> assertThat(i.message()).contains("not accepted"));
 
     NameUsage sp1 = findByName(pid, "Guardus unus");
     assertThat(sp1.getStatus()).isEqualTo(Status.UNASSESSED);
-    assertThat(distributions.findByUsage(pid, sp1.getId())).isEmpty();
-    // the synonym itself is unaffected by the guard (only the 5 taxon-scoped kinds are gated).
+    assertThat(distributions.findByUsage(pid, sp1.getId())).hasSize(1);
+    // the synonym itself carries no taxon-scoped kinds (only the taxon owner does).
     assertThat(usages.findAllByProject(pid).stream()
         .anyMatch(u -> u.getScientificName().equals("Guardus unus somenymus"))).isTrue();
   }

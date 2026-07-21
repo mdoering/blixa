@@ -280,7 +280,7 @@ public class ClbImportService {
       }
       usages.insert(u);
       touched.add(newId);
-      if (u.getStatus() == Status.ACCEPTED && hasTaxonInfo(u)) {
+      if (u.getStatus().isTaxon() && hasTaxonInfo(u)) {
         taxonInfo.upsert(projectId, newId, u.getExtinct(), u.getEnvironment(),
             u.getTemporalRangeStart(), u.getTemporalRangeEnd());
       }
@@ -292,7 +292,7 @@ public class ClbImportService {
         synonymCount += insertSynonyms(projectId, userId, project, scope, bundle, newId,
             refResolver, usageIdMap, nameIdMap, touched, issues);
       }
-      insertChildEntities(projectId, userId, bundle, newId, u.getStatus() == Status.ACCEPTED,
+      insertChildEntities(projectId, userId, bundle, newId, u.getStatus().isTaxon(),
           usageIdMap, nameIdMap, refResolver, req.entityTypes(), true, childCounts, issues,
           pendingNameRelations);
     }
@@ -510,21 +510,21 @@ public class ClbImportService {
   // one gathered usage's whole bundle (covering both the accepted taxon AND its synonyms, since
   // UsageInfo -- and therefore MappedImport -- bundles them together). The 5 taxon-scoped kinds
   // (vernacular/distribution/media/estimate/property) always belong to `taxonOwnerId` itself (the
-  // accepted usage this bundle is FOR -- see ClbUsageMapper's own "taxa only" javadoc) and require
-  // `ownerAccepted` (mirrors AbstractChildEntityService.requireAcceptedUsage /
-  // ImportRunService.loadChildEntities' identical guard: PROVISIONALLY_ACCEPTED collapses to our
-  // UNASSESSED, see ClbUsageMapper.toStatus, so even a CLB "taxon" can fail this check). TypeMaterial/
-  // NameRelation key off whichever name/usage in the bundle owns them (nameIdMap/usageIdMap,
-  // populated for the accepted usage AND every synonym by the caller before this runs) and apply
-  // to ANY usage status, so they never consult `ownerAccepted`.
+  // taxon this bundle is FOR -- see ClbUsageMapper's own "taxa only" javadoc) and require
+  // `ownerIsTaxon` (mirrors AbstractChildEntityService.requireTaxonUsage /
+  // ImportRunService.loadChildEntities' identical guard: a taxon is ACCEPTED or UNASSESSED, and a
+  // CLB PROVISIONALLY_ACCEPTED collapses to our UNASSESSED (see ClbUsageMapper.toStatus), which is
+  // still a taxon). TypeMaterial/NameRelation key off whichever name/usage in the bundle owns them
+  // (nameIdMap/usageIdMap, populated for the taxon AND every synonym by the caller before this runs)
+  // and apply to ANY usage status, so they never consult `ownerIsTaxon`.
   private void insertChildEntities(int projectId, int userId, MappedImport bundle, int taxonOwnerId,
-      boolean ownerAccepted, Map<String, Integer> usageIdMap, Map<String, Integer> nameIdMap,
+      boolean ownerIsTaxon, Map<String, Integer> usageIdMap, Map<String, Integer> nameIdMap,
       RefResolver refResolver, Set<String> entityTypes, boolean defaultAll,
       Map<String, Integer> childCounts, List<ClbImportIssue> issues,
       List<PendingNameRelation> pendingNameRelations) {
 
     if (included(entityTypes, T_DISTRIBUTION, defaultAll)) {
-      if (ownerAccepted) {
+      if (ownerIsTaxon) {
         for (MappedDistribution d : bundle.distributions()) {
           DistributionRequest src = d.request();
           DistributionRequest r = new DistributionRequest(src.area(), src.areaId(), src.gazetteer(),
@@ -541,7 +541,7 @@ public class ClbImportService {
     }
 
     if (included(entityTypes, T_VERNACULAR, defaultAll)) {
-      if (ownerAccepted) {
+      if (ownerIsTaxon) {
         for (MappedVernacular vn : bundle.vernaculars()) {
           VernacularRequest src = vn.request();
           VernacularRequest r = new VernacularRequest(src.name(), src.language(), src.country(), src.sex(),
@@ -557,7 +557,7 @@ public class ClbImportService {
     }
 
     if (included(entityTypes, T_MEDIA, defaultAll)) {
-      if (ownerAccepted) {
+      if (ownerIsTaxon) {
         for (MediaRequest r : bundle.media()) {
           int id = idSeq.allocate(projectId, MEDIA_ENTITY);
           media.insert(projectId, id, taxonOwnerId, r, userId);
@@ -570,7 +570,7 @@ public class ClbImportService {
     }
 
     if (included(entityTypes, T_ESTIMATE, defaultAll)) {
-      if (ownerAccepted) {
+      if (ownerIsTaxon) {
         for (MappedEstimate est : bundle.estimates()) {
           EstimateRequest src = est.request();
           EstimateRequest r = new EstimateRequest(src.estimate(), src.type(),
@@ -586,7 +586,7 @@ public class ClbImportService {
     }
 
     if (included(entityTypes, T_PROPERTY, defaultAll)) {
-      if (ownerAccepted) {
+      if (ownerIsTaxon) {
         for (MappedProperty prop : bundle.properties()) {
           PropertyRequest src = prop.request();
           PropertyRequest r = new PropertyRequest(src.property(), src.value(), src.page(),

@@ -53,8 +53,8 @@ import tools.jackson.databind.ObjectMapper;
 //    targets, mirroring NameUsageColdpWriter.synonymRows) plus a derived row ID="42-4"
 //    (parentID=4) -- must collapse to ONE name_usage row carrying TWO synonym_accepted links.
 //  - an UNASSESSED-with-parentID row, Felis obscura(50), status "provisionally accepted",
-//    parentID=4 -- must become a synonym_accepted link (parent_id stays null), never a
-//    classification parent.
+//    parentID=4 -- a taxon, so parentID resolves to a real classification parent_id, never a
+//    synonym_accepted link.
 //  - a dangling parentID, Nonexistens vagus(70) -> parentID "9999" (never defined) -- must
 //    surface as an ImportIssue in the run's issues, not fail the whole import.
 //  - Panthera leo(4) also carries nameReferenceID="1" (single) and referenceID="1,2" (list),
@@ -239,12 +239,11 @@ class ImportNameUsageIT extends AbstractPostgresIT {
         .containsExactlyInAnyOrder(panthera.getId(), pantheraLeo.getId());
     assertThat(all.stream().filter(u -> "Leo pardus".equals(u.getScientificName())).toList()).hasSize(1);
 
-    // UNASSESSED-with-parentID: exported as parentID=<accepted> + "provisionally accepted", so on
-    // import that parentID must become a synonym link too, NOT a classification parent_id.
+    // UNASSESSED-with-parentID: a "provisionally accepted" row is a taxon, so its parentID resolves
+    // to a real classification parent_id (Panthera leo), NOT a synonym_accepted link.
     assertThat(felisObscura.getStatus()).isEqualTo(Status.UNASSESSED);
-    assertThat(felisObscura.getParentId()).isNull();
-    assertThat(synonymAccepted.findAcceptedFor(projectId, felisObscura.getId()))
-        .containsExactly(pantheraLeo.getId());
+    assertThat(felisObscura.getParentId()).isEqualTo(pantheraLeo.getId());
+    assertThat(synonymAccepted.findAcceptedFor(projectId, felisObscura.getId())).isEmpty();
 
     // Dangling parentID: no crash, no link, just the issue asserted above.
     assertThat(nonexistens.getParentId()).isNull();

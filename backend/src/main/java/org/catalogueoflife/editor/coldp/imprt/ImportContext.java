@@ -20,13 +20,14 @@ class ImportContext {
   final Map<String, Integer> refIds = new HashMap<>();     // sourceRefID -> our id
   final Map<String, Integer> authorIds = new HashMap<>();   // sourceAuthorID -> our id
   final Map<String, Integer> usageIds = new HashMap<>();    // filled by Task 4
-  // New (our) usage ids whose primary row's status is genuinely ACCEPTED (never SYNONYM/
-  // MISAPPLIED/UNASSESSED) -- filled alongside usageIds in Task 4's Pass 1 (insertPrimaryUsage).
-  // Consulted by the 5 taxon-scoped Task 5 child loaders (Distribution/VernacularName/Media/
-  // SpeciesEstimate/TaxonProperty) to uphold AbstractChildEntityService.requireAcceptedUsage's
-  // invariant that those 5 entities only ever apply to ACCEPTED usages -- TypeMaterial/NameRelation
-  // key off nameID and apply to any usage status, so they never consult this set.
-  final Set<Integer> acceptedUsageIds = new HashSet<>();
+  // New (our) usage ids whose primary row is a TAXON -- ACCEPTED or UNASSESSED ("provisionally
+  // accepted"), never SYNONYM/MISAPPLIED (see Status.isTaxon) -- filled alongside usageIds in Task
+  // 4's Pass 1 (insertPrimaryUsage). Consulted by the 5 taxon-scoped Task 5 child loaders
+  // (Distribution/VernacularName/Media/SpeciesEstimate/TaxonProperty) to uphold
+  // AbstractChildEntityService.requireTaxonUsage's invariant that those 5 entities only ever apply
+  // to taxa -- TypeMaterial/NameRelation key off nameID and apply to any usage status, so they never
+  // consult this set.
+  final Set<Integer> taxonUsageIds = new HashSet<>();
   int referenceCount;
   int authorCount;
   int nameUsageCount;

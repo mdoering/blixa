@@ -43,8 +43,11 @@ public class NameUsageColdpWriter {
 
     List<Map<ColdpTerm, String>> rows = new ArrayList<>();
     for (NameUsage u : usages.findAllByProject(projectId)) {
-      if (u.getStatus() == Status.ACCEPTED) {
-        rows.add(acceptedRow(u, code));
+      // Taxa -- accepted AND unassessed ("provisionally accepted") -- are self-parented rows
+      // carrying their parentID + taxon_info; coldpStatus() emits the right ColDP status for each.
+      // Only synonyms/misapplied names produce accepted-linked synonym rows.
+      if (u.getStatus().isTaxon()) {
+        rows.add(taxonRow(u, code));
       } else {
         rows.addAll(synonymRows(u, code, acceptedBySynonym.getOrDefault(u.getId(), List.of())));
       }
@@ -64,7 +67,7 @@ public class NameUsageColdpWriter {
     return grouped;
   }
 
-  private static Map<ColdpTerm, String> acceptedRow(NameUsage u, String code) {
+  private static Map<ColdpTerm, String> taxonRow(NameUsage u, String code) {
     Map<ColdpTerm, String> row = nameFields(u, code);
     row.put(ColdpTerm.ID, str(u.getId()));
     row.put(ColdpTerm.parentID, str(u.getParentId()));

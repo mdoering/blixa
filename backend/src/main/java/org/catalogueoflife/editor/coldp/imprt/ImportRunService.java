@@ -548,18 +548,18 @@ public class ImportRunService {
       }
     }
 
-    // Pass 2: every usage now exists, so parent_id (accepted) or a synonym_accepted link
-    // (non-accepted) can finally be resolved, and basionymID can finally be resolved into a
-    // `basionym` name_relation; a dangling reference is surfaced as an ImportIssue rather than
-    // failing the whole import. basionymID additionally falls back to nameIdToUsage (split form
-    // only -- see above); parentID never does, since a split-form parentID/taxonID is already a
-    // Taxon/Synonym id, resolved by ctx.usageIds directly exactly like the combined form.
+    // Pass 2: every usage now exists, so parent_id (a taxon -- accepted or unassessed) or a
+    // synonym_accepted link (synonym/misapplied) can finally be resolved, and basionymID can finally
+    // be resolved into a `basionym` name_relation; a dangling reference is surfaced as an ImportIssue
+    // rather than failing the whole import. basionymID additionally falls back to nameIdToUsage
+    // (split form only -- see above); parentID never does, since a split-form parentID/taxonID is
+    // already a Taxon/Synonym id, resolved by ctx.usageIds directly exactly like the combined form.
     for (Pending p : pending) {
       Map<ColdpTerm, String> row = p.row();
       String rowId = row.get(ColdpTerm.ID);
       Integer basionymNewId =
           resolveUsageRef(ctx, nameIdToUsage, row.get(ColdpTerm.basionymID), "basionym", rowId);
-      if (p.usage().getStatus() == Status.ACCEPTED) {
+      if (p.usage().getStatus().isTaxon()) {
         Integer parentNewId = resolveUsageRef(ctx, null, row.get(ColdpTerm.parentID), "parent", rowId);
         usages.updateHierarchy(ctx.projectId, p.usage().getId(), parentNewId, userId);
       } else {
@@ -613,12 +613,12 @@ public class ImportRunService {
   // insertPrimaryUsage above. A row whose parent usage (taxonID/nameID) can't be resolved is skipped
   // with a ctx.issue rather than failing the whole import -- never fatal, matching every other
   // dangling-reference case in this file. The 5 taxon-scoped loaders additionally require the
-  // resolved taxonID to be ACCEPTED (ctx.acceptedUsageIds, populated in Task 4's Pass 1): this
-  // mirrors AbstractChildEntityService.requireAcceptedUsage, which every ordinary (non-import) write
-  // path for these 5 entities enforces, and NameUsageService.writeTaxonInfo's taxonChildren.dropAll
-  // on any status change away from ACCEPTED -- a synonym's taxonID must never be allowed to end up
-  // owning one of these 5 rows, import included. TypeMaterial + NameRelation key off nameID and apply
-  // to ANY usage status, so they deliberately do NOT consult acceptedUsageIds.
+  // resolved taxonID to be a TAXON -- accepted or unassessed (ctx.taxonUsageIds, populated in Task
+  // 4's Pass 1): this mirrors AbstractChildEntityService.requireTaxonUsage, which every ordinary
+  // (non-import) write path for these 5 entities enforces, and NameUsageService.writeTaxonInfo's
+  // taxonChildren.dropAll when a usage becomes a synonym -- a synonym's taxonID must never be
+  // allowed to end up owning one of these 5 rows, import included. TypeMaterial + NameRelation key
+  // off nameID and apply to ANY usage status, so they deliberately do NOT consult taxonUsageIds.
   private void loadChildEntities(ColdpReader reader, ImportContext ctx, int userId) {
     loadTypeMaterial(reader, ctx, userId);
     loadDistribution(reader, ctx, userId);
@@ -681,7 +681,7 @@ public class ImportRunService {
         ctx.issue(DISTRIBUTION_ENTITY, rowId, "taxon " + taxonSrc + " not found");
         return;
       }
-      if (!ctx.acceptedUsageIds.contains(usageId)) {
+      if (!ctx.taxonUsageIds.contains(usageId)) {
         ctx.issue(DISTRIBUTION_ENTITY, rowId,
             "taxon " + taxonSrc + " is not accepted — distribution skipped");
         return;
@@ -716,7 +716,7 @@ public class ImportRunService {
         ctx.issue(VERNACULAR_ENTITY, rowId, "taxon " + taxonSrc + " not found");
         return;
       }
-      if (!ctx.acceptedUsageIds.contains(usageId)) {
+      if (!ctx.taxonUsageIds.contains(usageId)) {
         ctx.issue(VERNACULAR_ENTITY, rowId,
             "taxon " + taxonSrc + " is not accepted — vernacular skipped");
         return;
@@ -750,7 +750,7 @@ public class ImportRunService {
         ctx.issue(MEDIA_ENTITY, rowId, "taxon " + taxonSrc + " not found");
         return;
       }
-      if (!ctx.acceptedUsageIds.contains(usageId)) {
+      if (!ctx.taxonUsageIds.contains(usageId)) {
         ctx.issue(MEDIA_ENTITY, rowId, "taxon " + taxonSrc + " is not accepted — media skipped");
         return;
       }
@@ -782,7 +782,7 @@ public class ImportRunService {
         ctx.issue(ESTIMATE_ENTITY, rowId, "taxon " + taxonSrc + " not found");
         return;
       }
-      if (!ctx.acceptedUsageIds.contains(usageId)) {
+      if (!ctx.taxonUsageIds.contains(usageId)) {
         ctx.issue(ESTIMATE_ENTITY, rowId,
             "taxon " + taxonSrc + " is not accepted — estimate skipped");
         return;
@@ -852,7 +852,7 @@ public class ImportRunService {
         ctx.issue(PROPERTY_ENTITY, rowId, "taxon " + taxonSrc + " not found");
         return;
       }
-      if (!ctx.acceptedUsageIds.contains(usageId)) {
+      if (!ctx.taxonUsageIds.contains(usageId)) {
         ctx.issue(PROPERTY_ENTITY, rowId,
             "taxon " + taxonSrc + " is not accepted — property skipped");
         return;
@@ -945,10 +945,10 @@ public class ImportRunService {
     Status status = ColdpParse.parseStatus(row.get(ColdpTerm.status));
     u.setStatus(status == null ? Status.UNASSESSED : status);
 
-    // extinct/environment/temporalRange* live in taxon_info and only ever apply to accepted usages
-    // -- acceptedRow is the only NameUsageColdpWriter branch that writes them (synonymRows never
-    // does), so only an ACCEPTED row is allowed to populate them here.
-    if (u.getStatus() == Status.ACCEPTED) {
+    // extinct/environment/temporalRange* live in taxon_info and apply only to taxa -- taxonRow is
+    // the only NameUsageColdpWriter branch that writes them (synonymRows never does), so only a
+    // taxon row (accepted or unassessed) is allowed to populate them here.
+    if (u.getStatus().isTaxon()) {
       String extinctStr = row.get(ColdpTerm.extinct);
       u.setExtinct(extinctStr == null ? null : Boolean.valueOf(extinctStr));
       List<Environment> envs = ColdpParse.csv(row.get(ColdpTerm.environment)).stream()
@@ -1011,7 +1011,7 @@ public class ImportRunService {
     }
 
     usages.insert(u);
-    if (u.getStatus() == Status.ACCEPTED && hasTaxonInfo(u)) {
+    if (u.getStatus().isTaxon() && hasTaxonInfo(u)) {
       taxonInfo.upsert(ctx.projectId, u.getId(), u.getExtinct(), u.getEnvironment(),
           u.getTemporalRangeStart(), u.getTemporalRangeEnd());
     }
@@ -1023,8 +1023,8 @@ public class ImportRunService {
       ctx.issue("name_usage", usageSrcId, "duplicate ID — later row shadows earlier in cross-references");
     }
     ctx.usageIds.put(usageSrcId, u.getId());
-    if (u.getStatus() == Status.ACCEPTED) {
-      ctx.acceptedUsageIds.add(u.getId());
+    if (u.getStatus().isTaxon()) {
+      ctx.taxonUsageIds.add(u.getId());
     }
     ctx.nameUsageCount++;
     return u;
