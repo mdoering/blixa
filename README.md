@@ -210,6 +210,38 @@ DB_PASSWORD=CHANGE_ME
 On the next backend start, Flyway runs `V1__initial_schema.sql` against the empty database
 (creating `pg_trgm` and all 32 tables). To reset later, see [Reset the database](#reset-the-database).
 
+### Logs
+
+The backend writes **no log file** — Spring Boot logs to stdout, and the `col-blixa` systemd
+unit leaves `StandardOutput` at its default, so everything goes to the **systemd journal**
+(`journald`). A failed start crash-loops (`Restart=on-failure`), so repeated startup stack
+traces collect there too.
+
+On the app host (as a user with journal access):
+
+```bash
+sudo journalctl -u col-blixa -n 200 --no-pager         # last 200 lines (startup + first stack trace)
+sudo journalctl -u col-blixa -f                        # follow live
+sudo journalctl -u col-blixa -p err -n 100 --no-pager  # errors only
+sudo journalctl -u col-blixa --since "20 min ago" --no-pager
+sudo systemctl status col-blixa                        # current state + last few lines
+```
+
+Remotely (host specifics in [`deploy/`](deploy/README.md)):
+
+```bash
+ssh col@<app-host> "sudo journalctl -u col-blixa -n 200 --no-pager"
+```
+
+GBIF also mirrors journald to the partial public log viewer at <https://logs.gbif.org/>.
+
+> On a boot failure the first `Caused by:` line is the root cause. A common one:
+> `Unable to obtain connection from database: Connection to localhost:5432 refused` means the
+> env file didn't set `DB_URL` — the **deployed default profile reads `DB_URL`** (plus
+> `DB_USER`/`DB_PASSWORD`), *not* `DB_HOST`/`DB_PORT`/`DB_NAME` (those are only read by the
+> local `dev` profile), so the backend fell back to its `localhost` default instead of the real
+> database host.
+
 ---
 
 ## Notes
