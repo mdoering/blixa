@@ -32,9 +32,14 @@ class TaxonChildEntitiesIT extends AbstractPostgresIT {
     if (users.requireByUsernameOrNull(u) == null) users.createLocal(u, "pw", u);
   }
 
+  // Unique per call: project titles are unique per owner, and this IT (sharing one DB with the whole
+  // suite) now creates a project in more than one test method under the same mock user.
+  private static final java.util.concurrent.atomic.AtomicInteger SEQ =
+      new java.util.concurrent.atomic.AtomicInteger();
+
   private long createProject() throws Exception {
     String b = mvc.perform(post("/api/projects").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-            .content("{\"title\":\"tax\",\"nomCode\":\"zoological\"}"))
+            .content("{\"title\":\"tax " + SEQ.incrementAndGet() + "\",\"nomCode\":\"zoological\"}"))
         .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
     return json.readTree(b).get("id").asLong();
   }
@@ -113,5 +118,35 @@ class TaxonChildEntitiesIT extends AbstractPostgresIT {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"name\":\"Nope\"}"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void unassessedTaxaHoldChildEntitiesAndKeepThemAcrossAccUnassessed() throws Exception {
+    ensureUser("taxOwner");
+    long pid = createProject();
+
+    // An unassessed ("provisionally accepted") usage may hold taxon-level supplementary data --
+    // vernaculars etc. -- just like an accepted taxon (this was rejected before).
+    long u = json.readTree(mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Provisia nova\",\"rank\":\"species\",\"status\":\"unassessed\"}"))
+        .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).get("id").asLong();
+    post201(pid, u, "vernaculars", "{\"name\":\"Newling\"}");
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + u + "/vernaculars"))
+        .andExpect(jsonPath("$.length()").value(1));
+
+    // Flipping accepted <-> unassessed keeps the supplementary data (both are taxa); only becoming a
+    // synonym/misapplied would drop it. Create an accepted taxon, give it a vernacular, make it
+    // unassessed -- the vernacular survives.
+    long acc = json.readTree(createUsage(pid, "Panthera onca")).get("id").asLong();
+    post201(pid, acc, "vernaculars", "{\"name\":\"Jaguar\"}");
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + acc).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Panthera onca\",\"rank\":\"species\",\"status\":\"unassessed\",\"version\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("UNASSESSED"));
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + acc + "/vernaculars"))
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].name").value("Jaguar"));
   }
 }

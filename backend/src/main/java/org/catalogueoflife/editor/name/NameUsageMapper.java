@@ -73,6 +73,13 @@ public interface NameUsageMapper {
   @Select("SELECT scientific_name FROM name_usage WHERE project_id = #{projectId} AND id = #{id}")
   String findScientificName(@Param("projectId") int projectId, @Param("id") int id);
 
+  // Count a usage's direct children that have the given status -- used to guard the accepted
+  // backbone (a taxon can't become unassessed while it still has accepted children).
+  @Select("SELECT count(*) FROM name_usage WHERE project_id = #{projectId}"
+      + " AND parent_id = #{parentId} AND status = #{status}")
+  int countChildrenWithStatus(@Param("projectId") int projectId, @Param("parentId") int parentId,
+      @Param("status") String status);
+
   // The same full-row projection findByIdInProject uses (including the taxon_info LEFT JOIN), but
   // for every usage in the project rather than a single id, id-ordered for a stable/deterministic
   // file -- ColDP export's NameUsage.tsv source (coldp/export/NameUsageColdpWriter.write).

@@ -170,18 +170,19 @@ public class NameUsageService {
   public NameUsageResponse create(int userId, int projectId, CreateNameUsageRequest req) {
     requireEditor(userId, projectId);
     Project project = requireProject(projectId);
+    Status status = VocabParsing.requireParse(Status.class, req.status(), "status");
     if (req.parentId() != null) {
       // See TreeMapper.lockProject: serializes against concurrent moves/creates/updates that
       // touch this project's tree while we validate+use req.parentId() below.
       tree.lockProject(projectId);
-      requireValidParent(projectId, null, req.parentId());
+      requireValidParent(projectId, null, req.parentId(), status);
     }
     NameUsage u = new NameUsage();
     u.setProjectId(projectId);
     u.setScientificName(req.scientificName());
     u.setAuthorship(req.authorship());
     u.setRank(req.rank());
-    u.setStatus(VocabParsing.requireParse(Status.class, req.status(), "status"));
+    u.setStatus(status);
     u.setParentId(req.parentId());
     u.setNamePhrase(req.namePhrase());
     u.setNomStatus(VocabParsing.parse(NomStatus.class, req.nomStatus(), "nomStatus"));
@@ -217,12 +218,15 @@ public class NameUsageService {
   public NameUsageResponse update(int userId, int projectId, int id, UpdateNameUsageRequest req) {
     requireEditor(userId, projectId);
     Project project = requireProject(projectId);
+    Status status = VocabParsing.requireParse(Status.class, req.status(), "status");
     if (req.parentId() != null) {
       // See TreeMapper.lockProject: serializes against concurrent moves/creates/updates that
       // touch this project's tree while we validate+use req.parentId() below.
       tree.lockProject(projectId);
-      requireValidParent(projectId, id, req.parentId());
+      requireValidParent(projectId, id, req.parentId(), status);
     }
+    // Becoming UNASSESSED must not strand accepted children under an unassessed parent.
+    requireNoAcceptedChildrenIfUnassessed(projectId, id, status);
     NameUsage u = requireInProject(projectId, id);
     // Snapshot BEFORE mutating u's fields in place below: MyBatis's session-scoped local cache
     // would hand back this SAME cached instance from a second identical findByIdInProject call
@@ -242,7 +246,7 @@ public class NameUsageService {
     u.setScientificName(req.scientificName());
     u.setAuthorship(req.authorship());
     u.setRank(req.rank());
-    u.setStatus(VocabParsing.requireParse(Status.class, req.status(), "status"));
+    u.setStatus(status);
     u.setParentId(req.parentId());
     u.setNamePhrase(req.namePhrase());
     u.setNomStatus(VocabParsing.parse(NomStatus.class, req.nomStatus(), "nomStatus"));
@@ -309,6 +313,12 @@ public class NameUsageService {
             "cannot change " + u.getStatus() + " to " + target + " in bulk: only accepted<->unassessed"
                 + " and synonym<->misapplied keep the parent");
       }
+      // Keep the accepted backbone intact: an accepted taxon may never sit under an unassessed
+      // parent. bulk keeps each usage's parent, so re-use requireValidParent against the current one.
+      if (u.getParentId() != null) {
+        requireValidParent(projectId, id, u.getParentId(), target);
+      }
+      requireNoAcceptedChildrenIfUnassessed(projectId, id, target);
       toChange.add(u);
     }
     for (NameUsage u : toChange) {
@@ -788,7 +798,7 @@ public class NameUsageService {
   // TreeMapper.lockProject(projectId) first so the isDescendant check below is atomic with the
   // eventual write. `id` is null on create (the new row has no id yet, so no self-parent/cycle is
   // possible -- only the accepted-parent check applies); non-null on update.
-  private void requireValidParent(int projectId, Integer id, int parentId) {
+  private void requireValidParent(int projectId, Integer id, int parentId, Status childStatus) {
     if (id != null && parentId == id) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "a usage cannot be its own parent");
     }
@@ -796,11 +806,30 @@ public class NameUsageService {
     if (parent == null) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "parent not in project");
     }
-    if (parent.getStatus() != Status.ACCEPTED) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "parent must be an accepted usage");
+    // An accepted taxon's parent must also be accepted, so the accepted classification stays a
+    // self-contained backbone. An unassessed ("provisionally accepted") taxon may hang under an
+    // accepted OR an unassessed parent -- but an accepted one may never sit under an unassessed
+    // parent. (Synonyms/misapplied attach via synonym links, not parent_id.)
+    boolean parentOk = parent.getStatus() == Status.ACCEPTED
+        || (childStatus == Status.UNASSESSED && parent.getStatus() == Status.UNASSESSED);
+    if (!parentOk) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, childStatus == Status.UNASSESSED
+          ? "the parent of an unassessed taxon must be accepted or unassessed"
+          : "the parent of an accepted taxon must be accepted");
     }
     if (id != null && tree.isDescendant(projectId, id, parentId)) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "would create a cycle");
+    }
+  }
+
+  // Keeps the accepted backbone intact when a usage takes on the UNASSESSED status: its existing
+  // accepted children would then sit under an unassessed parent, which the model forbids. (The
+  // reverse -- becoming ACCEPTED under an unassessed parent -- is caught by requireValidParent.)
+  private void requireNoAcceptedChildrenIfUnassessed(int projectId, int id, Status target) {
+    if (target == Status.UNASSESSED
+        && usages.countChildrenWithStatus(projectId, id, Status.ACCEPTED.name()) > 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "cannot make a taxon unassessed while it still has accepted children");
     }
   }
 
@@ -840,23 +869,26 @@ public class NameUsageService {
         .toList();
   }
 
-  // Taxon-level attributes (extinct/environment/temporal range) live in taxon_info and belong only
-  // to accepted usages. Upsert them when the usage is accepted and carries a value; otherwise
-  // (non-accepted, or accepted with nothing set) ensure no row lingers. Runs inside the caller's
-  // write transaction. Spec: docs/superpowers/specs/2026-07-09-taxon-info-refactor-design.md
+  // Taxon-level attributes (extinct/environment/temporal range) live in taxon_info and belong to
+  // taxon-like usages -- accepted AND unassessed ("provisionally accepted"), which differs from an
+  // accepted taxon only in being flagged for review and hidden from the tree by default. Upsert them
+  // when the usage is a taxon and carries a value; otherwise (a synonym/misapplied, or a taxon with
+  // nothing set) ensure no row lingers. Runs inside the caller's write transaction.
+  // Spec: docs/superpowers/specs/2026-07-09-taxon-info-refactor-design.md
   private void writeTaxonInfo(NameUsage u) {
+    boolean taxon = TAXON_STATUSES.contains(u.getStatus());
     boolean hasData = u.getExtinct() != null || u.getEnvironment() != null
         || u.getTemporalRangeStart() != null || u.getTemporalRangeEnd() != null;
-    if (u.getStatus() == Status.ACCEPTED && hasData) {
+    if (taxon && hasData) {
       taxonInfo.upsert(u.getProjectId(), u.getId(), u.getExtinct(), u.getEnvironment(),
           u.getTemporalRangeStart(), u.getTemporalRangeEnd());
     } else {
       taxonInfo.delete(u.getProjectId(), u.getId());
     }
-    // Taxon-level child entities (vernacular/distribution/media/estimate/property) belong only to
-    // accepted usages; drop them whenever the usage is not accepted. This covers both a direct
-    // status edit (update) and demote, which both funnel through here.
-    if (u.getStatus() != Status.ACCEPTED) {
+    // Taxon-level child entities (vernacular/distribution/media/estimate/property) belong to
+    // taxon-like usages; drop them only when the usage becomes a synonym/misapplied. Covers both a
+    // direct status edit (update) and demote, which both funnel through here.
+    if (!taxon) {
       taxonChildren.dropAll(u.getProjectId(), u.getId());
     }
   }

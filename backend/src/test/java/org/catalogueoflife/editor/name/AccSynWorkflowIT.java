@@ -230,4 +230,37 @@ class AccSynWorkflowIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + pid + "/usages/" + sp1))
         .andExpect(jsonPath("$.status").value("UNASSESSED"));
   }
+
+  @Test
+  void unassessedParentRulesAndBackboneGuards() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("backbone");
+    long accRoot = createUsage(pid, "Accroot", "genus", "accepted", null);
+    // An unassessed taxon may hang under an accepted parent...
+    long una = createUsage(pid, "Unassa", "species", "unassessed", accRoot);
+    // ...and under an unassessed parent ("provisionally accepted" chains are allowed).
+    long una2 = createUsage(pid, "Unassb", "subspecies", "unassessed", una);
+
+    // But an ACCEPTED taxon may never hang under an unassessed parent.
+    mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Accbad\",\"rank\":\"species\",\"status\":\"accepted\",\"parentId\":" + una + "}"))
+        .andExpect(status().isBadRequest());
+
+    // Backbone guard: an accepted taxon that still has accepted children can't be made unassessed
+    // (those children would then sit under an unassessed parent).
+    long accParent = createUsage(pid, "Accparent", "genus", "accepted", null);
+    createUsage(pid, "Accparent speciesa", "species", "accepted", accParent);
+    mvc.perform(post("/api/projects/" + pid + "/usages/bulk-status").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"ids\":[" + accParent + "],\"status\":\"UNASSESSED\"}"))
+        .andExpect(status().isBadRequest());
+
+    // Backbone guard: an unassessed taxon under an unassessed parent can't be made accepted while
+    // that parent is still unassessed.
+    mvc.perform(post("/api/projects/" + pid + "/usages/bulk-status").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"ids\":[" + una2 + "],\"status\":\"ACCEPTED\"}"))
+        .andExpect(status().isBadRequest());
+  }
 }

@@ -13,9 +13,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 // Shared CRUD skeleton for the taxon-level child entities (vernacular, distribution, media,
-// estimate, property). Each of these belongs only to an ACCEPTED usage; create is guarded
-// accordingly and demote drops them (see NameUsageService.writeTaxonInfo). Concrete subclasses
-// supply the mapper calls and the entity name. See the child-entities spec.
+// estimate, property). Each of these belongs to a TAXON -- an accepted OR unassessed
+// ("provisionally accepted") usage; create is guarded accordingly (requireTaxonUsage) and becoming
+// a synonym drops them (see NameUsageService.writeTaxonInfo). Concrete subclasses supply the mapper
+// calls and the entity name. See the child-entities spec.
 public abstract class AbstractChildEntityService<REQ, RES> {
 
   protected final NameUsageMapper usages;
@@ -56,7 +57,7 @@ public abstract class AbstractChildEntityService<REQ, RES> {
   @org.springframework.transaction.annotation.Transactional
   public RES create(int userId, int projectId, int usageId, REQ req) {
     requireEditor(userId, projectId);
-    requireAcceptedUsage(projectId, usageId);
+    requireTaxonUsage(projectId, usageId);
     int id = idSeq.allocate(projectId, entity());
     doInsert(projectId, id, usageId, req, userId);
     RES after = findById(projectId, id);
@@ -103,10 +104,13 @@ public abstract class AbstractChildEntityService<REQ, RES> {
     return u;
   }
 
-  protected void requireAcceptedUsage(int projectId, int usageId) {
-    if (requireUsage(projectId, usageId).getStatus() != Status.ACCEPTED) {
+  // Taxon-level supplementary data belongs to taxon-like usages: accepted AND unassessed
+  // ("provisionally accepted"). Synonyms/misapplied names can't carry it.
+  protected void requireTaxonUsage(int projectId, int usageId) {
+    Status s = requireUsage(projectId, usageId).getStatus();
+    if (s != Status.ACCEPTED && s != Status.UNASSESSED) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-          entity() + " applies only to accepted taxa");
+          entity() + " applies only to accepted or unassessed taxa");
     }
   }
 
