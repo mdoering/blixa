@@ -40,15 +40,18 @@ public class TreeService {
     this.events = events;
   }
 
-  public List<TreeNode> listRoots(int actorId, int projectId, int limit, int offset) {
+  public List<TreeNode> listRoots(int actorId, int projectId, int limit, int offset,
+      boolean includeUnassessed) {
     projects.requireRole(actorId, projectId); // any member may read
-    return tree.findRoots(projectId, Pagination.clampLimit(limit), Pagination.clampOffset(offset));
+    return tree.findRoots(projectId, Pagination.clampLimit(limit), Pagination.clampOffset(offset),
+        includeUnassessed);
   }
 
-  public List<TreeNode> listChildren(int actorId, int projectId, int parentId, int limit, int offset) {
+  public List<TreeNode> listChildren(int actorId, int projectId, int parentId, int limit, int offset,
+      boolean includeUnassessed) {
     projects.requireRole(actorId, projectId);
     return tree.findChildren(projectId, parentId, Pagination.clampLimit(limit),
-        Pagination.clampOffset(offset));
+        Pagination.clampOffset(offset), includeUnassessed);
   }
 
   public List<PathNode> path(int actorId, int projectId, int id) {

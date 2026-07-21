@@ -27,17 +27,19 @@ public class TreeController {
   @GetMapping("/roots")
   public List<TreeNode> roots(@PathVariable int pid,
       @RequestParam(defaultValue = "50") int limit,
-      @RequestParam(defaultValue = "0") int offset) {
+      @RequestParam(defaultValue = "0") int offset,
+      @RequestParam(defaultValue = "false") boolean unassessed) {
     int uid = currentUser.require().getId();
-    return service.listRoots(uid, pid, limit, offset);
+    return service.listRoots(uid, pid, limit, offset, unassessed);
   }
 
   @GetMapping("/children/{parentId}")
   public List<TreeNode> children(@PathVariable int pid, @PathVariable int parentId,
       @RequestParam(defaultValue = "50") int limit,
-      @RequestParam(defaultValue = "0") int offset) {
+      @RequestParam(defaultValue = "0") int offset,
+      @RequestParam(defaultValue = "false") boolean unassessed) {
     int uid = currentUser.require().getId();
-    return service.listChildren(uid, pid, parentId, limit, offset);
+    return service.listChildren(uid, pid, parentId, limit, offset, unassessed);
   }
 
   @GetMapping("/path/{id}")

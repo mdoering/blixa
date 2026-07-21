@@ -208,4 +208,34 @@ class TreeApiIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$[2].scientificName").value("Plantae"))
         .andExpect(jsonPath("$[2].childCount").value(1));
   }
+
+  @Test
+  @WithMockUser(username = "treeUnaOwner")
+  void unassessedToggleControlsWhetherProvisionalNodesShow() throws Exception {
+    ensureUser("treeUnaOwner");
+    long pid = createProject("treeunaproj");
+    long acc = createUsage(pid, "Acceptedgenus", "genus", "accepted", null);
+    long accSp = createUsage(pid, "Acceptedgenus speciesa", "species", "accepted", acc);
+    createUsage(pid, "Acceptedgenus provisia", "species", "unassessed", acc); // unassessed child
+    createUsage(pid, "Provisrootus", "genus", "unassessed", null); // unassessed root
+
+    // Default: only the accepted backbone. One root (the accepted genus), whose childCount counts
+    // only its accepted child; the unassessed root and unassessed child are hidden.
+    mvc.perform(get("/api/projects/" + pid + "/tree/roots"))
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].id").value((int) acc))
+        .andExpect(jsonPath("$[0].childCount").value(1));
+    mvc.perform(get("/api/projects/" + pid + "/tree/children/" + acc))
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].id").value((int) accSp));
+
+    // With ?unassessed=true the provisional layer shows too: the unassessed root appears, and the
+    // accepted genus's childCount + children now include its unassessed child.
+    mvc.perform(get("/api/projects/" + pid + "/tree/roots?unassessed=true"))
+        .andExpect(jsonPath("$.length()").value(2))
+        .andExpect(jsonPath("$[0].id").value((int) acc))
+        .andExpect(jsonPath("$[0].childCount").value(2));
+    mvc.perform(get("/api/projects/" + pid + "/tree/children/" + acc + "?unassessed=true"))
+        .andExpect(jsonPath("$.length()").value(2));
+  }
 }

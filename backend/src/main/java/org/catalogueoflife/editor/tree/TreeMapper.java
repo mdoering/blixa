@@ -20,29 +20,39 @@ import org.catalogueoflife.editor.tree.dto.PathNode;
 @Mapper
 public interface TreeMapper {
 
+  // The tree normally shows only the accepted backbone. When {@code includeUnassessed} is true it
+  // also shows UNASSESSED ("provisionally accepted") nodes -- both as tree nodes and in each node's
+  // childCount -- so a curator can browse the provisional layer. Accepted nodes never sit under an
+  // unassessed parent (see NameUsageService.requireValidParent), so hiding the unassessed layer can
+  // never hide an accepted taxon.
   @Select("""
       SELECT n.id, n.scientific_name AS scientificName, n.authorship, n.rank, n.status, n.ordinal,
         (SELECT COUNT(*) FROM name_usage c
-           WHERE c.project_id = n.project_id AND c.parent_id = n.id AND c.status = 'ACCEPTED') AS childCount
+           WHERE c.project_id = n.project_id AND c.parent_id = n.id
+             AND (c.status = 'ACCEPTED' OR (#{includeUnassessed} AND c.status = 'UNASSESSED'))) AS childCount
       FROM name_usage n
-      WHERE n.project_id = #{projectId} AND n.parent_id IS NULL AND n.status = 'ACCEPTED'
+      WHERE n.project_id = #{projectId} AND n.parent_id IS NULL
+        AND (n.status = 'ACCEPTED' OR (#{includeUnassessed} AND n.status = 'UNASSESSED'))
       ORDER BY n.ordinal NULLS LAST, n.scientific_name
       LIMIT #{limit} OFFSET #{offset}
       """)
   List<TreeNode> findRoots(@Param("projectId") int projectId, @Param("limit") int limit,
-      @Param("offset") int offset);
+      @Param("offset") int offset, @Param("includeUnassessed") boolean includeUnassessed);
 
   @Select("""
       SELECT n.id, n.scientific_name AS scientificName, n.authorship, n.rank, n.status, n.ordinal,
         (SELECT COUNT(*) FROM name_usage c
-           WHERE c.project_id = n.project_id AND c.parent_id = n.id AND c.status = 'ACCEPTED') AS childCount
+           WHERE c.project_id = n.project_id AND c.parent_id = n.id
+             AND (c.status = 'ACCEPTED' OR (#{includeUnassessed} AND c.status = 'UNASSESSED'))) AS childCount
       FROM name_usage n
-      WHERE n.project_id = #{projectId} AND n.parent_id = #{parentId} AND n.status = 'ACCEPTED'
+      WHERE n.project_id = #{projectId} AND n.parent_id = #{parentId}
+        AND (n.status = 'ACCEPTED' OR (#{includeUnassessed} AND n.status = 'UNASSESSED'))
       ORDER BY n.ordinal NULLS LAST, n.scientific_name
       LIMIT #{limit} OFFSET #{offset}
       """)
   List<TreeNode> findChildren(@Param("projectId") int projectId, @Param("parentId") int parentId,
-      @Param("limit") int limit, @Param("offset") int offset);
+      @Param("limit") int limit, @Param("offset") int offset,
+      @Param("includeUnassessed") boolean includeUnassessed);
 
   // Root-first ancestor path (including the node itself) via a recursive walk up parent_id.
   // The anchor (base case) IS filtered to status = 'ACCEPTED': the target id itself must be a

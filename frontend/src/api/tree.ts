@@ -4,12 +4,16 @@ import type { PathNode, TreeNode } from './types';
 export interface PageParams {
   limit?: number;
   offset?: number;
+  // When true, the tree also includes UNASSESSED ("provisionally accepted") nodes; default (false)
+  // shows only the accepted backbone. Threaded onto every roots/children fetch.
+  unassessed?: boolean;
 }
 
 function pageQuery(params: PageParams): string {
   const search = new URLSearchParams();
   if (params.limit !== undefined) search.set('limit', String(params.limit));
   if (params.offset !== undefined) search.set('offset', String(params.offset));
+  if (params.unassessed) search.set('unassessed', 'true');
   const s = search.toString();
   return s ? `?${s}` : '';
 }

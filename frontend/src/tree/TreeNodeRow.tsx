@@ -22,6 +22,9 @@ export interface TreeNodeRowProps {
   // See ClassificationTree: when this row's node matches, it (and its subtree) is disabled as a
   // Move target -- non-selectable and non-expandable.
   disabledId?: number;
+  // Threaded down from the "Show unassessed" toggle so every children fetch includes (or excludes)
+  // UNASSESSED nodes consistently with the level above.
+  includeUnassessed?: boolean;
 }
 
 export default function TreeNodeRow({
@@ -33,6 +36,7 @@ export default function TreeNodeRow({
   canEdit = false,
   onAfterDelete,
   disabledId,
+  includeUnassessed = false,
 }: TreeNodeRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -41,12 +45,15 @@ export default function TreeNodeRow({
   // A disabled node's whole subtree is off-limits as a target, so it can't be expanded to reach it.
   const hasChildren = node.childCount > 0 && !disabled;
   const selected = selectedId === node.id;
+  // UNASSESSED ("provisionally accepted") nodes only appear when the toggle is on; mark them so they
+  // read as provisional/awaiting-review rather than part of the accepted backbone.
+  const unassessed = node.status === 'UNASSESSED';
 
   // Lazy: children are only fetched once this node is expanded, and stay cached by
   // TanStack Query afterwards (collapsing/re-expanding doesn't refetch).
   const { data: children, isLoading } = useQuery({
-    queryKey: ['treeChildren', pid, node.id],
-    queryFn: () => getChildren(pid, node.id),
+    queryKey: ['treeChildren', pid, node.id, includeUnassessed],
+    queryFn: () => getChildren(pid, node.id, { unassessed: includeUnassessed }),
     enabled: expanded && hasChildren,
   });
 
@@ -120,7 +127,14 @@ export default function TreeNodeRow({
               </ThemeIcon>
             </Tooltip>
           )}
-          <Text size="sm" fw={selected ? 700 : 400} truncate>
+          {unassessed && (
+            <Tooltip label="Unassessed — provisionally accepted, awaiting review" withArrow>
+              <Badge size="xs" variant="light" color="blue" style={{ flexShrink: 0 }}>
+                Unassessed
+              </Badge>
+            </Tooltip>
+          )}
+          <Text size="sm" fw={selected ? 700 : 400} fs={unassessed ? 'italic' : undefined} truncate>
             {node.scientificName}
           </Text>
           {node.authorship && (
@@ -162,6 +176,7 @@ export default function TreeNodeRow({
               canEdit={canEdit}
               onAfterDelete={onAfterDelete}
               disabledId={disabledId}
+              includeUnassessed={includeUnassessed}
             />
           ))}
         </Stack>

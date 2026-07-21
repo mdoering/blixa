@@ -105,3 +105,32 @@ test('shows no lock indicator when the lock list is empty', async () => {
   await screen.findByText('Animalia');
   expect(screen.queryByLabelText(/is editing/)).not.toBeInTheDocument();
 });
+
+test('with includeUnassessed, requests the unassessed layer and visually marks those nodes', async () => {
+  let rootsUrl = '';
+  const provisional = {
+    id: 5,
+    scientificName: 'Provisia nova',
+    authorship: null,
+    rank: 'SPECIES',
+    status: 'UNASSESSED',
+    ordinal: 3,
+    childCount: 0,
+  };
+  server.use(
+    http.get('/api/projects/7/tree/roots', ({ request }) => {
+      rootsUrl = request.url;
+      return HttpResponse.json([animalia, provisional]);
+    }),
+    http.get('/api/projects/7/tree/children/1', () => HttpResponse.json([chordata])),
+  );
+  renderWithProviders(
+    <ClassificationTree pid={7} selectedId={null} onSelect={() => {}} includeUnassessed />,
+  );
+
+  expect(await screen.findByText('Provisia nova')).toBeInTheDocument();
+  // the tree asked the backend to include the unassessed layer...
+  expect(rootsUrl).toContain('unassessed=true');
+  // ...and only the unassessed node carries the marker (the accepted root does not).
+  expect(screen.getAllByText('Unassessed')).toHaveLength(1);
+});

@@ -18,6 +18,9 @@ export interface ClassificationTreeProps {
   // non-expandable -- so neither the node itself nor any of its descendants (only reachable by
   // expanding it, since the tree is single-parent) can be chosen as a new parent.
   disabledId?: number;
+  // When true, the tree also shows UNASSESSED ("provisionally accepted") nodes (visually marked);
+  // default (false) shows only the accepted backbone. Threaded through to every children fetch.
+  includeUnassessed?: boolean;
 }
 
 // Lazy classification tree: only the root level is fetched eagerly; every other level is
@@ -30,14 +33,15 @@ export default function ClassificationTree({
   canEdit = false,
   onAfterDelete,
   disabledId,
+  includeUnassessed = false,
 }: ClassificationTreeProps) {
   const {
     data: roots,
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ['treeRoots', pid],
-    queryFn: () => getRoots(pid),
+    queryKey: ['treeRoots', pid, includeUnassessed],
+    queryFn: () => getRoots(pid, { unassessed: includeUnassessed }),
   });
 
   if (isLoading) return <Loader size="sm" />;
@@ -57,6 +61,7 @@ export default function ClassificationTree({
           canEdit={canEdit}
           onAfterDelete={onAfterDelete}
           disabledId={disabledId}
+          includeUnassessed={includeUnassessed}
         />
       ))}
     </Stack>

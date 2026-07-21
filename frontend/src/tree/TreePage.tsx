@@ -1,4 +1,4 @@
-import { Box, Button, Grid, Group, Text } from '@mantine/core';
+import { Box, Button, Grid, Group, Switch, Text } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -15,6 +15,9 @@ export default function TreePage() {
   const { projectId } = useParams();
   const pid = Number(projectId);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // The tree defaults to the accepted backbone only; this toggles the provisional (UNASSESSED)
+  // layer on so a curator can browse and review it.
+  const [showUnassessed, setShowUnassessed] = useState(false);
 
   // Same source as TaxonDetail's canEdit: the project's role for the current user. Shared
   // queryKey (['project', pid]) means this dedups with TaxonDetail's own fetch below.
@@ -43,11 +46,19 @@ export default function TreePage() {
     <Box>
       <Group justify="space-between" mb="md">
         <Text fw={600}>Classification tree</Text>
-        {canEdit && (
-          <Button leftSection={<IconPlus size={14} />} size="xs" onClick={handleNewName}>
-            New name
-          </Button>
-        )}
+        <Group gap="md">
+          <Switch
+            size="sm"
+            label="Show unassessed"
+            checked={showUnassessed}
+            onChange={(e) => setShowUnassessed(e.currentTarget.checked)}
+          />
+          {canEdit && (
+            <Button leftSection={<IconPlus size={14} />} size="xs" onClick={handleNewName}>
+              New name
+            </Button>
+          )}
+        </Group>
       </Group>
       <Grid gutter="md">
         <Grid.Col span={5} style={{ maxHeight: '75vh', overflowY: 'auto' }}>
@@ -56,6 +67,7 @@ export default function TreePage() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             canEdit={canEdit}
+            includeUnassessed={showUnassessed}
             onAfterDelete={(id) => {
               if (id === selectedId) setSelectedId(null);
             }}
