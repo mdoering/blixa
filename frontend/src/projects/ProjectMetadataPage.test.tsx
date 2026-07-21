@@ -55,8 +55,31 @@ test('prefills the form and saves updated metadata', async () => {
   await waitFor(() => expect(title).toHaveValue('Mammals'));
   await userEvent.clear(title);
   await userEvent.type(title, 'Mammalia');
-  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+  await userEvent.click(screen.getAllByRole('button', { name: /save/i })[0]);
   await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument());
+});
+
+test('a second Save button below Settings submits the same metadata form', async () => {
+  let puts = 0;
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    http.put('/api/projects/3/metadata', async () => {
+      puts += 1;
+      return HttpResponse.json(project);
+    }),
+    noLatestMatchRun,
+    noLatestExportRun,
+  );
+  renderPage();
+  await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Mammals'));
+
+  // Two identical "Save" buttons now: the original at the top of the form and a second one after the
+  // Settings section. The lower one targets the same form (via the form= attribute), so clicking it
+  // submits the same metadata without scrolling back to the top.
+  const saves = screen.getAllByRole('button', { name: /save/i });
+  expect(saves).toHaveLength(2);
+  await userEvent.click(saves[1]);
+  await waitFor(() => expect(puts).toBe(1));
 });
 
 test('citation style: seeds the Select from the project and saves a changed value', async () => {
@@ -80,7 +103,7 @@ test('citation style: seeds the Select from the project and saves a changed valu
   await userEvent.click(styleSelect);
   await userEvent.click(await screen.findByRole('option', { name: 'IEEE' }));
 
-  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+  await userEvent.click(screen.getAllByRole('button', { name: /save/i })[0]);
   await waitFor(() => expect(savedBody.cslStyle).toBe('ieee'));
 });
 
@@ -100,7 +123,7 @@ test('toggles the GBIF occurrence layer switch and saves it', async () => {
   await waitFor(() => expect(toggle).toBeChecked());
   await userEvent.click(toggle);
   expect(toggle).not.toBeChecked();
-  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+  await userEvent.click(screen.getAllByRole('button', { name: /save/i })[0]);
   // Assert on the captured request body rather than the "Saved" notification text: the
   // notifications store is global and the prior test in this file may leave a same-text
   // notification mounted, making `getByText('Saved')` ambiguous.
@@ -138,7 +161,7 @@ test('identifier scopes: prefills configured rows, defaults the COL dataset key,
   await waitFor(() => expect(datasetKeyRow2).toHaveValue('3LXR'));
   expect(screen.getByText(/COL is a CLB project alias for dataset 3LXR/)).toBeInTheDocument();
 
-  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+  await userEvent.click(screen.getAllByRole('button', { name: /save/i })[0]);
   await waitFor(() =>
     expect(savedBody.identifierScopes).toEqual([
       { scope: 'ipni' },
@@ -175,7 +198,7 @@ test('identifier scopes: removing a row drops it from the saved payload', async 
   );
   await userEvent.click(screen.getByRole('button', { name: 'Remove scope 1' }));
 
-  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+  await userEvent.click(screen.getAllByRole('button', { name: /save/i })[0]);
   await waitFor(() => expect(savedBody.identifierScopes).toEqual([{ scope: 'gbif' }]));
 });
 
@@ -447,7 +470,7 @@ test('viewer role sees a disabled Save button', async () => {
   // assertion reflects the loaded role (canEdit=false because viewer ∉ owner/editor),
   // not the pre-fetch `data === undefined` default.
   await waitFor(() => expect(title).toHaveValue('Mammals'));
-  expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();
+  expect(screen.getAllByRole('button', { name: /save/i })[0]).toBeDisabled();
 });
 
 test(

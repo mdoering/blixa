@@ -357,6 +357,7 @@ export default function ProjectMetadataPage() {
           section further down the page; Mantine's form state is independent of DOM position, so
           this Save button still submits their values along with everything below. */}
       <form
+        id="project-metadata-form"
         onSubmit={form.onSubmit((v) => {
           // Blank rows (added via "Add scope" but never filled in) are dropped rather than saved
           // as an empty-scope entry; a blank datasetKey is sent as undefined (-> null on the
@@ -571,6 +572,15 @@ export default function ProjectMetadataPage() {
           </Stack>
         </fieldset>
       </Stack>
+
+      {/* A second Save, mirroring the one at the top: the metadata form + Settings make a long
+          section, so this saves the whole thing (it submits the form above by id -- Mantine reads
+          the values from form state, not DOM position) without scrolling back up to the first Save. */}
+      <Group>
+        <Button type="submit" form="project-metadata-form" loading={mutation.isPending} disabled={!canEdit}>
+          Save
+        </Button>
+      </Group>
 
       {/* 4. Tools: one-off actions over the project's data -- export, bulk identifier matching,
           and the supervised project merge. */}
