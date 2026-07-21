@@ -74,6 +74,15 @@ pipeline {
           # jenkins-deploy has `(col) NOPASSWD: ALL`, so install the jar as the col user;
           # the systemctl restart is granted separately (jenkins-deploy-col-blixa sudoers).
           $SSH 'sudo -u col install -m 644 /tmp/blixa-backend.jar /home/col/bin/blixa/blixa-backend.jar && rm -f /tmp/blixa-backend.jar'
+
+          echo "== Refresh deploy config from the VM's deploy-repo checkout =="
+          # The systemd EnvironmentFile (blixa/blixa-dev.env) and the Apache vhost live in a git
+          # checkout at /home/col/bin on the VM, NOT in this repo -- so a jar-only deploy leaves them
+          # stale and a config change (e.g. DB_URL) never lands, silently crash-looping the service.
+          # Pull the checkout as col, then refuse to restart if DB_URL isn't set.
+          $SSH 'sudo -u col git -C /home/col/bin pull --ff-only'
+          $SSH 'grep -q "^DB_URL=" /home/col/bin/blixa/blixa-dev.env || { echo "ERROR: DB_URL missing in blixa-dev.env -- refusing to restart"; exit 1; }'
+
           $SSH sudo /usr/bin/systemctl restart col-blixa.service
 
           echo "== Backend health check =="
