@@ -180,12 +180,25 @@ export default function ImportProjectModal({ opened, onClose }: ImportProjectMod
         )}
 
         <Group justify="flex-end">
-          <Button variant="default" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={!canSubmit}>
-            Import
-          </Button>
+          {run?.status === 'DONE' ? (
+            // The import already created the project -- offering "Import" again here just makes a
+            // second, duplicate project (and "Cancel" no longer means anything), so once we're DONE
+            // the only action is to close the report.
+            <Button onClick={onClose}>Done</Button>
+          ) : (
+            <>
+              <Button variant="default" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => mutation.mutate()}
+                loading={mutation.isPending}
+                disabled={!canSubmit}
+              >
+                Import
+              </Button>
+            </>
+          )}
         </Group>
       </Stack>
     </Modal>

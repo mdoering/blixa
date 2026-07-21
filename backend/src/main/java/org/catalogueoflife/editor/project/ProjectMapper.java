@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
 import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
@@ -56,6 +57,22 @@ public interface ProjectMapper {
       WHERE id = #{id}
       """)
   void updateMetadata(Project p);
+
+  // True if {@code userId} already OWNS another project with this title (case-insensitive; the
+  // service trims before calling). Scopes uniqueness per owner -- like a GitHub repo name -- so two
+  // different users may each have a "Fungi" project, but one user cannot. {@code excludeId} is the
+  // project being renamed (so it never conflicts with itself), or 0 on create. 'owner' is
+  // Role.OWNER.dbValue().
+  @Select("""
+      SELECT EXISTS(
+        SELECT 1 FROM project p
+        JOIN project_member m ON m.project_id = p.id
+        WHERE m.user_id = #{userId} AND m.role = 'owner'
+          AND lower(p.title) = lower(#{title})
+          AND p.id <> #{excludeId})
+      """)
+  boolean ownerHasTitle(@Param("userId") int userId, @Param("title") String title,
+      @Param("excludeId") int excludeId);
 
   @Delete("DELETE FROM project WHERE id = #{id}")
   void delete(int id);

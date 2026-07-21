@@ -313,7 +313,11 @@ public class ImportRunService {
       }
     } catch (Exception e) {
       log.warn("import run {} failed for user {}: {}", runId, userId, e.getMessage(), e);
-      runs.fail(runId, e.getMessage());
+      // A ResponseStatusException (e.g. the duplicate-title 409 from projectService.create) carries a
+      // clean, user-facing reason; surface that rather than its "409 CONFLICT ..." toString.
+      String reason = e instanceof ResponseStatusException rse && rse.getReason() != null
+          ? rse.getReason() : e.getMessage();
+      runs.fail(runId, reason);
     } finally {
       deleteQuietly(dir);
     }

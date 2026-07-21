@@ -46,12 +46,25 @@ public class ProjectService {
   @Transactional
   public Project create(int userId, CreateProjectRequest req) {
     Project p = new Project();
-    p.setTitle(req.title());
+    p.setTitle(requireUniqueTitle(userId, req.title(), 0));
     p.setAlias(req.alias());
     p.setNomCode(parseNomCode(req.nomCode()));
     projects.insert(p);
     members.upsert(new ProjectMember(p.getId(), userId, Role.OWNER.dbValue()));
     return p;
+  }
+
+  // A user's own project titles must be unique (case-insensitive), so re-importing or re-creating a
+  // dataset can't silently produce two identically-named projects. Returns the trimmed title to
+  // store; throws 409 if the user already owns a different project with the same title. excludeId is
+  // the project being renamed (excluded so a no-op rename doesn't conflict with itself), 0 on create.
+  private String requireUniqueTitle(int userId, String rawTitle, int excludeId) {
+    String title = rawTitle == null ? "" : rawTitle.trim();
+    if (projects.ownerHasTitle(userId, title, excludeId)) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT,
+          "you already have a project titled \"" + title + "\"");
+    }
+    return title;
   }
 
   public List<Project> listForUser(int userId) {
@@ -107,7 +120,7 @@ public class ProjectService {
     License license = Licenses.parse(req.license());
     Project p = projects.findById(projectId);
     String oldCslStyle = p.getCslStyle();
-    p.setTitle(req.title());
+    p.setTitle(requireUniqueTitle(userId, req.title(), projectId));
     p.setAlias(req.alias());
     p.setDescription(req.description());
     p.setNomCode(nomCode);

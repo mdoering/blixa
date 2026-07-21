@@ -278,4 +278,76 @@ class ProjectApiIT extends AbstractPostgresIT {
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.title").value("Keep me"));
   }
+
+  @Test
+  @WithMockUser(username = "dupCreator")
+  void createRejectsDuplicateTitleForSameOwner() throws Exception {
+    ensureUser("dupCreator");
+    mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Duplicated\"}"))
+       .andExpect(status().isCreated());
+
+    // Exact, case-insensitive, and whitespace-only variants all collide with the existing project.
+    for (String dupe : new String[] {"Duplicated", "duplicated", "  Duplicated  "}) {
+      mvc.perform(post("/api/projects").with(csrf())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(json.writeValueAsString(java.util.Map.of("title", dupe))))
+         .andExpect(status().isConflict());
+    }
+  }
+
+  @Test
+  void differentOwnersMayReuseATitle() throws Exception {
+    ensureUser("ownerA");
+    ensureUser("ownerB");
+    mvc.perform(post("/api/projects").with(csrf()).with(user("ownerA"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Shared Name\"}"))
+       .andExpect(status().isCreated());
+    // Uniqueness is per owner (like a GitHub repo name), so a different user may reuse the title.
+    mvc.perform(post("/api/projects").with(csrf()).with(user("ownerB"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Shared Name\"}"))
+       .andExpect(status().isCreated());
+  }
+
+  @Test
+  @WithMockUser(username = "renamer")
+  void renameRejectsDuplicateTitleButAllowsSelf() throws Exception {
+    ensureUser("renamer");
+    mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Alpha\"}"))
+       .andExpect(status().isCreated());
+    String betaBody = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Beta\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    int betaId = json.readTree(betaBody).get("id").asInt();
+
+    // Renaming Beta onto Alpha's title (another project this owner has) is a 409.
+    mvc.perform(put("/api/projects/" + betaId + "/metadata").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Alpha\"}"))
+       .andExpect(status().isConflict());
+    // But renaming Beta to a case variant of its own title is fine -- a project never conflicts with itself.
+    mvc.perform(put("/api/projects/" + betaId + "/metadata").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"BETA\"}"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.title").value("BETA"));
+  }
+
+  @Test
+  @WithMockUser(username = "trimmer")
+  void createTrimsTitle() throws Exception {
+    ensureUser("trimmer");
+    mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"  Padded Title  \"}"))
+       .andExpect(status().isCreated())
+       .andExpect(jsonPath("$.title").value("Padded Title"));
+  }
 }

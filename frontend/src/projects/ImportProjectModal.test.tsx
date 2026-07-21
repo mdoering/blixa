@@ -85,6 +85,12 @@ test('uploads a file, polls RUNNING -> DONE, and shows counts + the new-project 
   expect(link).toHaveAttribute('href', '/projects/9');
   expect(screen.getByText('1 issue')).toBeInTheDocument();
   expect(screen.getByText('Reference: missing year')).toBeInTheDocument();
+
+  // Once DONE the project already exists, so the "Import" button is replaced by a single "Done"
+  // (close) action -- clicking "Import" again here would create a second, duplicate project.
+  expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
 });
 
 test('toggling "Preserve source identifiers" reveals the scope field, hides it when off, and includes it in the POST', async () => {
