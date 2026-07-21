@@ -40,9 +40,14 @@ class ColMatchIT extends AbstractPostgresIT {
     if (users.requireByUsernameOrNull(u) == null) users.createLocal(u, "pw", u);
   }
 
+  // Unique per call: project titles are unique per owner, and this IT (sharing one DB with the
+  // whole suite) creates a project in more than one test method under the same mock user.
+  private static final java.util.concurrent.atomic.AtomicInteger SEQ =
+      new java.util.concurrent.atomic.AtomicInteger();
+
   private long createProject() throws Exception {
     String b = mvc.perform(post("/api/projects").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-            .content("{\"title\":\"colmatch\",\"nomCode\":\"zoological\"}"))
+            .content("{\"title\":\"colmatch " + SEQ.incrementAndGet() + "\",\"nomCode\":\"zoological\"}"))
         .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
     return json.readTree(b).get("id").asLong();
   }

@@ -2,6 +2,7 @@ package org.catalogueoflife.editor.coldp.imprt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -151,18 +152,20 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
     return u;
   }
 
-  private JsonNode getRun(long runId) throws Exception {
-    String body = mvc.perform(get("/api/projects/import/" + runId))
+  // An import run is only visible to the user who started it, so poll as that user (the re-import
+  // above runs as "roundtrip-reimporter", not the class's default mock owner).
+  private JsonNode getRun(long runId, String asUser) throws Exception {
+    String body = mvc.perform(get("/api/projects/import/" + runId).with(user(asUser)))
         .andExpect(status().isOk())
         .andReturn().getResponse().getContentAsString();
     return json.readTree(body);
   }
 
-  private JsonNode pollUntilTerminal(long runId) throws Exception {
+  private JsonNode pollUntilTerminal(long runId, String asUser) throws Exception {
     Instant deadline = Instant.now().plus(TIMEOUT);
     JsonNode last;
     do {
-      last = getRun(runId);
+      last = getRun(runId, asUser);
       if (!"RUNNING".equals(last.get("status").asString())) {
         return last;
       }
@@ -269,18 +272,23 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
     // synonym's second accepted link (see NameUsageColdpWriter.synonymRows).
     assertThat(counts.nameUsageCount()).isEqualTo(8);
 
-    // --- Reimport that exact zip through the real HTTP job, preserving source ids. ---
+    // --- Reimport that exact zip through the real HTTP job, preserving source ids. Import as a
+    // DIFFERENT user: project titles are unique per owner, and the re-import re-creates a project
+    // with the source's title (from its metadata), so re-importing as the source owner would be
+    // (correctly) rejected as a duplicate. A second curator importing the export is the realistic path. ---
+    createUser("roundtrip-reimporter");
     byte[] zipBytes = Files.readAllBytes(zip);
     MockMultipartFile file =
         new MockMultipartFile("file", "roundtrip-export.zip", "application/zip", zipBytes);
 
     String startBody = mvc.perform(multipart("/api/projects/import").file(file)
-            .param("preserveIds", "true").param("idScope", "orig").with(csrf()))
+            .param("preserveIds", "true").param("idScope", "orig").with(csrf())
+            .with(user("roundtrip-reimporter")))
         .andExpect(status().isAccepted())
         .andReturn().getResponse().getContentAsString();
     long runId = json.readTree(startBody).get("id").asLong();
 
-    JsonNode done = pollUntilTerminal(runId);
+    JsonNode done = pollUntilTerminal(runId, "roundtrip-reimporter");
     assertThat(done.get("status").asString()).isEqualTo("DONE");
     assertThat(done.get("error").isNull()).isTrue();
     // A clean fixture with no dangling references must surface zero issues.

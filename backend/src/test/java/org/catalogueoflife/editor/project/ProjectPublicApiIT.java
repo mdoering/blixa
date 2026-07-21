@@ -32,10 +32,16 @@ class ProjectPublicApiIT extends AbstractPostgresIT {
     if (users.requireByUsernameOrNull(u) == null) users.createLocal(u, "pw", u);
   }
 
+  // Unique per call: project titles are unique per owner, and this IT (sharing one DB with the
+  // whole suite) creates a "Pub" project in several test methods under the same owner.
+  private static final java.util.concurrent.atomic.AtomicInteger SEQ =
+      new java.util.concurrent.atomic.AtomicInteger();
+
   private int createProject(String owner) throws Exception {
     ensureUser(owner);
     String body = mvc.perform(post("/api/projects").with(csrf()).with(user(owner))
-            .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"Pub\"}"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Pub " + SEQ.incrementAndGet() + "\"}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.public").value(false))   // default false, serialized as "public"
         .andReturn().getResponse().getContentAsString();
@@ -43,11 +49,14 @@ class ProjectPublicApiIT extends AbstractPostgresIT {
   }
 
   // A license is required before a project can be made public (B2) -- set one via the metadata
-  // endpoint so the public-toggle tests below exercise the allowed path.
+  // endpoint so the public-toggle tests below exercise the allowed path. Re-sends the project's
+  // existing (unique) title so the update doesn't rename it onto another project's title.
   private void setLicense(int pid, String owner) throws Exception {
+    String title = json.readTree(mvc.perform(get("/api/projects/" + pid).with(user(owner)))
+        .andReturn().getResponse().getContentAsString()).get("title").asString();
     mvc.perform(put("/api/projects/" + pid + "/metadata").with(csrf()).with(user(owner))
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"title\":\"Pub\",\"license\":\"CC0-1.0\"}"))
+            .content("{\"title\":\"" + title + "\",\"license\":\"CC0-1.0\"}"))
        .andExpect(status().isOk());
   }
 
