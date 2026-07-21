@@ -20,7 +20,7 @@ public final class ColdpParse {
       case "accepted" -> Status.ACCEPTED;
       case "synonym", "ambiguous synonym" -> Status.SYNONYM;
       case "misapplied" -> Status.MISAPPLIED;
-      case "provisionally accepted", "unassessed" -> Status.UNASSESSED;
+      case "provisionally accepted", "unassessed", "bare", "bare name" -> Status.UNASSESSED;
       default -> Status.UNASSESSED;                     // unknown -> UNASSESSED (safest non-accepted)
     };
   }
