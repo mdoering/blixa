@@ -36,7 +36,7 @@ public class ActiveUserFilter extends OncePerRequestFilter {
         && !path.startsWith("/api/public/") && !path.startsWith("/api/auth/");
     Authentication a = SecurityContextHolder.getContext().getAuthentication();
     if (gated && a != null && a.isAuthenticated() && !(a instanceof AnonymousAuthenticationToken)) {
-      AppUser u = users.findByUsername(a.getName());
+      AppUser u = users.findByUsernameOrOrcid(a.getName());
       if (u != null && !UserState.ACTIVE.name().equals(u.getState())) {
         res.setStatus(HttpServletResponse.SC_FORBIDDEN);
         res.setContentType("application/json");

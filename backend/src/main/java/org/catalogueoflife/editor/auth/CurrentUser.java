@@ -22,7 +22,9 @@ public class CurrentUser {
     if (a == null || !a.isAuthenticated() || "anonymousUser".equals(a.getName())) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
     }
-    AppUser u = users.findByUsername(a.getName());
+    // Match on username OR orcid: an ORCID login's principal is the ORCID iD, which stays valid
+    // even after the user changes their username (see AppUserMapper.findByUsernameOrOrcid).
+    AppUser u = users.findByUsernameOrOrcid(a.getName());
     if (u == null) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
     }

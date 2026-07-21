@@ -27,6 +27,16 @@ public interface AppUserMapper {
   @Select("SELECT * FROM app_user WHERE orcid = #{orcid}")
   AppUser findByOrcid(String orcid);
 
+  // Resolve the app user behind a login principal: a local login's principal is the username; an
+  // ORCID login's principal is the ORCID iD (OrcidUserService keys the principal on "sub"). Matching
+  // on either keeps an ORCID account resolvable after the user picks a custom username. A username
+  // match wins if the name somehow matches one row's username and another row's orcid.
+  @Select("""
+      SELECT * FROM app_user WHERE username = #{name} OR orcid = #{name}
+      ORDER BY (username = #{name}) DESC LIMIT 1
+      """)
+  AppUser findByUsernameOrOrcid(String name);
+
   @Select("SELECT * FROM app_user ORDER BY (state = 'PENDING') DESC, username")
   java.util.List<AppUser> findAll();
 

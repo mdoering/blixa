@@ -19,6 +19,9 @@ public class AppUserService implements UserDetailsService {
   // A username must be mention-friendly (@username): start alphanumeric, then alphanumeric/_/-,
   // at least 2 chars. Keeps handles usable as inline mentions in discussions.
   private static final Pattern USERNAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]+");
+  // An ORCID iD (16 digits in 4 groups, last char may be an X checksum) -- disallowed as a custom
+  // username so it can't collide with the orcid-based login-principal resolution.
+  private static final Pattern ORCID_SHAPED = Pattern.compile("\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]");
 
   private final AppUserMapper mapper;
   private final PasswordEncoder encoder;
@@ -41,6 +44,13 @@ public class AppUserService implements UserDetailsService {
     if (!USERNAME.matcher(username).matches()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
           "username must be 2+ characters of letters, digits, _ or - and start alphanumeric");
+    }
+    // A custom username must not look like an ORCID iD -- the login-principal resolver matches on
+    // username OR orcid (see AppUserMapper.findByUsernameOrOrcid), so an ORCID-shaped username could
+    // shadow another account's orcid.
+    if (ORCID_SHAPED.matcher(username).matches()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "username may not look like an ORCID iD");
     }
     AppUser existing = mapper.findByUsername(username);
     if (existing != null && existing.getId() != userId) {
