@@ -51,7 +51,15 @@ coldp:
   # env vars work too, e.g. COLDP_AI_DEFAULT_PROVIDER=anthropic and the key below):
   #   coldp.ai.default-provider: anthropic   (anthropic | openai | google | mistral)
   ai:
+    # The active provider uses its own model from `models` below; `default-model` is the fallback
+    # when a provider has no entry. Each provider needs a model valid for IT (e.g. a gpt-* for OpenAI)
+    # -- switching default-provider without setting that provider's model would send the fallback.
     default-model: ${AI_DEFAULT_MODEL:claude-opus-4-8}
+    models:
+      anthropic: ${AI_MODEL_ANTHROPIC:}
+      openai: ${AI_MODEL_OPENAI:}
+      google: ${AI_MODEL_GOOGLE:}
+      mistral: ${AI_MODEL_MISTRAL:}
     api-keys:
       anthropic: ${ANTHROPIC_API_KEY:}
       openai: ${OPENAI_API_KEY:}

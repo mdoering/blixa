@@ -51,4 +51,30 @@ class AiConfigServiceTest {
     assertThat(r.available()).isFalse();
     assertThat(r.provider()).isEqualTo("openai");
   }
+
+  @Test
+  void perProviderModelOverridesTheDefaultModel() {
+    AiProperties p = props(Provider.ANTHROPIC, "fallback-model", Provider.ANTHROPIC, "sk-x");
+    p.getModels().put(Provider.ANTHROPIC, "claude-opus-4-8");
+    AiConfigResponse r = svc(p).resolve();
+    assertThat(r.available()).isTrue();
+    assertThat(r.model()).isEqualTo("claude-opus-4-8");
+  }
+
+  @Test
+  void fallsBackToDefaultModelWhenActiveProviderHasNoModel() {
+    AiProperties p = props(Provider.ANTHROPIC, "claude-default", Provider.ANTHROPIC, "sk-x");
+    p.getModels().put(Provider.OPENAI, "gpt-5"); // a model for a different provider
+    AiConfigResponse r = svc(p).resolve();
+    assertThat(r.model()).isEqualTo("claude-default");
+  }
+
+  @Test
+  void notAvailableWhenNoModelForTheActiveProviderAndNoDefault() {
+    AiProperties p = props(Provider.OPENAI, null, Provider.OPENAI, "sk-x"); // no default, no openai model
+    p.getModels().put(Provider.ANTHROPIC, "claude-opus-4-8");
+    AiConfigResponse r = svc(p).resolve();
+    assertThat(r.available()).isFalse();
+    assertThat(r.model()).isNull();
+  }
 }

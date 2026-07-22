@@ -23,7 +23,7 @@ public class AiConfigService {
   // Pure resolution over the backend config (no project state, no key ever returned).
   public AiConfigResponse resolve() {
     Provider provider = props.getDefaultProvider();
-    String model = props.getDefaultModel();
+    String model = props.modelFor(provider);
     boolean available =
         provider != null && props.hasKey(provider) && model != null && !model.isBlank();
     String providerName = provider == null ? null : provider.name().toLowerCase(Locale.ROOT);
@@ -45,6 +45,6 @@ public class AiConfigService {
   }
 
   public String effectiveModel() {
-    return props.getDefaultModel();
+    return props.modelFor(props.getDefaultProvider());
   }
 }
