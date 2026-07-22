@@ -35,4 +35,16 @@ public class AiConfigService {
     projects.requireRole(userId, projectId);
     return resolve();
   }
+
+  public boolean available() {
+    return resolve().available();
+  }
+
+  public Provider effectiveProvider() {
+    return props.getDefaultProvider();
+  }
+
+  public String effectiveModel() {
+    return props.getDefaultModel();
+  }
 }

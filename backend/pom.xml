@@ -22,6 +22,12 @@
   </properties>
 
   <dependencies>
+    <!-- Official Anthropic Java SDK for the AI-assisted curation feature's Claude adapter. -->
+    <dependency>
+      <groupId>com.anthropic</groupId>
+      <artifactId>anthropic-java</artifactId>
+      <version>2.34.0</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
