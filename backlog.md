@@ -52,13 +52,21 @@ renamed to avoid collision with the validation *Issues*, and because the shape i
 
 Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 
-### 2. AI-assisted curation
-- Ask AI to gather info for the **focal taxon**, its **children**, or run a **review**.
-- Configure a per-**project** auth token for **Claude / OpenAI / Google / Mistral**.
-- Apply **accepted** AI suggestions to the taxon (curator picks what lands).
-- Suggest **key literature**; pick which to add to the taxon's refs (single-nomen and taxon lists).
-  - The **nomenclatural** reference (for the exact combination) goes on the **name**.
-  - The **basionym**'s reference goes on the **basionym**, not the current combination.
+### 2. AI-assisted curation  *(v1 slice shipped; spec `docs/superpowers/specs/2026-07-22-ai-assisted-curation-design.md`)*
+- [x] **Backend config + availability** — `coldp.ai.*` (backend-only keys, installation-wide default
+  provider/model); `GET /ai/config → {available, provider, model}` (never a key).
+- [x] **Suggest pipeline** — `POST /usages/{id}/ai/suggest` (editor-only): context → LLM provider →
+  **reference verification** against Crossref/DataCite (hallucinated refs dropped) → per-project
+  **usage recording** (`ai_usage`). Provider abstraction (`LlmProvider`), **Anthropic adapter** via
+  the official Java SDK (claude-opus-4-8).
+- [x] **Frontend** — config-gated **brain icon** on the focal taxon → suggestions modal, **synonyms
+  leading** (each with its verified nomenclatural reference); **one-click accept** creates the
+  `SYNONYM` usage + link. Verified references listed; other categories shown for manual review.
+- **Follow-ups:** one-click accept for the non-synonym categories (references-attach — nomenclatural
+  ref → the **name**, basionym's ref → the **basionym**; vernaculars; distribution; description;
+  etymology); **OpenAI / Google / Mistral** adapters; **per-project provider/model override** + settings
+  UI; richer context (classification); "children" and bulk "review" scopes; live-key runtime test of
+  the Anthropic adapter.
 
 ### 3. Compare focal taxon with CLB  *(shipped; spec `docs/superpowers/specs/2026-07-20-clb-comparison-design.md`)*
 - [x] Compare the focal taxon against one in ChecklistBank — side-by-side (name/authorship/rank/status
