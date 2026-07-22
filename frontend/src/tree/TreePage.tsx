@@ -1,10 +1,11 @@
 import { Box, Button, Group, Switch, Text } from '@mantine/core';
-import { IconPlus } from '@tabler/icons-react';
+import { IconDownload, IconPlus } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getProject } from '../api/projects';
 import { getUsage } from '../api/usages';
+import { subtreeTxtreeUrl } from '../api/tree';
 import CollapsibleSplit from '../components/CollapsibleSplit';
 import CreateNameModal from '../names/CreateNameModal';
 import { useNameActions } from '../names/useNameActions';
@@ -82,7 +83,20 @@ export default function TreePage() {
             <Text c="dimmed">Select a taxon in the tree to see its details.</Text>
           ) : (
             <Box>
-              <Breadcrumb pid={pid} selectedId={selectedId} />
+              <Group justify="space-between" wrap="nowrap" align="flex-start" gap="sm">
+                <Breadcrumb pid={pid} selectedId={selectedId} />
+                <Button
+                  component="a"
+                  href={subtreeTxtreeUrl(pid, selectedId)}
+                  download
+                  variant="light"
+                  size="xs"
+                  leftSection={<IconDownload size={14} />}
+                  style={{ flexShrink: 0 }}
+                >
+                  Download subtree
+                </Button>
+              </Group>
               <Box mt="md">
                 <TaxonDetail pid={pid} usageId={selectedId} />
               </Box>

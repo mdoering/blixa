@@ -1,6 +1,10 @@
 import { expect, test } from 'vitest';
 import { server, http, HttpResponse } from '../test/server';
-import { getChildren, getPath, getRoots, moveParent } from './tree';
+import { getChildren, getPath, getRoots, moveParent, subtreeTxtreeUrl } from './tree';
+
+test('subtreeTxtreeUrl builds the subtree TextTree download URL', () => {
+  expect(subtreeTxtreeUrl(7, 9)).toBe('/api/projects/7/tree/9/subtree.txtree');
+});
 
 test('getRoots calls the project roots endpoint with paging params', async () => {
   let requestUrl = '';

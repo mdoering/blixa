@@ -95,6 +95,26 @@ public interface TreeMapper {
   boolean isDescendant(@Param("projectId") int projectId, @Param("rootId") int rootId,
       @Param("candidateId") int candidateId);
 
+  // The accepted subtree rooted at rootId (rootId included), parent-first (recursion depth order)
+  // with each sibling level in ordinal order -- the row set for the TextTree subtree export (see
+  // TreeService.buildSubtree). Same accepted-only recursion + depth bound as isDescendant above.
+  @Select("""
+      WITH RECURSIVE sub AS (
+        SELECT project_id, id, parent_id, scientific_name, authorship, rank, ordinal, 0 AS depth
+        FROM name_usage
+        WHERE project_id = #{projectId} AND id = #{rootId} AND status = 'ACCEPTED'
+        UNION ALL
+        SELECT n.project_id, n.id, n.parent_id, n.scientific_name, n.authorship, n.rank, n.ordinal,
+               sub.depth + 1
+        FROM name_usage n JOIN sub ON n.project_id = sub.project_id AND n.parent_id = sub.id
+        WHERE n.status = 'ACCEPTED' AND sub.depth < 10000
+      )
+      SELECT id, parent_id AS parentId, scientific_name AS scientificName, authorship, rank
+      FROM sub
+      ORDER BY depth, ordinal NULLS LAST, scientific_name
+      """)
+  List<SubtreeRow> subtreeUsages(@Param("projectId") int projectId, @Param("rootId") int rootId);
+
   // Optimistic-locked reparent: 0 affected rows means either the usage no longer exists (already
   // deleted by another actor) or -- far more likely -- version is stale (concurrent edit);
   // TreeService.move turns that into a 409, matching NameUsageMapper.update's CAS pattern.

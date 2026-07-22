@@ -1,5 +1,6 @@
 package org.catalogueoflife.editor.tree;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.catalogueoflife.editor.audit.AuditService;
@@ -13,6 +14,7 @@ import org.catalogueoflife.editor.project.Role;
 import org.catalogueoflife.editor.tree.dto.MoveRequest;
 import org.catalogueoflife.editor.tree.dto.PathNode;
 import org.catalogueoflife.editor.validation.ValidationEvent;
+import org.gbif.txtree.SimpleTreeNode;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -52,6 +54,42 @@ public class TreeService {
     projects.requireRole(actorId, projectId);
     return tree.findChildren(projectId, parentId, Pagination.clampLimit(limit),
         Pagination.clampOffset(offset), includeUnassessed);
+  }
+
+  // Builds the accepted subtree rooted at rootId (root included) as a TextTree node tree, each
+  // accepted taxon's synonyms nested beneath it (heterotypic `=` for now; homotypic `≡` refinement
+  // is a follow-up). Any project member may read; 404 if rootId is not an accepted taxon here. The
+  // controller streams the returned root via SubtreeTxtree (see TreeController#subtreeTxtree).
+  public SimpleTreeNode buildSubtree(int actorId, int projectId, int rootId) {
+    projects.requireRole(actorId, projectId);
+    List<SubtreeRow> rows = tree.subtreeUsages(projectId, rootId);
+    Map<Integer, SimpleTreeNode> byId = new LinkedHashMap<>();
+    SimpleTreeNode root = null;
+    for (SubtreeRow r : rows) {
+      SimpleTreeNode node = new SimpleTreeNode(
+          r.id(), label(r.scientificName(), r.authorship()), r.rank(), false, false, false, false);
+      byId.put(r.id(), node);
+      for (NameUsage syn : usages.findSynonymsOfAccepted(projectId, r.id())) {
+        node.synonyms.add(new SimpleTreeNode(syn.getId(),
+            label(syn.getScientificName(), syn.getAuthorship()), syn.getRank(),
+            false, false, false, false));
+      }
+      if (r.id() == rootId) {
+        root = node;
+      } else {
+        SimpleTreeNode parent = byId.get(r.parentId()); // parent precedes child (depth order)
+        if (parent != null) parent.children.add(node);
+      }
+    }
+    if (root == null) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+          "no accepted taxon " + rootId + " in project " + projectId);
+    }
+    return root;
+  }
+
+  private static String label(String name, String authorship) {
+    return (authorship == null || authorship.isBlank()) ? name : name + " " + authorship;
   }
 
   public List<PathNode> path(int actorId, int projectId, int id) {

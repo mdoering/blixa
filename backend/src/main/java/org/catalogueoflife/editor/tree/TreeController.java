@@ -1,7 +1,10 @@
 package org.catalogueoflife.editor.tree;
 
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 import org.catalogueoflife.editor.auth.CurrentUser;
+import org.gbif.txtree.SimpleTreeNode;
 import org.catalogueoflife.editor.tree.dto.MoveRequest;
 import org.catalogueoflife.editor.tree.dto.PathNode;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,6 +49,19 @@ public class TreeController {
   public List<PathNode> path(@PathVariable int pid, @PathVariable int id) {
     int uid = currentUser.require().getId();
     return service.path(uid, pid, id);
+  }
+
+  // Streams the accepted subtree rooted at {id} as a TextTree (.txtree) attachment -- the
+  // "Download subtree" action in the tree view. Any project member (read).
+  @GetMapping("/{id}/subtree.txtree")
+  public void subtreeTxtree(@PathVariable int pid, @PathVariable int id, HttpServletResponse response)
+      throws IOException {
+    int uid = currentUser.require().getId();
+    SimpleTreeNode root = service.buildSubtree(uid, pid, id); // requireRole + 404 before headers
+    response.setContentType("text/plain;charset=UTF-8");
+    response.setHeader("Content-Disposition",
+        "attachment; filename=\"project-" + pid + "-subtree-" + id + ".txtree\"");
+    SubtreeTxtree.write(response.getOutputStream(), root);
   }
 
   // 200 (not 204): the plan's move test cases assert on the plain success status here, so we

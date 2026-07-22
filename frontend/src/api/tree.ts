@@ -34,6 +34,12 @@ export function getPath(pid: number, id: number): Promise<PathNode[]> {
   return api<PathNode[]>(`/api/projects/${pid}/tree/path/${id}`);
 }
 
+// Direct URL for GET /tree/{id}/subtree.txtree -- the accepted subtree rooted at {id} (with nested
+// synonyms) as a TextTree attachment. Used as an <a href download>, not via api() (binary stream).
+export function subtreeTxtreeUrl(pid: number, id: number): string {
+  return `/api/projects/${pid}/tree/${id}/subtree.txtree`;
+}
+
 // PUT /tree/usages/{id}/parent -- reparents `id` under `parentId` (null makes it a root). `version`
 // is the moved usage's optimistic-lock version: a stale value comes back as 409. The backend is
 // cycle-safe -- it rejects a self/descendant/non-accepted parent with a 400 whose {error} message
