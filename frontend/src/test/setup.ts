@@ -49,7 +49,35 @@ window.ResizeObserver = class {
 // jsdom lacks getComputedStyle scrollbar measuring used by some Mantine components.
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
+// jsdom (without a --localstorage-file) doesn't provide localStorage; supply a minimal in-memory
+// Storage so components that persist small UI preferences (e.g. CollapsibleSplit's collapsed flag)
+// work under test and can be asserted on. Cleared after each test to avoid cross-test leakage.
+const memoryStorage = new (class {
+  private store = new Map<string, string>();
+  get length() {
+    return this.store.size;
+  }
+  clear() {
+    this.store.clear();
+  }
+  getItem(key: string) {
+    return this.store.has(key) ? (this.store.get(key) as string) : null;
+  }
+  setItem(key: string, value: string) {
+    this.store.set(key, String(value));
+  }
+  removeItem(key: string) {
+    this.store.delete(key);
+  }
+  key(index: number) {
+    return Array.from(this.store.keys())[index] ?? null;
+  }
+})();
+Object.defineProperty(window, 'localStorage', { writable: true, value: memoryStorage });
+Object.assign(globalThis, { localStorage: memoryStorage });
+
 afterEach(() => cleanup());
+afterEach(() => memoryStorage.clear());
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => server.resetHandlers());

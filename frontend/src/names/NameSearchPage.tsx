@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Grid, Group, Select, Text, TextInput, ThemeIcon, Title, Tooltip } from '@mantine/core';
+import { Badge, Box, Button, Group, Select, Text, TextInput, ThemeIcon, Title, Tooltip } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { IconLock, IconPlus, IconSearch } from '@tabler/icons-react';
 import {
@@ -16,6 +16,7 @@ import { listLocks } from '../api/locks';
 import { bulkChangeStatus, searchUsages } from '../api/usages';
 import { messageFor } from '../api/client';
 import type { Lock, NameUsage } from '../api/types';
+import CollapsibleSplit from '../components/CollapsibleSplit';
 import MergeRecordsModal from '../merge/MergeRecordsModal';
 import TaxonDetail from '../tree/TaxonDetail';
 import CreateNameModal from './CreateNameModal';
@@ -360,18 +361,18 @@ export default function NameSearchPage() {
           </Button>
         </Group>
       )}
-      <Grid gutter="md">
-        <Grid.Col span={7}>
-          <MantineReactTable table={table} />
-        </Grid.Col>
-        <Grid.Col span={5}>
-          {selectedId == null ? (
+      <CollapsibleSplit
+        storageKey="coldp:split:names:collapsed"
+        leftPercent={58}
+        left={<MantineReactTable table={table} />}
+        right={
+          selectedId == null ? (
             <Text c="dimmed">Select a name to see its details.</Text>
           ) : (
             <TaxonDetail pid={pid} usageId={selectedId} />
-          )}
-        </Grid.Col>
-      </Grid>
+          )
+        }
+      />
       {actions.modalState && (
         <CreateNameModal
           pid={pid}

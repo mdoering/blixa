@@ -1,10 +1,11 @@
-import { Box, Button, Grid, Group, Switch, Text } from '@mantine/core';
+import { Box, Button, Group, Switch, Text } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getProject } from '../api/projects';
 import { getUsage } from '../api/usages';
+import CollapsibleSplit from '../components/CollapsibleSplit';
 import CreateNameModal from '../names/CreateNameModal';
 import { useNameActions } from '../names/useNameActions';
 import Breadcrumb from './Breadcrumb';
@@ -60,8 +61,11 @@ export default function TreePage() {
           )}
         </Group>
       </Group>
-      <Grid gutter="md">
-        <Grid.Col span={5} style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+      <CollapsibleSplit
+        storageKey="coldp:split:tree:collapsed"
+        leftPercent={42}
+        leftStyle={{ maxHeight: '75vh', overflowY: 'auto' }}
+        left={
           <ClassificationTree
             pid={pid}
             selectedId={selectedId}
@@ -72,9 +76,9 @@ export default function TreePage() {
               if (id === selectedId) setSelectedId(null);
             }}
           />
-        </Grid.Col>
-        <Grid.Col span={7}>
-          {selectedId == null ? (
+        }
+        right={
+          selectedId == null ? (
             <Text c="dimmed">Select a taxon in the tree to see its details.</Text>
           ) : (
             <Box>
@@ -83,9 +87,9 @@ export default function TreePage() {
                 <TaxonDetail pid={pid} usageId={selectedId} />
               </Box>
             </Box>
-          )}
-        </Grid.Col>
-      </Grid>
+          )
+        }
+      />
       {actions.modalState && (
         <CreateNameModal
           pid={pid}
