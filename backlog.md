@@ -62,11 +62,13 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 - [x] **Frontend** — config-gated **brain icon** on the focal taxon → suggestions modal, **synonyms
   leading** (each with its verified nomenclatural reference); **one-click accept** creates the
   `SYNONYM` usage + link. Verified references listed; other categories shown for manual review.
+- [x] **All four provider adapters** — Anthropic (official Java SDK) + OpenAI, Mistral
+  (OpenAI-compatible), Google/Gemini via the shared `RestClient` + `AiPrompts`/`AiJson` helpers.
 - **Follow-ups:** one-click accept for the non-synonym categories (references-attach — nomenclatural
   ref → the **name**, basionym's ref → the **basionym**; vernaculars; distribution; description;
-  etymology); **OpenAI / Google / Mistral** adapters; **per-project provider/model override** + settings
-  UI; richer context (classification); "children" and bulk "review" scopes; live-key runtime test of
-  the Anthropic adapter.
+  etymology); **per-project provider/model override** + settings UI; richer context (classification);
+  "children" and bulk "review" scopes; live-key runtime test of the provider adapters (they compile
+  but make live calls, so none is test-exercised).
 
 ### 3. Compare focal taxon with CLB  *(shipped; spec `docs/superpowers/specs/2026-07-20-clb-comparison-design.md`)*
 - [x] Compare the focal taxon against one in ChecklistBank — side-by-side (name/authorship/rank/status
