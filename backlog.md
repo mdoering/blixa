@@ -86,6 +86,7 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 - **CSL-JSON reference import** — reuse the `RefMapping` path that DOI / BibTeX / RIS already use.
 - **DOI consolidation** — find DOIs for existing references (Crossref / DataCite lookup on the structured fields).
 - **References list total count** — the list endpoint returns a bare `List` (prev/next paging, no total); add a count for a richer MRT table.
+- **BHL page links (nomenclatural protologue)** — the Biodiversity Heritage Library hosts much of the old taxonomic literature that has **no DOI** and isn't in Crossref. Beyond linking a name to its nomenclatural reference, allow linking a name to the **exact BHL page** where it was first published (the *protologue* in botany / original description in zoology), plus tooling to **find or suggest** that page. ColDP carries this as `col:nameReferencePageLink` (confirm the exact term).
 
 ## Validation & issues
 
@@ -106,11 +107,13 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
   …/usages/{id}/homotypic/{conflicts,consolidate}`.
 - **GBIF occurrence import into TypeMaterial** — by `occurrenceId` (the field is already carried).
 - **Distribution map preview** — via portal-components, using the gazetteer `areaId`.
+- **Shared taxon property keys** — manage a project's standard **property keys** (`col:property`): **autocomplete** the key when adding a new taxon property, an optional **description** per key, an on-demand **project-wide overview** of unique keys with usage counts, and **reconciliation** (merge two keys into one) from that overview. Mirrors the existing journal-title reconciliation pattern.
 
 ## UI / polish
 
 - **Tree virtualization** — lazy-per-node is fine for now; needed at Lepidoptera scale (large sibling lists render in full today).
 - **nomStatus as a Select** — currently a free-text input showing the enum name.
+- **Link tracked changes to the current work objective / lock** — a prominent **top-right selector** to pick the active work objective/lock (or **none**) so subsequent tracked changes attach to it. Much of the plumbing may already exist (tasks/work-sessions, soft locks, `discussion_change`); the gap is mainly a convenient, prominent UI switch that sets the active objective for the change log.
 
 ## Deployment / docs
 
