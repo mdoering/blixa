@@ -23,6 +23,21 @@ export function searchUsages(pid: number, params: SearchUsagesParams): Promise<U
   return api<UsagePage>(`/api/projects/${pid}/usages?${search.toString()}`);
 }
 
+// Direct URL for GET /usages/export.tsv?q=&rank=&status= -- ALL rows matching the current filters
+// (no pagination) as a TSV attachment. Used as an <a href download>, not via api(), since the
+// response is a binary attachment stream, not JSON (mirrors export.ts#exportFileUrl).
+export function usageExportTsvUrl(
+  pid: number,
+  params: { q?: string; rank?: string | null; status?: string | null },
+): string {
+  const search = new URLSearchParams();
+  if (params.q && params.q.trim()) search.set('q', params.q.trim());
+  if (params.rank) search.set('rank', params.rank);
+  if (params.status) search.set('status', params.status);
+  const qs = search.toString();
+  return `/api/projects/${pid}/usages/export.tsv${qs ? `?${qs}` : ''}`;
+}
+
 export function getUsage(pid: number, id: number): Promise<NameUsage> {
   return api<NameUsage>(`/api/projects/${pid}/usages/${id}`);
 }

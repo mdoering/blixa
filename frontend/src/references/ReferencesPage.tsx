@@ -16,6 +16,7 @@ import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
   IconDotsVertical,
+  IconDownload,
   IconFileImport,
   IconPlus,
   IconSearch,
@@ -28,7 +29,12 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { messageFor } from '../api/client';
 import MergeRecordsModal from '../merge/MergeRecordsModal';
 import { getProject } from '../api/projects';
-import { deleteReference, getReference, listReferences } from '../api/references';
+import {
+  deleteReference,
+  getReference,
+  listReferences,
+  referenceExportTsvUrl,
+} from '../api/references';
 import type { CreateRefPayload, CslName, Reference } from '../api/types';
 import ImportBibtexModal from './ImportBibtexModal';
 import ImportDoiModal from './ImportDoiModal';
@@ -143,7 +149,19 @@ export default function ReferencesPage() {
         <Title order={3} m={0}>
           References
         </Title>
-        {canEdit && (
+        <Group gap="xs">
+          {(refs?.length ?? 0) > 0 && (
+            <Button
+              component="a"
+              href={referenceExportTsvUrl(pid, { q: debouncedQ, ...parseYearFilter(debouncedYear) })}
+              download
+              variant="light"
+              leftSection={<IconDownload size={14} />}
+            >
+              Download TSV
+            </Button>
+          )}
+          {canEdit && (
           <Group gap="xs">
             <Button
               variant="default"
@@ -177,7 +195,8 @@ export default function ReferencesPage() {
               New reference
             </Button>
           </Group>
-        )}
+          )}
+        </Group>
       </Group>
 
       <Group gap="xs">

@@ -21,6 +21,21 @@ export function listReferences(pid: number, params: ListRefsParams): Promise<Ref
   return api<Reference[]>(`/api/projects/${pid}/references?${search.toString()}`);
 }
 
+// Direct URL for GET /references/export.tsv?q=&yearFrom=&yearTo= -- ALL references matching the
+// current filters (no pagination) as a TSV attachment. Used as an <a href download>, not via api()
+// (binary attachment stream, not JSON); mirrors export.ts#exportFileUrl.
+export function referenceExportTsvUrl(
+  pid: number,
+  params: { q?: string; yearFrom?: number; yearTo?: number },
+): string {
+  const search = new URLSearchParams();
+  if (params.q && params.q.trim()) search.set('q', params.q.trim());
+  if (params.yearFrom !== undefined) search.set('yearFrom', String(params.yearFrom));
+  if (params.yearTo !== undefined) search.set('yearTo', String(params.yearTo));
+  const qs = search.toString();
+  return `/api/projects/${pid}/references/export.tsv${qs ? `?${qs}` : ''}`;
+}
+
 export function getReference(pid: number, id: number): Promise<Reference> {
   return api<Reference>(`/api/projects/${pid}/references/${id}`);
 }

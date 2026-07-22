@@ -3,7 +3,10 @@ package org.catalogueoflife.editor.name;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.catalogueoflife.editor.auth.CurrentUser;
+import org.catalogueoflife.editor.name.export.SearchTsv;
 import org.catalogueoflife.editor.name.dto.BulkStatusRequest;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.DemoteRequest;
@@ -47,6 +50,22 @@ public class NameUsageController {
       @RequestParam(defaultValue = "0") int offset) {
     int uid = currentUser.require().getId();
     return service.searchPage(uid, pid, q, rank, status, limit, offset);
+  }
+
+  // Streams ALL name usages matching the current q/rank/status filters (no pagination) as a TSV
+  // attachment -- the "Download TSV" action on the Names search page. Any project member (read).
+  @GetMapping("/export.tsv")
+  public void exportTsv(@PathVariable int pid,
+      @RequestParam(required = false) String q,
+      @RequestParam(required = false) String rank,
+      @RequestParam(required = false) String status,
+      HttpServletResponse response) throws IOException {
+    int uid = currentUser.require().getId();
+    List<NameUsage> rows = service.exportRows(uid, pid, q, rank, status);
+    response.setContentType("text/tab-separated-values;charset=UTF-8");
+    response.setHeader("Content-Disposition",
+        "attachment; filename=\"project-" + pid + "-names.tsv\"");
+    SearchTsv.writeUsages(response.getOutputStream(), rows);
   }
 
   @PostMapping

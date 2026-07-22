@@ -3,7 +3,10 @@ package org.catalogueoflife.editor.name;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.catalogueoflife.editor.auth.CurrentUser;
+import org.catalogueoflife.editor.name.export.SearchTsv;
 import org.catalogueoflife.editor.name.dto.BibtexRequest;
 import org.catalogueoflife.editor.name.dto.ContainerTitleFacet;
 import org.catalogueoflife.editor.name.dto.ContainerTitleMergeRequest;
@@ -82,6 +85,22 @@ public class ReferenceController {
     int uid = currentUser.require().getId();
     return service.search(uid, pid, q, yearFrom, yearTo, limit, offset).stream()
         .map(r -> ReferenceResponse.of(r, pdfBaseUrl)).toList();
+  }
+
+  // Streams ALL references matching the current q/yearFrom/yearTo filters (no pagination) as a TSV
+  // attachment -- the "Download TSV" action on the References page. Any project member (read).
+  @GetMapping("/export.tsv")
+  public void exportTsv(@PathVariable int pid,
+      @RequestParam(required = false) String q,
+      @RequestParam(required = false) Integer yearFrom,
+      @RequestParam(required = false) Integer yearTo,
+      HttpServletResponse response) throws IOException {
+    int uid = currentUser.require().getId();
+    List<Reference> rows = service.exportRows(uid, pid, q, yearFrom, yearTo);
+    response.setContentType("text/tab-separated-values;charset=UTF-8");
+    response.setHeader("Content-Disposition",
+        "attachment; filename=\"project-" + pid + "-references.tsv\"");
+    SearchTsv.writeReferences(response.getOutputStream(), rows);
   }
 
   @PostMapping

@@ -64,6 +64,18 @@ public class ReferenceService {
         Pagination.clampLimit(limit), Pagination.clampOffset(offset));
   }
 
+  // Runaway guard for the unpaginated TSV export below.
+  private static final int EXPORT_CAP = 100_000;
+
+  // Export variant of search(): same q/yearFrom/yearTo filters, no pagination -- every matching
+  // reference as raw models for the TSV download (see ReferenceController#exportTsv / SearchTsv).
+  public List<Reference> exportRows(int userId, int projectId, String q, Integer yearFrom,
+      Integer yearTo) {
+    projects.requireRole(userId, projectId);
+    return references.search(projectId, (q == null || q.isBlank()) ? null : q.trim(), yearFrom,
+        yearTo, EXPORT_CAP, 0);
+  }
+
   public Reference get(int userId, int projectId, int id) {
     projects.requireRole(userId, projectId);
     return requireInProject(projectId, id);

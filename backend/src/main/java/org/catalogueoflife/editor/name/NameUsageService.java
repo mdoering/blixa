@@ -123,6 +123,29 @@ public class NameUsageService {
     return new UsagePage(items, total);
   }
 
+  private static final org.slf4j.Logger log =
+      org.slf4j.LoggerFactory.getLogger(NameUsageService.class);
+
+  // Runaway guard for the unpaginated TSV export below -- the per-project result set is bounded, but
+  // never stream an unbounded query; if the cap is ever hit it is logged, not silently truncated.
+  private static final int EXPORT_CAP = 100_000;
+
+  // Export variant of searchPage: same q/rank/status filters, but no pagination -- returns every
+  // matching row as raw models for the TSV download (see NameUsageController#exportTsv / SearchTsv).
+  public List<NameUsage> exportRows(int userId, int projectId, String q, String rank, String status) {
+    projects.requireRole(userId, projectId);
+    String qFilter = (q == null || q.isBlank()) ? null : q;
+    String rankFilter = normalizeRankFilter(rank);
+    String statusFilter = normalizeStatusFilter(status);
+    List<NameUsage> rows =
+        usages.searchItems(projectId, qFilter, rankFilter, statusFilter, EXPORT_CAP, 0);
+    if (rows.size() == EXPORT_CAP) {
+      log.warn("Name TSV export for project {} hit the {}-row cap; output may be truncated",
+          projectId, EXPORT_CAP);
+    }
+    return rows;
+  }
+
   // Blank/null -> no filter; otherwise the name-parser Rank matching the (case/space/hyphen
   // tolerant) input, re-rendered lower-case to match how rank is actually stored on name_usage.
   private static String normalizeRankFilter(String raw) {

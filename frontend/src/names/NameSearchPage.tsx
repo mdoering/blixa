@@ -1,6 +1,6 @@
 import { Badge, Box, Button, Group, Select, Text, TextInput, ThemeIcon, Title, Tooltip } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
-import { IconLock, IconPlus, IconSearch } from '@tabler/icons-react';
+import { IconDownload, IconLock, IconPlus, IconSearch } from '@tabler/icons-react';
 import {
   MantineReactTable,
   useMantineReactTable,
@@ -13,7 +13,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getProject } from '../api/projects';
 import { listLocks } from '../api/locks';
-import { bulkChangeStatus, searchUsages } from '../api/usages';
+import { bulkChangeStatus, searchUsages, usageExportTsvUrl } from '../api/usages';
 import { messageFor } from '../api/client';
 import type { Lock, NameUsage } from '../api/types';
 import CollapsibleSplit from '../components/CollapsibleSplit';
@@ -310,11 +310,25 @@ export default function NameSearchPage() {
     <Box>
       <Group justify="space-between" mb="md">
         <Title order={3} m={0}>Names</Title>
-        {canEdit && (
-          <Button leftSection={<IconPlus size={14} />} size="xs" onClick={() => actions.createRoot()}>
-            New name
-          </Button>
-        )}
+        <Group gap="xs">
+          {(data?.total ?? 0) > 0 && (
+            <Button
+              component="a"
+              href={usageExportTsvUrl(pid, { q: debouncedQ, rank, status })}
+              download
+              variant="light"
+              size="xs"
+              leftSection={<IconDownload size={14} />}
+            >
+              Download TSV
+            </Button>
+          )}
+          {canEdit && (
+            <Button leftSection={<IconPlus size={14} />} size="xs" onClick={() => actions.createRoot()}>
+              New name
+            </Button>
+          )}
+        </Group>
       </Group>
       <Group mb="md">
         <TextInput
