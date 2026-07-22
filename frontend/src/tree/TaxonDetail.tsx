@@ -16,7 +16,7 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconLock, IconPencil, IconWorld } from '@tabler/icons-react';
+import { IconBrain, IconLock, IconPencil, IconWorld } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
@@ -24,6 +24,7 @@ import { getProject } from '../api/projects';
 import { getVocab } from '../api/coldp';
 import { listLocks } from '../api/locks';
 import { getUsage, updateUsage } from '../api/usages';
+import { getAiConfig } from '../api/ai';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import CurieId from '../components/CurieId';
 import EntitySelect from '../child/EntitySelect';
@@ -44,6 +45,7 @@ import { useUsageLock } from '../lock/useUsageLock';
 import IssueList from './IssueList';
 import SynonymList from './SynonymList';
 import Synonymy from './Synonymy';
+import AiSuggestModal from './AiSuggestModal';
 
 const STATUS_OPTIONS = [
   { value: 'ACCEPTED', label: 'Accepted' },
@@ -121,6 +123,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
   // identifiers immediately show as resolved chips again.
   const [editingIds, setEditingIds] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const form = useForm<EditableFields>({
     initialValues: {
@@ -150,6 +153,14 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
     queryFn: () => getProject(pid),
   });
   const canEdit = project ? ['owner', 'editor'].includes(project.role) : false;
+
+  // Whether the AI-curation affordance should appear at all: a provider configured WITH a backend
+  // key (keys are backend-only, so the frontend can only ask). Cached briefly across taxa.
+  const { data: aiConfig } = useQuery({
+    queryKey: ['aiConfig', pid],
+    queryFn: () => getAiConfig(pid),
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Shared locks list for this project, polled so a foreign lock's "locked by X" banner (below)
   // shows immediately on open -- before the current user has made any edit of their own (and thus
@@ -312,6 +323,17 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
   return (
     <Box>
       <Group justify="flex-end" mb="xs">
+        {canEdit && aiConfig?.available && (
+          <ActionIcon
+            variant="light"
+            size="lg"
+            aria-label="AI suggestions"
+            title="AI suggestions"
+            onClick={() => setAiOpen(true)}
+          >
+            <IconBrain size={18} />
+          </ActionIcon>
+        )}
         <Button
           variant="default"
           size="xs"
@@ -326,6 +348,14 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
         usageId={usageId}
         opened={compareOpen}
         onClose={() => setCompareOpen(false)}
+      />
+      <AiSuggestModal
+        pid={pid}
+        usageId={usageId}
+        usageRank={usage.rank}
+        usageName={usage.scientificName}
+        opened={aiOpen}
+        onClose={() => setAiOpen(false)}
       />
       {foreignLock && (
         <Alert color="orange" variant="light" mb="sm" icon={<IconLock size={16} />}>
