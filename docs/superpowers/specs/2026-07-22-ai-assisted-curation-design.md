@@ -39,7 +39,7 @@ the curator keeps final say over what lands.
 ## Architecture
 
 ```
-TaxonDetail ─ "AI assist" tab
+TaxonDetail ─ brain-icon / context-menu action  →  "AI suggestions" modal
    │  POST /api/projects/{pid}/usages/{id}/ai/suggest   (editor-only)
    ▼
 AiSuggestionService
@@ -164,14 +164,24 @@ output for an accepted taxon.
 
 ## Frontend
 
-- New **"AI" tab** in `TaxonDetail` (shown when an AI provider is available — the
-  installation default or a project override — and the user can edit): a **"Gather
-  suggestions"** button → calls the
-  suggest endpoint → renders cards grouped by category. Each card: value, provenance
-  (provider/model), a **verified** badge (green, references) or **unverified** badge
-  (amber, other facts), and Accept / Dismiss.
-- Accepting routes to the relevant existing create path and invalidates the affected
-  child-entity query so the tab refreshes.
+- **Invocation is an action, not a tab.** Tabs in `TaxonDetail` stay reserved for the
+  taxon's **data-entity editors** (vernaculars, distributions, references, type
+  material, …). AI curation is invoked from a **small brain icon** (`IconBrain`) on the
+  focal taxon form view, plus a matching **context-menu entry** ("AI suggestions…" in
+  `NameActionMenu` / the tree node context menu).
+- **Only shown when AI is properly configured** for the project — the effective provider
+  (project override ?? installation default) exists **and** its API key is present in
+  backend config — and the user can edit. When AI isn't configured, no AI affordance
+  appears at all.
+  - Keys are backend-only, so the frontend can't inspect them: a lightweight
+    `GET /api/projects/{pid}/ai/config` returns `{ available: boolean, provider, model }`
+    (never a key). The brain icon / menu entry render only when `available` is true.
+- Clicking it opens an **"AI suggestions" modal** for the focal taxon that calls the
+  suggest endpoint and renders the cards grouped by category. Each card: value,
+  provenance (provider/model), a **verified** badge (green, references) or **unverified**
+  badge (amber, other facts), and Accept / Dismiss. Accepting routes to the relevant
+  existing create endpoint and invalidates the affected child-entity query so the
+  corresponding data tab refreshes.
 - **Project settings** (`ProjectMetadataPage` → Settings, alongside favorite CLB
   datasets & the discussion token): an **optional override** of provider + model (from
   the providers the server has keys for), defaulting to "use installation default
