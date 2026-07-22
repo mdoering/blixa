@@ -45,6 +45,18 @@ editor:
     orcids: ${EDITOR_ADMIN_ORCIDS:}
 
 coldp:
+  # AI-assisted curation. Backend-only config (keys never touch the DB or frontend). Unconfigured by
+  # default -> the feature is unavailable (GET /ai/config reports available=false) and the UI hides
+  # its affordance. To enable, set the default provider + the matching API key (relaxed binding, so
+  # env vars work too, e.g. COLDP_AI_DEFAULT_PROVIDER=anthropic and the key below):
+  #   coldp.ai.default-provider: anthropic   (anthropic | openai | google | mistral)
+  ai:
+    default-model: ${AI_DEFAULT_MODEL:claude-opus-4-8}
+    api-keys:
+      anthropic: ${ANTHROPIC_API_KEY:}
+      openai: ${OPENAI_API_KEY:}
+      google: ${GOOGLE_API_KEY:}
+      mistral: ${MISTRAL_API_KEY:}
   # Outgoing email for discussion-follow notifications. Sending is best-effort and only happens when
   # `from` is set AND Spring's mail sender is configured (spring.mail.host); otherwise it's logged.
   mail:
