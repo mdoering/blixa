@@ -25,8 +25,9 @@ affordances stay hidden — that itself is worth confirming).
 
 Applied cleanly under Testcontainers; the persistent dev Postgres migrates on deploy.
 
-- [ ] Confirm Flyway applied **V2** (`ai_usage`) and **V3** (`reference.bhl_item_id`)
-      on the dev deploy (startup logs / `journalctl -u col-blixa`) — no failed boot.
+- [ ] Confirm Flyway applied **V2** (`ai_usage`), **V3** (`reference.bhl_item_id`) and
+      **V4** (`property_key`) on the dev deploy (startup logs / `journalctl -u col-blixa`)
+      — no failed boot. (V4 is fully IT-tested, so this is just a "did it migrate" check.)
 
 ## 2. AI-assisted curation — provider adapters
 
