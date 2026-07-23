@@ -117,7 +117,14 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
   …/usages/{id}/homotypic/{conflicts,consolidate}`.
 - **GBIF occurrence import into TypeMaterial** — by `occurrenceId` (the field is already carried).
 - **Distribution map preview** — via portal-components, using the gazetteer `areaId`.
-- **Shared taxon property keys** — manage a project's standard **property keys** (`col:property`): **autocomplete** the key when adding a new taxon property, an optional **description** per key, an on-demand **project-wide overview** of unique keys with usage counts, and **reconciliation** (merge two keys into one) from that overview. Mirrors the existing journal-title reconciliation pattern.
+- **Shared taxon property keys** — *shipped:* manage a project's standard **property keys**
+  (`col:property`): the taxon Property tab's key field is a Mantine **Autocomplete** sourced from the
+  project's used ∪ defined keys; a `property_key` table (Flyway V4) holds optional **descriptions**;
+  a **PropertyKeysModal** (Project → Settings → *Manage property keys*) shows the project-wide
+  **overview** with usage counts + editable descriptions, add-a-key, per-key definition removal, and
+  **reconciliation** (merge variant spellings → one canonical, rewriting `property.property`).
+  Endpoints `GET /property-keys`, `PUT /property-keys` (body `{key,description}`), `DELETE
+  /property-keys?key=…`, `POST /property-keys/merge`. Mirrors the journal-title reconciliation.
 
 ## UI / polish
 

@@ -1,8 +1,16 @@
 import { Stack } from '@mantine/core';
 import { childApi } from '../api/childApi';
+import { getPropertyKeys } from '../api/propertyKeys';
 import ChildEntityTab, { type ColumnDef, type FieldDef } from './ChildEntityTab';
+import type { Option } from './EntitySelect';
 import DistributionMapPanel from './map/DistributionMapPanel';
 import { referenceOptions } from './NameRelationsTab';
+
+// Suggestion loader for the Property key field -- the project's standard + used property keys, so
+// spellings stay consistent (managed via PropertyKeysModal). Free-text, so new keys stay typeable.
+function propertyKeyOptions(pid: number): () => Promise<Option[]> {
+  return () => getPropertyKeys(pid).then((keys) => keys.map((k) => ({ value: k.key, label: k.key })));
+}
 
 // The 5 taxon-level child entities (accepted-only; the backend guards create and demote drops
 // them). Each is a thin ChildEntityTab config over the generic childApi factory. See the
@@ -282,7 +290,14 @@ export function PropertyTab({ pid, usageId, canEdit }: TabProps) {
     { header: 'Value', cell: (r) => r.value ?? '—' },
   ];
   const fields: FieldDef<Property>[] = [
-    { name: 'property', label: 'Property', span: 4 },
+    {
+      name: 'property',
+      label: 'Property',
+      type: 'autocomplete',
+      load: propertyKeyOptions(pid),
+      entityQueryKey: ['propertyKeys', pid],
+      span: 4,
+    },
     { name: 'value', label: 'Value', span: 4 },
     { name: 'page', label: 'Page', span: 4 },
     {

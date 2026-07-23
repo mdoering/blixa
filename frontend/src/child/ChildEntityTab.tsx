@@ -20,8 +20,16 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
 import EntitySelect, { type Option } from './EntitySelect';
+import AutocompleteField from './AutocompleteField';
 
-export type FieldType = 'text' | 'textarea' | 'number' | 'select' | 'boolean' | 'entity';
+export type FieldType =
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'select'
+  | 'boolean'
+  | 'entity'
+  | 'autocomplete';
 
 export interface FieldDef<T = unknown> {
   name: string;
@@ -257,6 +265,14 @@ export default function ChildEntityTab<T>({
                       load={f.load!}
                       queryKey={f.entityQueryKey ?? [f.name]}
                       current={editingRow && f.current ? f.current(editingRow) : null}
+                    />
+                  ) : f.type === 'autocomplete' ? (
+                    <AutocompleteField
+                      label={f.label}
+                      value={val}
+                      onChange={set}
+                      load={f.load!}
+                      queryKey={f.entityQueryKey ?? [f.name]}
                     />
                   ) : (
                     <TextInput label={f.label} value={val} onChange={(e) => set(e.currentTarget.value)} />

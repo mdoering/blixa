@@ -48,10 +48,12 @@ overview; a key can be used-but-undefined (no description) or defined-but-unused
   combined `GET /api/projects/{pid}/property-keys` returns each key with `{key, count,
   description}` (LEFT JOIN the facet with `property_key`; keys defined-but-unused
   included).
-- **Define/describe:** `PUT /api/projects/{pid}/property-keys/{key}` body `{description}`
+- **Define/describe:** `PUT /api/projects/{pid}/property-keys` body `{key, description}`
   upserts a `property_key` row (defines a standard key / edits its description). `DELETE
-  …/property-keys/{key}` removes the *definition* only (never touches `property` rows).
-  Editor-only.
+  …/property-keys?key=…` removes the *definition* only (never touches `property` rows).
+  Editor-only. (The key travels in the body / query param rather than a `/{key}` path segment:
+  property keys are free-form text — spaces, slashes, dots — and Spring Security's
+  `StrictHttpFirewall` rejects an encoded space/slash in a path segment with a bare 400.)
 - **Reconcile:** `POST /api/projects/{pid}/property-keys/merge` body `{canonical,
   variants[]}` → `UPDATE property SET property = canonical WHERE project_id = ? AND
   property IN (variants)`; also fold the variants' `property_key` rows into the canonical

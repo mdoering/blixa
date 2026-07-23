@@ -35,6 +35,7 @@ import { deleteRelease, listReleases, publishRelease } from '../api/releases';
 import { messageFor } from '../api/client';
 import type { UpdateMetadataPayload } from '../api/types';
 import MergeModal from '../merge/MergeModal';
+import PropertyKeysModal from './PropertyKeysModal';
 import { NOM_CODES } from './CreateProjectModal';
 
 // The CLB dataset key COL's own checklist is published under -- "col" conventionally aliases
@@ -255,6 +256,8 @@ export default function ProjectMetadataPage() {
   // Supervised project merge (owner/editor only, same tier as "Match all identifiers"): opens
   // MergeModal, which owns its own start/poll/apply state scoped to this project as the target.
   const [merging, setMerging] = useState(false);
+  // PropertyKeysModal: manage the project's standard taxon property keys (describe + reconcile).
+  const [propKeysOpen, setPropKeysOpen] = useState(false);
 
   // Public visibility toggle (owner-only): lists the project on the public landing page and
   // exposes its READY releases through the public read API (Phase 2, not this task).
@@ -579,6 +582,29 @@ export default function ProjectMetadataPage() {
             </Stack>
           </Stack>
         </fieldset>
+
+        {/* Property keys live outside the disabled fieldset: viewing is open to any member, while
+            the modal's write actions (describe / merge / remove) are owner/editor gated server-side. */}
+        <Divider />
+        <Stack gap="xs">
+          <Stack gap={2}>
+            <Text size="sm" fw={500}>
+              Taxon property keys
+            </Text>
+            <Text size="xs" c="dimmed">
+              Standardise the free-form keys used on taxon properties: give them descriptions and
+              merge variant spellings into one. The taxon Property tab autocompletes from this set.
+            </Text>
+          </Stack>
+          <Button
+            type="button"
+            variant="default"
+            style={{ alignSelf: 'flex-start' }}
+            onClick={() => setPropKeysOpen(true)}
+          >
+            Manage property keys…
+          </Button>
+        </Stack>
       </Stack>
 
       {/* A second Save, mirroring the one at the top: the metadata form + Settings make a long
@@ -723,6 +749,7 @@ export default function ProjectMetadataPage() {
               Merge another project&apos;s names and references into this one.
             </Text>
             <MergeModal opened={merging} onClose={() => setMerging(false)} targetId={id} />
+            <PropertyKeysModal pid={id} opened={propKeysOpen} onClose={() => setPropKeysOpen(false)} />
           </Stack>
         )}
       </Stack>
