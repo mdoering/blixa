@@ -96,7 +96,7 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 - **CSL-JSON reference import** — reuse the `RefMapping` path that DOI / BibTeX / RIS already use.
 - **DOI consolidation** — find DOIs for existing references (Crossref / DataCite lookup on the structured fields).
 - **References list total count** — the list endpoint returns a bare `List` (prev/next paging, no total); add a count for a richer MRT table.
-- **BHL page links (nomenclatural protologue)** — the Biodiversity Heritage Library hosts much of the old taxonomic literature that has **no DOI** and isn't in Crossref. Beyond linking a name to its nomenclatural reference, allow linking a name to the **exact BHL page** where it was first published (the *protologue* in botany / original description in zoology), plus tooling to **find or suggest** that page. ColDP carries this as `col:nameReferencePageLink` (confirm the exact term).
+- **BHL page links (nomenclatural protologue)** *(shipped; spec `docs/superpowers/specs/2026-07-23-bhl-integration-design.md`)* — for literature with **no DOI** (not in Crossref). Two-level flow, key-gated (`coldp.bhl.api-key`): (1) link a **reference → a BHL item** (volume) from the References editor (`reference.bhl_item_id`, "Find on BHL"); (2) on the taxon form, once the name's nomenclatural reference has an item, **"Find page on BHL"** shows the pages where the name appears (BHL `GetNameMetadata` index — the likely protologue) plus all item pages, and picking one fills **`publishedInPageLink`** + `publishedInPage`. Follow-ups: validate the `GetNameMetadata` response mapping on the first live call (BhlClient is mocked in tests); a global "earliest appearance" suggestion across all of BHL before a reference is linked.
 
 ## Validation & issues
 
