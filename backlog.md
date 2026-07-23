@@ -92,7 +92,11 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 
 ## References
 
-- **Abbreviated botanical citations** — abbreviated **author** form and abbreviated **nomenclatural / reference title** for the botanical citation tradition (short *container* title already done). ColDP supports these.
+- **Abbreviated botanical citations** — *shipped:* added the reference **title-short** (CSL
+  title-short / ColDP `titleShort`, e.g. "Sp. Pl.") with a form field, CSL-JSON mapping, and ColDP
+  round-trip; also closed a gap where **containerTitleShort** wasn't exported/imported. Scope: the
+  abbreviated **author** form stays on the name's authorship field (not a reference field) — see the
+  2026-07-24 scope decision. (IPNI author-abbreviation help on the name remains a possible future item.)
 - **CSL-JSON reference import** — *shipped:* `RefMapping.fromCslJson` + `Import CSL-JSON` modal
   (array or single object, paste or `.json` file), reusing the DOI/BibTeX/RIS create path.
 - **DOI consolidation** — *shipped:* "Find DOI…" on the reference form searches Crossref over the
