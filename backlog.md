@@ -116,7 +116,15 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
   others to homotypic synonyms; pro-parte / dual-status flagged. Consolidation page + `GET/POST
   …/usages/{id}/homotypic/{conflicts,consolidate}`.
 - **GBIF occurrence import into TypeMaterial** — by `occurrenceId` (the field is already carried).
-- **Distribution map preview** — via portal-components, using the gazetteer `areaId`.
+- **Distribution map preview** — *mostly shipped* as a bespoke maplibre-gl view (richer than
+  portal-components: distribution polygons focal/children via CLB `/vocab/area/{gaz}:{id}` GeoJSON,
+  type-specimen points, GBIF occurrence raster + preflight count, COL-match, WebGL-degradation).
+  *2026-07-24:* now **fits the view to the taxon's geometry** instead of opening on the world.
+  **Remaining (needs a product decision):** the map ignores each distribution's
+  **`status`/`establishmentMeans`** (`MapDataMapper` selects only area/gazetteer) — so *absent*
+  areas render identically to *present*, and native vs. introduced is undistinguished. Options:
+  hide absent, or colour by establishment. Minor extras: click **popups** (features already carry
+  name/locality/status) and a **legend**.
 - **Shared taxon property keys** — *shipped:* manage a project's standard **property keys**
   (`col:property`): the taxon Property tab's key field is a Mantine **Autocomplete** sourced from the
   project's used ∪ defined keys; a `property_key` table (Flyway V4) holds optional **descriptions**;
