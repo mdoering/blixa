@@ -5,6 +5,7 @@ import { Alert } from '@mantine/core';
 import type { Feature, FeatureCollection, GeoJSON as GeoJson } from 'geojson';
 import type { MapAreaRecord, MapPointRecord } from '../../api/map';
 import { areaGeojsonUrl, gbifTileUrl } from './mapUrls';
+import { boundsOfFeatures } from './mapBounds';
 
 // The ONLY module that imports maplibre-gl. Kept behind React.lazy from DistributionMapPanel so
 // the ~230KB (gzip) maplibre bundle lands in its own chunk and stays out of the main entry.
@@ -173,8 +174,9 @@ export default function MapView({
       addAreaGroup('dist-focal', focalFeatures, DIST_FOCAL_FILL);
       addAreaGroup('dist-children', childFeatures, DIST_CHILDREN_FILL);
 
-      const addPointGroup = (id: 'type-focal' | 'type-children', focal: boolean, color: string) => {
-        const feats = pointsToFeatures(typeSpecimens, focal);
+      const typeFocalFeats = pointsToFeatures(typeSpecimens, true);
+      const typeChildFeats = pointsToFeatures(typeSpecimens, false);
+      const addPointGroup = (id: 'type-focal' | 'type-children', feats: FeatureList, color: string) => {
         if (feats.length === 0) return;
         map.addSource(id, { type: 'geojson', data: fc(feats) });
         map.addLayer({
@@ -189,8 +191,24 @@ export default function MapView({
           },
         });
       };
-      addPointGroup('type-focal', true, TYPE_FOCAL_COLOR);
-      addPointGroup('type-children', false, TYPE_CHILDREN_COLOR);
+      addPointGroup('type-focal', typeFocalFeats, TYPE_FOCAL_COLOR);
+      addPointGroup('type-children', typeChildFeats, TYPE_CHILDREN_COLOR);
+
+      // Fit the initial view to the taxon's rendered geometry (polygons + type points) instead of
+      // opening on the whole world -- the single biggest "preview" win. Done once here on build,
+      // not on every visibility toggle, so flipping a checkbox never re-pans the map. GBIF's raster
+      // has no vector bounds and is global anyway, so it doesn't participate; when there is no
+      // coded geometry at all (free-text areas / GBIF-only), bounds is null and the world view
+      // stays.
+      const fitBounds = boundsOfFeatures([
+        ...focalFeatures,
+        ...childFeatures,
+        ...typeFocalFeats,
+        ...typeChildFeats,
+      ]);
+      if (fitBounds) {
+        map.fitBounds(fitBounds, { padding: 40, maxZoom: 6, duration: 0 });
+      }
 
       // GBIF occurrence-density raster (only meaningful once matched to COL). Gated on colId only
       // (not gbifEnabled or gbifAvailable): this mirrors every other layer group above, which is
