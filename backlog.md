@@ -125,12 +125,10 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 - **Distribution map preview** — *mostly shipped* as a bespoke maplibre-gl view (richer than
   portal-components: distribution polygons focal/children via CLB `/vocab/area/{gaz}:{id}` GeoJSON,
   type-specimen points, GBIF occurrence raster + preflight count, COL-match, WebGL-degradation).
-  *2026-07-24:* now **fits the view to the taxon's geometry** instead of opening on the world.
-  **Remaining (needs a product decision):** the map ignores each distribution's
-  **`status`/`establishmentMeans`** (`MapDataMapper` selects only area/gazetteer) — so *absent*
-  areas render identically to *present*, and native vs. introduced is undistinguished. Options:
-  hide absent, or colour by establishment. Minor extras: click **popups** (features already carry
-  name/locality/status) and a **legend**.
+  *2026-07-24:* now **fits the view to the taxon's geometry**; **colours distributions by
+  establishment means** using ChecklistBank's palette (with a legend); and a **click popover**
+  shows the complete distribution record. Minor remaining: click popups for **type-specimen
+  points** (only distribution polygons have them today); threat-status styling.
 - **Shared taxon property keys** — *shipped:* manage a project's standard **property keys**
   (`col:property`): the taxon Property tab's key field is a Mantine **Autocomplete** sourced from the
   project's used ∪ defined keys; a `property_key` table (Flyway V4) holds optional **descriptions**;

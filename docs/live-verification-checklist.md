@@ -95,6 +95,9 @@ IT-verified; only the real Crossref round-trip is unverified.
 ## 5. UI (fully tested — a glance)
 
 - [ ] Collapsible left pane on Tree & Names remembers its collapsed state per page.
+- [ ] **Distribution map** (maplibre wiring is jsdom-stubbed in tests, so eyeball live): polygons
+      are coloured by establishment means (CLB palette) with a matching legend; the view fits to the
+      taxon's areas; clicking a polygon opens a popover with the full distribution record.
 
 ---
 
