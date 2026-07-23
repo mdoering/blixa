@@ -168,6 +168,7 @@ test('a viewer sees no editing controls', async () => {
   expect(screen.queryByRole('button', { name: 'Import DOI' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Import BibTeX' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Import RIS' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Import CSL-JSON' })).not.toBeInTheDocument();
 });
 
 test('Import RIS parses pasted text and refreshes the list', async () => {

@@ -4,6 +4,7 @@ import {
   countReferences,
   createReference,
   importBibtex,
+  importCslJson,
   importRisReferences,
   listReferences,
   resolveDoi,
@@ -99,4 +100,17 @@ test('importRisReferences POSTs the text and returns created refs', async () => 
   const created = await importRisReferences(3, 'TY  - JOUR\nTI  - T\nER  - ');
   expect(body).toEqual({ ris: 'TY  - JOUR\nTI  - T\nER  - ' });
   expect(created).toHaveLength(2);
+});
+
+test('importCslJson POSTs the blob and returns created refs', async () => {
+  let body: unknown = null;
+  server.use(
+    http.post('/api/projects/3/references/import-csl-json', async ({ request }) => {
+      body = await request.json();
+      return HttpResponse.json([{ id: 1 }]);
+    }),
+  );
+  const created = await importCslJson(3, '[{"title":"X"}]');
+  expect(body).toEqual({ cslJson: '[{"title":"X"}]' });
+  expect(created).toHaveLength(1);
 });

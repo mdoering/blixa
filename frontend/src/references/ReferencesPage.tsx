@@ -38,6 +38,7 @@ import {
 } from '../api/references';
 import type { CreateRefPayload, CslName, Reference } from '../api/types';
 import ImportBibtexModal from './ImportBibtexModal';
+import ImportCslJsonModal from './ImportCslJsonModal';
 import ImportDoiModal from './ImportDoiModal';
 import ImportRisModal from './ImportRisModal';
 import ReconcileJournalsModal from './ReconcileJournalsModal';
@@ -95,6 +96,7 @@ export default function ReferencesPage() {
   const [importDoi, setImportDoi] = useState(false);
   const [importBib, setImportBib] = useState(false);
   const [importRis, setImportRis] = useState(false);
+  const [importCsl, setImportCsl] = useState(false);
   const [reconcileOpen, setReconcileOpen] = useState(false);
 
   // Multi-select for the "Merge N selected…" action (reference dedupe, reuses Task 3's
@@ -197,6 +199,13 @@ export default function ReferencesPage() {
               onClick={() => setImportRis(true)}
             >
               Import RIS
+            </Button>
+            <Button
+              variant="default"
+              leftSection={<IconFileImport size={14} />}
+              onClick={() => setImportCsl(true)}
+            >
+              Import CSL-JSON
             </Button>
             <Button
               variant="default"
@@ -353,6 +362,7 @@ export default function ReferencesPage() {
       />
       <ImportBibtexModal pid={pid} opened={importBib} onClose={() => setImportBib(false)} />
       <ImportRisModal pid={pid} opened={importRis} onClose={() => setImportRis(false)} />
+      <ImportCslJsonModal pid={pid} opened={importCsl} onClose={() => setImportCsl(false)} />
       <ReconcileJournalsModal pid={pid} opened={reconcileOpen} onClose={() => setReconcileOpen(false)} />
       <MergeRecordsModal
         entity="reference"

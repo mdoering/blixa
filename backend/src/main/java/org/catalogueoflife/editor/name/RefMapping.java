@@ -141,6 +141,107 @@ public final class RefMapping {
     return (s == null || s.isBlank()) ? null : s.trim();
   }
 
+  // --- CSL-JSON (citeproc format: Zotero/CrossRef "Get citation", pandoc, etc.) ---
+
+  private static final Pattern FOUR_DIGIT_YEAR = Pattern.compile("\\d{4}");
+
+  // Maps a CSL-JSON document -- an array of items, or a single item object -- into create requests.
+  // CSL-JSON overlaps heavily with the Crossref work message but differs in a few fields:
+  // title/container-title are plain strings (not arrays), `type` is already a CSL type, ISBN/ISSN are
+  // strings, and institutions use `literal`. Non-object array elements are skipped; the caller
+  // (ReferenceImportService) treats an empty result as a 400.
+  public static List<CreateReferenceRequest> fromCslJson(JsonNode root) {
+    List<CreateReferenceRequest> out = new ArrayList<>();
+    if (root != null && root.isArray()) {
+      for (JsonNode item : root) {
+        if (item.isObject()) {
+          out.add(cslJsonEntry(item));
+        }
+      }
+    } else if (root != null && root.isObject()) {
+      out.add(cslJsonEntry(root));
+    }
+    return out;
+  }
+
+  private static CreateReferenceRequest cslJsonEntry(JsonNode obj) {
+    String title = cslText(obj.path("title"));
+    String author = cslNames(obj.path("author"));
+    String editor = cslNames(obj.path("editor"));
+    String container = cslText(obj.path("container-title"));
+    String containerShort = cslText(obj.path("container-title-short"));
+    String year = cslYear(obj.path("issued"));
+    String volume = text(obj.path("volume"));
+    String issue = text(obj.path("issue"));
+    String page = text(obj.path("page"));
+    String publisher = text(obj.path("publisher"));
+    String doi = text(obj.path("DOI"));
+    String isbn = cslText(obj.path("ISBN"));
+    String issn = cslText(obj.path("ISSN"));
+    String link = text(obj.path("URL"));
+    String type = canonicalCslType(text(obj.path("type")));
+    String accessed = crossrefDate(obj.path("accessed"));
+    String citation = citation(author, year, title, container, volume, issue, page);
+    return new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
+        title, container, containerShort, year, volume, issue, page, publisher, doi, isbn, issn, link,
+        accessed, null);
+  }
+
+  // CSL string fields are plain strings, but some producers wrongly emit single-element arrays
+  // (Crossref-style); tolerate both.
+  private static String cslText(JsonNode n) {
+    if (n == null || n.isMissingNode() || n.isNull()) {
+      return null;
+    }
+    return n.isArray() ? text(n.path(0)) : text(n);
+  }
+
+  // CSL name array -> "; "-joined "Family, Given" (parseNames splits it back into CslName). Handles
+  // the CSL `literal` field for institutional/single-string names (and tolerates a Crossref-style
+  // `name`), mirroring crossrefNames otherwise.
+  private static String cslNames(JsonNode arr) {
+    if (arr == null || !arr.isArray() || arr.isEmpty()) {
+      return null;
+    }
+    List<String> names = new ArrayList<>();
+    for (JsonNode a : arr) {
+      String family = text(a.path("family"));
+      String given = text(a.path("given"));
+      if (family != null && given != null) {
+        names.add(family + ", " + given);
+      } else if (family != null) {
+        names.add(family);
+      } else {
+        String literal = text(a.path("literal"));
+        if (literal == null) {
+          literal = text(a.path("name"));
+        }
+        if (literal != null) {
+          names.add(literal);
+        }
+      }
+    }
+    return names.isEmpty() ? null : String.join("; ", names);
+  }
+
+  // CSL `issued` -> a 4-digit year: prefer the date-parts triple's year, else the first 4-digit run
+  // in a `raw`/`literal` free-text date. Stored as the reference year (like the other importers).
+  private static String cslYear(JsonNode issued) {
+    String fromParts = crossrefYear(issued);
+    if (fromParts != null) {
+      return fromParts;
+    }
+    String raw = text(issued.path("raw"));
+    if (raw == null) {
+      raw = text(issued.path("literal"));
+    }
+    if (raw == null) {
+      return null;
+    }
+    Matcher m = FOUR_DIGIT_YEAR.matcher(raw);
+    return m.find() ? m.group() : null;
+  }
+
   // --- DataCite ---
 
   // Maps the `data.attributes` node of DataCite's GET /dois/{doi} response (JSON:API). Used as a

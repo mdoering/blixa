@@ -11,6 +11,7 @@ import org.catalogueoflife.editor.name.dto.BibtexRequest;
 import org.catalogueoflife.editor.name.dto.ContainerTitleFacet;
 import org.catalogueoflife.editor.name.dto.ContainerTitleMergeRequest;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
+import org.catalogueoflife.editor.name.dto.CslJsonRequest;
 import org.catalogueoflife.editor.name.dto.DoiRequest;
 import org.catalogueoflife.editor.name.dto.ReferenceResponse;
 import org.catalogueoflife.editor.name.dto.RisRequest;
@@ -72,6 +73,15 @@ public class ReferenceController {
   public List<ReferenceResponse> importRis(@PathVariable int pid, @RequestBody RisRequest req) {
     int uid = currentUser.require().getId();
     return importService.importRis(uid, pid, req.ris()).stream()
+        .map(r -> ReferenceResponse.of(r, pdfBaseUrl)).toList();
+  }
+
+  // Parse + create every item in a CSL-JSON blob (array or single object -- Zotero/pandoc export).
+  @PostMapping("/import-csl-json")
+  @ResponseStatus(HttpStatus.CREATED)
+  public List<ReferenceResponse> importCslJson(@PathVariable int pid, @RequestBody CslJsonRequest req) {
+    int uid = currentUser.require().getId();
+    return importService.importCslJson(uid, pid, req.cslJson()).stream()
         .map(r -> ReferenceResponse.of(r, pdfBaseUrl)).toList();
   }
 

@@ -93,6 +93,15 @@ export function importRisReferences(pid: number, ris: string): Promise<Reference
   });
 }
 
+// POST /references/import-csl-json — parses a CSL-JSON blob (array or single object, the citeproc
+// format Zotero/pandoc export) and creates every item, returns the created references.
+export function importCslJson(pid: number, cslJson: string): Promise<Reference[]> {
+  return api<Reference[]>(`/api/projects/${pid}/references/import-csl-json`, {
+    method: 'POST',
+    json: { cslJson },
+  });
+}
+
 // POST /references/{id}/pdf — uploads (or replaces) this reference's hosted PDF; multipart, mirrors
 // the ColDP-import upload's use of the `formData` branch (see api/import.ts's startImport). Returns
 // the updated reference, whose pdfUrl now points at the publicly-served file.

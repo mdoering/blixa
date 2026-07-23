@@ -8,9 +8,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
-// DOI (Crossref, with DataCite fallback) resolution + BibTeX import, mapping both into the normal
-// ReferenceService.create path (which enforces owner/editor + auditing + validation).
+// DOI (Crossref, with DataCite fallback) resolution + BibTeX/RIS/CSL-JSON import, mapping all into
+// the normal ReferenceService.create path (which enforces owner/editor + auditing + validation).
 @Service
 public class ReferenceImportService {
 
@@ -18,13 +21,15 @@ public class ReferenceImportService {
   private final DataciteClient datacite;
   private final ReferenceService references;
   private final ProjectService projects;
+  private final ObjectMapper json;
 
   public ReferenceImportService(CrossrefClient crossref, DataciteClient datacite,
-      ReferenceService references, ProjectService projects) {
+      ReferenceService references, ProjectService projects, ObjectMapper json) {
     this.crossref = crossref;
     this.datacite = datacite;
     this.references = references;
     this.projects = projects;
+    this.json = json;
   }
 
   // Resolve a DOI to an UNSAVED CreateReferenceRequest preview (the UI reviews it before saving).
@@ -74,6 +79,31 @@ public class ReferenceImportService {
   @Transactional
   public List<Reference> importRis(int userId, int projectId, String ris) {
     List<CreateReferenceRequest> parsed = RefMapping.fromRis(ris);
+    List<Reference> created = new ArrayList<>();
+    for (CreateReferenceRequest req : parsed) {
+      created.add(references.create(userId, projectId, req));
+    }
+    return created;
+  }
+
+  // Parse a CSL-JSON blob (an array of items, or a single item object -- the citeproc format
+  // Zotero/CrossRef "Get citation"/pandoc emit) and create every item atomically, same shape as the
+  // BibTeX/RIS imports. Malformed JSON or a document with no mappable item -> 400.
+  @Transactional
+  public List<Reference> importCslJson(int userId, int projectId, String cslJson) {
+    if (cslJson == null || cslJson.isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "no CSL-JSON provided");
+    }
+    JsonNode root;
+    try {
+      root = json.readTree(cslJson);
+    } catch (JacksonException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "could not parse CSL-JSON");
+    }
+    List<CreateReferenceRequest> parsed = RefMapping.fromCslJson(root);
+    if (parsed.isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "no CSL-JSON items found");
+    }
     List<Reference> created = new ArrayList<>();
     for (CreateReferenceRequest req : parsed) {
       created.add(references.create(userId, projectId, req));
