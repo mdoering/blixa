@@ -76,6 +76,16 @@ per the v3 docs but never hit live.
   - [ ] Confirm BHL's real page + thumbnail URL formats match what's derived
         (`/page/{id}`, `/pagethumb/{id}`).
 
+## 3b. DOI consolidation (Crossref search — mocked in tests)
+
+`CrossrefClient.searchWorks` (GET `/works?query.bibliographic=…&query.author=…`) is a live
+call, `@MockitoBean`'d in `DoiConsolidationIT`. The query-building + candidate mapping are
+IT-verified; only the real Crossref round-trip is unverified.
+
+- [ ] On a reference **without a DOI**, "Find DOI…" returns sensible candidates ranked by
+      Crossref score; picking one fills the DOI field and saving persists it.
+- [ ] A reference whose fields don't match anything shows the empty state (no crash).
+
 ## 4. Exports (IT-verified — quick browser sanity only)
 
 - [ ] Names TSV download opens with the expected columns.

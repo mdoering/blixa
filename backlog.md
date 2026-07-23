@@ -93,9 +93,15 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 ## References
 
 - **Abbreviated botanical citations** — abbreviated **author** form and abbreviated **nomenclatural / reference title** for the botanical citation tradition (short *container* title already done). ColDP supports these.
-- **CSL-JSON reference import** — reuse the `RefMapping` path that DOI / BibTeX / RIS already use.
-- **DOI consolidation** — find DOIs for existing references (Crossref / DataCite lookup on the structured fields).
-- **References list total count** — the list endpoint returns a bare `List` (prev/next paging, no total); add a count for a richer MRT table.
+- **CSL-JSON reference import** — *shipped:* `RefMapping.fromCslJson` + `Import CSL-JSON` modal
+  (array or single object, paste or `.json` file), reusing the DOI/BibTeX/RIS create path.
+- **DOI consolidation** — *shipped:* "Find DOI…" on the reference form searches Crossref over the
+  reference's structured fields (`CrossrefClient.searchWorks`), lists scored candidates, and picking
+  one fills the DOI. *Follow-up:* a DataCite fallback (Crossref-only for now — the main DOI source
+  for literature); the live Crossref call is mocked in tests (see live-verification checklist).
+- **References list total count** — *shipped:* `GET /references/count` drives the header total
+  ("References (N)"), "Page X of M", and precise last-page detection. (A full MRT-table swap of the
+  plain Mantine list is a separate UI item.)
 - **BHL page links (nomenclatural protologue)** *(shipped; spec `docs/superpowers/specs/2026-07-23-bhl-integration-design.md`)* — for literature with **no DOI** (not in Crossref). Two-level flow, key-gated (`coldp.bhl.api-key`): (1) link a **reference → a BHL item** (volume) from the References editor (`reference.bhl_item_id`, "Find on BHL"); (2) on the taxon form, once the name's nomenclatural reference has an item, **"Find page on BHL"** shows the pages where the name appears (BHL `GetNameMetadata` index — the likely protologue) plus all item pages, and picking one fills **`publishedInPageLink`** + `publishedInPage`. Follow-ups: validate the `GetNameMetadata` response mapping on the first live call (BhlClient is mocked in tests); a global "earliest appearance" suggestion across all of BHL before a reference is linked.
 
 ## Validation & issues
