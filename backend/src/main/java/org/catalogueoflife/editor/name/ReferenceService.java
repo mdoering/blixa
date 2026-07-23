@@ -64,6 +64,14 @@ public class ReferenceService {
         Pagination.clampLimit(limit), Pagination.clampOffset(offset));
   }
 
+  // Total references matching the same q/yearFrom/yearTo filters as search() -- the list's row
+  // count, for accurate paging. Blank q normalized to null exactly as in search().
+  public long count(int userId, int projectId, String q, Integer yearFrom, Integer yearTo) {
+    projects.requireRole(userId, projectId);
+    return references.searchCount(projectId, (q == null || q.isBlank()) ? null : q.trim(),
+        yearFrom, yearTo);
+  }
+
   // Runaway guard for the unpaginated TSV export below.
   private static final int EXPORT_CAP = 100_000;
 

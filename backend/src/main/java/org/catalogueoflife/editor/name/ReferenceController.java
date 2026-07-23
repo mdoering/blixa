@@ -87,6 +87,17 @@ public class ReferenceController {
         .map(r -> ReferenceResponse.of(r, pdfBaseUrl)).toList();
   }
 
+  // Total references matching the current q/yearFrom/yearTo filters -- the list's row count for
+  // accurate paging (declared before /{id} so "count" isn't parsed as an id). Any project member.
+  @GetMapping("/count")
+  public Map<String, Long> count(@PathVariable int pid,
+      @RequestParam(required = false) String q,
+      @RequestParam(required = false) Integer yearFrom,
+      @RequestParam(required = false) Integer yearTo) {
+    int uid = currentUser.require().getId();
+    return Map.of("count", service.count(uid, pid, q, yearFrom, yearTo));
+  }
+
   // Streams ALL references matching the current q/yearFrom/yearTo filters (no pagination) as a TSV
   // attachment -- the "Download TSV" action on the References page. Any project member (read).
   @GetMapping("/export.tsv")

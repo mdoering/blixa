@@ -10,6 +10,7 @@ import ReferencesPage from './ReferencesPage';
 function mockProject(role = 'owner') {
   server.use(
     http.get('/api/projects/3', () => HttpResponse.json({ id: 3, title: 'P', role })),
+    http.get('/api/projects/3/references/count', () => HttpResponse.json({ count: 1 })),
     http.get('/api/projects/3/references', () =>
       HttpResponse.json([
         {
@@ -46,10 +47,21 @@ test('lists references', async () => {
   expect(screen.getByText('Linnaeus, C.')).toBeInTheDocument();
 });
 
+test('shows the total count and an accurate last page', async () => {
+  mockProject(); // count = 1 -> single page
+  renderPage();
+  // total in the heading
+  expect(await screen.findByRole('heading', { name: /References \(1\)/ })).toBeInTheDocument();
+  // exactly one page: "Page 1 of 1" and Next disabled
+  expect(screen.getByText(/Page 1 of 1/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+});
+
 test('typing a year range re-queries with yearFrom and yearTo', async () => {
   const seen: string[] = [];
   server.use(
     http.get('/api/projects/3', () => HttpResponse.json({ id: 3, title: 'P', role: 'owner' })),
+    http.get('/api/projects/3/references/count', () => HttpResponse.json({ count: 0 })),
     http.get('/api/projects/3/references', ({ request }) => {
       seen.push(new URL(request.url).search);
       return HttpResponse.json([]);
@@ -180,6 +192,7 @@ test('selecting 2 references opens the merge modal and refreshes the list on suc
   mockProject();
   let listCalls = 0;
   server.use(
+    http.get('/api/projects/3/references/count', () => HttpResponse.json({ count: 2 })),
     http.get('/api/projects/3/references', () => {
       listCalls++;
       return HttpResponse.json([

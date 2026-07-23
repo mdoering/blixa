@@ -177,6 +177,35 @@ class ReferenceApiIT extends AbstractPostgresIT {
   }
 
   @Test
+  @WithMockUser(username = "refCountOwner")
+  void countMatchesTheFilteredList() throws Exception {
+    ensureUser("refCountOwner");
+    long pid = createProject("refcountproj");
+    String base = "/api/projects/" + pid + "/references";
+
+    createRef(pid, "Miller 1768, Gardeners Dictionary", "1768");
+    createRef(pid, "Darwin 1859, On the Origin of Species", "1859");
+    createRef(pid, "Smith 1942, Some Fauna", "1942");
+    createRef(pid, "Jones 1943, More Fauna", "1943");
+
+    // Unfiltered count = the whole project, independent of list pagination (limit/offset).
+    mvc.perform(get(base + "/count"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.count").value(4));
+
+    // Count honours the same q / year filters as the list.
+    mvc.perform(get(base + "/count").param("q", "Fauna"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.count").value(2));
+    mvc.perform(get(base + "/count").param("yearFrom", "1942").param("yearTo", "1943"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.count").value(2));
+    mvc.perform(get(base + "/count").param("q", "Fauna").param("yearFrom", "1943"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.count").value(1));
+  }
+
+  @Test
   @WithMockUser(username = "refAccessedOwner")
   void accessedRoundTripsThroughCreateGetUpdate() throws Exception {
     ensureUser("refAccessedOwner");

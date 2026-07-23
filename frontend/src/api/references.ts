@@ -21,6 +21,22 @@ export function listReferences(pid: number, params: ListRefsParams): Promise<Ref
   return api<Reference[]>(`/api/projects/${pid}/references?${search.toString()}`);
 }
 
+// GET /references/count?q=&yearFrom=&yearTo= — total references matching the same filters as the
+// list (no pagination), for an accurate total + precise last-page detection.
+export function countReferences(
+  pid: number,
+  params: { q?: string; yearFrom?: number; yearTo?: number },
+): Promise<number> {
+  const search = new URLSearchParams();
+  if (params.q) search.set('q', params.q);
+  if (params.yearFrom !== undefined) search.set('yearFrom', String(params.yearFrom));
+  if (params.yearTo !== undefined) search.set('yearTo', String(params.yearTo));
+  const qs = search.toString();
+  return api<{ count: number }>(
+    `/api/projects/${pid}/references/count${qs ? `?${qs}` : ''}`,
+  ).then((r) => r.count);
+}
+
 // Direct URL for GET /references/export.tsv?q=&yearFrom=&yearTo= -- ALL references matching the
 // current filters (no pagination) as a TSV attachment. Used as an <a href download>, not via api()
 // (binary attachment stream, not JSON); mirrors export.ts#exportFileUrl.

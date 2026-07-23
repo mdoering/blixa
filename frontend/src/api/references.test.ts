@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { server, http, HttpResponse } from '../test/server';
 import {
+  countReferences,
   createReference,
   importBibtex,
   importRisReferences,
@@ -21,6 +22,22 @@ test('listReferences sends q/limit/offset', async () => {
   expect(url).toContain('q=linnaeus');
   expect(url).toContain('limit=25');
   expect(url).toContain('offset=25');
+});
+
+test('countReferences returns the count and forwards the filters (no limit/offset)', async () => {
+  let url = '';
+  server.use(
+    http.get('/api/projects/3/references/count', ({ request }) => {
+      url = request.url;
+      return HttpResponse.json({ count: 42 });
+    }),
+  );
+  const total = await countReferences(3, { q: 'linnaeus', yearFrom: 1750 });
+  expect(total).toBe(42);
+  expect(url).toContain('q=linnaeus');
+  expect(url).toContain('yearFrom=1750');
+  expect(url).not.toContain('limit');
+  expect(url).not.toContain('offset');
 });
 
 test('createReference POSTs the payload', async () => {

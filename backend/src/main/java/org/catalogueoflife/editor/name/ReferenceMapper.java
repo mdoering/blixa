@@ -94,6 +94,26 @@ public interface ReferenceMapper {
       @Param("yearFrom") Integer yearFrom, @Param("yearTo") Integer yearTo,
       @Param("limit") int limit, @Param("offset") int offset);
 
+  // Total number of references matching search()'s filters (same WHERE, no ORDER/LIMIT/OFFSET) --
+  // the list endpoint's row count for accurate paging ("Page N of M", precise last-page detection).
+  @Select("""
+      <script>
+      SELECT count(*) FROM reference
+      WHERE project_id = #{projectId}
+      <if test="q != null and q != ''">
+        AND to_tsvector('simple', coalesce(citation, '')) @@ websearch_to_tsquery('simple', #{q})
+      </if>
+      <if test="yearFrom != null">
+        AND substring(issued from '\\d{4}')::int &gt;= #{yearFrom}
+      </if>
+      <if test="yearTo != null">
+        AND substring(issued from '\\d{4}')::int &lt;= #{yearTo}
+      </if>
+      </script>
+      """)
+  long searchCount(@Param("projectId") int projectId, @Param("q") String q,
+      @Param("yearFrom") Integer yearFrom, @Param("yearTo") Integer yearTo);
+
   // Best trigram-similar target reference by citation, for merge.ReferenceMatcher's POSSIBLE
   // fuzzy-citation fallback (no exact DOI/citation match) -- uses the reference_citation_trgm GIN
   // index (V3__name_core.sql). Caller must guard a null/blank citation before calling this: `%`

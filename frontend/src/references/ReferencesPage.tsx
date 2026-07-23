@@ -30,6 +30,7 @@ import { messageFor } from '../api/client';
 import MergeRecordsModal from '../merge/MergeRecordsModal';
 import { getProject } from '../api/projects';
 import {
+  countReferences,
   deleteReference,
   getReference,
   listReferences,
@@ -125,6 +126,19 @@ export default function ReferencesPage() {
   });
   const rows = refs ?? [];
 
+  // Total matching the current filters (independent of the page offset), for an accurate count +
+  // precise last-page detection instead of the "a full page might be the last" heuristic.
+  const countParams = { q: params.q, yearFrom: params.yearFrom, yearTo: params.yearTo };
+  // Keyed UNDER ['references', pid, …] so every existing invalidateQueries(['references', pid])
+  // (create / delete / import / merge / reconcile) prefix-matches and refreshes the total too.
+  const { data: total } = useQuery({
+    queryKey: ['references', pid, 'count', countParams],
+    queryFn: () => countReferences(pid, countParams),
+    placeholderData: keepPreviousData,
+  });
+  const totalPages = total !== undefined ? Math.max(1, Math.ceil(total / PAGE)) : undefined;
+  const isLastPage = totalPages !== undefined ? page + 1 >= totalPages : rows.length < PAGE;
+
   const del = useMutation({
     mutationFn: (id: number) => deleteReference(pid, id),
     onSuccess: async () => {
@@ -147,7 +161,7 @@ export default function ReferencesPage() {
     <Stack>
       <Group justify="space-between">
         <Title order={3} m={0}>
-          References
+          References{total !== undefined ? ` (${total})` : ''}
         </Title>
         <Group gap="xs">
           {(refs?.length ?? 0) > 0 && (
@@ -310,11 +324,12 @@ export default function ReferencesPage() {
         </Button>
         <Text size="sm" c="dimmed">
           Page {page + 1}
+          {totalPages !== undefined ? ` of ${totalPages}` : ''}
         </Text>
         <Button
           variant="default"
           size="xs"
-          disabled={rows.length < PAGE}
+          disabled={isLastPage}
           onClick={() => setPage((p) => p + 1)}
         >
           Next
