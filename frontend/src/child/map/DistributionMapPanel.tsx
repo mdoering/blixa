@@ -6,6 +6,7 @@ import { getMapData } from '../../api/map';
 import { getProject } from '../../api/projects';
 import MatchColModal from './MatchColModal';
 import { GBIF_CHECKLIST_KEY, getGbifCount } from './mapUrls';
+import { legendFor } from './distributionStyle';
 import type { LayerVisibility } from './MapView';
 
 // maplibre-gl lives entirely inside MapView; lazy-load it so its ~230KB (gzip) bundle stays out
@@ -76,6 +77,8 @@ export default function DistributionMapPanel({ pid, usageId, canEdit }: Props) {
 
   // Free-text areas without a gazetteer code cannot be drawn on the map.
   const notMappable = mapData.distributions.filter((d) => d.area && !d.areaId);
+  // Establishment-means colour legend for the coded distributions actually present.
+  const legend = legendFor(mapData.distributions.filter((d) => d.areaId));
 
   return (
     <Paper withBorder p="sm">
@@ -147,6 +150,28 @@ export default function DistributionMapPanel({ pid, usageId, canEdit }: Props) {
             gbifAvailable={gbifAvailable}
           />
         </Suspense>
+
+        {legend.length > 0 && (
+          <Group gap="md" mt={4}>
+            {legend.map((e) => (
+              <Group key={e.label} gap={6} wrap="nowrap">
+                <span
+                  aria-hidden
+                  style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: 2,
+                    background: e.color,
+                    display: 'inline-block',
+                  }}
+                />
+                <Text size="xs" c="dimmed">
+                  {e.label}
+                </Text>
+              </Group>
+            ))}
+          </Group>
+        )}
 
         {notMappable.length > 0 && (
           <Text size="xs" c="dimmed">

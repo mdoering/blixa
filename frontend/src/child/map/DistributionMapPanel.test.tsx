@@ -32,7 +32,18 @@ function mockMap(colId: string | null) {
       HttpResponse.json({
         colId,
         distributions: [
-          { usageId: 10, name: 'Panthera leo', focal: true, gazetteer: 'tdwg', areaId: 'AB', area: null },
+          {
+            usageId: 10,
+            name: 'Panthera leo',
+            focal: true,
+            gazetteer: 'tdwg',
+            areaId: 'AB',
+            area: null,
+            establishmentMeans: 'native',
+            threatStatus: null,
+            referenceId: null,
+            remarks: null,
+          },
           { usageId: 10, name: 'Somewhere', focal: true, gazetteer: null, areaId: null, area: 'Free text land' },
         ],
         typeSpecimens: [],
@@ -67,6 +78,8 @@ test('renders the layer checkboxes with children layers unchecked by default', a
   expect(await screen.findByTestId('map-view-stub')).toBeInTheDocument();
   // Free-text-only area listed as not mappable.
   expect(screen.getByText(/not mappable/i)).toBeInTheDocument();
+  // Establishment-means legend reflects the coded distribution's "native".
+  expect(screen.getByText('Native')).toBeInTheDocument();
 });
 
 test('greys out the GBIF checkbox when the preflight count confirms zero occurrences', async () => {

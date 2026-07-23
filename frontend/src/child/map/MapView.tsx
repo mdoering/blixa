@@ -6,15 +6,16 @@ import type { Feature, FeatureCollection, GeoJSON as GeoJson } from 'geojson';
 import type { MapAreaRecord, MapPointRecord } from '../../api/map';
 import { areaGeojsonUrl, gbifTileUrl } from './mapUrls';
 import { boundsOfFeatures } from './mapBounds';
+import { areaPopupHtml, colorForEstablishment, type AreaPopupProps } from './distributionStyle';
 
 // The ONLY module that imports maplibre-gl. Kept behind React.lazy from DistributionMapPanel so
 // the ~230KB (gzip) maplibre bundle lands in its own chunk and stays out of the main entry.
 
 const POSITRON_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
-// Layer paint colours: focal taxon vs its descendants get distinct hues.
-const DIST_FOCAL_FILL = '#1971c2'; // blue.7
-const DIST_CHILDREN_FILL = '#868e96'; // gray.6
+// Distribution polygons are coloured per-feature by establishment means (see distributionStyle,
+// mirroring ChecklistBank); focal vs descendants are distinguished by fill opacity + outline width
+// instead of hue. Type-specimen points keep distinct focal/children hues.
 const TYPE_FOCAL_COLOR = '#e03131'; // red.7
 const TYPE_CHILDREN_COLOR = '#f08c00'; // orange.7
 
@@ -74,7 +75,23 @@ async function fetchAreaFeatures(rec: MapAreaRecord): Promise<FeatureList> {
     if (json.type === 'FeatureCollection') features = json.features;
     else if (json.type === 'Feature') features = [json];
     else return [];
-    return features.map((f) => ({ ...f, properties: { ...f.properties, name: rec.name } }));
+    // Attach the whole distribution record (for the click popover) + a precomputed establishment
+    // colour (data-driven fill via ['get','color']).
+    return features.map((f) => ({
+      ...f,
+      properties: {
+        ...f.properties,
+        name: rec.name,
+        area: rec.area,
+        areaId: rec.areaId,
+        gazetteer: rec.gazetteer,
+        establishmentMeans: rec.establishmentMeans,
+        threatStatus: rec.threatStatus,
+        referenceId: rec.referenceId,
+        remarks: rec.remarks,
+        color: colorForEstablishment(rec.establishmentMeans),
+      },
+    }));
   } catch {
     return [];
   }
@@ -155,24 +172,48 @@ export default function MapView({
       const focalFeatures = focalGroups.flat();
       const childFeatures = childGroups.flat();
 
-      const addAreaGroup = (key: 'dist-focal' | 'dist-children', feats: FeatureList, color: string) => {
+      const addAreaGroup = (
+        key: 'dist-focal' | 'dist-children',
+        feats: FeatureList,
+        fillOpacity: number,
+        lineWidth: number,
+      ) => {
         if (feats.length === 0) return;
         map.addSource(key, { type: 'geojson', data: fc(feats) });
         map.addLayer({
           id: `${key}-fill`,
           type: 'fill',
           source: key,
-          paint: { 'fill-color': color, 'fill-opacity': 0.3 },
+          // Per-feature establishment colour, precomputed onto each feature's `color` property.
+          paint: { 'fill-color': ['get', 'color'], 'fill-opacity': fillOpacity },
         });
         map.addLayer({
           id: `${key}-line`,
           type: 'line',
           source: key,
-          paint: { 'line-color': color, 'line-width': 1 },
+          paint: { 'line-color': ['get', 'color'], 'line-width': lineWidth },
         });
       };
-      addAreaGroup('dist-focal', focalFeatures, DIST_FOCAL_FILL);
-      addAreaGroup('dist-children', childFeatures, DIST_CHILDREN_FILL);
+      // Focal = more opaque + thicker outline; descendants fainter -- hue is reserved for establishment.
+      addAreaGroup('dist-focal', focalFeatures, 0.55, 2);
+      addAreaGroup('dist-children', childFeatures, 0.3, 1);
+
+      // Click a distribution polygon -> a popover with the complete distribution record.
+      const popup = new maplibregl.Popup({ closeButton: true, closeOnClick: true });
+      const areaClick = (e: maplibregl.MapLayerMouseEvent) => {
+        const f = e.features?.[0];
+        if (!f) return;
+        popup.setLngLat(e.lngLat).setHTML(areaPopupHtml(f.properties as AreaPopupProps)).addTo(map);
+      };
+      for (const id of ['dist-focal-fill', 'dist-children-fill']) {
+        map.on('click', id, areaClick);
+        map.on('mouseenter', id, () => {
+          map.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mouseleave', id, () => {
+          map.getCanvas().style.cursor = '';
+        });
+      }
 
       const typeFocalFeats = pointsToFeatures(typeSpecimens, true);
       const typeChildFeats = pointsToFeatures(typeSpecimens, false);

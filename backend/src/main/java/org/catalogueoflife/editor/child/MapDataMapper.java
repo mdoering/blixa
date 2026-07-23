@@ -28,7 +28,8 @@ public interface MapDataMapper {
         WHERE sub.depth < 10000
       )
       SELECT d.usage_id, u.scientific_name AS name, (d.usage_id = #{usageId}) AS focal,
-             d.gazetteer, d.area_id, d.area
+             d.gazetteer, d.area_id, d.area,
+             d.establishment_means, d.threat_status, d.reference_id, d.remarks
       FROM distribution d JOIN sub ON d.usage_id = sub.id
       JOIN name_usage u ON u.project_id = #{projectId} AND u.id = d.usage_id
       WHERE d.project_id = #{projectId}

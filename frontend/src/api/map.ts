@@ -7,6 +7,10 @@ export interface MapAreaRecord {
   gazetteer: string | null;
   areaId: string | null;
   area: string | null;
+  establishmentMeans: string | null;
+  threatStatus: string | null;
+  referenceId: number | null;
+  remarks: string | null;
 }
 
 export interface MapPointRecord {

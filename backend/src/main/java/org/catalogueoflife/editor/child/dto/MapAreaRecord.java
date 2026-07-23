@@ -11,4 +11,10 @@ public record MapAreaRecord(
     boolean focal,
     String gazetteer,
     String areaId,
-    String area) {}
+    String area,
+    // The rest of the distribution record, so the map can colour polygons by establishment (like
+    // ChecklistBank) and show every field in a click popover.
+    String establishmentMeans,
+    String threatStatus,
+    Integer referenceId,
+    String remarks) {}

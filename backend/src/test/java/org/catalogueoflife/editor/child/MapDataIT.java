@@ -60,10 +60,12 @@ class MapDataIT extends AbstractPostgresIT {
     long leoId = json.readTree(createUsage(pid, "Panthera leo", "species", genusId)).get("id").asLong();
     long tigrisId = json.readTree(createUsage(pid, "Panthera tigris", "species", genusId)).get("id").asLong();
 
-    // Distribution on the genus itself.
+    // Distribution on the genus itself -- carries the full establishment/threat/remarks record so
+    // the map can colour by establishment and show every field in a popover.
     mvc.perform(post("/api/projects/" + pid + "/usages/" + genusId + "/distributions").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"areaId\":\"XY\",\"gazetteer\":\"tdwg\"}"))
+            .content("{\"areaId\":\"XY\",\"gazetteer\":\"tdwg\",\"establishmentMeans\":\"native\","
+                + "\"threatStatus\":\"least concern\",\"remarks\":\"widespread\"}"))
         .andExpect(status().isCreated());
 
     // Distribution on a descendant species.
@@ -100,6 +102,9 @@ class MapDataIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.distributions[0].focal").value(true))
         .andExpect(jsonPath("$.distributions[0].gazetteer").value("tdwg"))
         .andExpect(jsonPath("$.distributions[0].areaId").value("XY"))
+        .andExpect(jsonPath("$.distributions[0].establishmentMeans").value("native"))
+        .andExpect(jsonPath("$.distributions[0].threatStatus").value("least concern"))
+        .andExpect(jsonPath("$.distributions[0].remarks").value("widespread"))
         .andExpect(jsonPath("$.distributions[1].usageId").value(leoId))
         .andExpect(jsonPath("$.distributions[1].name").value("Panthera leo"))
         .andExpect(jsonPath("$.distributions[1].focal").value(false))
