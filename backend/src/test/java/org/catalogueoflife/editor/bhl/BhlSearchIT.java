@@ -1,6 +1,7 @@
 package org.catalogueoflife.editor.bhl;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -113,5 +114,27 @@ class BhlSearchIT extends AbstractPostgresIT {
     mvc.perform(put("/api/projects/" + pid + "/references/" + refId + "/bhl-item/9")
             .with(csrf()).with(user("bhlRefViewer")))
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(username = "bhlPageOwner")
+  void listsItemPagesAndNameSuggestedPages() throws Exception {
+    ensureUser("bhlPageOwner");
+    long pid = createProject("bhlpages");
+
+    when(bhlClient.itemPages(anyInt())).thenReturn(List.of(
+        new BhlPage(9, "5", "https://www.biodiversitylibrary.org/page/9",
+            "https://www.biodiversitylibrary.org/pagethumb/9")));
+    mvc.perform(get("/api/projects/" + pid + "/bhl/items/123/pages"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].pageId").value(9))
+        .andExpect(jsonPath("$[0].url").value("https://www.biodiversitylibrary.org/page/9"));
+
+    when(bhlClient.namePagesInItem(any(), anyInt())).thenReturn(List.of(
+        new BhlPage(9, "5", "https://www.biodiversitylibrary.org/page/9", null)));
+    mvc.perform(get("/api/projects/" + pid + "/bhl/items/123/name-pages").param("name", "Aus bus"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].pageId").value(9))
+        .andExpect(jsonPath("$[0].pageNumber").value("5"));
   }
 }

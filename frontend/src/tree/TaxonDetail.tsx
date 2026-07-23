@@ -16,7 +16,7 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconBrain, IconLock, IconPencil, IconWorld } from '@tabler/icons-react';
+import { IconBook, IconBrain, IconLock, IconPencil, IconWorld } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
@@ -25,6 +25,8 @@ import { getVocab } from '../api/coldp';
 import { listLocks } from '../api/locks';
 import { getUsage, updateUsage } from '../api/usages';
 import { getAiConfig } from '../api/ai';
+import { getReference } from '../api/references';
+import BhlPageModal from './BhlPageModal';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import CurieId from '../components/CurieId';
 import EntitySelect from '../child/EntitySelect';
@@ -161,6 +163,18 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
     queryFn: () => getAiConfig(pid),
     staleTime: 5 * 60 * 1000,
   });
+
+  // BHL page finder: the focal name's nomenclatural reference must already have a linked BHL item.
+  const nomRefId =
+    typeof form.values.publishedInReferenceId === 'number'
+      ? form.values.publishedInReferenceId
+      : null;
+  const { data: nomRef } = useQuery({
+    queryKey: ['reference', pid, nomRefId],
+    queryFn: () => getReference(pid, nomRefId as number),
+    enabled: nomRefId != null && canEdit,
+  });
+  const [bhlPageOpen, setBhlPageOpen] = useState(false);
 
   // Shared locks list for this project, polled so a foreign lock's "locked by X" banner (below)
   // shows immediately on open -- before the current user has made any edit of their own (and thus
@@ -454,6 +468,32 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                     {...form.getInputProps('publishedInPageLink')}
                   />
                 </SimpleGrid>
+                {canEdit && nomRef?.bhlItemId != null && (
+                  <Group>
+                    <Button
+                      size="xs"
+                      variant="light"
+                      leftSection={<IconBook size={14} />}
+                      onClick={() => setBhlPageOpen(true)}
+                    >
+                      Find page on BHL…
+                    </Button>
+                  </Group>
+                )}
+                {nomRef?.bhlItemId != null && (
+                  <BhlPageModal
+                    pid={pid}
+                    itemId={nomRef.bhlItemId}
+                    name={usage.scientificName ?? ''}
+                    opened={bhlPageOpen}
+                    onClose={() => setBhlPageOpen(false)}
+                    onPick={(p) => {
+                      form.setFieldValue('publishedInPageLink', p.url);
+                      form.setFieldValue('publishedInPage', p.pageNumber ?? '');
+                      claim();
+                    }}
+                  />
+                )}
                 <Select
                   label="Nomenclatural status"
                   searchable

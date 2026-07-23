@@ -28,12 +28,33 @@ public class BhlService {
 
   public List<BhlItem> publicationSearch(int userId, int projectId, String term) {
     projects.requireRole(userId, projectId);
-    if (!props.hasKey()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "BHL is not configured for this server");
-    }
+    requireAvailable();
     if (term == null || term.isBlank()) {
       return List.of();
     }
     return client.publicationSearch(term.trim());
+  }
+
+  // All pages of a linked BHL item (browse / jump to a page number).
+  public List<BhlPage> itemPages(int userId, int projectId, int itemId) {
+    projects.requireRole(userId, projectId);
+    requireAvailable();
+    return client.itemPages(itemId);
+  }
+
+  // Pages of the item where the focal name appears (suggested protologue pages).
+  public List<BhlPage> namePagesInItem(int userId, int projectId, int itemId, String name) {
+    projects.requireRole(userId, projectId);
+    requireAvailable();
+    if (name == null || name.isBlank()) {
+      return List.of();
+    }
+    return client.namePagesInItem(name.trim(), itemId);
+  }
+
+  private void requireAvailable() {
+    if (!props.hasKey()) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "BHL is not configured for this server");
+    }
   }
 }

@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest';
 import { server, http, HttpResponse } from '../test/server';
 import {
+  bhlItemPages,
+  bhlNamePages,
   bhlPublicationSearch,
   clearReferenceBhlItem,
   getBhlConfig,
@@ -36,6 +38,23 @@ test('setReferenceBhlItem PUTs to the reference bhl-item endpoint', async () => 
   const ref = await setReferenceBhlItem(3, 5, 7);
   expect(method).toBe('PUT');
   expect(ref.bhlItemId).toBe(7);
+});
+
+test('bhlItemPages and bhlNamePages hit the item page endpoints', async () => {
+  let nameUrl = '';
+  server.use(
+    http.get('/api/projects/3/bhl/items/7/pages', () =>
+      HttpResponse.json([{ pageId: 9, pageNumber: '5', url: 'https://bhl/page/9', thumbnailUrl: 't' }]),
+    ),
+    http.get('/api/projects/3/bhl/items/7/name-pages', ({ request }) => {
+      nameUrl = request.url;
+      return HttpResponse.json([{ pageId: 9, pageNumber: '5', url: 'https://bhl/page/9', thumbnailUrl: null }]);
+    }),
+  );
+  expect((await bhlItemPages(3, 7))[0].pageId).toBe(9);
+  const pages = await bhlNamePages(3, 7, 'Aus bus');
+  expect(pages[0].pageNumber).toBe('5');
+  expect(nameUrl).toContain('name=Aus%20bus');
 });
 
 test('clearReferenceBhlItem DELETEs the reference bhl-item', async () => {

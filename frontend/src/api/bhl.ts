@@ -15,8 +15,29 @@ export interface BhlItem {
   url: string | null;
 }
 
+// Mirrors BhlPage: a page within an item. `url` becomes a name's publishedInPageLink, pageNumber
+// its publishedInPage.
+export interface BhlPage {
+  pageId: number | null;
+  pageNumber: string | null;
+  url: string | null;
+  thumbnailUrl: string | null;
+}
+
 export function getBhlConfig(pid: number): Promise<BhlConfig> {
   return api<BhlConfig>(`/api/projects/${pid}/bhl/config`);
+}
+
+// All pages of a linked item (browse / jump to a known page).
+export function bhlItemPages(pid: number, itemId: number): Promise<BhlPage[]> {
+  return api<BhlPage[]>(`/api/projects/${pid}/bhl/items/${itemId}/pages`);
+}
+
+// Pages of the item where `name` appears (suggested protologue pages).
+export function bhlNamePages(pid: number, itemId: number, name: string): Promise<BhlPage[]> {
+  return api<BhlPage[]>(
+    `/api/projects/${pid}/bhl/items/${itemId}/name-pages?name=${encodeURIComponent(name)}`,
+  );
 }
 
 export function bhlPublicationSearch(pid: number, q: string): Promise<BhlItem[]> {

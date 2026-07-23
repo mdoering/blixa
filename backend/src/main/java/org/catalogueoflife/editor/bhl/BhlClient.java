@@ -53,6 +53,49 @@ public class BhlClient {
     return items;
   }
 
+  // All pages of an item (browse / jump to a known page number).
+  public List<BhlPage> itemPages(int itemId) {
+    JsonNode root = get("/api3?op=GetItemMetadata&id={id}&pages=t&ocr=f&parts=f&apikey={k}&format=json",
+        itemId, props.getApiKey());
+    List<BhlPage> pages = new ArrayList<>();
+    for (JsonNode p : root.path("Result").path(0).path("Pages")) {
+      pages.add(page(p));
+    }
+    return pages;
+  }
+
+  // Pages of the given item where `name` appears, from BHL's OCR name index (the likely protologue).
+  // GetNameMetadata returns occurrences across all of BHL; we keep only those in `itemId`. Best-effort
+  // -- BHL's name-index nesting is uneven, so handle both item-with-Pages and flat-page result shapes.
+  public List<BhlPage> namePagesInItem(String name, int itemId) {
+    JsonNode root = get("/api3?op=GetNameMetadata&name={n}&apikey={k}&format=json",
+        name, props.getApiKey());
+    List<BhlPage> pages = new ArrayList<>();
+    for (JsonNode r : root.path("Result")) {
+      Integer resultItemId = intOrNull(r.path("ItemID"));
+      if (resultItemId == null || resultItemId != itemId) {
+        continue;
+      }
+      JsonNode nested = r.path("Pages");
+      if (nested.isArray() && !nested.isEmpty()) {
+        for (JsonNode p : nested) {
+          pages.add(page(p));
+        }
+      } else if (!r.path("PageID").isMissingNode()) {
+        pages.add(page(r)); // flat page entry
+      }
+    }
+    return pages;
+  }
+
+  private static BhlPage page(JsonNode p) {
+    Integer pageId = intOrNull(p.path("PageID"));
+    String number = str(p.path("PageNumbers").path(0).path("Number"));
+    String url = pageId != null ? BASE + "/page/" + pageId : null;
+    String thumb = pageId != null ? BASE + "/pagethumb/" + pageId : null;
+    return new BhlPage(pageId, number.isBlank() ? null : number, url, thumb);
+  }
+
   private JsonNode get(String uri, Object... vars) {
     try {
       String body = http.get().uri(uri, vars).retrieve().body(String.class);

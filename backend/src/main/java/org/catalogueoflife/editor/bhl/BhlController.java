@@ -31,4 +31,18 @@ public class BhlController {
   public List<BhlItem> publicationSearch(@PathVariable int pid, @RequestParam String q) {
     return service.publicationSearch(currentUser.require().getId(), pid, q);
   }
+
+  // Phase B: within a reference's linked BHL item, browse pages and get name-suggested pages so a
+  // name can be pointed at its exact protologue page.
+  @GetMapping("/items/{itemId}/pages")
+  public List<BhlPage> itemPages(@PathVariable int pid, @PathVariable int itemId) {
+    return service.itemPages(currentUser.require().getId(), pid, itemId);
+  }
+
+  @GetMapping("/items/{itemId}/name-pages")
+  public List<BhlPage> namePages(@PathVariable int pid, @PathVariable int itemId,
+      @RequestParam String name) {
+    return service.namePagesInItem(currentUser.require().getId(), pid, itemId, name);
+  }
 }
+
