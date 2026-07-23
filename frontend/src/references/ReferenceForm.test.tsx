@@ -30,6 +30,7 @@ function makeReference(overrides: Partial<Reference> = {}): Reference {
     remarks: null,
     version: 0,
     pdfUrl: null,
+    bhlItemId: null,
     ...overrides,
   };
 }

@@ -6,8 +6,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
 import { getVocab } from '../api/coldp';
 import { attachReferencePdf, createReference, removeReferencePdf, updateReference } from '../api/references';
+import { clearReferenceBhlItem, getBhlConfig } from '../api/bhl';
 import type { CreateRefPayload, CslName, Reference } from '../api/types';
 import CslNameEditor from './CslNameEditor';
+import BhlLinkModal from './BhlLinkModal';
 
 export interface ReferenceFormProps {
   pid: number;
@@ -110,6 +112,22 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
   const [pdfUrl, setPdfUrl] = useState<string | null>(reference?.pdfUrl ?? null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  // Like pdfUrl: mirrors reference.bhlItemId but updated locally on link/unlink for an immediate swap.
+  const [bhlItemId, setBhlItemId] = useState<number | null>(reference?.bhlItemId ?? null);
+  const [bhlOpen, setBhlOpen] = useState(false);
+  const { data: bhlConfig } = useQuery({
+    queryKey: ['bhlConfig', pid],
+    queryFn: () => getBhlConfig(pid),
+    staleTime: 5 * 60 * 1000,
+  });
+  const clearBhl = useMutation({
+    mutationFn: () => clearReferenceBhlItem(pid, reference!.id),
+    onSuccess: () => {
+      setBhlItemId(null);
+      queryClient.invalidateQueries({ queryKey: ['references', pid] });
+    },
+    onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Failed to unlink') }),
+  });
 
   useEffect(() => {
     if (opened) {
@@ -117,6 +135,8 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
       setPdfUrl(reference?.pdfUrl ?? null);
       setPdfFile(null);
       setPdfError(null);
+      setBhlItemId(reference?.bhlItemId ?? null);
+      setBhlOpen(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened, reference?.id, initial]);
@@ -279,6 +299,49 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
                 </Text>
               )}
             </div>
+          )}
+          {/* BHL item link: only for a saved reference, and only when BHL is configured (or already
+              linked). Piece 1 -- names citing this reference then find the exact page within it. */}
+          {reference && (bhlItemId != null || bhlConfig?.available) && (
+            <div>
+              <Text size="sm" fw={500} mb={4}>
+                BHL item
+              </Text>
+              {bhlItemId != null ? (
+                <Group gap="xs">
+                  <Anchor
+                    href={`https://www.biodiversitylibrary.org/item/${bhlItemId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    BHL item {bhlItemId}
+                  </Anchor>
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    color="red"
+                    onClick={() => clearBhl.mutate()}
+                    loading={clearBhl.isPending}
+                  >
+                    Unlink
+                  </Button>
+                </Group>
+              ) : (
+                <Button size="xs" variant="light" onClick={() => setBhlOpen(true)}>
+                  Find on BHL…
+                </Button>
+              )}
+            </div>
+          )}
+          {reference && (
+            <BhlLinkModal
+              pid={pid}
+              refId={reference.id}
+              prefill={reference.citation ?? reference.title ?? ''}
+              opened={bhlOpen}
+              onClose={() => setBhlOpen(false)}
+              onLinked={(itemId) => setBhlItemId(itemId)}
+            />
           )}
           <TextInput
             label="Accessed"

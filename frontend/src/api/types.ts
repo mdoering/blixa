@@ -242,6 +242,9 @@ export interface Reference {
   // Public URL of the hosted PDF (coldp.pdf.base-url + filename), or null if none is attached --
   // see attachReferencePdf/removeReferencePdf in api/references.ts.
   pdfUrl: string | null;
+  // The BHL item (digitised volume) this reference is linked to, or null -- set via the "Find on
+  // BHL" flow (api/bhl.ts). Lets names citing this reference find the exact page within the item.
+  bhlItemId: number | null;
 }
 
 // Mirrors backend CreateReferenceRequest (also the shape returned by resolve-doi as a preview).
