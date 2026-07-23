@@ -33,6 +33,9 @@ public class Reference {
   private String isbn;
   private String issn;
   private String link;
+  // BHL item this reference is linked to (the digitised volume); lets names citing it find the exact
+  // page within that item. Managed via .../references/{id}/bhl-item, not the reference CRUD.
+  private Integer bhlItemId;
   // Filename of a hosted PDF (see name/PdfService), NOT a URL -- ReferenceResponse.pdfUrl and
   // ReferenceColdpWriter build the public URL from this + coldp.pdf.base-url. Deliberately separate
   // from `link`, which stays whatever the user set (see ReferenceMapper.updatePdf's javadoc).
@@ -85,6 +88,8 @@ public class Reference {
   public void setIssn(String issn) { this.issn = issn; }
   public String getLink() { return link; }
   public void setLink(String link) { this.link = link; }
+  public Integer getBhlItemId() { return bhlItemId; }
+  public void setBhlItemId(Integer bhlItemId) { this.bhlItemId = bhlItemId; }
   public String getPdf() { return pdf; }
   public void setPdf(String pdf) { this.pdf = pdf; }
   public String getAccessed() { return accessed; }

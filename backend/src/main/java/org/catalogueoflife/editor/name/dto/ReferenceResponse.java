@@ -26,7 +26,8 @@ public record ReferenceResponse(
     String accessed,
     String remarks,
     Integer version,
-    String pdfUrl) {
+    String pdfUrl,
+    Integer bhlItemId) {
 
   // pdfBaseUrl is coldp.pdf.base-url (see application.yml) -- threaded in from the caller (every
   // controller building a ReferenceResponse holds it via @Value) rather than read off the entity,
@@ -36,6 +37,7 @@ public record ReferenceResponse(
     return new ReferenceResponse(r.getId(), r.getCitation(), r.isCitationManual(), r.getType(),
         r.getAuthor(), r.getEditor(), r.getTitle(), r.getContainerTitle(), r.getContainerTitleShort(),
         r.getIssued(), r.getVolume(), r.getIssue(), r.getPage(), r.getPublisher(), r.getDoi(),
-        r.getIsbn(), r.getIssn(), r.getLink(), r.getAccessed(), r.getRemarks(), r.getVersion(), pdfUrl);
+        r.getIsbn(), r.getIssn(), r.getLink(), r.getAccessed(), r.getRemarks(), r.getVersion(), pdfUrl,
+        r.getBhlItemId());
   }
 }

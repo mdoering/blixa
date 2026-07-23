@@ -141,6 +141,16 @@ public interface ReferenceMapper {
       @Param("alternativeId") List<String> alternativeId,
       @Param("modifiedBy") int modifiedBy, @Param("version") Integer version);
 
+  // Narrow write of just the BHL item link (set or, with null, clear) -- sibling of updateAlternativeId
+  // / updatePdf. Owned by the .../bhl-item endpoint so a normal reference edit never clobbers it.
+  @Update("""
+      UPDATE reference SET bhl_item_id = #{bhlItemId},
+          modified = now(), modified_by = #{modifiedBy}, version = version + 1
+      WHERE project_id = #{projectId} AND id = #{id}
+      """)
+  int setBhlItem(@Param("projectId") int projectId, @Param("id") int id,
+      @Param("bhlItemId") Integer bhlItemId, @Param("modifiedBy") int modifiedBy);
+
   // Narrow CAS write of just pdf -- sibling of updateAlternativeId above. Deliberately never touches
   // `link`: PdfService/ReferenceService.attachPdf/removePdf own the pdf column exclusively, so a
   // hosted PDF never clobbers (or is clobbered by) the reference's own citable link. 0 rows updated

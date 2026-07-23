@@ -133,6 +133,22 @@ public class ReferenceController {
     return ReferenceResponse.of(service.get(uid, pid, id), pdfBaseUrl);
   }
 
+  // Link this reference to a BHL item (from the "Find on BHL" search). Editor-only; returns the
+  // updated reference so the UI shows the link. DELETE clears it.
+  @PutMapping("/{id}/bhl-item/{itemId}")
+  public ReferenceResponse setBhlItem(@PathVariable int pid, @PathVariable int id,
+      @PathVariable int itemId) {
+    int uid = currentUser.require().getId();
+    return ReferenceResponse.of(service.setBhlItem(uid, pid, id, itemId), pdfBaseUrl);
+  }
+
+  @DeleteMapping("/{id}/bhl-item")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void clearBhlItem(@PathVariable int pid, @PathVariable int id) {
+    int uid = currentUser.require().getId();
+    service.setBhlItem(uid, pid, id, null);
+  }
+
   @PutMapping("/{id}")
   public ReferenceResponse update(@PathVariable int pid, @PathVariable int id,
       @Valid @RequestBody UpdateReferenceRequest req) {

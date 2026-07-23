@@ -65,6 +65,10 @@ coldp:
       openai: ${OPENAI_API_KEY:}
       google: ${GOOGLE_API_KEY:}
       mistral: ${MISTRAL_API_KEY:}
+  # Biodiversity Heritage Library. A free key (biodiversitylibrary.org) enables finding the exact
+  # page a name was published on; unset -> the BHL tooling is unavailable and the UI hides it.
+  bhl:
+    api-key: ${BHL_API_KEY:}
   # Outgoing email for discussion-follow notifications. Sending is best-effort and only happens when
   # `from` is set AND Spring's mail sender is configured (spring.mail.host); otherwise it's logged.
   mail:

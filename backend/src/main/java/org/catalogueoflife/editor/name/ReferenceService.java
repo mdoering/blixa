@@ -167,6 +167,15 @@ public class ReferenceService {
     return after;
   }
 
+  // Set (or, with null, clear) the reference's linked BHL item. Editor-only; 404 if the reference
+  // isn't in the project. Returns the updated reference so the caller can echo bhlItemId back.
+  public Reference setBhlItem(int userId, int projectId, int id, Integer bhlItemId) {
+    requireEditor(userId, projectId);
+    requireInProject(projectId, id);
+    references.setBhlItem(projectId, id, bhlItemId, userId);
+    return requireInProject(projectId, id);
+  }
+
   @Transactional
   public void delete(int userId, int projectId, int id) {
     requireEditor(userId, projectId);
