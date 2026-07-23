@@ -12,6 +12,7 @@ import org.catalogueoflife.editor.name.dto.ContainerTitleFacet;
 import org.catalogueoflife.editor.name.dto.ContainerTitleMergeRequest;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.catalogueoflife.editor.name.dto.CslJsonRequest;
+import org.catalogueoflife.editor.name.dto.DoiCandidate;
 import org.catalogueoflife.editor.name.dto.DoiRequest;
 import org.catalogueoflife.editor.name.dto.ReferenceResponse;
 import org.catalogueoflife.editor.name.dto.RisRequest;
@@ -152,6 +153,14 @@ public class ReferenceController {
   public ReferenceResponse get(@PathVariable int pid, @PathVariable int id) {
     int uid = currentUser.require().getId();
     return ReferenceResponse.of(service.get(uid, pid, id), pdfBaseUrl);
+  }
+
+  // DOI consolidation: candidate DOIs for this reference from a Crossref search over its structured
+  // fields (the inverse of resolve-doi). Any member; the user applies one via the normal update.
+  @GetMapping("/{id}/doi-candidates")
+  public List<DoiCandidate> doiCandidates(@PathVariable int pid, @PathVariable int id) {
+    int uid = currentUser.require().getId();
+    return importService.findDoiCandidates(uid, pid, id);
   }
 
   // Link this reference to a BHL item (from the "Find on BHL" search). Editor-only; returns the

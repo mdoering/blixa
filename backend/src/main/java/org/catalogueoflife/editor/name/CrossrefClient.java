@@ -54,4 +54,33 @@ public class CrossrefClient {
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Crossref unavailable");
     }
   }
+
+  // Bibliographic search over GET /works -- for DOI consolidation (find a DOI for an existing
+  // reference from its structured fields). Returns the `message.items` array (each item carries a
+  // relevance `score` and the same fields as a single work message; see RefMapping.doiCandidates).
+  // A blank query returns an empty array without a network call. Any HTTP/transport failure -> 502.
+  public JsonNode searchWorks(String bibliographic, String author, int rows) {
+    if (bibliographic == null || bibliographic.isBlank()) {
+      return objectMapper.createArrayNode();
+    }
+    try {
+      String body = http.get().uri(b -> {
+        b.path("/works")
+            .queryParam("query.bibliographic", bibliographic)
+            .queryParam("rows", rows);
+        if (author != null && !author.isBlank()) {
+          b.queryParam("query.author", author);
+        }
+        return b.build();
+      }).retrieve().body(String.class);
+      if (body == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "empty Crossref response");
+      }
+      return objectMapper.readTree(body).path("message").path("items");
+    } catch (RestClientResponseException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Crossref request failed");
+    } catch (RestClientException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Crossref unavailable");
+    }
+  }
 }

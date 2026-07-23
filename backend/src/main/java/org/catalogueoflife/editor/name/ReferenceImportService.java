@@ -2,7 +2,9 @@ package org.catalogueoflife.editor.name;
 
 import java.util.ArrayList;
 import java.util.List;
+import life.catalogue.api.model.CslName;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
+import org.catalogueoflife.editor.name.dto.DoiCandidate;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -84,6 +86,58 @@ public class ReferenceImportService {
       created.add(references.create(userId, projectId, req));
     }
     return created;
+  }
+
+  // How many Crossref candidates to fetch for DOI consolidation (top-N by relevance).
+  private static final int DOI_CANDIDATE_ROWS = 5;
+
+  // DOI consolidation: find candidate DOIs for an EXISTING reference by searching Crossref over its
+  // structured fields (the inverse of resolveDoi). Read-only -- any project member; the user reviews
+  // the candidates (each with a relevance score) and applies one via the normal reference update, so
+  // this never writes. A reference that already has a DOI can still be checked. Empty query (nothing
+  // to search on) -> no candidates without a network call (CrossrefClient.searchWorks).
+  public List<DoiCandidate> findDoiCandidates(int userId, int projectId, int refId) {
+    Reference r = references.get(userId, projectId, refId); // requireRole + 404 if missing
+    return RefMapping.doiCandidates(
+        crossref.searchWorks(bibliographicQuery(r), authorQuery(r.getAuthor()), DOI_CANDIDATE_ROWS));
+  }
+
+  // Crossref query.bibliographic: the reference's title + container + year when structured, else the
+  // free-text citation. Crossref matches this loosely and ranks by score.
+  private static String bibliographicQuery(Reference r) {
+    String title = blankToNull(r.getTitle());
+    if (title == null) {
+      return blankToNull(r.getCitation());
+    }
+    StringBuilder sb = new StringBuilder(title);
+    String container = blankToNull(r.getContainerTitle());
+    if (container != null) {
+      sb.append(' ').append(container);
+    }
+    String year = blankToNull(r.getIssued());
+    if (year != null) {
+      sb.append(' ').append(year);
+    }
+    return sb.toString();
+  }
+
+  // Crossref query.author: the reference's author family (or literal) names, space-joined.
+  private static String authorQuery(List<CslName> authors) {
+    if (authors == null || authors.isEmpty()) {
+      return null;
+    }
+    List<String> parts = new ArrayList<>();
+    for (CslName a : authors) {
+      String name = a.getFamily() != null ? a.getFamily() : a.getLiteral();
+      if (name != null && !name.isBlank()) {
+        parts.add(name.trim());
+      }
+    }
+    return parts.isEmpty() ? null : String.join(" ", parts);
+  }
+
+  private static String blankToNull(String s) {
+    return (s == null || s.isBlank()) ? null : s.trim();
   }
 
   // Parse a CSL-JSON blob (an array of items, or a single item object -- the citeproc format

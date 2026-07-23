@@ -3,6 +3,7 @@ import { server, http, HttpResponse } from '../test/server';
 import {
   countReferences,
   createReference,
+  getDoiCandidates,
   importBibtex,
   importCslJson,
   importRisReferences,
@@ -100,6 +101,19 @@ test('importRisReferences POSTs the text and returns created refs', async () => 
   const created = await importRisReferences(3, 'TY  - JOUR\nTI  - T\nER  - ');
   expect(body).toEqual({ ris: 'TY  - JOUR\nTI  - T\nER  - ' });
   expect(created).toHaveLength(2);
+});
+
+test('getDoiCandidates GETs the reference doi-candidates', async () => {
+  server.use(
+    http.get('/api/projects/3/references/7/doi-candidates', () =>
+      HttpResponse.json([
+        { doi: '10.1/abc', title: 'T', author: 'Smith, J.', containerTitle: 'J', year: '1899', score: 88.5 },
+      ]),
+    ),
+  );
+  const cands = await getDoiCandidates(3, 7);
+  expect(cands[0].doi).toBe('10.1/abc');
+  expect(cands[0].score).toBe(88.5);
 });
 
 test('importCslJson POSTs the blob and returns created refs', async () => {

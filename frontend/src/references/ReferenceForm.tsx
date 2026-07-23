@@ -10,6 +10,7 @@ import { clearReferenceBhlItem, getBhlConfig } from '../api/bhl';
 import type { CreateRefPayload, CslName, Reference } from '../api/types';
 import CslNameEditor from './CslNameEditor';
 import BhlLinkModal from './BhlLinkModal';
+import DoiCandidatesModal from './DoiCandidatesModal';
 
 export interface ReferenceFormProps {
   pid: number;
@@ -115,6 +116,8 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
   // Like pdfUrl: mirrors reference.bhlItemId but updated locally on link/unlink for an immediate swap.
   const [bhlItemId, setBhlItemId] = useState<number | null>(reference?.bhlItemId ?? null);
   const [bhlOpen, setBhlOpen] = useState(false);
+  // DOI consolidation: search Crossref for this (persisted) reference's DOI from its fields.
+  const [doiFindOpen, setDoiFindOpen] = useState(false);
   const { data: bhlConfig } = useQuery({
     queryKey: ['bhlConfig', pid],
     queryFn: () => getBhlConfig(pid),
@@ -241,7 +244,19 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
           </SimpleGrid>
           <SimpleGrid cols={2}>
             <TextInput label="Publisher" {...form.getInputProps('publisher')} />
-            <TextInput label="DOI" {...form.getInputProps('doi')} />
+            <Stack gap={2}>
+              <TextInput label="DOI" {...form.getInputProps('doi')} />
+              {reference && (
+                <Button
+                  size="compact-xs"
+                  variant="subtle"
+                  style={{ alignSelf: 'flex-start' }}
+                  onClick={() => setDoiFindOpen(true)}
+                >
+                  Find DOI…
+                </Button>
+              )}
+            </Stack>
           </SimpleGrid>
           <SimpleGrid cols={3}>
             <TextInput label="ISBN" {...form.getInputProps('isbn')} />
@@ -341,6 +356,15 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
               opened={bhlOpen}
               onClose={() => setBhlOpen(false)}
               onLinked={(itemId) => setBhlItemId(itemId)}
+            />
+          )}
+          {reference && (
+            <DoiCandidatesModal
+              pid={pid}
+              referenceId={reference.id}
+              opened={doiFindOpen}
+              onClose={() => setDoiFindOpen(false)}
+              onPick={(doi) => form.setFieldValue('doi', doi)}
             />
           )}
           <TextInput

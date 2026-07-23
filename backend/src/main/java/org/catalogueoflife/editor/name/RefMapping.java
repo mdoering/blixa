@@ -8,6 +8,7 @@ import java.util.regex.Pattern;
 import life.catalogue.api.model.CSLType;
 import life.catalogue.api.model.CslName;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
+import org.catalogueoflife.editor.name.dto.DoiCandidate;
 import org.jbibtex.BibTeXDatabase;
 import org.jbibtex.BibTeXEntry;
 import org.jbibtex.BibTeXParser;
@@ -62,6 +63,28 @@ public final class RefMapping {
     return new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
         title, container, null, year, volume, issue, page, publisher, doi, isbn, issn, link, accessed,
         null);
+  }
+
+  // Maps a Crossref /works search `items` array (GET /works?query.bibliographic=...) into DOI
+  // candidates for an existing reference (DOI consolidation). Items without a DOI are skipped -- a
+  // candidate the user can't apply is noise. `score` is Crossref's relevance score, carried through
+  // so the UI can order/flag weak matches; the user always confirms before applying.
+  public static List<DoiCandidate> doiCandidates(JsonNode items) {
+    List<DoiCandidate> out = new ArrayList<>();
+    if (items == null || !items.isArray()) {
+      return out;
+    }
+    for (JsonNode it : items) {
+      String doi = text(it.path("DOI"));
+      if (doi == null) {
+        continue;
+      }
+      JsonNode scoreNode = it.path("score");
+      Double score = scoreNode.isNumber() ? scoreNode.asDouble() : null;
+      out.add(new DoiCandidate(doi, text(it.path("title").path(0)), crossrefNames(it.path("author")),
+          text(it.path("container-title").path(0)), crossrefYear(it.path("issued")), score));
+    }
+    return out;
   }
 
   private static String crossrefNames(JsonNode arr) {

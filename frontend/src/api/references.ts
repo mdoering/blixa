@@ -102,6 +102,23 @@ export function importCslJson(pid: number, cslJson: string): Promise<Reference[]
   });
 }
 
+// A candidate DOI for an existing reference (DOI consolidation) — from a Crossref bibliographic
+// search over its structured fields. `score` is Crossref's relevance score; the user confirms.
+export interface DoiCandidate {
+  doi: string;
+  title: string | null;
+  author: string | null;
+  containerTitle: string | null;
+  year: string | null;
+  score: number | null;
+}
+
+// GET /references/{id}/doi-candidates — candidate DOIs for an existing reference (find its DOI from
+// its structured fields, the inverse of resolve-doi). The user applies one via the normal update.
+export function getDoiCandidates(pid: number, id: number): Promise<DoiCandidate[]> {
+  return api<DoiCandidate[]>(`/api/projects/${pid}/references/${id}/doi-candidates`);
+}
+
 // POST /references/{id}/pdf — uploads (or replaces) this reference's hosted PDF; multipart, mirrors
 // the ColDP-import upload's use of the `formData` branch (see api/import.ts's startImport). Returns
 // the updated reference, whose pdfUrl now points at the publicly-served file.
