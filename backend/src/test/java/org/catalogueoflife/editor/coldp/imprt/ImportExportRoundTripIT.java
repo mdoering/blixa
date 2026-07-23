@@ -191,12 +191,13 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
     // taxonomic-tree machinery the rest of this fixture targets.
     Reference ref1 = referenceService.create(userId, pid, new CreateReferenceRequest(
         "Linnaeus, C. 1758. Systema Naturae.", false, "book", RefMapping.parseNames("Linnaeus, C."),
-        null, "Systema Naturae", null, null, "1758", null, null, null, null, null, null, null, null,
-        null, null));
+        null, "Systema Naturae", null, null, null, "1758", null, null, null, null, null, null, null,
+        null, null, null));
     Reference ref2 = referenceService.create(userId, pid, new CreateReferenceRequest(
         "Pocock, R.I. 1917. On the external characters of the Felidae.", false, "article-journal",
         RefMapping.parseNames("Pocock, R.I."), null, "On the external characters of the Felidae",
-        "Annals and Magazine of Natural History", null, "1917", "20", null, "329-350",
+        "Extern. Char. Felidae",
+        "Annals and Magazine of Natural History", "Ann. Mag. Nat. Hist.", "1917", "20", null, "329-350",
         null, null, null, null, null, null, null));
 
     Author author = new Author();
@@ -305,6 +306,13 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
     assertThat(allNew).hasSize(7);
     List<Reference> newRefs = references.findAllByProject((int) pid2);
     assertThat(newRefs).hasSize(2);
+    // The abbreviated title + container title (CSL/ColDP titleShort + containerTitleShort) survive
+    // the export -> reimport round trip.
+    Reference newPocock = newRefs.stream()
+        .filter(r -> "On the external characters of the Felidae".equals(r.getTitle()))
+        .findFirst().orElseThrow();
+    assertThat(newPocock.getTitleShort()).isEqualTo("Extern. Char. Felidae");
+    assertThat(newPocock.getContainerTitleShort()).isEqualTo("Ann. Mag. Nat. Hist.");
     List<Author> newAuthors = authors.findByProject((int) pid2);
     assertThat(newAuthors).hasSize(1);
     assertThat(newAuthors.get(0).getGiven()).isEqualTo("Carl");

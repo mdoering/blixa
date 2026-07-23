@@ -57,7 +57,9 @@ public class ReferenceColdpWriter {
     row.put(ColdpTerm.author, toColdpNameString(r.getAuthor()));
     row.put(ColdpTerm.editor, toColdpNameString(r.getEditor()));
     row.put(ColdpTerm.title, r.getTitle());
+    row.put(ColdpTerm.titleShort, r.getTitleShort());
     row.put(ColdpTerm.containerTitle, r.getContainerTitle());
+    row.put(ColdpTerm.containerTitleShort, r.getContainerTitleShort());
     row.put(ColdpTerm.issued, r.getIssued());
     row.put(ColdpTerm.volume, r.getVolume());
     row.put(ColdpTerm.issue, r.getIssue());

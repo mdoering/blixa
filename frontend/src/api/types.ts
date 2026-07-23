@@ -225,6 +225,7 @@ export interface Reference {
   author: CslName[] | null;
   editor: CslName[] | null;
   title: string | null;
+  titleShort: string | null;
   containerTitle: string | null;
   containerTitleShort: string | null;
   issued: string | null;
@@ -255,6 +256,7 @@ export interface CreateRefPayload {
   author?: CslName[];
   editor?: CslName[];
   title?: string;
+  titleShort?: string;
   containerTitle?: string;
   containerTitleShort?: string;
   issued?: string;

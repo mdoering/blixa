@@ -391,7 +391,9 @@ public class ImportRunService {
       r.setAuthor(RefMapping.parseNames(rec.get(ColdpTerm.author)));
       r.setEditor(RefMapping.parseNames(rec.get(ColdpTerm.editor)));
       r.setTitle(rec.get(ColdpTerm.title));
+      r.setTitleShort(rec.get(ColdpTerm.titleShort));
       r.setContainerTitle(rec.get(ColdpTerm.containerTitle));
+      r.setContainerTitleShort(rec.get(ColdpTerm.containerTitleShort));
       r.setIssued(rec.get(ColdpTerm.issued));
       r.setVolume(rec.get(ColdpTerm.volume));
       r.setIssue(rec.get(ColdpTerm.issue));

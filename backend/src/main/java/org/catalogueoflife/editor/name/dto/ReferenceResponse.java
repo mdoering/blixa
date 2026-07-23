@@ -12,6 +12,7 @@ public record ReferenceResponse(
     List<CslName> author,
     List<CslName> editor,
     String title,
+    String titleShort,
     String containerTitle,
     String containerTitleShort,
     String issued,
@@ -35,7 +36,8 @@ public record ReferenceResponse(
   public static ReferenceResponse of(Reference r, String pdfBaseUrl) {
     String pdfUrl = r.getPdf() == null ? null : pdfBaseUrl + "/" + r.getPdf();
     return new ReferenceResponse(r.getId(), r.getCitation(), r.isCitationManual(), r.getType(),
-        r.getAuthor(), r.getEditor(), r.getTitle(), r.getContainerTitle(), r.getContainerTitleShort(),
+        r.getAuthor(), r.getEditor(), r.getTitle(), r.getTitleShort(), r.getContainerTitle(),
+        r.getContainerTitleShort(),
         r.getIssued(), r.getVolume(), r.getIssue(), r.getPage(), r.getPublisher(), r.getDoi(),
         r.getIsbn(), r.getIssn(), r.getLink(), r.getAccessed(), r.getRemarks(), r.getVersion(), pdfUrl,
         r.getBhlItemId());

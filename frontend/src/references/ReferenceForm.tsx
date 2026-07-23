@@ -25,6 +25,7 @@ export interface ReferenceFormProps {
 const FIELDS = [
   'citation',
   'title',
+  'titleShort',
   'containerTitle',
   'containerTitleShort',
   'type',
@@ -223,7 +224,14 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
             value={form.values.editor}
             onChange={(v) => form.setFieldValue('editor', v)}
           />
-          <TextInput label="Title" {...form.getInputProps('title')} />
+          <SimpleGrid cols={2}>
+            <TextInput label="Title" {...form.getInputProps('title')} />
+            <TextInput
+              label="Title (short)"
+              placeholder="e.g. Sp. Pl."
+              {...form.getInputProps('titleShort')}
+            />
+          </SimpleGrid>
           <SimpleGrid cols={3}>
             <TextInput label="Container title" {...form.getInputProps('containerTitle')} />
             <TextInput label="Container title (short)" {...form.getInputProps('containerTitleShort')} />

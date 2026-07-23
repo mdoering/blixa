@@ -452,7 +452,7 @@ public class NameUsageService {
     NameUsage before = requireInProject(projectId, usageId);
     CreateReferenceRequest refReq = new CreateReferenceRequest(
         null, false, "webpage", RefMapping.parseNames(author), null, title != null ? title : url,
-        null, null, null, null, null, null, null, null, null, null, url, accessed, null);
+        null, null, null, null, null, null, null, null, null, null, null, url, accessed, null);
     Reference ref = referenceService.create(userId, projectId, refReq);
     var ids = new java.util.ArrayList<Integer>(
         before.getReferenceId() == null ? List.of() : before.getReferenceId());

@@ -81,12 +81,12 @@ class ReferenceExportIT extends AbstractPostgresIT {
 
     Reference plain = referenceService.create(userId, pid, new CreateReferenceRequest(
         "Plain, A. 2019. A plain citation.", false, "article-journal", RefMapping.parseNames("Plain A"),
-        null, "A plain title", "Journal of Plain Things", null, "2019", "1", "2", "10-20",
+        null, "A plain title", null, "Journal of Plain Things", null, "2019", "1", "2", "10-20",
         null, null, null, null, null, "2026-07-10", null));
 
     Reference withDoiAndAltId = referenceService.create(userId, pid, new CreateReferenceRequest(
         "Doi, B. 2020. A DOI'd citation.", false, "article-journal", RefMapping.parseNames("Doi B"),
-        null, "A DOI title", "Journal of DOIs", null, "2020", "3", "4", "40-50",
+        null, "A DOI title", null, "Journal of DOIs", null, "2020", "3", "4", "40-50",
         "Springer", "10.1234/abcd", null, null, null, null, null));
     withDoiAndAltId.setAlternativeId(List.of("col:REF-2"));
     references.update(withDoiAndAltId);
@@ -142,8 +142,8 @@ class ReferenceExportIT extends AbstractPostgresIT {
 
     Reference ref = referenceService.create(userId, pid, new CreateReferenceRequest(
         "World Flora Online & Bánki, O. 2021. A mixed-author citation.", false, "article-journal",
-        List.of(institution, person), null, "A mixed-author title", "Journal of Mixed Authors", null,
-        "2021", null, null, null, null, null, null, null, null, null, null));
+        List.of(institution, person), null, "A mixed-author title", null, "Journal of Mixed Authors",
+        null, "2021", null, null, null, null, null, null, null, null, null, null));
 
     Path targetZip = tmp.resolve("export.zip");
     writer.write(pid, targetZip);
@@ -195,7 +195,7 @@ class ReferenceExportIT extends AbstractPostgresIT {
     // reference purely to keep the archive readable -- unrelated to what this test asserts.
     referenceService.create(userId, pid, new CreateReferenceRequest(
         "Filler, C. 2021. A filler reference.", false, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null));
+        null, null, null, null, null, null, null, null, null, null, null));
 
     Path targetZip = tmp.resolve("export.zip");
     writer.write(pid, targetZip);

@@ -115,8 +115,8 @@ class ExportRoundTripIT extends AbstractPostgresIT {
 
     Reference reference = referenceService.create(userId, pid, new CreateReferenceRequest(
         "Linnaeus, C. 1758. Systema Naturae.", false, "book", RefMapping.parseNames("C. Linnaeus"),
-        null, "Systema Naturae", null, null, "1758", null, null, null, null, null, null, null, null,
-        null, null));
+        null, "Systema Naturae", null, null, null, "1758", null, null, null, null, null, null, null,
+        null, null, null));
 
     var distribution = distributionService.create(userId, pid, species.getId(),
         new DistributionRequest(null, "tdwg:AB", "tdwg", "native", null, null, null, null));

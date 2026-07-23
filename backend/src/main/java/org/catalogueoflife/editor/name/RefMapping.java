@@ -61,8 +61,8 @@ public final class RefMapping {
     String accessed = crossrefDate(message.path("accessed"));
     String citation = citation(author, year, title, container, volume, issue, page);
     return new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
-        title, container, null, year, volume, issue, page, publisher, doi, isbn, issn, link, accessed,
-        null);
+        title, null, container, null, year, volume, issue, page, publisher, doi, isbn, issn, link,
+        accessed, null);
   }
 
   // Maps a Crossref /works search `items` array (GET /works?query.bibliographic=...) into DOI
@@ -189,6 +189,7 @@ public final class RefMapping {
 
   private static CreateReferenceRequest cslJsonEntry(JsonNode obj) {
     String title = cslText(obj.path("title"));
+    String titleShort = cslText(obj.path("title-short"));
     String author = cslNames(obj.path("author"));
     String editor = cslNames(obj.path("editor"));
     String container = cslText(obj.path("container-title"));
@@ -206,8 +207,8 @@ public final class RefMapping {
     String accessed = crossrefDate(obj.path("accessed"));
     String citation = citation(author, year, title, container, volume, issue, page);
     return new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
-        title, container, containerShort, year, volume, issue, page, publisher, doi, isbn, issn, link,
-        accessed, null);
+        title, titleShort, container, containerShort, year, volume, issue, page, publisher, doi, isbn,
+        issn, link, accessed, null);
   }
 
   // CSL string fields are plain strings, but some producers wrongly emit single-element arrays
@@ -286,8 +287,8 @@ public final class RefMapping {
     String type = dataciteType(dataciteText(attributes.path("types").path("resourceTypeGeneral")));
     String citation = citation(author, year, title, containerTitle, volume, issue, page);
     return new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
-        title, containerTitle, null, year, volume, issue, page, publisher, doi, null, null, link, null,
-        null);
+        title, null, containerTitle, null, year, volume, issue, page, publisher, doi, null, null, link,
+        null, null);
   }
 
   // DataCite creators/contributors: each entry prefers the already-formatted "name" (typically
@@ -383,7 +384,7 @@ public final class RefMapping {
       String type = bibtexType(e.getType() == null ? null : e.getType().getValue());
       String citation = citation(author, year, title, container, volume, issue, page);
       out.add(new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
-          title, container, null, year, volume, issue, page, field(e, "publisher"), field(e, "doi"),
+          title, null, container, null, year, volume, issue, page, field(e, "publisher"), field(e, "doi"),
           field(e, "isbn"), field(e, "issn"), field(e, "url"), field(e, "urldate"), null));
     }
     if (out.isEmpty()) {
@@ -503,7 +504,7 @@ public final class RefMapping {
     String remarks = id == null ? null : "ris:" + id;
     String citation = citation(author, year, title, container, volume, issue, page);
     return new CreateReferenceRequest(citation, false, type, parseNames(author), parseNames(editor),
-        title, container, null, year, volume, issue, page, publisher, doi, isbn, issn, link, null,
+        title, null, container, null, year, volume, issue, page, publisher, doi, isbn, issn, link, null,
         remarks);
   }
 

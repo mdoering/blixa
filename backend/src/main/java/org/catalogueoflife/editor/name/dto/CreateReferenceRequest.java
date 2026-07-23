@@ -15,6 +15,7 @@ public record CreateReferenceRequest(
     List<CslName> author,
     List<CslName> editor,
     String title,
+    String titleShort,
     String containerTitle,
     String containerTitleShort,
     String issued,

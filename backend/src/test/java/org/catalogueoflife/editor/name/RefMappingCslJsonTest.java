@@ -22,7 +22,8 @@ class RefMappingCslJsonTest {
         """
         {
           "type": "article-journal",
-          "title": "On a new species",
+          "title": "Species Plantarum",
+          "title-short": "Sp. Pl.",
           "container-title": "Journal of Botany",
           "container-title-short": "J. Bot.",
           "author": [
@@ -46,7 +47,8 @@ class RefMappingCslJsonTest {
     assertThat(out).hasSize(1);
     CreateReferenceRequest r = out.get(0);
     assertThat(r.type()).isEqualTo("article-journal");
-    assertThat(r.title()).isEqualTo("On a new species");
+    assertThat(r.title()).isEqualTo("Species Plantarum");
+    assertThat(r.titleShort()).isEqualTo("Sp. Pl.");
     assertThat(r.containerTitle()).isEqualTo("Journal of Botany");
     assertThat(r.containerTitleShort()).isEqualTo("J. Bot.");
     assertThat(r.author()).hasSize(2);
@@ -65,7 +67,7 @@ class RefMappingCslJsonTest {
     assertThat(r.issn()).isEqualTo("1234-5678");
     assertThat(r.link()).isEqualTo("https://example.org/x");
     assertThat(r.accessed()).isEqualTo("2026-07-01");
-    assertThat(r.citation()).contains("Smith").contains("1899").contains("On a new species");
+    assertThat(r.citation()).contains("Smith").contains("1899").contains("Species Plantarum");
   }
 
   @Test

@@ -23,14 +23,14 @@ public interface ReferenceMapper {
   // an explicit NULL and violate the NOT NULL constraint instead of using the default.
   @Insert("""
       INSERT INTO reference (project_id, id, alternative_id, citation, citation_manual, type, author,
-                              editor, title, container_title, container_title_short, issued, volume,
-                              issue, page, publisher, doi, isbn, issn, link, accessed, remarks,
+                              editor, title, title_short, container_title, container_title_short, issued,
+                              volume, issue, page, publisher, doi, isbn, issn, link, accessed, remarks,
                               modified_by)
       VALUES (#{projectId}, #{id}, #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
               #{citation}, #{citationManual}, #{type},
               #{author,typeHandler=org.catalogueoflife.editor.name.CslNameListTypeHandler},
               #{editor,typeHandler=org.catalogueoflife.editor.name.CslNameListTypeHandler},
-              #{title}, #{containerTitle}, #{containerTitleShort}, #{issued},
+              #{title}, #{titleShort}, #{containerTitle}, #{containerTitleShort}, #{issued},
               #{volume}, #{issue}, #{page}, #{publisher}, #{doi}, #{isbn}, #{issn}, #{link},
               #{accessed}, #{remarks}, #{modifiedBy})
       """)
@@ -137,7 +137,7 @@ public interface ReferenceMapper {
           citation = #{citation}, citation_manual = #{citationManual}, type = #{type},
           author = #{author,typeHandler=org.catalogueoflife.editor.name.CslNameListTypeHandler},
           editor = #{editor,typeHandler=org.catalogueoflife.editor.name.CslNameListTypeHandler},
-          title = #{title}, container_title = #{containerTitle},
+          title = #{title}, title_short = #{titleShort}, container_title = #{containerTitle},
           container_title_short = #{containerTitleShort}, issued = #{issued},
           volume = #{volume}, issue = #{issue}, page = #{page}, publisher = #{publisher},
           doi = #{doi}, isbn = #{isbn}, issn = #{issn}, link = #{link}, accessed = #{accessed},

@@ -15,6 +15,7 @@ function makeReference(overrides: Partial<Reference> = {}): Reference {
     author: [{ family: 'Linnaeus', given: 'C.' }],
     editor: null,
     title: 'Systema Naturae',
+    titleShort: null,
     containerTitle: null,
     containerTitleShort: null,
     issued: '1758',
@@ -149,6 +150,27 @@ test('creating a reference sends author as a structured CslName[], not a string'
 
   await waitFor(() => expect(body).not.toBeNull());
   expect(body!.author).toEqual([{ family: 'Linnaeus', given: 'C.' }]);
+});
+
+test('title-short prefills and round-trips through save (abbreviated botanical title)', async () => {
+  const reference = makeReference({ titleShort: 'Sp. Pl.' });
+  let body: Record<string, unknown> | null = null;
+  server.use(
+    http.put('/api/projects/3/references/1', async ({ request }) => {
+      body = (await request.json()) as Record<string, unknown>;
+      return HttpResponse.json(makeReference({ version: 1 }));
+    }),
+  );
+  renderWithProviders(<ReferenceForm pid={3} reference={reference} opened onClose={() => {}} />);
+
+  const shortInput = await screen.findByRole('textbox', { name: 'Title (short)' });
+  expect(shortInput).toHaveValue('Sp. Pl.');
+  await userEvent.clear(shortInput);
+  await userEvent.type(shortInput, 'Syst. Nat.');
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+  await waitFor(() => expect(body).not.toBeNull());
+  expect(body!.titleShort).toBe('Syst. Nat.');
 });
 
 test('editing an existing reference prefills the CslName rows', async () => {

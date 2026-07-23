@@ -21,6 +21,8 @@ public class Reference {
   private List<CslName> author;
   private List<CslName> editor;
   private String title;
+  // CSL title-short (e.g. a botanical work abbreviation "Sp. Pl."), alongside title.
+  private String titleShort;
   private String containerTitle;
   // CSL container-title-short (e.g. a botanical journal abbreviation), alongside containerTitle.
   private String containerTitleShort;
@@ -68,6 +70,8 @@ public class Reference {
   public void setTitle(String title) { this.title = title; }
   public String getContainerTitle() { return containerTitle; }
   public void setContainerTitle(String containerTitle) { this.containerTitle = containerTitle; }
+  public String getTitleShort() { return titleShort; }
+  public void setTitleShort(String titleShort) { this.titleShort = titleShort; }
   public String getContainerTitleShort() { return containerTitleShort; }
   public void setContainerTitleShort(String containerTitleShort) { this.containerTitleShort = containerTitleShort; }
   public String getIssued() { return issued; }

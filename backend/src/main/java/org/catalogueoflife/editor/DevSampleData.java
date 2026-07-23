@@ -93,7 +93,7 @@ public class DevSampleData implements ApplicationRunner {
         "Linnaeus, C. (1758). Systema Naturae per regna tria naturae, 10th ed., vol. 1. "
             + "Laurentius Salvius, Stockholm.",
         false, "book", RefMapping.parseNames("Linnaeus, C."), null,
-        "Systema Naturae per regna tria naturae", null, null, "1758", "1", null, "1-824",
+        "Systema Naturae per regna tria naturae", null, null, null, "1758", "1", null, "1-824",
         "Laurentius Salvius", null, null, null,
         "https://www.biodiversitylibrary.org/item/10277", null, null));
     int ref = linnaeus.getId();

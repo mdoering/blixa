@@ -98,6 +98,7 @@ public class ReferenceService {
     r.setAuthor(req.author());
     r.setEditor(req.editor());
     r.setTitle(req.title());
+    r.setTitleShort(req.titleShort());
     r.setContainerTitle(req.containerTitle());
     r.setContainerTitleShort(req.containerTitleShort());
     r.setIssued(req.issued());
@@ -141,6 +142,7 @@ public class ReferenceService {
     r.setAuthor(req.author());
     r.setEditor(req.editor());
     r.setTitle(req.title());
+    r.setTitleShort(req.titleShort());
     r.setContainerTitle(req.containerTitle());
     r.setContainerTitleShort(req.containerTitleShort());
     r.setIssued(req.issued());
