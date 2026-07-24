@@ -52,6 +52,33 @@ public class ColMatchService {
     return out;
   }
 
+  // Resolves a usage to its COL taxon id for downstream COL-keyed lookups (e.g. the GBIF occurrence
+  // type-specimen search): the usage's own stored col:<id> if it carries one, else a fresh
+  // name-match against the COL checklist, taking the primary match's id (null when the match type is
+  // NONE, i.e. no COL match). Read-only -- it does NOT persist a col: id (that stays the dedicated
+  // "Match to COL" write path). Returns null if the usage doesn't exist or can't be resolved.
+  public String resolveColId(int userId, int projectId, int usageId) {
+    Project project = projects.requireVisible(userId, projectId);
+    NameUsage u = usages.findByIdInProject(projectId, usageId);
+    if (u == null) {
+      return null;
+    }
+    String stored = colIdFrom(u.getAlternativeId());
+    if (stored != null) {
+      return stored;
+    }
+    String code = project.getNomCode() == null ? null : project.getNomCode().name();
+    String rank = u.getRank() == null ? null : u.getRank().toLowerCase(Locale.ROOT);
+    List<RankName> classification = usages.findClassification(projectId, usageId);
+    JsonNode root = clb.match(clb.defaultColDataset(), u.getScientificName(), u.getAuthorship(), rank,
+        code, classification);
+    String type = root.path("type").asString(null);
+    if (type == null || "NONE".equalsIgnoreCase(type)) {
+      return null;
+    }
+    return root.path("usage").path("id").asString(null);
+  }
+
   // Skips missing/null usage nodes (e.g. the top-level `usage` when the CLB response's type is
   // NONE) so the caller ends up with an empty list rather than a bogus all-null candidate.
   private static void addCandidate(List<ColMatchCandidate> out, JsonNode node, String matchType) {

@@ -84,6 +84,10 @@ coldp:
   col:
     match-dataset: 3LXR
     gbif-checklist-key: 7ddf754f-d193-4cc9-b351-99906754a03b
+  # GBIF API base (occurrence search for type specimens, see gbif/GbifOccurrenceClient). Overridden
+  # to a stub base URL in tests so no live GBIF call is made.
+  gbif:
+    base-url: ${COLDP_GBIF_BASE_URL:https://api.gbif.org/v1}
   # export/import/release dirs mirror COLDP_EXPORT_DIR/COLDP_IMPORT_DIR/COLDP_RELEASE_DIR env vars
   # for deploy (like pdf.dir below) -- falling back to a tmpdir subfolder for local dev.
   export:
