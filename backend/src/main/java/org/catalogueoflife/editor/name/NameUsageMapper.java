@@ -375,6 +375,50 @@ public interface NameUsageMapper {
       """)
   int countNonAcceptedSynonymTargets(@Param("projectId") int projectId, @Param("synonymId") int synonymId);
 
+  // Whether this usage is a synonym whose rank differs from an accepted target's rank
+  // (SynonymRankDiffersRule, mirrors CLB SYNONYM_RANK_DIFFERS). `IS DISTINCT FROM` is NULL-safe, but
+  // both ranks are additionally required non-null so a synonym or accepted name that simply has no
+  // rank isn't reported as a rank *mismatch* (that is a different, missing-rank concern).
+  @Select("""
+      SELECT EXISTS(
+        SELECT 1 FROM synonym_accepted sa
+          JOIN name_usage syn ON syn.project_id = sa.project_id AND syn.id = sa.synonym_id
+          JOIN name_usage acc ON acc.project_id = sa.project_id AND acc.id = sa.accepted_id
+        WHERE sa.project_id = #{projectId} AND sa.synonym_id = #{id}
+          AND syn.rank IS NOT NULL AND acc.rank IS NOT NULL
+          AND syn.rank IS DISTINCT FROM acc.rank)
+      """)
+  boolean synonymRankDiffers(@Param("projectId") int projectId, @Param("id") int id);
+
+  // The child-entity types that have a duplicate row group on this usage (DuplicateChildRecordsRule,
+  // mirrors CLB DUPLICATE_DISTRIBUTIONS / _VERNACULAR_NAMES / _MEDIA / _ESTIMATES /
+  // _TAXON_PROPERTIES). Each arm returns its type name only when a natural-key group on that child
+  // table has count > 1 for the usage; the coalesce()s make NULLs group together so two all-empty
+  // rows still count as duplicates. `SELECT '...' WHERE EXISTS(...)` yields either one row or none,
+  // so the result is the 0-5 duplicated types.
+  @Select("""
+      SELECT 'distribution' AS t WHERE EXISTS(
+          SELECT 1 FROM distribution WHERE project_id = #{projectId} AND usage_id = #{id}
+          GROUP BY coalesce(area_id,''), coalesce(gazetteer,''), coalesce(area,'') HAVING count(*) > 1)
+      UNION ALL
+      SELECT 'vernacular' WHERE EXISTS(
+          SELECT 1 FROM vernacular WHERE project_id = #{projectId} AND usage_id = #{id}
+          GROUP BY coalesce(name,''), coalesce(language,'') HAVING count(*) > 1)
+      UNION ALL
+      SELECT 'media' WHERE EXISTS(
+          SELECT 1 FROM media WHERE project_id = #{projectId} AND usage_id = #{id}
+          GROUP BY coalesce(url,'') HAVING count(*) > 1)
+      UNION ALL
+      SELECT 'estimate' WHERE EXISTS(
+          SELECT 1 FROM estimate WHERE project_id = #{projectId} AND usage_id = #{id}
+          GROUP BY coalesce(estimate,-1), coalesce(type,'') HAVING count(*) > 1)
+      UNION ALL
+      SELECT 'property' WHERE EXISTS(
+          SELECT 1 FROM property WHERE project_id = #{projectId} AND usage_id = #{id}
+          GROUP BY coalesce(property,''), coalesce(value,'') HAVING count(*) > 1)
+      """)
+  List<String> duplicateChildTypes(@Param("projectId") int projectId, @Param("id") int id);
+
   // Bulk reparent every direct child of oldParentId onto newParentId (which may be null = root).
   // Used by demote: a server-orchestrated move of a whole child set under the project advisory lock,
   // so unlike the single-node reparent it carries no per-child optimistic version -- it still bumps

@@ -146,9 +146,12 @@ public class ValidationService {
     int synonymNonAcceptedTargetCount = nameUsages.countNonAcceptedSynonymTargets(projectId, usage.getId());
     boolean hasSpeciesAncestor = nameUsages.hasSpeciesAncestor(projectId, usage.getId());
     int danglingReferenceCount = countDanglingReferences(projectId, usage.getReferenceId());
+    Set<String> duplicateChildTypes = new HashSet<>(nameUsages.duplicateChildTypes(projectId, usage.getId()));
+    boolean synonymRankDiffers = nameUsages.synonymRankDiffers(projectId, usage.getId());
     return new RuleContext(usage, synonymAcceptedCount, publishedInReference, duplicateCount,
         ancestorGenusName, parentRank, ancestorGenusYear, ancestorSpeciesEpithet,
-        synonymNonAcceptedTargetCount, hasSpeciesAncestor, danglingReferenceCount);
+        synonymNonAcceptedTargetCount, hasSpeciesAncestor, danglingReferenceCount, duplicateChildTypes,
+        synonymRankDiffers);
   }
 
   // How many distinct entries of the usage's taxonomic reference_id[] no longer resolve to a

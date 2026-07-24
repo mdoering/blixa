@@ -130,15 +130,17 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
   reference — the one pointer with no array FK; ERROR). *Possible follow-up:* dangling
   `name_relation.related_usage_id` / `reference_id` (also FK-less, but separate rows rather than
   per-usage fields). *(rank_vs_parent, genus_mismatch, species_epithet_mismatch, genus_year_after_species, year_vs_reference, synonym_of_non_accepted, synonym_without_accepted, duplicate_name, unparsable_name, missing_published_in also done.)*
-- **Evaluate the CLB backend issue enum** — *reviewed (152 issues) + first batch shipped.* Most CLB
-  issues are import-pipeline artifacts or `*_INVALID` field checks that Blixa prevents at write time
-  (enum parsing → 400), so they're moot here. Mapped the computable name-structure gaps to 4 new
-  rules: **`uppercase_epithet`**, **`missing_genus`**, **`binomial_above_genus`** (HIGHER_RANK_BINOMIAL),
-  **`gender_not_applicable`** — all pure functions of the usage. *Remaining candidates (need
-  context/nuance):* duplicate child entities (`DUPLICATE_DISTRIBUTIONS/VERNACULAR/MEDIA/ESTIMATE/
-  TAXON_PROPERTIES` — per-usage count queries), homoglyph/invisible/diacritic characters (via the
-  parser's `UnicodeUtils`), `synonym_rank_differs`, and autonym authorship rules (superfluous /
-  nominotypical-differs).
+- **Evaluate the CLB backend issue enum** — *done (152 issues reviewed, both batches shipped).* Most
+  CLB issues are import-pipeline artifacts or `*_INVALID` field checks that Blixa prevents at write
+  time (enum parsing → 400), so they're moot here. Mapped the computable name-structure gaps to
+  8 new rules. Batch 1 (pure functions of the usage): **`uppercase_epithet`**, **`missing_genus`**,
+  **`binomial_above_genus`** (HIGHER_RANK_BINOMIAL), **`gender_not_applicable`**. Batch 2 (deferred
+  checks): **`superfluous_authorship`** (autonym carrying its own author — subsumes
+  NOMINOTYPICAL_AUTHORSHIP_DIFFERS) and **`suspicious_name_characters`** (homoglyph / diacritic via the
+  parser's `UnicodeUtils`), both pure; plus the two query-backed rules **`duplicate_child_records`**
+  (per-usage GROUP BY across distribution/vernacular/media/estimate/property — DUPLICATE_DISTRIBUTIONS
+  etc.) and **`synonym_rank_differs`** (synonym_accepted rank join). Remaining CLB issues are
+  prevented-at-write or import-only and out of scope.
 - **Backend test coverage** — `GET /issues?entityId=` filter and the etymology PUT round-trip (code correct on inspection, untested).
 
 ## Tools & import

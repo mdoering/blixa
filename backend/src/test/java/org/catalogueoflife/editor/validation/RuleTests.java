@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import life.catalogue.api.vocab.Gender;
 import org.gbif.nameparser.api.NameType;
 import org.catalogueoflife.editor.name.NameUsage;
@@ -11,6 +12,10 @@ import org.catalogueoflife.editor.name.Reference;
 import org.catalogueoflife.editor.name.Status;
 import org.catalogueoflife.editor.validation.rules.BinomialAboveGenusRule;
 import org.catalogueoflife.editor.validation.rules.DanglingReferenceRule;
+import org.catalogueoflife.editor.validation.rules.DuplicateChildRecordsRule;
+import org.catalogueoflife.editor.validation.rules.SynonymRankDiffersRule;
+import org.catalogueoflife.editor.validation.rules.SuperfluousAuthorshipRule;
+import org.catalogueoflife.editor.validation.rules.SuspiciousNameCharactersRule;
 import org.catalogueoflife.editor.validation.rules.GenderNotApplicableRule;
 import org.catalogueoflife.editor.validation.rules.MissingGenusRule;
 import org.catalogueoflife.editor.validation.rules.UppercaseEpithetRule;
@@ -470,5 +475,94 @@ class RuleTests {
     species.setSpecificEpithet("leo");
     species.setGenderAgreement(true);
     assertThat(new GenderNotApplicableRule().evaluate(ctx(species))).isEmpty();
+  }
+
+  // --- SuperfluousAuthorshipRule (CLB SUPERFLUOUS_AUTHORSHIP) ---
+
+  @Test
+  void superfluousAuthorshipFlagsAnAutonymCarryingAnAuthor() {
+    NameUsage autonym = new NameUsage(); // "Panthera leo leo" -- infra == specific epithet
+    autonym.setRank("subspecies");
+    autonym.setSpecificEpithet("leo");
+    autonym.setInfraspecificEpithet("leo");
+    autonym.setAuthorship("Linnaeus, 1758");
+    Optional<Finding> f = new SuperfluousAuthorshipRule().evaluate(ctx(autonym));
+    assertThat(f).isPresent();
+    assertThat(f.get().rule()).isEqualTo("superfluous_authorship");
+  }
+
+  @Test
+  void superfluousAuthorshipQuietForAutonymWithoutAuthorAndForNonAutonyms() {
+    NameUsage autonymNoAuthor = new NameUsage();
+    autonymNoAuthor.setRank("subspecies");
+    autonymNoAuthor.setSpecificEpithet("leo");
+    autonymNoAuthor.setInfraspecificEpithet("leo");
+    assertThat(new SuperfluousAuthorshipRule().evaluate(ctx(autonymNoAuthor))).isEmpty();
+
+    NameUsage normalSubsp = new NameUsage(); // "Panthera leo persica" -- not an autonym
+    normalSubsp.setRank("subspecies");
+    normalSubsp.setSpecificEpithet("leo");
+    normalSubsp.setInfraspecificEpithet("persica");
+    normalSubsp.setAuthorship("Meyer, 1826");
+    assertThat(new SuperfluousAuthorshipRule().evaluate(ctx(normalSubsp))).isEmpty();
+  }
+
+  // --- SuspiciousNameCharactersRule (CLB HOMOGLYPH_CHARACTERS / DIACRITIC_CHARACTERS) ---
+
+  @Test
+  void suspiciousCharactersFlagsAHomoglyphInTheName() {
+    NameUsage u = new NameUsage();
+    u.setScientificName("Pаnthera leo"); // Cyrillic 'а' (U+0430) masquerading as Latin 'a'
+    Optional<Finding> f = new SuspiciousNameCharactersRule().evaluate(ctx(u));
+    assertThat(f).isPresent();
+    assertThat(f.get().rule()).isEqualTo("suspicious_name_characters");
+  }
+
+  @Test
+  void suspiciousCharactersQuietForACleanAsciiName() {
+    NameUsage u = new NameUsage();
+    u.setScientificName("Panthera leo");
+    assertThat(new SuspiciousNameCharactersRule().evaluate(ctx(u))).isEmpty();
+  }
+
+  // --- DuplicateChildRecordsRule (CLB DUPLICATE_DISTRIBUTIONS / _VERNACULAR_NAMES / ...) ---
+
+  private static RuleContext ctxDuplicateChildren(Set<String> types) {
+    return new RuleContext(usage(), 0, null, 0, null, null, null, null, 0, false, 0, types, false);
+  }
+
+  @Test
+  void duplicateChildRecordsFlagsAndNamesEachDuplicatedType() {
+    Optional<Finding> f =
+        new DuplicateChildRecordsRule().evaluate(ctxDuplicateChildren(Set.of("distribution", "vernacular")));
+    assertThat(f).isPresent();
+    assertThat(f.get().rule()).isEqualTo("duplicate_child_records");
+    assertThat(f.get().severity()).isEqualTo(Severity.WARNING);
+    assertThat(f.get().message()).contains("distribution").contains("vernacular");
+  }
+
+  @Test
+  void duplicateChildRecordsQuietWhenNoDuplicates() {
+    assertThat(new DuplicateChildRecordsRule().evaluate(ctxDuplicateChildren(Set.of()))).isEmpty();
+    assertThat(new DuplicateChildRecordsRule().evaluate(ctx(usage()))).isEmpty();
+  }
+
+  // --- SynonymRankDiffersRule (CLB SYNONYM_RANK_DIFFERS) ---
+
+  private static RuleContext ctxSynonymRankDiffers(boolean differs) {
+    return new RuleContext(usage(), 1, null, 0, null, null, null, null, 0, false, 0, Set.of(), differs);
+  }
+
+  @Test
+  void synonymRankDiffersFlagsWhenRanksDiffer() {
+    Optional<Finding> f = new SynonymRankDiffersRule().evaluate(ctxSynonymRankDiffers(true));
+    assertThat(f).isPresent();
+    assertThat(f.get().rule()).isEqualTo("synonym_rank_differs");
+    assertThat(f.get().severity()).isEqualTo(Severity.WARNING);
+  }
+
+  @Test
+  void synonymRankDiffersQuietWhenRanksMatch() {
+    assertThat(new SynonymRankDiffersRule().evaluate(ctxSynonymRankDiffers(false))).isEmpty();
   }
 }
