@@ -253,6 +253,15 @@ public class NameUsageService {
     // Becoming UNASSESSED must not strand accepted children under an unassessed parent.
     requireNoAcceptedChildrenIfUnassessed(projectId, id, status);
     NameUsage u = requireInProject(projectId, id);
+    // A plain status edit may only move WITHIN a group (accepted<->unassessed, synonym<->misapplied):
+    // crossing the taxon<->synonym boundary must reassign children and set/clear the accepted link,
+    // which only demote()/promote() do -- a generic update can't, and silently applying it would
+    // leave a malformed synonym (keeps its tree parent + children, no synonym_accepted link). Reject
+    // it here, mirroring bulkStatus's parentPreserving guard, so no client can produce that state.
+    if (u.getStatus() != status && !parentPreserving(u.getStatus(), status)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "changing between accepted and synonym requires Demote/Promote, not a plain status edit");
+    }
     // Snapshot BEFORE mutating u's fields in place below: MyBatis's session-scoped local cache
     // would hand back this SAME cached instance from a second identical findByIdInProject call
     // (no intervening write to invalidate it yet), so re-fetching would alias rather than give an

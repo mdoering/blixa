@@ -407,6 +407,14 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
   // demote), so their tabs only show when accepted.
   const isAccepted = usage.status === 'ACCEPTED';
 
+  // A plain status edit may only move WITHIN a group (accepted<->unassessed, synonym<->misapplied):
+  // crossing the taxon<->synonym boundary must reassign children + set/clear the accepted link, which
+  // only the guided Demote/Promote actions do (the backend rejects a cross-group plain update). So the
+  // Select offers just the loaded usage's group.
+  const inTaxonGroup = ['ACCEPTED', 'UNASSESSED'].includes((usage.status ?? 'ACCEPTED').toUpperCase());
+  const statusGroup = inTaxonGroup ? ['ACCEPTED', 'UNASSESSED'] : ['SYNONYM', 'MISAPPLIED'];
+  const statusOptions = STATUS_OPTIONS.filter((o) => statusGroup.includes(o.value));
+
   // Captured once per render (rather than calling form.getInputProps(...) again inside each
   // Select's onChange below) so the claim-wrapped onChange still delegates to the exact same
   // value/onChange pair the spread below wires up.
@@ -541,7 +549,8 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                   />
                   <Select
                     label="Status"
-                    data={STATUS_OPTIONS}
+                    description="Accepted ↔ synonym uses Demote/Promote"
+                    data={statusOptions}
                     {...statusInputProps}
                     onChange={(v) => {
                       claim();

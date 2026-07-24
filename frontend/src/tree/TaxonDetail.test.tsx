@@ -649,9 +649,22 @@ test('claims the lock on a Status-only edit (Select onChange, no native input ev
   // (wired to claim() in TaxonDetail) can catch this edit.
   const status = screen.getByRole('textbox', { name: 'Status' });
   await userEvent.click(status);
-  await userEvent.click(await screen.findByRole('option', { name: 'Synonym' }));
+  // Within-group option (an accepted taxon only offers Accepted/Unassessed; cross-group goes via
+  // Demote/Promote) -- the edit still fires the Select's onChange -> claim().
+  await userEvent.click(await screen.findByRole('option', { name: 'Unassessed' }));
 
   await waitFor(() => expect(acquired).toBe(true));
+});
+
+test('the Status select offers only within-group options for an accepted taxon', async () => {
+  mockCommon(); // accepted
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+  const status = await screen.findByRole('textbox', { name: 'Status' });
+  await userEvent.click(status);
+  expect(await screen.findByRole('option', { name: 'Unassessed' })).toBeInTheDocument();
+  // cross-group statuses are not offered -- they need Demote/Promote
+  expect(screen.queryByRole('option', { name: 'Synonym' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: 'Misapplied' })).not.toBeInTheDocument();
 });
 
 test('a warning issue shows its badge and message', async () => {

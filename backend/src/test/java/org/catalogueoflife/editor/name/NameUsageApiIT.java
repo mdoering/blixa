@@ -291,16 +291,46 @@ class NameUsageApiIT extends AbstractPostgresIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.environment[0]").value("MARINE"));
 
-    // ...but demoting it to SYNONYM (full-replace update carrying environment, as the UI does)
-    // sheds the taxon info.
-    mvc.perform(put("/api/projects/" + pid + "/usages/" + accId).with(csrf())
+    // ...but demoting it to SYNONYM (the proper acc->syn workflow; a plain cross-group status edit is
+    // rejected, see statusChangeAcrossGroupsIsRejected) sheds the taxon info, since a synonym is not
+    // a taxon.
+    String targetBody = mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"scientificName\":\"Acc env\",\"rank\":\"species\",\"status\":\"synonym\","
-                + "\"environment\":[\"marine\"],\"version\":" + version + "}"))
+            .content("{\"scientificName\":\"Target sp\",\"rank\":\"species\",\"status\":\"accepted\"}"))
+        .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    long targetId = json.readTree(targetBody).get("id").asLong();
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + accId + "/demote").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"acceptedId\":" + targetId + ",\"status\":\"SYNONYM\",\"version\":" + version + "}"))
         .andExpect(status().isOk());
     mvc.perform(get("/api/projects/" + pid + "/usages/" + accId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.environment[0]").doesNotExist());
+  }
+
+  // A plain status edit (PUT /usages/{id}) may only move within a group (accepted<->unassessed,
+  // synonym<->misapplied); crossing the taxon<->synonym boundary must use Demote/Promote, so it is
+  // rejected here rather than silently producing a malformed synonym.
+  @Test
+  @WithMockUser(username = "statusGuardOwner")
+  void statusChangeAcrossGroupsIsRejected() throws Exception {
+    ensureUser("statusGuardOwner");
+    long pid = createProject("statusguardproj");
+    long accId = createUsage(pid, "Guarda taxon", "Auth", "species", "accepted");
+
+    // accepted -> synonym via a plain update is rejected...
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + accId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Guarda taxon\",\"rank\":\"species\",\"status\":\"synonym\","
+                + "\"version\":0}"))
+        .andExpect(status().isBadRequest());
+    // ...but accepted -> unassessed (within the taxon group) is allowed.
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + accId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Guarda taxon\",\"rank\":\"species\",\"status\":\"unassessed\","
+                + "\"version\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("UNASSESSED"));
   }
 
   // GET /usages's rank/status filters + total count (Task 1 of the create/search/actions plan).
