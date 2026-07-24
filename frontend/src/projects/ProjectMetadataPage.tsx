@@ -359,15 +359,7 @@ export default function ProjectMetadataPage() {
         <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
           <Stack gap="md">
             <TextInput label="Title" {...form.getInputProps('title')} />
-            <SimpleGrid cols={2}>
-              <TextInput label="Alias" {...form.getInputProps('alias')} />
-              <Select
-                label="Nomenclatural code"
-                clearable
-                data={NOM_CODES.map((c) => ({ value: c, label: c }))}
-                {...form.getInputProps('nomCode')}
-              />
-            </SimpleGrid>
+            <TextInput label="Alias" {...form.getInputProps('alias')} />
             <Textarea label="Description" rows={3} {...form.getInputProps('description')} />
             <SimpleGrid cols={2}>
               <Select
@@ -486,6 +478,12 @@ export default function ProjectMetadataPage() {
             )}
         <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
           <Stack gap="md">
+            <Select
+              label="Nomenclatural code"
+              clearable
+              data={NOM_CODES.map((c) => ({ value: c, label: c }))}
+              {...form.getInputProps('nomCode')}
+            />
             <Switch
               label="Show GBIF occurrence layer on maps"
               {...form.getInputProps('gbifOccurrenceLayer', { type: 'checkbox' })}

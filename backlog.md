@@ -155,7 +155,7 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
   accepted name (incl. via synonyms), pick a survivor (most descendants suggested), and demote the
   others to homotypic synonyms; pro-parte / dual-status flagged. Consolidation page + `GET/POST
   …/usages/{id}/homotypic/{conflicts,consolidate}`.
-- **GBIF occurrence import into TypeMaterial** — by `occurrenceId` (the field is already carried).
+- **GBIF occurrence import into TypeMaterial** — *shipped; spec `docs/superpowers/specs/2026-07-25-gbif-occurrence-type-material-design.md`.* The Types tab's "Import from GBIF" resolves the name to COL (its `col:` id, else name-match to COL — the GBIF backbone is deprecated), queries GBIF occurrences against GBIF's COL checklist (`checklistKey` + the COL taxonID), and lists type specimens as TypeMaterial candidates (deduped by `occurrenceId`) for the curator to tick + import via the normal create path.
 - **Distribution map preview** — *mostly shipped* as a bespoke maplibre-gl view (richer than
   portal-components: distribution polygons focal/children via CLB `/vocab/area/{gaz}:{id}` GeoJSON,
   type-specimen points, GBIF occurrence raster + preflight count, COL-match, WebGL-degradation).

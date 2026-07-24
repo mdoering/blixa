@@ -5,7 +5,11 @@ import {
   updateTypeMaterial,
   type TypeMaterial,
 } from '../api/typeMaterial';
+import { Button, Group, Stack } from '@mantine/core';
+import { IconDownload } from '@tabler/icons-react';
+import { useState } from 'react';
 import ChildEntityTab, { type ColumnDef, type FieldDef } from './ChildEntityTab';
+import GbifTypesModal from './GbifTypesModal';
 import { referenceOptions } from './NameRelationsTab';
 
 // ColDP TypeStatus (common values); TEXT on the wire.
@@ -68,8 +72,23 @@ export default function TypeMaterialTab({
     { name: 'remarks', label: 'Remarks', type: 'textarea', span: 12 },
   ];
 
+  const [gbifOpen, setGbifOpen] = useState(false);
+
   return (
-    <ChildEntityTab<TypeMaterial>
+    <Stack>
+      {canEdit && (
+        <Group justify="flex-end">
+          <Button
+            variant="default"
+            size="xs"
+            leftSection={<IconDownload size={14} />}
+            onClick={() => setGbifOpen(true)}
+          >
+            Import from GBIF…
+          </Button>
+        </Group>
+      )}
+      <ChildEntityTab<TypeMaterial>
       pid={pid}
       usageId={usageId}
       canEdit={canEdit}
@@ -102,6 +121,13 @@ export default function TypeMaterialTab({
         remarks: r.remarks ?? '',
       })}
       describe={(r) => `Delete the ${r.status ?? ''} type material ${r.citation ?? ''}.`}
-    />
+      />
+      <GbifTypesModal
+        pid={pid}
+        usageId={usageId}
+        opened={gbifOpen}
+        onClose={() => setGbifOpen(false)}
+      />
+    </Stack>
   );
 }
