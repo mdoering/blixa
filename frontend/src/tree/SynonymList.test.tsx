@@ -39,6 +39,17 @@ test('synonym view lists accepteds and unlinks (this synonym -> accepted)', asyn
   await waitFor(() => expect(deleted).toBe('11->9'));
 });
 
+test('each linked usage is a link that opens it in the /names editor', async () => {
+  server.use(
+    http.get('/api/projects/7/usages/9/synonyms', () =>
+      HttpResponse.json([{ id: 11, scientificName: 'Xus', authorship: 'Auth' }]),
+    ),
+  );
+  renderWithProviders(<SynonymList pid={7} usageId={9} status="ACCEPTED" />);
+  const link = await screen.findByRole('link', { name: 'Xus' });
+  expect(link).toHaveAttribute('href', '/projects/7/names?usage=11');
+});
+
 test('read-only hides the unlink control', async () => {
   server.use(
     http.get('/api/projects/7/usages/9/synonyms', () =>

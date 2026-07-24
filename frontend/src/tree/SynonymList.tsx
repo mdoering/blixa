@@ -1,7 +1,8 @@
-import { ActionIcon, Group, List, Text } from '@mantine/core';
+import { ActionIcon, Anchor, Group, List, Text } from '@mantine/core';
 import { IconUnlink } from '@tabler/icons-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
+import { Link } from 'react-router-dom';
 import { messageFor } from '../api/client';
 import { getAccepted, getSynonyms, unlinkSynonym } from '../api/usages';
 
@@ -57,7 +58,12 @@ export default function SynonymList({ pid, usageId, status, canEdit = false }: S
         <List.Item key={u.id}>
           <Group gap={6} wrap="nowrap">
             <span>
-              {u.scientificName}
+              {/* Open the linked usage in the editor (the /names panel takes any usage via its
+                  `usage` param) -- the accepted-only tree can't reach a synonym, so this is how a
+                  synonym's own nomenclature + type material get edited. */}
+              <Anchor component={Link} to={`/projects/${pid}/names?usage=${u.id}`} size="sm">
+                {u.scientificName}
+              </Anchor>
               {u.authorship ? (
                 <Text span c="dimmed" size="xs">
                   {' '}
