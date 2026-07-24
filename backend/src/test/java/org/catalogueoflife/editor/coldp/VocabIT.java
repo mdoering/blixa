@@ -40,6 +40,10 @@ class VocabIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.nomStatus[0].zoological").exists())
         .andExpect(jsonPath("$.gender").isArray())
         .andExpect(jsonPath("$.environment").isArray())
+        // geoTimes: the GeoTime chronostratigraphic units the temporal-range picker offers
+        .andExpect(jsonPath("$.geoTimes").isArray())
+        .andExpect(jsonPath("$.geoTimes", org.hamcrest.Matchers.hasItem("Holocene")))
+        .andExpect(jsonPath("$.geoTimes", org.hamcrest.Matchers.hasItem("Cretaceous")))
         // cslTypes carries the CSL-JSON wire ids (e.g. "article-journal") the reference `type`
         // dropdown offers -- see ReferenceService.validateType for the matching persist-side check.
         .andExpect(jsonPath("$.cslTypes").isArray())

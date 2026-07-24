@@ -22,6 +22,7 @@ import org.catalogueoflife.editor.name.dto.IdentifiersRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.name.dto.PromoteRequest;
 import org.catalogueoflife.editor.name.dto.ReferenceIdsRequest;
+import org.catalogueoflife.editor.name.dto.TaxonInfoRequest;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.UsagePage;
 import org.catalogueoflife.editor.parse.NameParserService;
@@ -413,6 +414,33 @@ public class NameUsageService {
     if (usages.updateReferenceIds(projectId, id, ids, userId, req.version()) == 0) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
     }
+    NameUsage after = requireInProject(projectId, id);
+    audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
+    events.publishEvent(ValidationEvent.forUsage(projectId, id));
+    return toResponse(after, project);
+  }
+
+  // PUT /usages/{id}/taxon-info: the Biology tab's narrow write path for the taxon_info attributes
+  // (extinct / environment / temporal range), kept out of the generic update() so editing biology
+  // never rewrites (or re-parses) the name. A full replace of the four fields -- a null CLEARS.
+  // writeTaxonInfo, reused from create/update, upserts when the usage is a taxon (accepted/unassessed)
+  // and there is data, else deletes the row -- so this is a no-op-drop for a synonym (the Biology tab
+  // is accepted-gated anyway). CAS on the shared usage version via touchVersion (0 rows -> 409), so
+  // it interleaves safely with the Details form's update() on the same usage.
+  @Transactional
+  public NameUsageResponse updateTaxonInfo(int userId, int projectId, int id, TaxonInfoRequest req) {
+    requireEditor(userId, projectId);
+    Project project = requireProject(projectId);
+    NameUsage before = requireInProject(projectId, id);
+    if (usages.touchVersion(projectId, id, userId, req.version()) == 0) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
+    }
+    NameUsage edited = requireInProject(projectId, id);
+    edited.setExtinct(req.extinct());
+    edited.setEnvironment(parseEnvironments(req.environment()));
+    edited.setTemporalRangeStart(req.temporalRangeStart());
+    edited.setTemporalRangeEnd(req.temporalRangeEnd());
+    writeTaxonInfo(edited);
     NameUsage after = requireInProject(projectId, id);
     audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
     events.publishEvent(ValidationEvent.forUsage(projectId, id));

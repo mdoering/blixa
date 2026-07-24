@@ -1,11 +1,13 @@
 package org.catalogueoflife.editor.coldp;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import life.catalogue.api.model.CSLType;
 import life.catalogue.api.vocab.Environment;
 import life.catalogue.api.vocab.Gender;
+import life.catalogue.api.vocab.GeoTime;
 import life.catalogue.api.vocab.NomStatus;
 import org.gbif.nameparser.api.Rank;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +30,7 @@ public class VocabController {
   public record NomStatusOption(String value, String botanical, String zoological) {}
 
   public record VocabResponse(List<String> ranks, List<NomStatusOption> nomStatus,
-      List<String> gender, List<String> environment, List<String> cslTypes) {}
+      List<String> gender, List<String> environment, List<String> geoTimes, List<String> cslTypes) {}
 
   @GetMapping("/api/coldp/vocab")
   public VocabResponse vocab() {
@@ -39,6 +41,14 @@ public class VocabController {
             .toList(),
         Arrays.stream(Gender.values()).map(Enum::name).toList(),
         Arrays.stream(Environment.values()).map(Enum::name).toList(),
+        // The chronostratigraphic units (GeoTime, ICS 2020) the temporal-range picker offers, as
+        // names -- the exact stored form of temporalRangeStart/End (GeoTime.byName round-trips them).
+        // Ordered oldest -> youngest (getStart() is age in Ma, larger = older), so the two Start/End
+        // dropdowns read down the geological column the way a stratigrapher expects.
+        GeoTime.TIMES.values().stream()
+            .sorted(Comparator.comparing(GeoTime::getStart,
+                Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(GeoTime::getName))
+            .map(GeoTime::getName).toList(),
         // CSLType.toString() is the CSL-JSON wire id (e.g. "article-journal") -- the same canonical
         // form ReferenceService.validateType persists, so a value picked from this list always
         // round-trips (mirrors ranks' lower-case rationale above).

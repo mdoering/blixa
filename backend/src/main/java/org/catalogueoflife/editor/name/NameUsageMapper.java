@@ -508,4 +508,15 @@ public interface NameUsageMapper {
   int updateReferenceIds(@Param("projectId") int projectId, @Param("id") int id,
       @Param("referenceIds") List<Integer> referenceIds,
       @Param("modifiedBy") int modifiedBy, @Param("version") Integer version);
+
+  // Version-guarded bump of just version/modified, touching no other name_usage column -- the CAS
+  // half of NameUsageService.updateTaxonInfo (the taxon_info fields live in a separate table, so
+  // unlike updateReferenceIds/updateAlternativeId the payload can't ride along on a name_usage
+  // update). 0 rows updated -> caller treats as a stale-version 409, same as the other narrow writers.
+  @Update("""
+      UPDATE name_usage SET modified = now(), modified_by = #{modifiedBy}, version = version + 1
+      WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}
+      """)
+  int touchVersion(@Param("projectId") int projectId, @Param("id") int id,
+      @Param("modifiedBy") int modifiedBy, @Param("version") Integer version);
 }

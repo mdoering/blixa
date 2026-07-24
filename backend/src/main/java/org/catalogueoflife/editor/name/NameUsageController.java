@@ -14,6 +14,7 @@ import org.catalogueoflife.editor.name.dto.IdentifiersRequest;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.name.dto.PromoteRequest;
 import org.catalogueoflife.editor.name.dto.ReferenceIdsRequest;
+import org.catalogueoflife.editor.name.dto.TaxonInfoRequest;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.UsagePage;
 import org.catalogueoflife.editor.name.dto.WebReferenceRequest;
@@ -105,6 +106,15 @@ public class NameUsageController {
       @Valid @RequestBody ReferenceIdsRequest req) {
     int uid = currentUser.require().getId();
     return service.setReferences(uid, pid, id, req);
+  }
+
+  // Narrow write for the Biology tab's taxon_info attributes (extinct/environment/temporal range),
+  // separate from the generic update() so saving biology never rewrites the name.
+  @PutMapping("/{id}/taxon-info")
+  public NameUsageResponse updateTaxonInfo(@PathVariable int pid, @PathVariable int id,
+      @Valid @RequestBody TaxonInfoRequest req) {
+    int uid = currentUser.require().getId();
+    return service.updateTaxonInfo(uid, pid, id, req);
   }
 
   // Creates a type=webpage Reference from a URL (server-side title fetch, SSRF-guarded -- see
