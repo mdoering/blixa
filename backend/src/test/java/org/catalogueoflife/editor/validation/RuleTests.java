@@ -7,8 +7,10 @@ import java.util.Optional;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.Reference;
 import org.catalogueoflife.editor.name.Status;
+import org.catalogueoflife.editor.validation.rules.DanglingReferenceRule;
 import org.catalogueoflife.editor.validation.rules.DuplicateNameRule;
 import org.catalogueoflife.editor.validation.rules.GenusMismatchRule;
+import org.catalogueoflife.editor.validation.rules.InfraspecificMissingSpeciesRule;
 import org.catalogueoflife.editor.validation.rules.GenusYearAfterSpeciesRule;
 import org.catalogueoflife.editor.validation.rules.MissingPublishedInRule;
 import org.catalogueoflife.editor.validation.rules.RankVsParentRule;
@@ -299,5 +301,67 @@ class RuleTests {
     acc.setStatus(Status.ACCEPTED);
     assertThat(new SynonymOfNonAcceptedRule()
         .evaluate(new RuleContext(acc, 0, null, 0, null, null, null, null, 1))).isEmpty();
+  }
+
+  // --- DanglingReferenceRule ---
+
+  private static RuleContext ctxDangling(int danglingRefs) {
+    return new RuleContext(usage(), 0, null, 0, null, null, null, null, 0, false, danglingRefs);
+  }
+
+  @Test
+  void danglingReferenceRuleFlagsMissingTaxonomicReferences() {
+    Optional<Finding> finding = new DanglingReferenceRule().evaluate(ctxDangling(2));
+    assertThat(finding).isPresent();
+    assertThat(finding.get().rule()).isEqualTo("dangling_reference");
+    assertThat(finding.get().severity()).isEqualTo(Severity.ERROR);
+  }
+
+  @Test
+  void danglingReferenceRuleQuietWhenNoneDangle() {
+    assertThat(new DanglingReferenceRule().evaluate(ctxDangling(0))).isEmpty();
+  }
+
+  // --- InfraspecificMissingSpeciesRule ---
+
+  private static NameUsage infraspecific() {
+    NameUsage u = new NameUsage();
+    u.setScientificName("Panthera leo persica");
+    u.setRank("subspecies");
+    u.setInfraspecificEpithet("persica");
+    u.setStatus(Status.ACCEPTED);
+    return u;
+  }
+
+  private static RuleContext ctxInfra(NameUsage u, boolean hasSpeciesAncestor) {
+    return new RuleContext(u, 0, null, 0, null, null, null, null, 0, hasSpeciesAncestor, 0);
+  }
+
+  @Test
+  void infraspecificMissingSpeciesFlagsWhenNoSpeciesAncestor() {
+    Optional<Finding> finding = new InfraspecificMissingSpeciesRule().evaluate(ctxInfra(infraspecific(), false));
+    assertThat(finding).isPresent();
+    assertThat(finding.get().rule()).isEqualTo("infraspecific_missing_species");
+    assertThat(finding.get().severity()).isEqualTo(Severity.WARNING);
+  }
+
+  @Test
+  void infraspecificMissingSpeciesQuietWhenSpeciesAncestorPresent() {
+    assertThat(new InfraspecificMissingSpeciesRule().evaluate(ctxInfra(infraspecific(), true))).isEmpty();
+  }
+
+  @Test
+  void infraspecificMissingSpeciesIgnoresSpeciesAndHigherRanks() {
+    // A species has no infraspecific epithet -> never flagged, even at the top of the tree.
+    NameUsage species = usage(); // "Abies alba", no infraspecificEpithet
+    assertThat(new InfraspecificMissingSpeciesRule().evaluate(ctxInfra(species, false))).isEmpty();
+  }
+
+  @Test
+  void infraspecificMissingSpeciesIgnoresNonAcceptedUsages() {
+    // Only accepted usages sit in the classification tree; a synonym isn't parented under a species.
+    NameUsage syn = infraspecific();
+    syn.setStatus(Status.SYNONYM);
+    assertThat(new InfraspecificMissingSpeciesRule().evaluate(ctxInfra(syn, false))).isEmpty();
   }
 }

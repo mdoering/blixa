@@ -110,7 +110,12 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 
 ## Validation & issues
 
-- **Remaining validation rules** — infraspecific-epithet-vs-parent; dangling pointers (references to deleted usages/refs). *(rank_vs_parent, genus_mismatch, species_epithet_mismatch, genus_year_after_species, year_vs_reference, synonym_of_non_accepted, synonym_without_accepted, duplicate_name, unparsable_name, missing_published_in are all done.)*
+- **Remaining validation rules** — *shipped:* **`infraspecific_missing_species`** (an accepted
+  infraspecific name with no species ancestor — a subspecies parented straight under a genus;
+  WARNING) and **`dangling_reference`** (a usage whose taxonomic `reference_id[]` cites a deleted
+  reference — the one pointer with no array FK; ERROR). *Possible follow-up:* dangling
+  `name_relation.related_usage_id` / `reference_id` (also FK-less, but separate rows rather than
+  per-usage fields). *(rank_vs_parent, genus_mismatch, species_epithet_mismatch, genus_year_after_species, year_vs_reference, synonym_of_non_accepted, synonym_without_accepted, duplicate_name, unparsable_name, missing_published_in also done.)*
 - **Evaluate the CLB backend issue enum** — decide which CLB issues are worth surfacing / mapping to Blixa validation rules.
 - **Backend test coverage** — `GET /issues?entityId=` filter and the etymology PUT round-trip (code correct on inspection, untested).
 

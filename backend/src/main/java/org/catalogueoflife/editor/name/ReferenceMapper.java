@@ -47,6 +47,15 @@ public interface ReferenceMapper {
   })
   Reference findByIdInProject(@Param("projectId") int projectId, @Param("id") int id);
 
+  // Which of the given reference ids actually exist in this project -- ValidationService uses this
+  // to detect a usage's dangling taxonomic reference_id[] entries (DanglingReferenceRule). Callers
+  // must guard against an empty `ids` list (an empty IN (...) is a SQL error).
+  @Select({"<script>",
+      "SELECT id FROM reference WHERE project_id = #{projectId} AND id IN",
+      "<foreach item='rid' collection='ids' open='(' separator=',' close=')'>#{rid}</foreach>",
+      "</script>"})
+  List<Integer> existingIds(@Param("projectId") int projectId, @Param("ids") List<Integer> ids);
+
   // Unpaginated: all of a project's references in one go, ORDER BY id -- for the ColDP export
   // (ReferenceColdpWriter), which needs every row rather than a UI page. Don't reuse
   // findByProject/LIMIT for this: a project with more references than any reasonable page size

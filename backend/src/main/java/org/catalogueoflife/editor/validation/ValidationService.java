@@ -2,6 +2,7 @@ package org.catalogueoflife.editor.validation;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -143,9 +144,25 @@ public class ValidationService {
     Integer ancestorGenusYear = nameUsages.findAncestorGenusYear(projectId, usage.getId());
     String ancestorSpeciesEpithet = nameUsages.findAncestorSpeciesEpithet(projectId, usage.getId());
     int synonymNonAcceptedTargetCount = nameUsages.countNonAcceptedSynonymTargets(projectId, usage.getId());
+    boolean hasSpeciesAncestor = nameUsages.hasSpeciesAncestor(projectId, usage.getId());
+    int danglingReferenceCount = countDanglingReferences(projectId, usage.getReferenceId());
     return new RuleContext(usage, synonymAcceptedCount, publishedInReference, duplicateCount,
         ancestorGenusName, parentRank, ancestorGenusYear, ancestorSpeciesEpithet,
-        synonymNonAcceptedTargetCount);
+        synonymNonAcceptedTargetCount, hasSpeciesAncestor, danglingReferenceCount);
+  }
+
+  // How many distinct entries of the usage's taxonomic reference_id[] no longer resolve to a
+  // reference (DanglingReferenceRule). reference_id[] has no array FK, so this is checked here.
+  private int countDanglingReferences(int projectId, List<Integer> referenceId) {
+    if (referenceId == null || referenceId.isEmpty()) {
+      return 0;
+    }
+    List<Integer> distinct = referenceId.stream().filter(Objects::nonNull).distinct().toList();
+    if (distinct.isEmpty()) {
+      return 0;
+    }
+    Set<Integer> existing = new HashSet<>(references.existingIds(projectId, distinct));
+    return (int) distinct.stream().filter(id -> !existing.contains(id)).count();
   }
 
   private void insert(int projectId, int usageId, Finding finding, String contextJson) {

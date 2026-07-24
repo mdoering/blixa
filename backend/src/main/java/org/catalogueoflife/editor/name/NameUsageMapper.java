@@ -335,6 +335,23 @@ public interface NameUsageMapper {
       """)
   String findAncestorSpeciesEpithet(@Param("projectId") int projectId, @Param("id") int id);
 
+  // Whether a STRICT ancestor of rank species exists (InfraspecificMissingSpeciesRule). Distinct
+  // from findAncestorSpeciesEpithet: a species ancestor with a null specific_epithet still counts
+  // here (its epithet just can't be compared), so an infraspecific name genuinely without a species
+  // parent isn't confused with one whose species parent simply lacks a parsed epithet.
+  @Select("""
+      WITH RECURSIVE anc AS (
+        SELECT project_id, id, parent_id, rank, 0 AS depth
+        FROM name_usage WHERE project_id = #{projectId} AND id = #{id}
+        UNION ALL
+        SELECT n.project_id, n.id, n.parent_id, n.rank, anc.depth + 1
+        FROM name_usage n JOIN anc ON n.project_id = anc.project_id AND n.id = anc.parent_id
+        WHERE anc.depth < 10000
+      )
+      SELECT EXISTS(SELECT 1 FROM anc WHERE depth > 0 AND rank = 'species')
+      """)
+  boolean hasSpeciesAncestor(@Param("projectId") int projectId, @Param("id") int id);
+
   // How many of a synonym's accepted targets are NOT actually accepted (SynonymOfNonAcceptedRule).
   @Select("""
       SELECT COUNT(*) FROM synonym_accepted sa JOIN name_usage a
