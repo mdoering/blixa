@@ -87,7 +87,13 @@ export default function TreeNodeRow({
   const lock = locks?.find((l) => l.entityType === 'name_usage' && l.entityId === node.id);
 
   return (
-    <Stack gap={0}>
+    // content-visibility virtualization-lite: the browser skips layout + paint of this node's
+    // subtree while it's scrolled off-screen, so a deeply-expanded tree scrolls smoothly without a
+    // full windowing rewrite. Nested (every TreeNodeRow gets it), so each node skips independently;
+    // `contain-intrinsic-size: auto <h>` reserves a row's height when skipped and remembers the real
+    // size once rendered (avoids scrollbar jumpiness). Rows stay in the DOM — this cuts paint/layout
+    // cost, not React reconciliation; a full react-virtual windowing is the heavier follow-up.
+    <Stack gap={0} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 32px' }}>
       <Group
         gap={4}
         wrap="nowrap"

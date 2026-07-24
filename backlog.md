@@ -149,10 +149,13 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
   (precise remaining count from `node.childCount`; roots use a page-length heuristic). Removes the
   silent 50-cap that truncated large sibling lists. Deterministic offset paging guaranteed by an
   `n.id` tiebreaker in `TreeMapper`'s ORDER BY.
-- **Tree row virtualization** *(follow-up to the paging above)* — the rendered rows are still real
-  DOM nodes; at Lepidoptera scale a fully-expanded tree is heavy. Flatten the visible/expanded nodes
-  into one windowed list (`@tanstack/react-virtual`) so only viewport rows render. Composes with the
-  load-more paging already in place.
+- **Tree row virtualization** — *content-visibility approach shipped:* each `TreeNodeRow` sets
+  `content-visibility:auto` + `contain-intrinsic-size:auto 32px`, so the browser skips layout/paint
+  of off-screen node subtrees — native "virtualization-lite" that smooths scrolling of large expanded
+  trees with no rewrite and every tree feature/test intact. *Optional deeper follow-up:* full
+  `@tanstack/react-virtual` windowing (only viewport rows in the DOM) — a ~day-scale rewrite that
+  centralizes expand state + child fetching and splits `TreeNodeRow` into a presentational row; only
+  worth it if profiling at Lepidoptera scale shows React reconciliation (not paint) is the bottleneck.
 - **nomStatus as a Select** — currently a free-text input showing the enum name.
 - **Link tracked changes to the current work objective** — *shipped* (spec
   `docs/superpowers/specs/2026-07-24-work-objective-as-discussion-design.md`). Design pivot: the
