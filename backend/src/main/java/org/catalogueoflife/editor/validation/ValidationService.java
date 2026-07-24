@@ -132,6 +132,22 @@ public class ValidationService {
     }
   }
 
+  // Revalidates every usage in the subtree rooted at rootUsageId (the root included), returning the
+  // ids it processed so a caller can summarize just that scope. The middle granularity between
+  // revalidateUsage (one node) and revalidateProject (everything): a curator working a locked group,
+  // or a lock release/expiry, sweeps just that subtree -- and, unlike the per-usage auto-trigger,
+  // this re-checks the neighbours, so relational rules (genus_year_after_species, duplicate_name,
+  // synonym_rank_differs) settle across the group. Same `self`-proxy per-usage transaction model as
+  // revalidateProject (see that method and the `self` field's javadoc); an absent root yields an
+  // empty list and is a no-op.
+  public List<Integer> revalidateSubtree(int projectId, int rootUsageId) {
+    List<Integer> ids = nameUsages.findSubtreeIds(projectId, rootUsageId);
+    for (int usageId : ids) {
+      self.revalidateUsage(projectId, usageId);
+    }
+    return ids;
+  }
+
   private RuleContext buildContext(int projectId, NameUsage usage) {
     int synonymAcceptedCount = synonymAccepted.countBySynonym(projectId, usage.getId());
     Reference publishedInReference = usage.getPublishedInReferenceId() == null ? null

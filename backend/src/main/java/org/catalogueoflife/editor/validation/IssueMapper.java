@@ -165,6 +165,23 @@ public interface IssueMapper {
       """)
   List<StatusSeverityCount> countByStatusSeverity(@Param("projectId") int projectId);
 
+  // Same aggregation as countByStatusSeverity, but scoped to a set of name_usage ids -- the
+  // subtree-scoped summary IssueService returns after a POST /usages/{id}/revalidate, so the caller
+  // can show "N errors, M warnings in this group" rather than project-wide totals. The caller must
+  // not pass an empty id list (an empty IN () is invalid SQL); IssueService short-circuits to an
+  // empty summary in that case.
+  @Select("""
+      <script>
+      SELECT status AS status, severity AS severity, COUNT(*) AS count
+      FROM issue
+      WHERE project_id = #{projectId} AND entity_type = 'name_usage'
+        AND entity_id IN <foreach collection='ids' item='i' open='(' separator=',' close=')'>#{i}</foreach>
+      GROUP BY status, severity
+      </script>
+      """)
+  List<StatusSeverityCount> countByStatusSeverityForEntities(@Param("projectId") int projectId,
+      @Param("ids") List<Integer> ids);
+
   // Internal aggregation row for countByStatusSeverity -- not exposed via the API directly (see
   // IssueSummaryResponse for the shape the API returns).
   record StatusSeverityCount(String status, String severity, long count) {}

@@ -60,4 +60,12 @@ public class IssueController {
     int uid = currentUser.require().getId();
     return service.revalidateProject(uid, pid);
   }
+
+  // On-demand recompute of just one taxon's subtree (the "Revalidate this group" action), returning
+  // a summary scoped to that subtree. The targeted counterpart of /revalidate for large projects.
+  @PostMapping("/usages/{id}/revalidate")
+  public IssueSummaryResponse revalidateSubtree(@PathVariable int pid, @PathVariable int id) {
+    int uid = currentUser.require().getId();
+    return service.revalidateSubtree(uid, pid, id);
+  }
 }

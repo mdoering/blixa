@@ -79,8 +79,24 @@ public class IssueService {
     return buildSummary(projectId);
   }
 
+  // Owner/editor recomputes just the subtree rooted at usageId (ValidationService.revalidateSubtree)
+  // and gets back a summary scoped to that subtree -- the manual "Revalidate this group" action.
+  // Not @Transactional for the same reason as revalidateProject (per-usage transactions via the
+  // `self` proxy inside ValidationService).
+  public IssueSummaryResponse revalidateSubtree(int actorId, int projectId, int usageId) {
+    requireOwnerOrEditor(projects.requireRole(actorId, projectId));
+    List<Integer> ids = validationService.revalidateSubtree(projectId, usageId);
+    if (ids.isEmpty()) {
+      return summarize(List.of()); // absent/deleted root -> empty, avoids an empty IN () query
+    }
+    return summarize(issues.countByStatusSeverityForEntities(projectId, ids));
+  }
+
   private IssueSummaryResponse buildSummary(int projectId) {
-    List<IssueMapper.StatusSeverityCount> rows = issues.countByStatusSeverity(projectId);
+    return summarize(issues.countByStatusSeverity(projectId));
+  }
+
+  private static IssueSummaryResponse summarize(List<IssueMapper.StatusSeverityCount> rows) {
     Map<String, Long> byStatus = new LinkedHashMap<>();
     Map<String, Long> bySeverity = new LinkedHashMap<>();
     long total = 0;

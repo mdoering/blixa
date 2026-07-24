@@ -40,4 +40,20 @@ public class ValidationTrigger {
           event.entityType(), event.entityId(), e.getMessage(), e);
     }
   }
+
+  // Subtree recompute when an objective-tagged lock is released or swept (SubtreeValidationEvent).
+  // Same async/exception-swallowing contract as onValidationEvent, but fallbackExecution = true:
+  // LockService.release publishes from inside a transaction (so AFTER_COMMIT applies), while
+  // LockRetentionSweep publishes from a plain @Scheduled method with no transaction -- without the
+  // fallback the sweep's events would be silently dropped rather than executed.
+  @Async(ValidationAsyncConfig.EXECUTOR_BEAN)
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+  public void onSubtreeValidationEvent(SubtreeValidationEvent event) {
+    try {
+      validationService.revalidateSubtree(event.projectId(), event.rootUsageId());
+    } catch (Exception e) {
+      log.warn("auto-revalidate subtree failed for project {} root {}: {}", event.projectId(),
+          event.rootUsageId(), e.getMessage(), e);
+    }
+  }
 }

@@ -7,7 +7,10 @@ import org.catalogueoflife.editor.discussion.DiscussionStatus;
 import org.catalogueoflife.editor.lock.dto.AcquireLockRequest;
 import org.catalogueoflife.editor.lock.dto.LockResponse;
 import org.catalogueoflife.editor.project.ProjectService;
+import org.catalogueoflife.editor.validation.SubtreeValidationEvent;
+import org.catalogueoflife.editor.validation.ValidationEvent;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,13 +30,16 @@ public class LockService {
   private final LockMapper locks;
   private final ProjectService projects;
   private final DiscussionMapper discussions;
+  private final ApplicationEventPublisher events;
   private final int defaultTtlSeconds;
 
   public LockService(LockMapper locks, ProjectService projects, DiscussionMapper discussions,
+      ApplicationEventPublisher events,
       @Value("${coldp.lock.ttl-seconds:300}") int defaultTtlSeconds) {
     this.locks = locks;
     this.projects = projects;
     this.discussions = discussions;
+    this.events = events;
     this.defaultTtlSeconds = defaultTtlSeconds;
   }
 
@@ -87,9 +93,20 @@ public class LockService {
   @Transactional
   public void release(int actorId, int projectId, int lockId) {
     projects.requireRole(actorId, projectId);
+    // Load before deleting: delete() keys on lockId only, but a subtree revalidate needs the lock's
+    // entity + objective. Reading it first (rather than trusting the caller) also keeps the
+    // "released a group" signal honest -- we only fire for a lock this actor actually held and removed.
+    Lock lock = locks.findById(projectId, lockId);
     int rows = locks.delete(projectId, lockId, actorId);
     if (rows == 0) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "lock not found");
+    }
+    // Only objective-tagged taxon locks trigger a subtree recompute -- deliberate group-work, not an
+    // ad-hoc single-field lock (those are already covered by the per-usage auto-trigger). Published
+    // inside the transaction; ValidationTrigger picks it up AFTER_COMMIT on the async pool.
+    if (lock != null && ValidationEvent.ENTITY_NAME_USAGE.equals(lock.getEntityType())
+        && lock.getDiscussionId() != null && lock.getEntityId() != null) {
+      events.publishEvent(new SubtreeValidationEvent(projectId, lock.getEntityId()));
     }
   }
 

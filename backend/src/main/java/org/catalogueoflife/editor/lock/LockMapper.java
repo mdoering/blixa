@@ -79,6 +79,19 @@ public interface LockMapper {
   @Delete("DELETE FROM lock WHERE id = #{id} AND project_id = #{projectId} AND user_id = #{userId}")
   int delete(@Param("projectId") int projectId, @Param("id") int id, @Param("userId") int userId);
 
+  // The subtree roots of expired, objective-tagged name_usage locks -- fetched BEFORE deleteExpired()
+  // so LockRetentionSweep can publish a SubtreeValidationEvent per swept group (see that class).
+  // Only discussion_id IS NOT NULL rows: a subtree revalidate is deliberate group-work cleanup, not
+  // something an ad-hoc ungrouped lock should trigger. project_id is carried so the event targets the
+  // right project.
+  @Select("""
+      SELECT project_id, entity_id AS root_usage_id FROM lock
+      WHERE entity_type = 'name_usage' AND discussion_id IS NOT NULL AND expires_at <= now()
+      """)
+  List<ExpiredUsageRoot> findExpiredObjectiveUsageRoots();
+
+  record ExpiredUsageRoot(int projectId, int rootUsageId) {}
+
   // Retention sweep (see LockRetentionSweep): every findActive/upsertTakeover call already treats
   // an expired row as absent, but nothing physically removes it -- this is that cleanup, run
   // periodically rather than on every read.
