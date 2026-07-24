@@ -13,6 +13,7 @@ import {
   Select,
   Switch,
   Table,
+  Tabs,
   Text,
   Textarea,
   TextInput,
@@ -328,39 +329,21 @@ export default function ProjectMetadataPage() {
     });
 
   return (
-    <Stack style={{ maxWidth: 720 }} gap="xl">
-      {/* Public visibility toggle (owner-only) at the very top -- lists the project on the public
-          landing page + exposes its releases; gated on a license being set (B2). */}
-      {isOwner && (
-        <Stack gap="xs">
-          <Group justify="space-between">
-            <div>
-              <Text fw={600}>Public</Text>
-              <Text size="sm" c="dimmed">
-                List this project on the public landing page and publish its releases.
-              </Text>
-            </div>
-            <Switch
-              aria-label="Public"
-              checked={data?.public ?? false}
-              disabled={!data?.license}
-              onChange={(e) => publicMut.mutate(e.currentTarget.checked)}
-            />
-          </Group>
-          {!data?.license && (
-            <Text size="sm" c="dimmed">
-              Set a license first to make this project public.
-            </Text>
-          )}
-        </Stack>
-      )}
+    <Stack style={{ maxWidth: 900 }} gap="md">
+      <Tabs defaultValue="metadata">
+        <Tabs.List>
+          <Tabs.Tab value="metadata">Metadata</Tabs.Tab>
+          <Tabs.Tab value="settings">Settings</Tabs.Tab>
+          {isOwner && <Tabs.Tab value="releases">Releases</Tabs.Tab>}
+          <Tabs.Tab value="tools">Tools</Tabs.Tab>
+        </Tabs.List>
 
-      {/* 1. Main metadata form: the core editable project fields + Save. Note that the GBIF map
-          toggle and the identifier scopes editor are NOT rendered here -- they're bound to this
-          same `form` object (see form.getInputProps below) but visually live in the Settings
-          section further down the page; Mantine's form state is independent of DOM position, so
-          this Save button still submits their values along with everything below. */}
-      <form
+        {/* Metadata: the core bibliographic form + Save. The Settings tab's fields (GBIF map toggle,
+            citation style, identifier scopes) are bound to this SAME `form` object -- Mantine form
+            state is independent of DOM/tab position, so either tab's Save submits everything, and
+            the Settings tab's Save targets this form by id. */}
+        <Tabs.Panel value="metadata" pt="md">
+          <form
         id="project-metadata-form"
         onSubmit={form.onSubmit((v) => {
           // Blank rows (added via "Add scope" but never filled in) are dropped rather than saved
@@ -404,15 +387,13 @@ export default function ProjectMetadataPage() {
           </Stack>
         </fieldset>
       </form>
+        </Tabs.Panel>
 
-      {/* 2. Releases (owner-only): publish form + release list (publishing gated on a license, B2,
-          see ReleaseService.publish). The Public toggle lives at the very top of the page. */}
-      {isOwner && (
-        <Stack gap="xs">
-          <Divider />
-          <Title order={4} m={0}>
-            Releases
-          </Title>
+        {/* Releases (owner-only): publish form + release list (publishing gated on a license, B2,
+            see ReleaseService.publish). */}
+        {isOwner && (
+          <Tabs.Panel value="releases" pt="md">
+            <Stack gap="xs">
           <Group align="flex-end" gap="xs">
             <TextInput
               label="Version"
@@ -471,17 +452,38 @@ export default function ProjectMetadataPage() {
               </Table.Tbody>
             </Table>
           )}
-        </Stack>
-      )}
+            </Stack>
+          </Tabs.Panel>
+        )}
 
-      {/* 3. Settings: project-level configuration that isn't part of the core bibliographic
-          metadata above -- the GBIF occurrence map toggle and the identifier scopes editor. Both
-          are still bound to `form` (see the comment on the <form> above) and disabled the same
-          way the main metadata fields are (fieldset disabled={!canEdit}). */}
-      <Stack gap="md">
-        <Title order={4} m={0}>
-          Settings
-        </Title>
+        {/* Settings: public visibility + project-level configuration (GBIF occurrence map toggle,
+            citation style, identifier scopes). The form-bound fields target the metadata form by id,
+            so the Save here submits everything at once. */}
+        <Tabs.Panel value="settings" pt="md">
+          <Stack gap="md">
+            {isOwner && (
+              <Stack gap="xs">
+                <Group justify="space-between">
+                  <div>
+                    <Text fw={600}>Public</Text>
+                    <Text size="sm" c="dimmed">
+                      List this project on the public landing page and publish its releases.
+                    </Text>
+                  </div>
+                  <Switch
+                    aria-label="Public"
+                    checked={data?.public ?? false}
+                    disabled={!data?.license}
+                    onChange={(e) => publicMut.mutate(e.currentTarget.checked)}
+                  />
+                </Group>
+                {!data?.license && (
+                  <Text size="sm" c="dimmed">
+                    Set a license first to make this project public.
+                  </Text>
+                )}
+              </Stack>
+            )}
         <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
           <Stack gap="md">
             <Switch
@@ -605,24 +607,20 @@ export default function ProjectMetadataPage() {
             Manage property keys…
           </Button>
         </Stack>
-      </Stack>
+          </Stack>
+          {/* Saves the metadata + settings form (targets the metadata form by id -- Mantine reads
+              values from form state, not DOM/tab position). */}
+          <Group>
+            <Button type="submit" form="project-metadata-form" loading={mutation.isPending} disabled={!canEdit}>
+              Save
+            </Button>
+          </Group>
+        </Tabs.Panel>
 
-      {/* A second Save, mirroring the one at the top: the metadata form + Settings make a long
-          section, so this saves the whole thing (it submits the form above by id -- Mantine reads
-          the values from form state, not DOM position) without scrolling back up to the first Save. */}
-      <Group>
-        <Button type="submit" form="project-metadata-form" loading={mutation.isPending} disabled={!canEdit}>
-          Save
-        </Button>
-      </Group>
-
-      {/* 4. Tools: one-off actions over the project's data -- export, bulk identifier matching,
-          and the supervised project merge. */}
-      <Stack gap="md">
-        <Divider />
-        <Title order={4} m={0}>
-          Tools
-        </Title>
+        {/* Tools: one-off actions over the project's data -- export, bulk identifier matching, the
+            supervised project merge, and (owner) deleting the project. */}
+        <Tabs.Panel value="tools" pt="md">
+          <Stack gap="md">
 
         <Stack gap="xs">
           <Group justify="space-between">
@@ -752,17 +750,15 @@ export default function ProjectMetadataPage() {
             <PropertyKeysModal pid={id} opened={propKeysOpen} onClose={() => setPropKeysOpen(false)} />
           </Stack>
         )}
-      </Stack>
-
-      {/* 5. Danger zone (owner-only): stays at the very bottom. */}
-      {isOwner && (
-        <Stack
-          gap="xs"
-          style={{
-            borderTop: '1px solid var(--mantine-color-red-4)',
-            paddingTop: 'var(--mantine-spacing-md)',
-          }}
-        >
+          {/* Danger zone (owner-only). */}
+          {isOwner && (
+            <Stack
+              gap="xs"
+              style={{
+                borderTop: '1px solid var(--mantine-color-red-4)',
+                paddingTop: 'var(--mantine-spacing-md)',
+              }}
+            >
           <Group justify="space-between">
             <Title order={4} m={0} c="red">
               Danger zone
@@ -781,8 +777,11 @@ export default function ProjectMetadataPage() {
             Permanently deletes this project and all of its names, references, and history. This
             cannot be undone.
           </Text>
-        </Stack>
-      )}
+            </Stack>
+          )}
+          </Stack>
+        </Tabs.Panel>
+      </Tabs>
     </Stack>
   );
 }

@@ -30,6 +30,12 @@ function renderPage() {
   );
 }
 
+// The page is split into Metadata / Settings / Releases / Tools tabs; content in an inactive tab is
+// hidden (role queries exclude it), so a test must open the tab holding what it exercises first.
+async function openTab(name: 'Metadata' | 'Settings' | 'Releases' | 'Tools') {
+  await userEvent.click(await screen.findByRole('tab', { name }));
+}
+
 // Shared default: no COL match run has ever been started for this project. Individual tests that
 // care about the latest-run view override this with server.use(...) (MSW's last-registered handler
 // for a given route wins).
@@ -73,12 +79,10 @@ test('a second Save button below Settings submits the same metadata form', async
   renderPage();
   await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Mammals'));
 
-  // Two identical "Save" buttons now: the original at the top of the form and a second one after the
-  // Settings section. The lower one targets the same form (via the form= attribute), so clicking it
-  // submits the same metadata without scrolling back to the top.
-  const saves = screen.getAllByRole('button', { name: /save/i });
-  expect(saves).toHaveLength(2);
-  await userEvent.click(saves[1]);
+  // The Settings tab has its own Save that targets the metadata form by id (Mantine reads values
+  // from form state, not DOM/tab position), so clicking it submits the same metadata.
+  await openTab('Settings');
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(puts).toBe(1));
 });
 
@@ -97,6 +101,7 @@ test('citation style: seeds the Select from the project and saves a changed valu
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
+  await openTab('Settings');
   const styleSelect = screen.getByRole('textbox', { name: 'Citation style' });
   await waitFor(() => expect(styleSelect).toHaveValue('Harvard'));
 
@@ -147,6 +152,7 @@ test('identifier scopes: prefills configured rows, defaults the COL dataset key,
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
+  await openTab('Settings');
   // Prefilled from the loaded project: row 1 is 'ipni' with an empty (null -> '') dataset key.
   const scopeRow1 = await screen.findByRole('textbox', { name: 'Scope 1' });
   await waitFor(() => expect(scopeRow1).toHaveValue('ipni'));
@@ -193,6 +199,7 @@ test('identifier scopes: removing a row drops it from the saved payload', async 
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
+  await openTab('Settings');
   await waitFor(() =>
     expect(screen.getByRole('textbox', { name: 'Scope 2' })).toHaveValue('gbif'),
   );
@@ -269,6 +276,7 @@ test(
     const title = await screen.findByLabelText('Title');
     await waitFor(() => expect(title).toHaveValue('Mammals'));
 
+    await openTab('Tools');
     await userEvent.click(screen.getByRole('button', { name: 'Match all identifiers' }));
 
     // RUNNING: a progress indicator over the mocked 1-of-2 poll response.
@@ -305,6 +313,7 @@ test('a project with no matchable identifier scope disables "Match all identifie
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
+  await openTab('Tools');
   // No entry in identifierScopes has a non-blank datasetKey -- a run would be a no-op (total 0),
   // so the button stays disabled and a hint points the user at the fix (below, in the row editor).
   expect(screen.getByRole('button', { name: 'Match all identifiers' })).toBeDisabled();
@@ -323,6 +332,7 @@ test('a project with a matchable identifier scope enables "Match all identifiers
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
+  await openTab('Tools');
   expect(screen.getByRole('button', { name: 'Match all identifiers' })).not.toBeDisabled();
   expect(
     screen.queryByText('Configure an identifier scope with a dataset key below to enable matching.'),
@@ -373,8 +383,9 @@ test('a DONE latest run renders its summary on mount without the user clicking',
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
-  // No click on "Match all identifiers" anywhere in this test -- the summary must appear purely
+  // Open the Tools tab but do NOT click "Match all identifiers" -- the summary must appear purely
   // from the load-on-mount latest-run lookup seeding matchRunId.
+  await openTab('Tools');
   await waitFor(() => expect(screen.getByText('added 1')).toBeInTheDocument());
   expect(screen.getByText('verified 1')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Match all identifiers' })).not.toBeDisabled();
@@ -421,6 +432,7 @@ test('a RUNNING latest run disables the button and resumes the progress display 
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
+  await openTab('Tools');
   await waitFor(() => expect(screen.getByText(/Matched 1 of 4/)).toBeInTheDocument());
   expect(screen.getByRole('button', { name: 'Match all identifiers' })).toBeDisabled();
 });
@@ -443,6 +455,7 @@ test(
     const title = await screen.findByLabelText('Title');
     await waitFor(() => expect(title).toHaveValue('Mammals'));
 
+    await openTab('Tools');
     await userEvent.click(screen.getByRole('button', { name: 'Match all identifiers' }));
 
     // Generous timeout (like the poll-driven assertions elsewhere in this file): this file's form
@@ -523,6 +536,7 @@ test(
     const title = await screen.findByLabelText('Title');
     await waitFor(() => expect(title).toHaveValue('Mammals'));
 
+    await openTab('Tools');
     await userEvent.click(screen.getByRole('button', { name: 'Export ColDP' }));
 
     // RUNNING: a simple status line (the export job has no total/processed tally to show progress).
@@ -586,8 +600,9 @@ test('a DONE latest export renders its Download link on mount without the user c
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
-  // No click on "Export ColDP" anywhere in this test -- the Download link must appear purely from
-  // the load-on-mount latest-run lookup seeding exportRunId.
+  // Open Tools but do NOT click "Export ColDP" -- the Download link must appear purely from the
+  // load-on-mount latest-run lookup seeding exportRunId.
+  await openTab('Tools');
   await waitFor(() => expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument());
   expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute(
     'href',
@@ -613,6 +628,7 @@ test(
     const title = await screen.findByLabelText('Title');
     await waitFor(() => expect(title).toHaveValue('Mammals'));
 
+    await openTab('Tools');
     await userEvent.click(screen.getByRole('button', { name: 'Export ColDP' }));
 
     // Generous timeout -- see the analogous "starting a match run..." test above for why.
@@ -692,6 +708,8 @@ test('owner can toggle public and publish a release', async () => {
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
+  // The Public toggle lives on the Settings tab; publishing a release on the Releases tab.
+  await openTab('Settings');
   const publicSwitch = screen.getByRole('switch', { name: 'Public' });
   expect(publicSwitch).not.toBeChecked();
   await userEvent.click(publicSwitch);
@@ -700,6 +718,7 @@ test('owner can toggle public and publish a release', async () => {
   // both the request happened AND the page picked up the result.
   await waitFor(() => expect(publicSwitch).toBeChecked());
 
+  await openTab('Releases');
   await userEvent.type(screen.getByLabelText('Version'), '1.0');
   await userEvent.click(screen.getByRole('button', { name: 'Publish release' }));
 
@@ -718,9 +737,11 @@ test('a license-less project disables the Public toggle and Publish release butt
   const title = await screen.findByLabelText('Title');
   await waitFor(() => expect(title).toHaveValue('Mammals'));
 
+  await openTab('Settings');
   expect(screen.getByRole('switch', { name: 'Public' })).toBeDisabled();
   expect(screen.getByText('Set a license first to make this project public.')).toBeInTheDocument();
 
+  await openTab('Releases');
   await userEvent.type(screen.getByLabelText('Version'), '1.0');
   expect(screen.getByRole('button', { name: 'Publish release' })).toBeDisabled();
   expect(screen.getByText('Set a license first to publish a release.')).toBeInTheDocument();
