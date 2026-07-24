@@ -139,7 +139,7 @@ export interface NameUsage {
   genderAgreement: boolean | null;
   // Read-only: the grammatical gender of the nearest genus ancestor, shown on the form for a
   // bi/trinomial. Null on list/search responses (computed only on the detail path).
-  ancestorGenusGender: string | null;
+  genusGender: string | null;
   etymology: string | null;
   nameType: string | null;
   parseState: string | null;

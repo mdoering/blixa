@@ -839,9 +839,13 @@ public class NameUsageService {
     List<Integer> synonymIds = Status.ACCEPTED == u.getStatus()
         ? synonymAccepted.findSynonymsOf(u.getProjectId(), u.getId())
         : List.of();
-    // The parent genus's gender, shown read-only on the form for a bi/trinomial. Detail path only.
-    String ancestorGenusGender = usages.findAncestorGenusGender(u.getProjectId(), u.getId());
-    return NameUsageResponse.of(u, formattedName, acceptedParentIds, synonymIds, ancestorGenusGender);
+    // The gender of the name's NOMENCLATURAL genus (its own genus token, not the classification
+    // ancestor), shown read-only on the form for a bi/trinomial. Null for a uninomial (no genus
+    // token) and when the genus isn't a usage here. Detail path only.
+    String genusGender = u.getGenus() == null || u.getGenus().isBlank()
+        ? null
+        : usages.findGenusGenderByName(u.getProjectId(), u.getGenus());
+    return NameUsageResponse.of(u, formattedName, acceptedParentIds, synonymIds, genusGender);
   }
 
   // Cheap response for list/search hot paths: avoids the full name-parser re-parse and the

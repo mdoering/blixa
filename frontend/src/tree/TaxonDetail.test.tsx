@@ -704,7 +704,7 @@ test('gender is an editable Select on a genus, with no agreement checkbox', asyn
 });
 
 test('a species shows the derived parent-genus gender read-only + an agreement checkbox', async () => {
-  mockCommon(baseUsage({ ancestorGenusGender: 'FEMININE', genderAgreement: true }));
+  mockCommon(baseUsage({ genusGender: 'FEMININE', genderAgreement: true }));
   renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
 
   const derived = await screen.findByLabelText('Gender (from parent genus)');

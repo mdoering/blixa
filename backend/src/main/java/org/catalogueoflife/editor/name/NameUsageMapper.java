@@ -277,20 +277,22 @@ public interface NameUsageMapper {
       """)
   String findAncestorGenusName(@Param("projectId") int projectId, @Param("id") int id);
 
-  // Grammatical gender of the nearest STRICT genus ancestor -- the gender a bi/trinomial's epithets
-  // must agree with -- or null. Read-only display on the name form (NameUsageResponse.ancestorGenusGender).
+  // Grammatical gender of a bi/trinomial's NOMENCLATURAL genus -- the gender its epithets must agree
+  // with -- looked up by the genus token in the name (not the classification ancestor: the two
+  // coincide for an accepted name but diverge for a synonym, whose own genus usually differs from the
+  // accepted hierarchy it hangs under). Finds a rank=genus usage named `genus` that carries a gender,
+  // preferring an accepted one; null when no such genus usage exists (e.g. a synonym whose old
+  // combination's genus isn't in this project). Read-only display on the name form
+  // (NameUsageResponse.genusGender). uninomial is the parsed bare genus name (no authorship), so it's
+  // the reliable match; scientific_name is a fallback for a genus whose uninomial didn't parse.
   @Select("""
-      WITH RECURSIVE anc AS (
-        SELECT project_id, id, parent_id, rank, gender, 0 AS depth
-        FROM name_usage WHERE project_id = #{projectId} AND id = #{id}
-        UNION ALL
-        SELECT n.project_id, n.id, n.parent_id, n.rank, n.gender, anc.depth + 1
-        FROM name_usage n JOIN anc ON n.project_id = anc.project_id AND n.id = anc.parent_id
-        WHERE anc.depth < 10000
-      )
-      SELECT gender FROM anc WHERE depth > 0 AND rank = 'genus' ORDER BY depth LIMIT 1
+      SELECT gender FROM name_usage
+      WHERE project_id = #{projectId} AND rank = 'genus' AND gender IS NOT NULL
+        AND (uninomial = #{genus} OR scientific_name = #{genus})
+      ORDER BY (status = 'ACCEPTED') DESC, id
+      LIMIT 1
       """)
-  String findAncestorGenusGender(@Param("projectId") int projectId, @Param("id") int id);
+  String findGenusGenderByName(@Param("projectId") int projectId, @Param("genus") String genus);
 
   // Full higher classification of a usage: every STRICT ancestor (depth > 0, self excluded),
   // root-first (ORDER BY depth DESC), skipping unranked ancestors -- fed to the COL name matcher

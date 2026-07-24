@@ -646,7 +646,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                     <TextInput
                       label="Gender (from parent genus)"
                       readOnly
-                      value={usage.ancestorGenusGender ?? '—'}
+                      value={usage.genusGender ?? '—'}
                     />
                     <Checkbox
                       mt={30}

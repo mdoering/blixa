@@ -46,9 +46,10 @@ public record NameUsageResponse(
     String publishedInPageLink,
     String gender,
     Boolean genderAgreement,
-    // Read-only: the grammatical gender of the nearest genus ancestor (for a bi/trinomial the epithets
-    // must agree with it). Computed only on the detail path -- null on list/search responses.
-    String ancestorGenusGender,
+    // Read-only: the grammatical gender of the name's NOMENCLATURAL genus (the genus token in the
+    // name; for a bi/trinomial the epithets must agree with it) -- not the classification ancestor,
+    // which diverges for synonyms. Computed only on the detail path -- null on list/search responses.
+    String genusGender,
     String etymology,
     String nameType,
     String parseState,
@@ -59,7 +60,7 @@ public record NameUsageResponse(
     Integer version) {
 
   public static NameUsageResponse of(NameUsage u, String formattedName, List<Integer> acceptedParentIds,
-      List<Integer> synonymIds, String ancestorGenusGender) {
+      List<Integer> synonymIds, String genusGender) {
     return new NameUsageResponse(u.getId(), u.getParentId(), u.getAlternativeId(), name(u.getStatus()),
         u.getNamePhrase(), u.getReferenceId(),
         u.getExtinct(), names(u.getEnvironment()), u.getTemporalRangeStart(), u.getTemporalRangeEnd(),
@@ -69,7 +70,7 @@ public record NameUsageResponse(
         u.getCombinationAuthorshipYear(), u.getBasionymAuthorship(), u.getBasionymExAuthorship(),
         u.getBasionymAuthorshipYear(), u.getSanctioningAuthor(), name(u.getNomStatus()),
         u.getPublishedInReferenceId(), u.getPublishedInYear(), u.getPublishedInPage(),
-        u.getPublishedInPageLink(), name(u.getGender()), u.getGenderAgreement(), ancestorGenusGender,
+        u.getPublishedInPageLink(), name(u.getGender()), u.getGenderAgreement(), genusGender,
         u.getEtymology(), name(u.getNameType()), u.getParseState(),
         u.getRemarks(), formattedName, acceptedParentIds, synonymIds, u.getVersion());
   }
