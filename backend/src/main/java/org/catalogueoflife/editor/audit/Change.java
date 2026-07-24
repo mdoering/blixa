@@ -21,7 +21,10 @@ public class Change {
   private Integer entityId;
   private String operation;
   private String diff;
-  private Integer taskId;
+  // The objective (an OPEN discussion) this change was authored under, or null (ungrouped). The
+  // title is a read-only join for display (see ChangeMapper), never inserted.
+  private Integer discussionId;
+  private String discussionTitle;
 
   public Integer getId() { return id; }
   public void setId(Integer id) { this.id = id; }
@@ -41,6 +44,8 @@ public class Change {
   public void setOperation(String operation) { this.operation = operation; }
   public String getDiff() { return diff; }
   public void setDiff(String diff) { this.diff = diff; }
-  public Integer getTaskId() { return taskId; }
-  public void setTaskId(Integer taskId) { this.taskId = taskId; }
+  public Integer getDiscussionId() { return discussionId; }
+  public void setDiscussionId(Integer discussionId) { this.discussionId = discussionId; }
+  public String getDiscussionTitle() { return discussionTitle; }
+  public void setDiscussionTitle(String discussionTitle) { this.discussionTitle = discussionTitle; }
 }

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { api, ApiError } from './client';
+import { writeActiveObjectiveId } from './activeObjective';
 
 describe('api client', () => {
   beforeEach(() => {
@@ -8,6 +9,40 @@ describe('api client', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+    localStorage.clear();
+  });
+
+  test('a write to a project attaches the active objective as X-Objective-Id', async () => {
+    writeActiveObjectiveId(4, 42);
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+    await api('/api/projects/4/references', { method: 'POST', json: { citation: 'x' } });
+    const [, init] = fetchMock.mock.calls.at(-1)!;
+    expect((init?.headers as Record<string, string>)['X-Objective-Id']).toBe('42');
+  });
+
+  test('no active objective -> no X-Objective-Id header (ungrouped, the default)', async () => {
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+    await api('/api/projects/4/references', { method: 'POST', json: { citation: 'x' } });
+    const [, init] = fetchMock.mock.calls.at(-1)!;
+    expect((init?.headers as Record<string, string>)['X-Objective-Id']).toBeUndefined();
+  });
+
+  test('the objective header is never sent on a GET', async () => {
+    writeActiveObjectiveId(4, 42);
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), { status: 200 }),
+    );
+    await api('/api/projects/4/references');
+    const [, init] = fetchMock.mock.calls.at(-1)!;
+    expect((init?.headers as Record<string, string>)['X-Objective-Id']).toBeUndefined();
+  });
+
+  test("a different project's write does not carry project 4's objective", async () => {
+    writeActiveObjectiveId(4, 42);
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+    await api('/api/projects/9/references', { method: 'POST', json: { citation: 'x' } });
+    const [, init] = fetchMock.mock.calls.at(-1)!;
+    expect((init?.headers as Record<string, string>)['X-Objective-Id']).toBeUndefined();
   });
 
   test('GET sends credentials and no CSRF header', async () => {

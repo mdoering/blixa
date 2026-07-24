@@ -1,7 +1,7 @@
 # Work objective = discussion — design
 
 **Date:** 2026-07-24
-**Status:** approved (pending spec review)
+**Status:** implemented (2026-07-24)
 
 ## Problem
 

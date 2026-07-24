@@ -55,8 +55,8 @@ export const server = setupServer(
       acquiredAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + 300_000).toISOString(),
       heldByMe: true,
-      taskId: null,
-      taskTitle: null,
+      discussionId: null,
+      discussionTitle: null,
     });
   }),
   http.delete('/api/projects/:pid/locks/:id', () => new HttpResponse(null, { status: 204 })),

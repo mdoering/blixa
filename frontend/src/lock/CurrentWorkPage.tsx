@@ -1,4 +1,4 @@
-import { Anchor, Button, Group, Stack, Table, Text, Title } from '@mantine/core';
+import { Anchor, Badge, Button, Group, Stack, Table, Text, Title } from '@mantine/core';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -45,6 +45,7 @@ export default function CurrentWorkPage() {
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Name/entity</Table.Th>
+              <Table.Th>Objective</Table.Th>
               <Table.Th>Holder</Table.Th>
               <Table.Th>Since</Table.Th>
               <Table.Th>Expires</Table.Th>
@@ -58,6 +59,17 @@ export default function CurrentWorkPage() {
                   <Anchor component={Link} to={`/projects/${pid}/names?usage=${lock.entityId}`} size="sm">
                     {lock.entityType} #{lock.entityId}
                   </Anchor>
+                </Table.Td>
+                <Table.Td>
+                  {lock.discussionTitle ? (
+                    <Badge size="sm" variant="light" color="grape">
+                      {lock.discussionTitle}
+                    </Badge>
+                  ) : (
+                    <Text size="sm" c="dimmed">
+                      —
+                    </Text>
+                  )}
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm">

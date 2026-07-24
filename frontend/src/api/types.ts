@@ -300,7 +300,9 @@ export interface IssueSummary {
   bySeverity: Record<string, number>;
 }
 
-// Mirrors backend Change (audit log row). `diff` is a raw JSON string.
+// Mirrors backend Change (audit log row). `diff` is a raw JSON string. The objective this change
+// was authored under is an OPEN discussion (the task entity was retired); discussionTitle is a
+// read-only join for display.
 export interface Change {
   id: number;
   userId: number;
@@ -310,19 +312,14 @@ export interface Change {
   entityId: number;
   operation: string;
   diff: string;
-  taskId: number | null;
-}
-
-// Mirrors backend TaskResponse (subset used by the History task filter).
-export interface Task {
-  id: number;
-  title: string;
-  status: string;
+  discussionId: number | null;
+  discussionTitle: string | null;
 }
 
 // Mirrors backend LockResponse: a soft lock on an entity (e.g. a name_usage), held by a user for
 // a limited time (see api/locks.ts). `heldByMe` distinguishes the caller's own lock from someone
-// else's; `taskId`/`taskTitle` are set when the lock was acquired as part of a task.
+// else's; `discussionId`/`discussionTitle` are set when the lock was acquired under an objective
+// (an OPEN discussion).
 export interface Lock {
   id: number;
   entityType: string;
@@ -332,6 +329,6 @@ export interface Lock {
   acquiredAt: string;
   expiresAt: string;
   heldByMe: boolean;
-  taskId: number | null;
-  taskTitle: string | null;
+  discussionId: number | null;
+  discussionTitle: string | null;
 }

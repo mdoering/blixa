@@ -4,7 +4,8 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { listChanges, listTasks } from '../api/changes';
+import { listChanges } from '../api/changes';
+import { listDiscussions } from '../api/discussions';
 import type { Change } from '../api/types';
 
 dayjs.extend(relativeTime);
@@ -50,6 +51,11 @@ function ChangeRow({ change, pid }: { change: Change; pid: number }) {
           )}
         </Group>
         <Group gap="xs" wrap="nowrap">
+          {change.discussionTitle && (
+            <Badge size="sm" variant="light" color="grape" title="Objective">
+              {change.discussionTitle}
+            </Badge>
+          )}
           <Text size="sm" c="dimmed">
             {change.username ?? 'unknown'}
           </Text>
@@ -68,19 +74,22 @@ function ChangeRow({ change, pid }: { change: Change; pid: number }) {
 }
 
 // Project-level audit log (changelog): reverse-chronological changes with a collapsible JSON diff,
-// filterable by task. Read-only; any project member may view.
+// filterable by objective (an OPEN discussion). Read-only; any project member may view.
 export default function HistoryPage() {
   const { projectId } = useParams();
   const pid = Number(projectId);
-  const [taskId, setTaskId] = useState<string | null>(null);
+  const [objectiveId, setObjectiveId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
-  const { data: tasks } = useQuery({ queryKey: ['tasks', pid], queryFn: () => listTasks(pid) });
+  const { data: objectives } = useQuery({
+    queryKey: ['objectives', pid],
+    queryFn: () => listDiscussions(pid, { status: 'OPEN', limit: 100, offset: 0 }),
+  });
   const { data: changes } = useQuery({
-    queryKey: ['changes', pid, taskId, page],
+    queryKey: ['changes', pid, objectiveId, page],
     queryFn: () =>
       listChanges(pid, {
-        taskId: taskId ? Number(taskId) : undefined,
+        discussionId: objectiveId ? Number(objectiveId) : undefined,
         limit: PAGE,
         offset: page * PAGE,
       }),
@@ -95,13 +104,13 @@ export default function HistoryPage() {
           History
         </Title>
         <Select
-          placeholder="All tasks"
+          placeholder="All objectives"
           clearable
-          w={220}
-          data={(tasks ?? []).map((t) => ({ value: String(t.id), label: t.title }))}
-          value={taskId}
+          w={240}
+          data={(objectives?.items ?? []).map((d) => ({ value: String(d.id), label: d.title }))}
+          value={objectiveId}
           onChange={(v) => {
-            setTaskId(v);
+            setObjectiveId(v);
             setPage(0);
           }}
         />

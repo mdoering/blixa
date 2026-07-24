@@ -1,4 +1,5 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { expect, test } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders } from '../test/utils';
@@ -14,23 +15,34 @@ function renderPage() {
   );
 }
 
-test('renders changes with operation, entity, and author', async () => {
+// The objective filter is fed by the OPEN discussions list.
+function mockObjectives(items: { id: number; title: string }[] = []) {
   server.use(
-    http.get('/api/projects/3/tasks', () => HttpResponse.json([])),
+    http.get('/api/projects/3/discussions', () =>
+      HttpResponse.json({ items: items.map((i) => ({ ...i, status: 'OPEN' })), total: items.length }),
+    ),
+  );
+}
+
+const change = (over: Record<string, unknown>) => ({
+  id: 1,
+  userId: 1,
+  username: 'admin',
+  at: '2026-07-09T10:00:00Z',
+  entityType: 'name_usage',
+  entityId: 9,
+  operation: 'UPDATE',
+  diff: '{}',
+  discussionId: null,
+  discussionTitle: null,
+  ...over,
+});
+
+test('renders changes with operation, entity, and author', async () => {
+  mockObjectives();
+  server.use(
     http.get('/api/projects/3/changes', () =>
-      HttpResponse.json([
-        {
-          id: 1,
-          userId: 1,
-          username: 'admin',
-          at: '2026-07-09T10:00:00Z',
-          entityType: 'name_usage',
-          entityId: 9,
-          operation: 'UPDATE',
-          diff: '{"status":{"from":"ACCEPTED","to":"SYNONYM"}}',
-          taskId: null,
-        },
-      ]),
+      HttpResponse.json([change({ diff: '{"status":{"from":"ACCEPTED","to":"SYNONYM"}}' })]),
     ),
   );
   renderPage();
@@ -40,52 +52,40 @@ test('renders changes with operation, entity, and author', async () => {
 });
 
 test('shows an empty state when there are no changes', async () => {
-  server.use(
-    http.get('/api/projects/3/tasks', () => HttpResponse.json([])),
-    http.get('/api/projects/3/changes', () => HttpResponse.json([])),
-  );
+  mockObjectives();
+  server.use(http.get('/api/projects/3/changes', () => HttpResponse.json([])));
   renderPage();
   expect(await screen.findByText('No changes')).toBeInTheDocument();
 });
 
-test('links a name_usage change to the Names page, a reference change to References, and no link for a deletion', async () => {
+test('shows the objective on a change row and filters by objective', async () => {
+  mockObjectives([{ id: 5, title: 'Revise Felidae' }]);
+  let lastUrl = '';
   server.use(
-    http.get('/api/projects/3/tasks', () => HttpResponse.json([])),
+    http.get('/api/projects/3/changes', ({ request }) => {
+      lastUrl = request.url;
+      return HttpResponse.json([change({ discussionId: 5, discussionTitle: 'Revise Felidae' })]);
+    }),
+  );
+  renderPage();
+
+  // the objective title shows on the change row (show-on-rows)
+  await waitFor(() => expect(screen.getAllByText('Revise Felidae').length).toBeGreaterThan(0));
+
+  // picking the objective in the filter re-queries with discussionId
+  await userEvent.click(screen.getByPlaceholderText('All objectives'));
+  await userEvent.click(await screen.findByRole('option', { name: 'Revise Felidae' }));
+  await waitFor(() => expect(lastUrl).toContain('discussionId=5'));
+});
+
+test('links a name_usage change to Names, a reference change to References, and no link for a deletion', async () => {
+  mockObjectives();
+  server.use(
     http.get('/api/projects/3/changes', () =>
       HttpResponse.json([
-        {
-          id: 1,
-          userId: 1,
-          username: 'admin',
-          at: '2026-07-09T10:00:00Z',
-          entityType: 'name_usage',
-          entityId: 9,
-          operation: 'UPDATE',
-          diff: '{}',
-          taskId: null,
-        },
-        {
-          id: 2,
-          userId: 1,
-          username: 'admin',
-          at: '2026-07-09T10:00:00Z',
-          entityType: 'reference',
-          entityId: 42,
-          operation: 'CREATE',
-          diff: '{}',
-          taskId: null,
-        },
-        {
-          id: 3,
-          userId: 1,
-          username: 'admin',
-          at: '2026-07-09T10:00:00Z',
-          entityType: 'name_usage',
-          entityId: 7,
-          operation: 'DELETE',
-          diff: '{}',
-          taskId: null,
-        },
+        change({ id: 1, entityType: 'name_usage', entityId: 9, operation: 'UPDATE' }),
+        change({ id: 2, entityType: 'reference', entityId: 42, operation: 'CREATE' }),
+        change({ id: 3, entityType: 'name_usage', entityId: 7, operation: 'DELETE' }),
       ]),
     ),
   );
@@ -93,11 +93,8 @@ test('links a name_usage change to the Names page, a reference change to Referen
 
   const usageLink = await screen.findByRole('link', { name: 'name_usage #9' });
   expect(usageLink).toHaveAttribute('href', '/projects/3/names?usage=9');
-
   const refLink = screen.getByRole('link', { name: 'reference #42' });
   expect(refLink).toHaveAttribute('href', '/projects/3/references?ref=42');
-
-  // Deleted entities are gone -- plain text, no link.
   expect(screen.getByText('name_usage #7')).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'name_usage #7' })).not.toBeInTheDocument();
 });

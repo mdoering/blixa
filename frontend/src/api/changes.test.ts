@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 import { server, http, HttpResponse } from '../test/server';
-import { listChanges, listTasks } from './changes';
+import { listChanges } from './changes';
 
-test('listChanges sends taskId/limit/offset', async () => {
+test('listChanges sends discussionId/limit/offset', async () => {
   let url = '';
   server.use(
     http.get('/api/projects/3/changes', ({ request }) => {
@@ -10,13 +10,13 @@ test('listChanges sends taskId/limit/offset', async () => {
       return HttpResponse.json([]);
     }),
   );
-  await listChanges(3, { taskId: 7, limit: 25, offset: 25 });
-  expect(url).toContain('taskId=7');
+  await listChanges(3, { discussionId: 7, limit: 25, offset: 25 });
+  expect(url).toContain('discussionId=7');
   expect(url).toContain('limit=25');
   expect(url).toContain('offset=25');
 });
 
-test('listChanges omits taskId when not given', async () => {
+test('listChanges omits discussionId when not given', async () => {
   let url = '';
   server.use(
     http.get('/api/projects/3/changes', ({ request }) => {
@@ -25,17 +25,5 @@ test('listChanges omits taskId when not given', async () => {
     }),
   );
   await listChanges(3, { limit: 25, offset: 0 });
-  expect(url).not.toContain('taskId');
-});
-
-test('listTasks GETs the tasks endpoint', async () => {
-  let called = false;
-  server.use(
-    http.get('/api/projects/3/tasks', () => {
-      called = true;
-      return HttpResponse.json([]);
-    }),
-  );
-  await listTasks(3);
-  expect(called).toBe(true);
+  expect(url).not.toContain('discussionId');
 });

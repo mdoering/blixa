@@ -28,8 +28,8 @@ test('renders active locks with entity link, holder, and expiry', async () => {
           acquiredAt: '2026-07-09T10:00:00Z',
           expiresAt: '2026-07-09T10:05:00Z',
           heldByMe: true,
-          taskId: null,
-          taskTitle: null,
+          discussionId: 5,
+          discussionTitle: 'Revise Felidae',
         },
         {
           id: 2,
@@ -40,8 +40,8 @@ test('renders active locks with entity link, holder, and expiry', async () => {
           acquiredAt: '2026-07-09T09:00:00Z',
           expiresAt: '2026-07-09T09:05:00Z',
           heldByMe: false,
-          taskId: null,
-          taskTitle: null,
+          discussionId: null,
+          discussionTitle: null,
         },
       ]),
     ),
@@ -56,6 +56,8 @@ test('renders active locks with entity link, holder, and expiry', async () => {
   expect(screen.getByText(/alice/)).toBeInTheDocument();
   expect(screen.getByText(/\(you\)/)).toBeInTheDocument();
   expect(screen.getByText('bob')).toBeInTheDocument();
+  // the objective (discussion) title shows in the Objective column of the locking row.
+  expect(screen.getByText('Revise Felidae')).toBeInTheDocument();
 
   // Only the heldByMe row shows a Release button.
   expect(screen.getAllByRole('button', { name: 'Release' })).toHaveLength(1);
@@ -83,8 +85,8 @@ test('clicking Release calls releaseLock and refetches the list', async () => {
           acquiredAt: '2026-07-09T10:00:00Z',
           expiresAt: '2026-07-09T10:05:00Z',
           heldByMe: true,
-          taskId: null,
-          taskTitle: null,
+          discussionId: null,
+          discussionTitle: null,
         },
       ]);
     }),

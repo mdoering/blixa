@@ -1,4 +1,13 @@
+import { readActiveObjectiveId } from './activeObjective';
+
 const BASE = import.meta.env.VITE_API_BASE ?? '';
+
+// The project id in an /api/projects/{pid}/... path, or null. Used to attach the active work
+// objective (per project) to writes.
+function projectIdFromPath(path: string): number | null {
+  const m = /\/api\/projects\/(\d+)(?:\/|\?|$)/.exec(path);
+  return m ? Number(m[1]) : null;
+}
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -38,6 +47,14 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     await ensureCsrfCookie();
     const token = readCookie('XSRF-TOKEN');
     if (token) headers['X-XSRF-TOKEN'] = token;
+    // Attach the active work objective (an OPEN discussion) for this write's project, if any, so
+    // the backend stamps the resulting change (and lock) with it. No objective selected -> no
+    // header -> ungrouped, the default. Per-project keyed, so cross-project writes stay correct.
+    const pid = projectIdFromPath(path);
+    if (pid != null) {
+      const objectiveId = readActiveObjectiveId(pid);
+      if (objectiveId != null) headers['X-Objective-Id'] = String(objectiveId);
+    }
   }
 
   if (opts.formData) {

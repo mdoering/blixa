@@ -5,7 +5,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -50,13 +49,14 @@ class LockApiIT extends AbstractPostgresIT {
     return json.readTree(body).get("id").asLong();
   }
 
-  private JsonNode createTask(long pid, String title) throws Exception {
-    String body = mvc.perform(post("/api/projects/" + pid + "/tasks").with(csrf())
+  // The work objective a lock is taken under is an OPEN discussion (the task entity was retired).
+  private long createObjective(long pid, String title) throws Exception {
+    String body = mvc.perform(post("/api/projects/" + pid + "/discussions").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"title\":\"" + title + "\"}"))
-        .andExpect(status().isOk())
+        .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
-    return json.readTree(body);
+    return json.readTree(body).get("id").asLong();
   }
 
   @Test
@@ -151,58 +151,57 @@ class LockApiIT extends AbstractPostgresIT {
   }
 
   @Test
-  @WithMockUser(username = "lockTaskOwner")
-  void acquireCarriesOptionalTaskIntent() throws Exception {
-    ensureUser("lockTaskOwner");
-    long pid = createProject("lockTaskProj");
+  @WithMockUser(username = "lockObjectiveOwner")
+  void acquireCarriesOptionalObjective() throws Exception {
+    ensureUser("lockObjectiveOwner");
+    long pid = createProject("lockObjectiveProj");
 
-    // an open task T -- its title is the "intent" the lock list should surface.
-    JsonNode task = createTask(pid, "Revise genus Abies");
-    long taskId = task.get("id").asLong();
+    // an OPEN discussion D as the objective -- its title is what the lock list should surface.
+    long objId = createObjective(pid, "Revise genus Abies");
 
-    // 1) acquiring WITH taskId -> 200, taskId + taskTitle populated from the task.
+    // 1) acquiring WITH discussionId -> 200, discussionId + discussionTitle populated from it.
     String acquireBody = mvc.perform(post("/api/projects/" + pid + "/locks").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"entityType\":\"name_usage\",\"entityId\":1,\"taskId\":" + taskId + "}"))
+            .content("{\"entityType\":\"name_usage\",\"entityId\":1,\"discussionId\":" + objId + "}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.heldByMe").value(true))
-        .andExpect(jsonPath("$.taskId").value(taskId))
-        .andExpect(jsonPath("$.taskTitle").value("Revise genus Abies"))
+        .andExpect(jsonPath("$.discussionId").value(objId))
+        .andExpect(jsonPath("$.discussionTitle").value("Revise genus Abies"))
         .andReturn().getResponse().getContentAsString();
     long lockId = json.readTree(acquireBody).get("id").asLong();
 
-    // 2) GET /locks shows the same intent (title), not just the id.
+    // 2) GET /locks shows the same objective (title), not just the id.
     mvc.perform(get("/api/projects/" + pid + "/locks"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].id").value(lockId))
-        .andExpect(jsonPath("$[0].taskId").value(taskId))
-        .andExpect(jsonPath("$[0].taskTitle").value("Revise genus Abies"));
+        .andExpect(jsonPath("$[0].discussionId").value(objId))
+        .andExpect(jsonPath("$[0].discussionTitle").value("Revise genus Abies"));
 
-    // 3) acquiring on a DIFFERENT entity with NO taskId still works -- null taskId/taskTitle.
-    String untaskedBody = mvc.perform(post("/api/projects/" + pid + "/locks").with(csrf())
+    // 3) acquiring on a DIFFERENT entity with NO objective still works -- null discussionId/title.
+    String plainBody = mvc.perform(post("/api/projects/" + pid + "/locks").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"entityType\":\"name_usage\",\"entityId\":2}"))
         .andExpect(status().isOk())
         .andReturn().getResponse().getContentAsString();
-    JsonNode untasked = json.readTree(untaskedBody);
-    assertThat(untasked.get("taskId").isNull()).isTrue();
-    assertThat(untasked.get("taskTitle").isNull()).isTrue();
+    JsonNode plain = json.readTree(plainBody);
+    assertThat(plain.get("discussionId").isNull()).isTrue();
+    assertThat(plain.get("discussionTitle").isNull()).isTrue();
 
-    // 4) a nonexistent taskId -> 400.
+    // 4) a nonexistent objective id -> 400.
     mvc.perform(post("/api/projects/" + pid + "/locks").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"entityType\":\"name_usage\",\"entityId\":3,\"taskId\":999999}"))
+            .content("{\"entityType\":\"name_usage\",\"entityId\":3,\"discussionId\":999999}"))
         .andExpect(status().isBadRequest());
 
-    // 5) close the task, then acquiring with its (now closed) id -> 400.
-    mvc.perform(patch("/api/projects/" + pid + "/tasks/" + taskId).with(csrf())
+    // 5) resolve the discussion, then acquiring with its (now non-OPEN) id -> 400.
+    mvc.perform(post("/api/projects/" + pid + "/discussions/" + objId + "/status").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"status\":\"closed\"}"))
+            .content("{\"status\":\"RESOLVED\"}"))
         .andExpect(status().isOk());
     mvc.perform(post("/api/projects/" + pid + "/locks").with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"entityType\":\"name_usage\",\"entityId\":4,\"taskId\":" + taskId + "}"))
+            .content("{\"entityType\":\"name_usage\",\"entityId\":4,\"discussionId\":" + objId + "}"))
         .andExpect(status().isBadRequest());
   }
 }

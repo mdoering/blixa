@@ -15,8 +15,8 @@ function fakeLock(overrides: Partial<Record<string, unknown>> = {}) {
     acquiredAt: '2026-07-12T00:00:00Z',
     expiresAt: '2026-07-12T00:05:00Z',
     heldByMe: false,
-    taskId: null,
-    taskTitle: null,
+    discussionId: null,
+    discussionTitle: null,
     ...overrides,
   };
 }

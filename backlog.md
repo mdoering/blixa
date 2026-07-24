@@ -146,7 +146,15 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 
 - **Tree virtualization** — lazy-per-node is fine for now; needed at Lepidoptera scale (large sibling lists render in full today).
 - **nomStatus as a Select** — currently a free-text input showing the enum name.
-- **Link tracked changes to the current work objective / lock** — a prominent **top-right selector** to pick the active work objective/lock (or **none**) so subsequent tracked changes attach to it. Much of the plumbing may already exist (tasks/work-sessions, soft locks, `discussion_change`); the gap is mainly a convenient, prominent UI switch that sets the active objective for the change log.
+- **Link tracked changes to the current work objective** — *shipped* (spec
+  `docs/superpowers/specs/2026-07-24-work-objective-as-discussion-design.md`). Design pivot: the
+  work objective **is a discussion** — the redundant `task` entity was retired (no data migration;
+  `change.task_id` was null everywhere). A prominent top-right **objective selector** (`AppLayout`)
+  picks/creates an OPEN discussion or **None** (the default; ordinary editing is never gated); the
+  `api()` client sends **`X-Objective-Id`** on writes so `AuditService` stamps `change.discussion_id`,
+  and locks acquired while editing carry `lock.discussion_id` (shown in Activity). History gained an
+  objective filter + shows the objective per change row. Deferred: close/reopen from the selector,
+  server-side (cross-device) active objective.
 
 ## Deployment / docs
 

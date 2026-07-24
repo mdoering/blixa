@@ -11,6 +11,7 @@ import AppFooter from './AppFooter';
 import AccountModal from './AccountModal';
 import BlixaLogo from './BlixaLogo';
 import ColorSchemeToggle from './ColorSchemeToggle';
+import ActiveObjectiveSelector from './ActiveObjectiveSelector';
 import UserAvatar from './UserAvatar';
 
 export default function AppLayout() {
@@ -68,6 +69,7 @@ export default function AppLayout() {
           {/* Read-only current-project context; picking a project happens on the Projects list. */}
           <CurrentProjectName projectId={projectId} />
           <Group ml="auto" gap="sm" wrap="nowrap">
+            {projectId != null && <ActiveObjectiveSelector pid={projectId} />}
             <ColorSchemeToggle />
             <Menu position="bottom-end" withinPortal>
               <Menu.Target>

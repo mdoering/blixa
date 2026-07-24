@@ -14,18 +14,25 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface ChangeMapper {
 
+  // The change plus its author's username and its objective's (discussion's) title -- both LEFT
+  // JOINs so a change with no user / no objective still returns with nulls. `discussion_title` is
+  // read-only display (Change.discussionTitle), never inserted.
+  String SELECT = """
+      SELECT c.id, c.project_id, c.user_id, u.username, c.at, c.entity_type, c.entity_id,
+             c.operation, c.diff, c.discussion_id, d.title AS discussion_title
+      FROM change c
+      LEFT JOIN app_user u ON u.id = c.user_id
+      LEFT JOIN discussion d ON d.project_id = c.project_id AND d.id = c.discussion_id
+      """;
+
   @Insert("""
-      INSERT INTO change (project_id, user_id, entity_type, entity_id, operation, diff, task_id)
-      VALUES (#{projectId}, #{userId}, #{entityType}, #{entityId}, #{operation}, #{diff}::jsonb, #{taskId})
+      INSERT INTO change (project_id, user_id, entity_type, entity_id, operation, diff, discussion_id)
+      VALUES (#{projectId}, #{userId}, #{entityType}, #{entityId}, #{operation}, #{diff}::jsonb, #{discussionId})
       """)
   @Options(useGeneratedKeys = true, keyProperty = "id")
   void insert(Change c);
 
-  @Select("""
-      SELECT c.id, c.project_id, c.user_id, u.username, c.at, c.entity_type, c.entity_id,
-             c.operation, c.diff, c.task_id
-      FROM change c
-      LEFT JOIN app_user u ON u.id = c.user_id
+  @Select(SELECT + """
       WHERE c.project_id = #{projectId}
       ORDER BY c.at DESC, c.id DESC
       LIMIT #{limit} OFFSET #{offset}
@@ -33,11 +40,7 @@ public interface ChangeMapper {
   List<Change> findByProject(@Param("projectId") int projectId, @Param("limit") int limit,
       @Param("offset") int offset);
 
-  @Select("""
-      SELECT c.id, c.project_id, c.user_id, u.username, c.at, c.entity_type, c.entity_id,
-             c.operation, c.diff, c.task_id
-      FROM change c
-      LEFT JOIN app_user u ON u.id = c.user_id
+  @Select(SELECT + """
       WHERE c.project_id = #{projectId} AND c.entity_type = #{entityType} AND c.entity_id = #{entityId}
       ORDER BY c.at DESC, c.id DESC
       LIMIT #{limit} OFFSET #{offset}
@@ -45,11 +48,7 @@ public interface ChangeMapper {
   List<Change> findByEntity(@Param("projectId") int projectId, @Param("entityType") String entityType,
       @Param("entityId") int entityId, @Param("limit") int limit, @Param("offset") int offset);
 
-  @Select("""
-      SELECT c.id, c.project_id, c.user_id, u.username, c.at, c.entity_type, c.entity_id,
-             c.operation, c.diff, c.task_id
-      FROM change c
-      LEFT JOIN app_user u ON u.id = c.user_id
+  @Select(SELECT + """
       WHERE c.project_id = #{projectId} AND c.entity_type = #{entityType}
       ORDER BY c.at DESC, c.id DESC
       LIMIT #{limit} OFFSET #{offset}
@@ -57,15 +56,12 @@ public interface ChangeMapper {
   List<Change> findByType(@Param("projectId") int projectId, @Param("entityType") String entityType,
       @Param("limit") int limit, @Param("offset") int offset);
 
-  @Select("""
-      SELECT c.id, c.project_id, c.user_id, u.username, c.at, c.entity_type, c.entity_id,
-             c.operation, c.diff, c.task_id
-      FROM change c
-      LEFT JOIN app_user u ON u.id = c.user_id
-      WHERE c.project_id = #{projectId} AND c.task_id = #{taskId}
+  // Grouped-by-objective changelog: every change authored under one discussion.
+  @Select(SELECT + """
+      WHERE c.project_id = #{projectId} AND c.discussion_id = #{discussionId}
       ORDER BY c.at DESC, c.id DESC
       LIMIT #{limit} OFFSET #{offset}
       """)
-  List<Change> findByTask(@Param("projectId") int projectId, @Param("taskId") int taskId,
-      @Param("limit") int limit, @Param("offset") int offset);
+  List<Change> findByDiscussion(@Param("projectId") int projectId,
+      @Param("discussionId") int discussionId, @Param("limit") int limit, @Param("offset") int offset);
 }

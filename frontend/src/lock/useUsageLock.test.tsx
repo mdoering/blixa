@@ -14,8 +14,8 @@ const fakeLock: Lock = {
   acquiredAt: '2026-01-01T00:00:00Z',
   expiresAt: '2026-01-01T00:05:00Z',
   heldByMe: true,
-  taskId: null,
-  taskTitle: null,
+  discussionId: null,
+  discussionTitle: null,
 };
 
 const wrapper = ({ children }: { children: ReactNode }) => <>{children}</>;

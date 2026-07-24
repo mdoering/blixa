@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { readActiveObjectiveId } from '../api/activeObjective';
 import { acquireLock, refreshLock, releaseLock } from '../api/locks';
 import type { Lock } from '../api/types';
 
@@ -36,7 +37,10 @@ export function useUsageLock(pid: number, usageId: number | null, enabled: boole
 
   function claim() {
     if (!enabled || usageId == null || heldRef.current) return;
-    acquireLock(pid, { entityType: 'name_usage', entityId: usageId })
+    // Tag the lock with the active objective (an OPEN discussion), if any, so the Activity view
+    // shows what this edit is part of. undefined when there's no objective (the default).
+    const discussionId = readActiveObjectiveId(pid) ?? undefined;
+    acquireLock(pid, { entityType: 'name_usage', entityId: usageId, discussionId })
       .then(({ lock, conflict }) => {
         heldRef.current = lock;
         if (conflict) setHolder(lock);

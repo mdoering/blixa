@@ -18,8 +18,10 @@ public class Lock {
   private String username;
   private OffsetDateTime acquiredAt;
   private OffsetDateTime expiresAt;
-  private Integer taskId;
-  private String taskTitle;
+  // The objective (an OPEN discussion) this lock was taken under, or null. The title is a
+  // read-only join for display (see LockMapper).
+  private Integer discussionId;
+  private String discussionTitle;
 
   public Integer getId() { return id; }
   public void setId(Integer id) { this.id = id; }
@@ -37,8 +39,8 @@ public class Lock {
   public void setAcquiredAt(OffsetDateTime acquiredAt) { this.acquiredAt = acquiredAt; }
   public OffsetDateTime getExpiresAt() { return expiresAt; }
   public void setExpiresAt(OffsetDateTime expiresAt) { this.expiresAt = expiresAt; }
-  public Integer getTaskId() { return taskId; }
-  public void setTaskId(Integer taskId) { this.taskId = taskId; }
-  public String getTaskTitle() { return taskTitle; }
-  public void setTaskTitle(String taskTitle) { this.taskTitle = taskTitle; }
+  public Integer getDiscussionId() { return discussionId; }
+  public void setDiscussionId(Integer discussionId) { this.discussionId = discussionId; }
+  public String getDiscussionTitle() { return discussionTitle; }
+  public void setDiscussionTitle(String discussionTitle) { this.discussionTitle = discussionTitle; }
 }

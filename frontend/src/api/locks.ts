@@ -5,7 +5,7 @@ export const listLocks = (pid: number) => api<Lock[]>(`/api/projects/${pid}/lock
 
 export async function acquireLock(
   pid: number,
-  body: { entityType: string; entityId: number; ttlSeconds?: number },
+  body: { entityType: string; entityId: number; ttlSeconds?: number; discussionId?: number },
 ): Promise<{ lock: Lock; conflict: boolean }> {
   try {
     const lock = await api<Lock>(`/api/projects/${pid}/locks`, { method: 'POST', json: body });

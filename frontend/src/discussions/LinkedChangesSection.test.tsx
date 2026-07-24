@@ -14,7 +14,7 @@ const change = {
   entityId: 7,
   operation: 'CREATE',
   diff: '{}',
-  taskId: null,
+  discussionId: null,
 };
 
 test('lists linked changes and links a recent one', async () => {

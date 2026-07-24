@@ -1,12 +1,12 @@
 package org.catalogueoflife.editor.lock;
 
 import java.util.List;
+import org.catalogueoflife.editor.discussion.Discussion;
+import org.catalogueoflife.editor.discussion.DiscussionMapper;
+import org.catalogueoflife.editor.discussion.DiscussionStatus;
 import org.catalogueoflife.editor.lock.dto.AcquireLockRequest;
 import org.catalogueoflife.editor.lock.dto.LockResponse;
 import org.catalogueoflife.editor.project.ProjectService;
-import org.catalogueoflife.editor.task.Task;
-import org.catalogueoflife.editor.task.TaskMapper;
-import org.catalogueoflife.editor.task.TaskStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -26,14 +26,14 @@ public class LockService {
 
   private final LockMapper locks;
   private final ProjectService projects;
-  private final TaskMapper tasks;
+  private final DiscussionMapper discussions;
   private final int defaultTtlSeconds;
 
-  public LockService(LockMapper locks, ProjectService projects, TaskMapper tasks,
+  public LockService(LockMapper locks, ProjectService projects, DiscussionMapper discussions,
       @Value("${coldp.lock.ttl-seconds:300}") int defaultTtlSeconds) {
     this.locks = locks;
     this.projects = projects;
-    this.tasks = tasks;
+    this.discussions = discussions;
     this.defaultTtlSeconds = defaultTtlSeconds;
   }
 
@@ -41,8 +41,8 @@ public class LockService {
   public LockResponse acquire(int actorId, int projectId, AcquireLockRequest req) {
     projects.requireRole(actorId, projectId);
     int ttl = clampTtl(req.ttlSeconds());
-    Integer taskId = validateTask(projectId, req.taskId());
-    locks.upsertTakeover(projectId, req.entityType(), req.entityId(), actorId, taskId, ttl);
+    Integer discussionId = validateObjective(projectId, req.discussionId());
+    locks.upsertTakeover(projectId, req.entityType(), req.entityId(), actorId, discussionId, ttl);
     // Read back the row rather than trusting the UPSERT's own affected-row count: this is the
     // single source of truth for who ended up holding it, whether that's us (fresh
     // acquire/takeover) or the still-active other user the UPSERT's WHERE clause left untouched.
@@ -50,19 +50,20 @@ public class LockService {
     return toResponse(current, actorId);
   }
 
-  // Tasks are optional intent: null passes through untouched (an ungrouped/plain lock). A
-  // present-but-invalid reference (not in this project, or CLOSED) is a client error -> 400,
-  // mirroring CurrentTask's X-Task-Id validation for changelog attribution -- surfacing the bug
-  // rather than silently dropping the declared intent.
-  private Integer validateTask(int projectId, Integer taskId) {
-    if (taskId == null) {
+  // The objective is optional intent: null passes through untouched (an ungrouped/plain lock). A
+  // present-but-invalid reference (not an OPEN discussion in this project) is a client error -> 400,
+  // mirroring CurrentObjective's X-Objective-Id validation for changelog attribution -- surfacing a
+  // stale selection rather than silently dropping the declared intent.
+  private Integer validateObjective(int projectId, Integer discussionId) {
+    if (discussionId == null) {
       return null;
     }
-    Task t = tasks.findById(projectId, taskId);
-    if (t == null || !TaskStatus.OPEN.name().equals(t.getStatus())) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown or closed task: " + taskId);
+    Discussion d = discussions.findByIdInProject(projectId, discussionId);
+    if (d == null || !DiscussionStatus.OPEN.name().equals(d.getStatus())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "unknown or non-open objective (discussion): " + discussionId);
     }
-    return taskId;
+    return discussionId;
   }
 
   @Transactional
@@ -100,7 +101,7 @@ public class LockService {
   private static LockResponse toResponse(Lock l, int actorId) {
     return new LockResponse(l.getId(), l.getEntityType(), l.getEntityId(), l.getUserId(),
         l.getUsername(), l.getAcquiredAt(), l.getExpiresAt(), l.getUserId() == actorId,
-        l.getTaskId(), l.getTaskTitle());
+        l.getDiscussionId(), l.getDiscussionTitle());
   }
 
   private int clampTtl(Integer ttlSeconds) {
