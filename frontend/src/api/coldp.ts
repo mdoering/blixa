@@ -27,6 +27,10 @@ export interface Vocab {
   nomStatus: NomStatusOption[];
   gender: string[];
   environment: string[];
+  // GeoTime (ICS 2020) chronostratigraphic unit names for the Biology tab's temporal-range picker,
+  // ordered oldest -> youngest; the exact stored form of temporalRangeStart/End so a picked value
+  // round-trips.
+  geoTimes: string[];
   // CSL-JSON wire ids (e.g. "article-journal") for the reference `type` dropdown; the same
   // canonical form the backend persists (ReferenceService.validateType), so a picked value always
   // round-trips.

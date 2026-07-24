@@ -54,6 +54,25 @@ export function updateUsage(
   return api<NameUsage>(`/api/projects/${pid}/usages/${id}`, { method: 'PUT', json: payload });
 }
 
+// The Biology tab's taxon-level attributes (taxon_info): a narrow full-replace of the four fields,
+// separate from updateUsage so saving biology never rewrites the name. A null/omitted field CLEARS
+// it. `version` is the usage's shared optimistic lock (a stale value 409s).
+export interface TaxonInfoPayload {
+  extinct?: boolean;
+  environment?: string[];
+  temporalRangeStart?: string;
+  temporalRangeEnd?: string;
+  version: number;
+}
+
+export function updateTaxonInfo(
+  pid: number,
+  id: number,
+  payload: TaxonInfoPayload,
+): Promise<NameUsage> {
+  return api<NameUsage>(`/api/projects/${pid}/usages/${id}/taxon-info`, { method: 'PUT', json: payload });
+}
+
 // POST /usages/bulk-status -- change the taxonomic status of several usages at once. The backend
 // only accepts parent-preserving transitions (accepted<->unassessed, synonym<->misapplied) and
 // rejects anything else with 400; returns how many usages were actually changed.

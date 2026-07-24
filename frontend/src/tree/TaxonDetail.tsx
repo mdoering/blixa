@@ -39,11 +39,11 @@ import ReferencesTab from '../child/ReferencesTab';
 import TypeMaterialTab from '../child/TypeMaterialTab';
 import UsageDiscussionsTab from '../discussions/UsageDiscussionsTab';
 import CompareClbModal from '../child/clb/CompareClbModal';
+import BiologyTab from '../child/BiologyTab';
 import {
   DistributionTab,
   EstimateTab,
   MediaTab,
-  PropertyTab,
   VernacularTab,
 } from '../child/taxonTabs';
 import { useUsageLock } from '../lock/useUsageLock';
@@ -469,7 +469,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
           {isAccepted && <Tabs.Tab value="distribution">Distribution</Tabs.Tab>}
           {isAccepted && <Tabs.Tab value="media">Media</Tabs.Tab>}
           {isAccepted && <Tabs.Tab value="estimates">Estimates</Tabs.Tab>}
-          {isAccepted && <Tabs.Tab value="properties">Properties</Tabs.Tab>}
+          {isAccepted && <Tabs.Tab value="properties">Biology</Tabs.Tab>}
           <Tabs.Tab value="issues">Issues</Tabs.Tab>
           <Tabs.Tab value="references">References</Tabs.Tab>
           <Tabs.Tab value="discussions">Discussions</Tabs.Tab>
@@ -736,7 +736,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
         )}
         {isAccepted && (
           <Tabs.Panel value="properties" pt="md">
-            <PropertyTab pid={pid} usageId={usageId} canEdit={canEdit} />
+            <BiologyTab pid={pid} usageId={usageId} canEdit={canEdit} usage={usage} />
           </Tabs.Panel>
         )}
 
