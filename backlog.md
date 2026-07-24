@@ -146,7 +146,7 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 
 ## Tools & import
 
-- **DwC-A import adapter** — map Darwin Core terms → ColDP into the shared staging path (reuse GBIF `dwca-io` / CLB readers). *(ColDP and TextTree adapters already exist.)*
+- **DwC-A import adapter** — *shipped; spec `docs/superpowers/specs/2026-07-24-dwca-import-design.md`.* `DwcaAdapter` + `DwcaToColdp` read a Darwin Core Archive (`org.gbif:dwca-io`) and write a ColDP staging archive the existing importer loads. Content-sniffs `meta.xml` to tell a DwC-A `.zip` from a ColDP `.zip`. Taxon core → NameUsage (status normalized to the ColDP vocab); classification both normalized (`parentNameUsageID`/`acceptedNameUsageID`) and flat (synthesize higher taxa from the Linnaean columns, deduped by path); VernacularName + Distribution + SpeciesProfile (→ extinct/environment) extensions. *(No DwC-A export — out of scope. v1 excludes references/type/multimedia extensions, `higherClassification` string, multi-target pro-parte.)*
 - **Homotypic grouping** — *Side 1 shipped:* in-taxon detection + nested synonymy. Select an accepted
   taxon, auto-detect basionym-anchored homotypic groups among its synonyms (BasionymSorter-lite over
   parsed authorship), confirm, and persist as `name_relation` rows; the synonymy renders nested (≡/=)

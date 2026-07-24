@@ -200,9 +200,14 @@ public class ImportRunService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file is required");
     }
     SourceFormat format = SourceFormat.detect(file.getOriginalFilename());
+    // ColDP and DwC-A are both .zip -- tell them apart by peeking for the DwC-A meta.xml descriptor.
+    if (format == SourceFormat.COLDP && looksLikeDwca(file)) {
+      format = SourceFormat.DWCA;
+    }
     // Preserve-ids/id-scope only make sense for a ColDP archive with real source ids; a text-tree's
-    // synthetic line ids must never be kept as identifiers.
-    if (format == SourceFormat.TXTREE) {
+    // synthetic line ids -- and a DwC-A's synthesized higher taxa (flat-classification fallback) --
+    // must never be kept as identifiers.
+    if (format == SourceFormat.TXTREE || format == SourceFormat.DWCA) {
       preserveIds = false;
       idScope = null;
     }
@@ -1271,6 +1276,25 @@ public class ImportRunService {
   // (always, success or failure) and from start()'s own extraction-failure path. A leftover
   // directory tree here is a disk-space nuisance, never a correctness issue (nothing downstream
   // reads it again), so failures are swallowed exactly like ExportRunService.run's cleanup.
+  // Content sniff to tell a DwC-A .zip from a ColDP .zip: a DwC-A carries a meta.xml descriptor at
+  // its root (dwca-io reads it). Reads only the central directory entry names, not the data. A file
+  // that isn't a readable zip simply isn't a DwC-A (it'll fail later as a ColDP archive with a clear
+  // error). getInputStream() returns a fresh stream, so the later materialize() re-reads cleanly.
+  private static boolean looksLikeDwca(MultipartFile file) {
+    try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(file.getInputStream())) {
+      java.util.zip.ZipEntry e;
+      while ((e = zis.getNextEntry()) != null) {
+        String name = e.getName();
+        if (name.equals("meta.xml") || name.endsWith("/meta.xml")) {
+          return true;
+        }
+      }
+    } catch (IOException ex) {
+      return false;
+    }
+    return false;
+  }
+
   private void deleteQuietly(Path dir) {
     try {
       if (!Files.exists(dir)) {

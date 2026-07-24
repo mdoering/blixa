@@ -184,6 +184,13 @@
       <artifactId>jbibtex</artifactId>
       <version>1.0.20</version>
     </dependency>
+    <!-- Darwin Core Archive reading (DwcFiles/Archive/StarRecord) for coldp/imprt DwC-A import;
+         org.gbif:dwc-api (the Term vocab) is already pulled in transitively. -->
+    <dependency>
+      <groupId>org.gbif</groupId>
+      <artifactId>dwca-io</artifactId>
+      <version>3.0.0</version>
+    </dependency>
   </dependencies>
 
   <repositories>

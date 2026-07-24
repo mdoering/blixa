@@ -31,10 +31,11 @@ export interface ImportProjectModalProps {
 // col-match polls on ProjectMetadataPage (see COL_MATCH_POLL_MS/EXPORT_POLL_MS there).
 const IMPORT_POLL_MS = 1500;
 
-// Upload a ColDP .zip or a text-tree file (.txtree/.tree/.txt/.tsv) -- the backend detects the
-// format from the filename and parses it into a brand-new project (async job) -> poll until
-// DONE/FAILED. Unlike export/col-match (which act on an existing project this modal isn't scoped
-// to one), so there's no "resume the latest run on mount" seeding here -- each open starts fresh.
+// Upload a ColDP .zip, a Darwin Core Archive .zip, or a text-tree file (.txtree/.tree/.txt/.tsv) --
+// the backend detects the format (filename, plus a meta.xml content-sniff to tell a DwC-A .zip from
+// a ColDP .zip) and parses it into a brand-new project (async job) -> poll until DONE/FAILED. Unlike
+// export/col-match (which act on an existing project this modal isn't scoped to one), so there's no
+// "resume the latest run on mount" seeding here -- each open starts fresh.
 export default function ImportProjectModal({ opened, onClose }: ImportProjectModalProps) {
   const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
@@ -98,8 +99,8 @@ export default function ImportProjectModal({ opened, onClose }: ImportProjectMod
     <Modal opened={opened} onClose={onClose} title="Import ColDP">
       <Stack gap="md">
         <FileInput
-          label="ColDP or text-tree file"
-          placeholder="Select a .zip or text-tree file"
+          label="ColDP, DwC-A, or text-tree file"
+          placeholder="Select a .zip (ColDP or Darwin Core Archive) or text-tree file"
           accept=".zip,.txtree,.tree,.txt,.tsv"
           value={file}
           onChange={setFile}
@@ -107,7 +108,7 @@ export default function ImportProjectModal({ opened, onClose }: ImportProjectMod
         />
         <TextInput
           label="Title"
-          description="Used as the project title for text-tree imports."
+          description="Used as the project title for text-tree and DwC-A imports (ColDP carries its own)."
           value={title}
           onChange={(e) => setTitle(e.currentTarget.value)}
         />
