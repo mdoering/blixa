@@ -4,10 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 import java.util.Optional;
+import life.catalogue.api.vocab.Gender;
+import org.gbif.nameparser.api.NameType;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.Reference;
 import org.catalogueoflife.editor.name.Status;
+import org.catalogueoflife.editor.validation.rules.BinomialAboveGenusRule;
 import org.catalogueoflife.editor.validation.rules.DanglingReferenceRule;
+import org.catalogueoflife.editor.validation.rules.GenderNotApplicableRule;
+import org.catalogueoflife.editor.validation.rules.MissingGenusRule;
+import org.catalogueoflife.editor.validation.rules.UppercaseEpithetRule;
 import org.catalogueoflife.editor.validation.rules.DuplicateNameRule;
 import org.catalogueoflife.editor.validation.rules.GenusMismatchRule;
 import org.catalogueoflife.editor.validation.rules.InfraspecificMissingSpeciesRule;
@@ -363,5 +369,106 @@ class RuleTests {
     NameUsage syn = infraspecific();
     syn.setStatus(Status.SYNONYM);
     assertThat(new InfraspecificMissingSpeciesRule().evaluate(ctxInfra(syn, false))).isEmpty();
+  }
+
+  // --- New CLB-issue-derived rules (2026-07-24). Pure functions of the usage, so a bare 4-arg ctx. ---
+
+  private static RuleContext ctx(NameUsage u) {
+    return new RuleContext(u, 0, null, 0);
+  }
+
+  // --- UppercaseEpithetRule (CLB UPPERCASE_EPITHET) ---
+
+  @Test
+  void uppercaseEpithetFlagsACapitalInAnEpithet() {
+    NameUsage u = new NameUsage();
+    u.setScientificName("Panthera Leo");
+    u.setRank("species");
+    u.setSpecificEpithet("Leo");
+    Optional<Finding> f = new UppercaseEpithetRule().evaluate(ctx(u));
+    assertThat(f).isPresent();
+    assertThat(f.get().rule()).isEqualTo("uppercase_epithet");
+    assertThat(f.get().severity()).isEqualTo(Severity.WARNING);
+  }
+
+  @Test
+  void uppercaseEpithetQuietForLowercaseEpithetsAndNonScientificNames() {
+    NameUsage ok = new NameUsage();
+    ok.setRank("species");
+    ok.setSpecificEpithet("leo");
+    assertThat(new UppercaseEpithetRule().evaluate(ctx(ok))).isEmpty();
+    // a formula / non-scientific name is skipped even with odd casing
+    NameUsage formula = new NameUsage();
+    formula.setNameType(NameType.FORMULA);
+    formula.setSpecificEpithet("Leo");
+    assertThat(new UppercaseEpithetRule().evaluate(ctx(formula))).isEmpty();
+  }
+
+  // --- MissingGenusRule (CLB MISSING_GENUS) ---
+
+  @Test
+  void missingGenusFlagsABinomialWithoutAGenus() {
+    NameUsage u = new NameUsage();
+    u.setRank("species");
+    u.setSpecificEpithet("leo");
+    u.setGenus(null);
+    Optional<Finding> f = new MissingGenusRule().evaluate(ctx(u));
+    assertThat(f).isPresent();
+    assertThat(f.get().rule()).isEqualTo("missing_genus");
+
+    NameUsage ok = new NameUsage();
+    ok.setRank("species");
+    ok.setSpecificEpithet("leo");
+    ok.setGenus("Panthera");
+    assertThat(new MissingGenusRule().evaluate(ctx(ok))).isEmpty();
+  }
+
+  // --- BinomialAboveGenusRule (CLB HIGHER_RANK_BINOMIAL) ---
+
+  @Test
+  void binomialAboveGenusFlagsASpeciesEpithetOnAGenusOrHigher() {
+    NameUsage genusWithEpithet = new NameUsage();
+    genusWithEpithet.setRank("genus");
+    genusWithEpithet.setSpecificEpithet("leo");
+    Optional<Finding> f = new BinomialAboveGenusRule().evaluate(ctx(genusWithEpithet));
+    assertThat(f).isPresent();
+    assertThat(f.get().rule()).isEqualTo("binomial_above_genus");
+
+    NameUsage species = new NameUsage();
+    species.setRank("species");
+    species.setSpecificEpithet("leo");
+    assertThat(new BinomialAboveGenusRule().evaluate(ctx(species))).isEmpty();
+  }
+
+  // --- GenderNotApplicableRule (CLB GENDER_*_NOT_APPLICABLE) ---
+
+  @Test
+  void genderNotApplicableFlagsGenderOffAGenusAndAgreementOffABinomial() {
+    // gender set on a species (belongs to the genus)
+    NameUsage speciesWithGender = new NameUsage();
+    speciesWithGender.setRank("species");
+    speciesWithGender.setSpecificEpithet("leo");
+    speciesWithGender.setGender(Gender.FEMININE);
+    assertThat(new GenderNotApplicableRule().evaluate(ctx(speciesWithGender))).isPresent();
+
+    // genderAgreement set on a genus (only meaningful for a bi/trinomial)
+    NameUsage genusWithAgreement = new NameUsage();
+    genusWithAgreement.setRank("genus");
+    genusWithAgreement.setGenderAgreement(true);
+    assertThat(new GenderNotApplicableRule().evaluate(ctx(genusWithAgreement))).isPresent();
+  }
+
+  @Test
+  void genderNotApplicableQuietWhenGenderOnGenusAndAgreementOnSpecies() {
+    NameUsage genus = new NameUsage();
+    genus.setRank("genus");
+    genus.setGender(Gender.FEMININE);
+    assertThat(new GenderNotApplicableRule().evaluate(ctx(genus))).isEmpty();
+
+    NameUsage species = new NameUsage();
+    species.setRank("species");
+    species.setSpecificEpithet("leo");
+    species.setGenderAgreement(true);
+    assertThat(new GenderNotApplicableRule().evaluate(ctx(species))).isEmpty();
   }
 }
