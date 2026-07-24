@@ -95,6 +95,10 @@ IT-verified; only the real Crossref round-trip is unverified.
 ## 5. UI (fully tested — a glance)
 
 - [ ] Collapsible left pane on Tree & Names remembers its collapsed state per page.
+- [ ] **Active objective** (fully test-covered; a quick end-to-end eyeball): the top-right
+      objective selector creates/picks an OPEN discussion or None (default); editing under an
+      objective shows it on the change in History and on the lock in Activity; a stale selection
+      reconciles to None rather than erroring.
 - [ ] **Distribution map** (maplibre wiring is jsdom-stubbed in tests, so eyeball live): polygons
       are coloured by establishment means (CLB palette) with a matching legend; the view fits to the
       taxon's areas; clicking a polygon opens a popover with the full distribution record.
