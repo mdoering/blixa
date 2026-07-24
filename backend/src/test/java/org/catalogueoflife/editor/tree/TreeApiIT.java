@@ -1,5 +1,6 @@
 package org.catalogueoflife.editor.tree;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -21,6 +22,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @AutoConfigureMockMvc
@@ -56,6 +58,37 @@ class TreeApiIT extends AbstractPostgresIT {
         .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
     return json.readTree(body).get("id").asLong();
+  }
+
+  private java.util.List<Long> childIds(long pid, long parentId, int limit, int offset) throws Exception {
+    String body = mvc.perform(get("/api/projects/" + pid + "/tree/children/" + parentId)
+            .param("limit", String.valueOf(limit)).param("offset", String.valueOf(offset)))
+        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    java.util.List<Long> ids = new java.util.ArrayList<>();
+    for (JsonNode n : json.readTree(body)) ids.add(n.get("id").asLong());
+    return ids;
+  }
+
+  @Test
+  @WithMockUser(username = "treePagingOwner")
+  void childrenPagingIsDeterministicAndNonOverlapping() throws Exception {
+    ensureUser("treePagingOwner");
+    long pid = createProject("treepagingproj");
+    long genus = createUsage(pid, "Aus", "genus", "accepted", null);
+    // 5 accepted children, no explicit ordinal (all NULL) -- the case where a non-deterministic
+    // ORDER BY would let offset pages skip/duplicate. The n.id tiebreaker makes paging stable.
+    for (int i = 1; i <= 5; i++) createUsage(pid, "Aus sp" + i, "species", "accepted", genus);
+
+    java.util.List<Long> full = childIds(pid, genus, 50, 0);
+    assertThat(full).hasSize(5);
+
+    // Paged in windows of 2 (2 + 2 + 1) -> exactly the full list, same order, no overlap/gap.
+    java.util.List<Long> paged = new java.util.ArrayList<>();
+    paged.addAll(childIds(pid, genus, 2, 0));
+    paged.addAll(childIds(pid, genus, 2, 2));
+    paged.addAll(childIds(pid, genus, 2, 4));
+    assertThat(paged).containsExactlyElementsOf(full);
+    assertThat(new java.util.HashSet<>(paged)).hasSize(5); // no duplicates across page boundaries
   }
 
   @Test

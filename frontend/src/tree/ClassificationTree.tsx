@@ -1,7 +1,10 @@
-import { Loader, Stack, Text } from '@mantine/core';
-import { useQuery } from '@tanstack/react-query';
+import { Group, Loader, Stack, Text, UnstyledButton } from '@mantine/core';
+import { IconChevronDown } from '@tabler/icons-react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { getRoots } from '../api/tree';
 import TreeNodeRow from './TreeNodeRow';
+
+const ROOTS_PAGE = 50;
 
 export interface ClassificationTreeProps {
   pid: number;
@@ -23,9 +26,10 @@ export interface ClassificationTreeProps {
   includeUnassessed?: boolean;
 }
 
-// Lazy classification tree: only the root level is fetched eagerly; every other level is
-// fetched on demand when its parent row is expanded (see TreeNodeRow). No virtualization
-// yet -- a follow-up should add it (or server paging controls) for very large sibling lists.
+// Lazy classification tree: only the root level is fetched eagerly (paged); every other level is
+// fetched on demand when its parent row is expanded (see TreeNodeRow). Roots have no parent to
+// carry a total, so paging uses the page-length heuristic (a full page -> maybe more). Row
+// virtualization is a separate follow-up.
 export default function ClassificationTree({
   pid,
   selectedId,
@@ -36,17 +40,26 @@ export default function ClassificationTree({
   includeUnassessed = false,
 }: ClassificationTreeProps) {
   const {
-    data: roots,
+    data: rootPages,
     isLoading,
     isError,
-  } = useQuery({
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['treeRoots', pid, includeUnassessed],
-    queryFn: () => getRoots(pid, { unassessed: includeUnassessed }),
+    queryFn: ({ pageParam }) =>
+      getRoots(pid, { unassessed: includeUnassessed, limit: ROOTS_PAGE, offset: pageParam }),
+    initialPageParam: 0,
+    // No total for roots: another page may exist only if the last one came back full.
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === ROOTS_PAGE ? allPages.reduce((n, p) => n + p.length, 0) : undefined,
   });
+  const roots = rootPages?.pages.flat() ?? [];
 
   if (isLoading) return <Loader size="sm" />;
   if (isError) return <Text c="red">Could not load the tree</Text>;
-  if (!roots || roots.length === 0) return <Text c="dimmed">No taxa yet</Text>;
+  if (roots.length === 0) return <Text c="dimmed">No taxa yet</Text>;
 
   return (
     <Stack gap={0}>
@@ -64,6 +77,16 @@ export default function ClassificationTree({
           includeUnassessed={includeUnassessed}
         />
       ))}
+      {hasNextPage && (
+        <UnstyledButton onClick={() => fetchNextPage()} disabled={isFetchingNextPage} py={4} pl={28}>
+          <Group gap={6} wrap="nowrap">
+            {isFetchingNextPage ? <Loader size="xs" /> : <IconChevronDown size={14} />}
+            <Text size="xs" c="dimmed">
+              {isFetchingNextPage ? 'Loading…' : 'Load more'}
+            </Text>
+          </Group>
+        </UnstyledButton>
+      )}
     </Stack>
   );
 }

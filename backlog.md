@@ -144,7 +144,15 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 
 ## UI / polish
 
-- **Tree virtualization** — lazy-per-node is fine for now; needed at Lepidoptera scale (large sibling lists render in full today).
+- **Tree children paging** — *shipped* (spec `docs/superpowers/specs/2026-07-24-tree-children-paging-design.md`).
+  Children/roots load a page (50) at a time via `useInfiniteQuery` with a **"Load N more"** row
+  (precise remaining count from `node.childCount`; roots use a page-length heuristic). Removes the
+  silent 50-cap that truncated large sibling lists. Deterministic offset paging guaranteed by an
+  `n.id` tiebreaker in `TreeMapper`'s ORDER BY.
+- **Tree row virtualization** *(follow-up to the paging above)* — the rendered rows are still real
+  DOM nodes; at Lepidoptera scale a fully-expanded tree is heavy. Flatten the visible/expanded nodes
+  into one windowed list (`@tanstack/react-virtual`) so only viewport rows render. Composes with the
+  load-more paging already in place.
 - **nomStatus as a Select** — currently a free-text input showing the enum name.
 - **Link tracked changes to the current work objective** — *shipped* (spec
   `docs/superpowers/specs/2026-07-24-work-objective-as-discussion-design.md`). Design pivot: the

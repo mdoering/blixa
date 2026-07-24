@@ -106,6 +106,39 @@ test('shows no lock indicator when the lock list is empty', async () => {
   expect(screen.queryByLabelText(/is editing/)).not.toBeInTheDocument();
 });
 
+test('a node with more children than one page shows "Load N more" and appends the next page', async () => {
+  const parent = { ...animalia, childCount: 3 }; // 3 children, but the first page returns only 2
+  const kid = (id: number, name: string) => ({
+    id,
+    scientificName: name,
+    authorship: null,
+    rank: 'PHYLUM',
+    status: 'ACCEPTED',
+    ordinal: id,
+    childCount: 0,
+  });
+  server.use(
+    http.get('/api/projects/7/tree/roots', () => HttpResponse.json([parent])),
+    http.get('/api/projects/7/tree/children/1', ({ request }) => {
+      const offset = new URL(request.url).searchParams.get('offset');
+      if (offset === '2') return HttpResponse.json([kid(12, 'Third')]);
+      return HttpResponse.json([kid(10, 'First'), kid(11, 'Second')]);
+    }),
+  );
+  renderWithProviders(<ClassificationTree pid={7} selectedId={null} onSelect={() => {}} />);
+
+  await userEvent.click(await screen.findByRole('button', { name: /expand/i }));
+  expect(await screen.findByText('First')).toBeInTheDocument();
+  expect(screen.getByText('Second')).toBeInTheDocument();
+  // 2 of 3 loaded -> a precise "Load 1 more" row (childCount is the true total).
+  const loadMore = await screen.findByRole('button', { name: /load 1 more/i });
+
+  await userEvent.click(loadMore);
+  expect(await screen.findByText('Third')).toBeInTheDocument();
+  // all 3 loaded -> the row is gone.
+  expect(screen.queryByRole('button', { name: /load .* more/i })).not.toBeInTheDocument();
+});
+
 test('with includeUnassessed, requests the unassessed layer and visually marks those nodes', async () => {
   let rootsUrl = '';
   const provisional = {

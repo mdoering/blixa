@@ -33,7 +33,7 @@ public interface TreeMapper {
       FROM name_usage n
       WHERE n.project_id = #{projectId} AND n.parent_id IS NULL
         AND (n.status = 'ACCEPTED' OR (#{includeUnassessed} AND n.status = 'UNASSESSED'))
-      ORDER BY n.ordinal NULLS LAST, n.scientific_name
+      ORDER BY n.ordinal NULLS LAST, n.scientific_name, n.id
       LIMIT #{limit} OFFSET #{offset}
       """)
   List<TreeNode> findRoots(@Param("projectId") int projectId, @Param("limit") int limit,
@@ -47,7 +47,7 @@ public interface TreeMapper {
       FROM name_usage n
       WHERE n.project_id = #{projectId} AND n.parent_id = #{parentId}
         AND (n.status = 'ACCEPTED' OR (#{includeUnassessed} AND n.status = 'UNASSESSED'))
-      ORDER BY n.ordinal NULLS LAST, n.scientific_name
+      ORDER BY n.ordinal NULLS LAST, n.scientific_name, n.id
       LIMIT #{limit} OFFSET #{offset}
       """)
   List<TreeNode> findChildren(@Param("projectId") int projectId, @Param("parentId") int parentId,

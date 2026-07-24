@@ -1,8 +1,11 @@
-import { ActionIcon, Badge, Box, Group, Loader, Stack, Text, ThemeIcon, Tooltip } from '@mantine/core';
+import { ActionIcon, Badge, Box, Group, Loader, Stack, Text, ThemeIcon, Tooltip, UnstyledButton } from '@mantine/core';
 import { IconChevronDown, IconChevronRight, IconLock } from '@tabler/icons-react';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { getChildren } from '../api/tree';
+
+// Children are fetched a page at a time; a node with more shows a "Load more" row (see below).
+const CHILDREN_PAGE = 50;
 import { listLocks } from '../api/locks';
 import type { TreeNode } from '../api/types';
 import NameActionMenu from '../names/NameActionMenu';
@@ -49,13 +52,28 @@ export default function TreeNodeRow({
   // read as provisional/awaiting-review rather than part of the accepted backbone.
   const unassessed = node.status === 'UNASSESSED';
 
-  // Lazy: children are only fetched once this node is expanded, and stay cached by
-  // TanStack Query afterwards (collapsing/re-expanding doesn't refetch).
-  const { data: children, isLoading } = useQuery({
+  // Lazy + paged: children are only fetched once this node is expanded (and stay cached
+  // afterwards), a page of CHILDREN_PAGE at a time. node.childCount is the true total, so we know
+  // exactly how many remain -- a "Load N more" row fetches the next page and appends. Without this
+  // a node with >50 children was silently truncated.
+  const {
+    data: childrenPages,
+    isLoading,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['treeChildren', pid, node.id, includeUnassessed],
-    queryFn: () => getChildren(pid, node.id, { unassessed: includeUnassessed }),
+    queryFn: ({ pageParam }) =>
+      getChildren(pid, node.id, { unassessed: includeUnassessed, limit: CHILDREN_PAGE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (_last, allPages) => {
+      const loaded = allPages.reduce((n, p) => n + p.length, 0);
+      return loaded < node.childCount ? loaded : undefined;
+    },
     enabled: expanded && hasChildren,
   });
+  const children = childrenPages?.pages.flat() ?? [];
+  const remaining = node.childCount - children.length;
 
   // Every row asks for the same project-wide lock list -- the tree is lazy-recursive (each row
   // fetches its own children), so there's no single container to fetch this once and thread down
@@ -163,9 +181,9 @@ export default function TreeNodeRow({
               Loading…
             </Text>
           )}
-          {/* No virtualization yet: a page of children (server default limit) renders in full.
-              Follow-up: paginate/virtualize very large sibling lists. */}
-          {(children ?? []).map((child) => (
+          {/* Children render in full per loaded page; virtualization of the rendered rows is a
+              separate follow-up. */}
+          {children.map((child) => (
             <TreeNodeRow
               key={child.id}
               pid={pid}
@@ -179,6 +197,25 @@ export default function TreeNodeRow({
               includeUnassessed={includeUnassessed}
             />
           ))}
+          {remaining > 0 && !isLoading && (
+            <UnstyledButton
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              pl={(depth + 1) * INDENT_PX + 28}
+              py={4}
+            >
+              <Group gap={6} wrap="nowrap">
+                {isFetchingNextPage ? (
+                  <Loader size="xs" />
+                ) : (
+                  <IconChevronDown size={14} />
+                )}
+                <Text size="xs" c="dimmed">
+                  {isFetchingNextPage ? 'Loading…' : `Load ${remaining} more`}
+                </Text>
+              </Group>
+            </UnstyledButton>
+          )}
         </Stack>
       )}
     </Stack>
