@@ -141,6 +141,7 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
   (per-usage GROUP BY across distribution/vernacular/media/estimate/property — DUPLICATE_DISTRIBUTIONS
   etc.) and **`synonym_rank_differs`** (synonym_accepted rank join). Remaining CLB issues are
   prevented-at-write or import-only and out of scope.
+- **Subtree (group) revalidation** — *shipped; spec `docs/superpowers/specs/2026-07-24-subtree-revalidation-design.md`.* Third trigger granularity between per-usage (auto) and whole-project (on-demand): `ValidationService.revalidateSubtree` over `findSubtreeIds`. Manual **"Revalidate this group"** action on the taxon (owner/editor; `POST /usages/{id}/revalidate` → subtree-scoped summary), plus automatic revalidation when an **objective-tagged** `name_usage` lock is released or swept (new `SubtreeValidationEvent`, async `AFTER_COMMIT` + `fallbackExecution=true`). Catches relational rules the single-usage trigger misses (genus_year_after_species, duplicate_name, synonym_rank_differs on neighbours). *(Not built: auto-on-objective-close — rejected; a subtree filter on the Issues panel.)*
 - **Backend test coverage** — `GET /issues?entityId=` filter and the etymology PUT round-trip (code correct on inspection, untested).
 
 ## Tools & import

@@ -1,7 +1,13 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, test } from 'vitest';
+import { notifications } from '@mantine/notifications';
+import { afterEach, expect, test } from 'vitest';
 import { renderWithProviders } from '../test/utils';
+
+// Mantine's notification store is a module-level singleton, not reset when the Notifications
+// provider unmounts between tests -- stale toasts accumulate and, once past the default limit, new
+// ones queue instead of rendering. Clear it after each test so notification assertions are reliable.
+afterEach(() => notifications.clean());
 import { server, http, HttpResponse } from '../test/server';
 import TaxonDetail from './TaxonDetail';
 
@@ -711,4 +717,31 @@ test('a clean scientific name shows no name-quality warning', async () => {
   await screen.findByLabelText('Scientific name');
   expect(screen.queryByText('Hybrid formula')).not.toBeInTheDocument();
   expect(screen.queryByText('Partially parsed')).not.toBeInTheDocument();
+});
+
+test('an editor can revalidate the taxon subtree, POSTing and showing the scoped summary', async () => {
+  mockCommon();
+  let posted = false;
+  server.use(
+    http.post('/api/projects/4/usages/10/revalidate', () => {
+      posted = true;
+      return HttpResponse.json({ total: 2, byStatus: { open: 2 }, bySeverity: { warning: 1, info: 1 } });
+    }),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  const action = await screen.findByRole('button', { name: 'Revalidate this group' });
+  await userEvent.click(action);
+
+  await waitFor(() => expect(posted).toBe(true));
+  expect(
+    await screen.findByText('Revalidated this group: 2 issues (0 errors, 1 warning)'),
+  ).toBeInTheDocument();
+});
+
+test('a viewer sees no revalidate-group action', async () => {
+  mockCommon(baseUsage(), 'viewer');
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+  await screen.findByLabelText('Scientific name');
+  expect(screen.queryByRole('button', { name: 'Revalidate this group' })).not.toBeInTheDocument();
 });

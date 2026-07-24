@@ -18,7 +18,7 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconBook, IconBrain, IconLock, IconPencil, IconWorld } from '@tabler/icons-react';
+import { IconBook, IconBrain, IconLock, IconPencil, IconRefresh, IconWorld } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
@@ -27,6 +27,7 @@ import { getVocab } from '../api/coldp';
 import { listLocks } from '../api/locks';
 import { getUsage, updateUsage } from '../api/usages';
 import { getAiConfig } from '../api/ai';
+import { revalidateSubtree } from '../api/issues';
 import { getReference } from '../api/references';
 import BhlPageModal from './BhlPageModal';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
@@ -367,6 +368,23 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
     },
   });
 
+  // "Revalidate this group": recompute the focal taxon's whole subtree, so relational rules settle
+  // across it (see the subtree-revalidation design). The returned summary is scoped to the subtree.
+  const revalidateMutation = useMutation({
+    mutationFn: () => revalidateSubtree(pid, usageId),
+    onSuccess: async (summary) => {
+      await queryClient.invalidateQueries({ queryKey: ['usageIssues', pid, usageId] });
+      await queryClient.invalidateQueries({ queryKey: ['issueSummary', pid] });
+      const errors = summary.bySeverity.error ?? 0;
+      const warnings = summary.bySeverity.warning ?? 0;
+      notifications.show({
+        message: `Revalidated this group: ${summary.total} issue${summary.total === 1 ? '' : 's'}`
+          + ` (${errors} error${errors === 1 ? '' : 's'}, ${warnings} warning${warnings === 1 ? '' : 's'})`,
+      });
+    },
+    onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Revalidate failed') }),
+  });
+
   if (usageQuery.isLoading) return <Text c="dimmed">Loading…</Text>;
   if (usageQuery.isError || !usage) return <Text c="red">Could not load this taxon</Text>;
 
@@ -389,6 +407,19 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
   return (
     <Box>
       <Group justify="flex-end" mb="xs">
+        {canEdit && (
+          <ActionIcon
+            variant="light"
+            size="lg"
+            color="gray"
+            aria-label="Revalidate this group"
+            title="Revalidate this group (recompute the subtree's issues)"
+            loading={revalidateMutation.isPending}
+            onClick={() => revalidateMutation.mutate()}
+          >
+            <IconRefresh size={18} />
+          </ActionIcon>
+        )}
         {canEdit && aiConfig?.available && (
           <ActionIcon
             variant="light"

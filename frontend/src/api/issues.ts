@@ -38,3 +38,9 @@ export function reviewIssue(pid: number, id: number, action: string): Promise<Is
 export function revalidate(pid: number): Promise<IssueSummary> {
   return api<IssueSummary>(`/api/projects/${pid}/revalidate`, { method: 'POST' });
 }
+
+// On-demand recompute of one taxon's subtree ("Revalidate this group"); returns a summary scoped to
+// that subtree. The targeted counterpart of revalidate() for large projects.
+export function revalidateSubtree(pid: number, usageId: number): Promise<IssueSummary> {
+  return api<IssueSummary>(`/api/projects/${pid}/usages/${usageId}/revalidate`, { method: 'POST' });
+}
