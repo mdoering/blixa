@@ -691,3 +691,24 @@ test('a suprageneric name shows neither gender field', async () => {
   expect(screen.queryByLabelText('Gender (from parent genus)')).not.toBeInTheDocument();
   expect(screen.queryByLabelText('Gender agreement')).not.toBeInTheDocument();
 });
+
+test('a non-scientific name type (formula) is flagged prominently', async () => {
+  mockCommon(baseUsage({ nameType: 'FORMULA', scientificName: 'Aus x Bus' }));
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+  expect(await screen.findByText('Hybrid formula')).toBeInTheDocument();
+  expect(screen.getByText(/won’t atomise|won't atomise/)).toBeInTheDocument();
+});
+
+test('a scientific name that only partially parsed shows a softer warning', async () => {
+  mockCommon(baseUsage({ parseState: 'PARTIAL' }));
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+  expect(await screen.findByText('Partially parsed')).toBeInTheDocument();
+});
+
+test('a clean scientific name shows no name-quality warning', async () => {
+  mockCommon(); // default: SCIENTIFIC + COMPLETE
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+  await screen.findByLabelText('Scientific name');
+  expect(screen.queryByText('Hybrid formula')).not.toBeInTheDocument();
+  expect(screen.queryByText('Partially parsed')).not.toBeInTheDocument();
+});

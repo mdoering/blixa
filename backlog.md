@@ -14,6 +14,20 @@ mostly self-contained follow-ups.
 
 ## Big features (new — each needs its own design pass)
 
+### Name vs. parsed fields — editing model *(fundamental design/UX decision — parked, take our time)*
+`name_usage` stores the full **scientificName** *and* the parser-derived atomised parts (genus,
+epithets, authorship components, nameType, parseState). Today the name is the source of truth and the
+parts are re-derived on every name/authorship/rank edit (not independently editable), so they can't
+contradict *through the app* — the redundancy is a denormalised parse cache. **Agreed direction
+(2026-07-24 discussion):** keep **name-first editing** (the parser atomises the ~95% that parse
+cleanly; a full parts form would balloon and should be **rank-driven** if ever exposed), moving
+toward **parts-as-canonical with the stored name always re-derived from them** (prevention over a
+"name ≠ canonical" validation rule, which would be noisy — authorship parsing especially). Verbatim
+escape hatch for unparsable names via `parseState`/`nameType`. **First step shipped:** the name form
+now prominently flags **nameType ≠ SCIENTIFIC** (formula/informal/placeholder/identifier/other, red)
+and a partially-parsed scientific name (orange), so we can observe how often names fall out of clean
+parsing before committing to the parts-editable model. Needs its own spec before the model change.
+
 ### 1. Discussions  *(feature-complete — all 6 phases + identity polish + mention autocomplete shipped; see `docs/superpowers/specs/2026-07-20-discussions-design.md`)*
 A forum-style, per-project discussion tracker keyed on **ORCIDs** (formerly "issue tracker" —
 renamed to avoid collision with the validation *Issues*, and because the shape is a conversation thread).

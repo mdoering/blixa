@@ -1,6 +1,7 @@
 import {
   ActionIcon,
   Alert,
+  Badge,
   Box,
   Button,
   Checkbox,
@@ -68,6 +69,40 @@ function parseCurie(entry: string): { scope: string; id: string } | null {
   const i = entry.indexOf(':');
   if (i < 0) return null;
   return { scope: entry.slice(0, i), id: entry.slice(i + 1) };
+}
+
+// The parser classifies a name it can't treat as a normal scientific name (nameType != SCIENTIFIC):
+// these won't atomise into name parts, so the form flags them prominently. (See the name-vs-parts
+// design discussion 2026-07-24.)
+const NAME_TYPE_LABEL: Record<string, string> = {
+  FORMULA: 'Hybrid formula',
+  INFORMAL: 'Informal name',
+  PLACEHOLDER: 'Placeholder',
+  IDENTIFIER: 'Identifier',
+  OTHER: 'Other / unparsable',
+};
+
+// The name-quality warning for a usage: a hard flag when it isn't a scientific name at all, else a
+// softer one when a scientific name only partially parsed. Null when the name atomised cleanly.
+function nameWarningFor(
+  nameType: string | null,
+  parseState: string | null,
+): { color: string; label: string; hint: string } | null {
+  if (nameType && nameType !== 'SCIENTIFIC') {
+    return {
+      color: 'red',
+      label: NAME_TYPE_LABEL[nameType] ?? nameType,
+      hint: 'Not a standard scientific name — the parser won’t atomise it into name parts.',
+    };
+  }
+  if (parseState && parseState !== 'COMPLETE') {
+    return {
+      color: 'orange',
+      label: parseState === 'NONE' ? 'Unparsed' : 'Partially parsed',
+      hint: 'The parser could not fully atomise this scientific name.',
+    };
+  }
+  return null;
 }
 
 interface EditableFields {
@@ -426,6 +461,19 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                   <TextInput label="Scientific name" {...form.getInputProps('scientificName')} />
                   <TextInput label="Authorship" {...form.getInputProps('authorship')} />
                 </SimpleGrid>
+                {(() => {
+                  const w = nameWarningFor(usage.nameType, usage.parseState);
+                  return w ? (
+                    <Group gap="xs" wrap="nowrap" mt={-8}>
+                      <Badge color={w.color} variant="filled" size="sm" style={{ flexShrink: 0 }}>
+                        {w.label}
+                      </Badge>
+                      <Text size="xs" c="dimmed">
+                        {w.hint}
+                      </Text>
+                    </Group>
+                  ) : null;
+                })()}
                 <SimpleGrid cols={2}>
                   <Select
                     label="Rank"
