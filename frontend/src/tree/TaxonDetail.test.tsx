@@ -296,8 +296,8 @@ test('a viewer role sees a disabled Save button', async () => {
 });
 
 test('an accepted usage with two synonyms renders both', async () => {
-  // Accepted usages render the nested Synonymy view (off GET .../synonymy), not the flat
-  // SynonymList (which stays for synonym/misapplied usages) -- see TaxonDetail's synonyms panel.
+  // Accepted usages render the nested Synonymy view (off GET .../synonymy); the Synonyms tab is
+  // shown only for accepted taxa (a synonym has none), see TaxonDetail's synonyms panel.
   mockCommon();
   server.use(
     http.get('/api/projects/4/usages/10/synonymy', () =>
@@ -317,6 +317,20 @@ test('an accepted usage with two synonyms renders both', async () => {
   await userEvent.click(screen.getByRole('tab', { name: /synonyms/i }));
   await screen.findByText('Felis leo');
   expect(screen.getByText('Panthera leo persica')).toBeInTheDocument();
+});
+
+test('a synonym shows no taxon-level tabs (Synonyms, Vernaculars, Distribution, Biology)', async () => {
+  mockCommon(baseUsage({ status: 'SYNONYM' }));
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+  await screen.findByLabelText('Scientific name');
+  // nomenclature + name-level tabs remain
+  expect(screen.getByRole('tab', { name: 'Details' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Types' })).toBeInTheDocument();
+  // taxon-level tabs are gone for a synonym
+  expect(screen.queryByRole('tab', { name: 'Synonyms' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'Vernaculars' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'Distribution' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'Biology' })).not.toBeInTheDocument();
 });
 
 test('the Relations tab lists a basionym relation with the joined related name', async () => {

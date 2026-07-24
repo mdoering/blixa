@@ -48,7 +48,6 @@ import {
 } from '../child/taxonTabs';
 import { useUsageLock } from '../lock/useUsageLock';
 import IssueList from './IssueList';
-import SynonymList from './SynonymList';
 import Synonymy from './Synonymy';
 import AiSuggestModal from './AiSuggestModal';
 
@@ -385,6 +384,22 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
     onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Revalidate failed') }),
   });
 
+  // Controlled tabs so switching usage (e.g. clicking a synonym) never leaves a now-hidden tab
+  // active with a blank panel: fall the selection back to Details whenever the current tab isn't
+  // available for the loaded usage. The taxon-level tabs (synonyms/vernaculars/distribution/media/
+  // estimates/biology) exist only for accepted taxa -- a synonym has none of them.
+  const [activeTab, setActiveTab] = useState<string | null>('details');
+  useEffect(() => {
+    if (!usage) return;
+    const taxonTabs =
+      usage.status === 'ACCEPTED'
+        ? ['synonyms', 'vernaculars', 'distribution', 'media', 'estimates', 'properties']
+        : [];
+    const available = ['details', 'names', 'types', 'issues', 'references', 'discussions', ...taxonTabs];
+    if (activeTab && !available.includes(activeTab)) setActiveTab('details');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usage, activeTab]);
+
   if (usageQuery.isLoading) return <Text c="dimmed">Loading…</Text>;
   if (usageQuery.isError || !usage) return <Text c="red">Could not load this taxon</Text>;
 
@@ -459,10 +474,10 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
           {foreignLock.username} is editing this name — your changes may conflict.
         </Alert>
       )}
-      <Tabs defaultValue="details" keepMounted={false}>
+      <Tabs value={activeTab} onChange={setActiveTab} keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="details">Details</Tabs.Tab>
-          <Tabs.Tab value="synonyms">Synonyms</Tabs.Tab>
+          {isAccepted && <Tabs.Tab value="synonyms">Synonyms</Tabs.Tab>}
           <Tabs.Tab value="names">Relations</Tabs.Tab>
           <Tabs.Tab value="types">Types</Tabs.Tab>
           {isAccepted && <Tabs.Tab value="vernaculars">Vernaculars</Tabs.Tab>}
@@ -740,13 +755,11 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
           </Tabs.Panel>
         )}
 
-        <Tabs.Panel value="synonyms" pt="md">
-          {(usage.status ?? '').toUpperCase() === 'ACCEPTED' ? (
+        {isAccepted && (
+          <Tabs.Panel value="synonyms" pt="md">
             <Synonymy pid={pid} usageId={usageId} canEdit={canEdit} />
-          ) : (
-            <SynonymList pid={pid} usageId={usageId} status={usage.status} canEdit={canEdit} />
-          )}
-        </Tabs.Panel>
+          </Tabs.Panel>
+        )}
 
         <Tabs.Panel value="issues" pt="md">
           <IssueList pid={pid} entityId={usageId} />

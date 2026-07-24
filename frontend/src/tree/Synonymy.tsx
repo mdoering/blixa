@@ -1,15 +1,21 @@
-import { Box, Button, Group, List, Stack, Text } from '@mantine/core';
+import { Anchor, Box, Button, Group, List, Stack, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { getSynonymy, type SynEntry } from '../api/usages';
 import HomotypicGroupModal from './HomotypicGroupModal';
 
-function EntryLine({ e, marker }: { e: SynEntry; marker: '≡' | '=' }) {
+// The name links to the synonym's own editor (the /names panel opens any usage via its `usage`
+// param) -- the accepted-only tree can't reach a synonym, so this is how a synonym's nomenclature +
+// type material get edited, one click from where it's listed under its accepted name.
+function EntryLine({ pid, e, marker }: { pid: number; e: SynEntry; marker: '≡' | '=' }) {
   return (
     <Group gap={6} wrap="nowrap" align="baseline">
       <Text span c="dimmed" w={12} ta="center">{marker}</Text>
       <span>
-        {e.formattedName ?? e.scientificName}
+        <Anchor component={Link} to={`/projects/${pid}/names?usage=${e.id}`} size="sm">
+          {e.formattedName ?? e.scientificName}
+        </Anchor>
         {!e.formattedName && e.authorship ? (
           <Text span c="dimmed" size="xs"> {e.authorship}</Text>
         ) : null}
@@ -51,7 +57,7 @@ export default function Synonymy({ pid, usageId, canEdit = false }: SynonymyProp
       {s && s.homotypic.length > 0 && (
         <List listStyleType="none" spacing={2}>
           {s.homotypic.map((e) => (
-            <List.Item key={e.id}><EntryLine e={e} marker="≡" /></List.Item>
+            <List.Item key={e.id}><EntryLine pid={pid} e={e} marker="≡" /></List.Item>
           ))}
         </List>
       )}
@@ -61,7 +67,7 @@ export default function Synonymy({ pid, usageId, canEdit = false }: SynonymyProp
             {grp.map((e, idx) => (
               <List.Item key={e.id}>
                 <Box pl={idx === 0 ? 0 : 'md'}>
-                  <EntryLine e={e} marker={idx === 0 ? '=' : '≡'} />
+                  <EntryLine pid={pid} e={e} marker={idx === 0 ? '=' : '≡'} />
                 </Box>
               </List.Item>
             ))}
@@ -70,7 +76,7 @@ export default function Synonymy({ pid, usageId, canEdit = false }: SynonymyProp
       {s && s.misapplied.length > 0 && (
         <List listStyleType="none" spacing={2}>
           {s.misapplied.map((e) => (
-            <List.Item key={e.id}><EntryLine e={e} marker="=" /></List.Item>
+            <List.Item key={e.id}><EntryLine pid={pid} e={e} marker="=" /></List.Item>
           ))}
         </List>
       )}

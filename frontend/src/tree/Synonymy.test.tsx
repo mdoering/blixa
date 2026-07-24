@@ -32,6 +32,12 @@ describe('Synonymy', () => {
     expect(screen.getByText(/Poa annua auct\./)).toBeInTheDocument();
   });
 
+  it('links each synonym to its own editor in the /names panel', async () => {
+    render(<Synonymy pid={1} usageId={1} canEdit={false} />);
+    const link = await screen.findByRole('link', { name: /Ochlopoa annua/ });
+    expect(link).toHaveAttribute('href', '/projects/1/names?usage=2');
+  });
+
   it('shows the Group synonyms button only when editable', async () => {
     const { rerender } = render(<Synonymy pid={1} usageId={1} canEdit={false} />);
     await screen.findByText(/Ochlopoa annua/);
