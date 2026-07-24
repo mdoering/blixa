@@ -147,6 +147,7 @@ public class DevSampleData implements ApplicationRunner {
         null,  // publishedInPage
         null,  // publishedInPageLink
         null,  // gender
+        null,  // genderAgreement
         null,  // extinct
         null,  // environment
         null,  // temporalRangeStart

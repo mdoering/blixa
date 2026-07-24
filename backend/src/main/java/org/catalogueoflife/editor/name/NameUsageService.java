@@ -214,6 +214,7 @@ public class NameUsageService {
     u.setPublishedInPage(req.publishedInPage());
     u.setPublishedInPageLink(req.publishedInPageLink());
     u.setGender(VocabParsing.parse(Gender.class, req.gender(), "gender"));
+    u.setGenderAgreement(req.genderAgreement());
     u.setExtinct(req.extinct());
     u.setEnvironment(parseEnvironments(req.environment()));
     u.setTemporalRangeStart(req.temporalRangeStart());
@@ -278,6 +279,7 @@ public class NameUsageService {
     u.setPublishedInPage(req.publishedInPage());
     u.setPublishedInPageLink(req.publishedInPageLink());
     u.setGender(VocabParsing.parse(Gender.class, req.gender(), "gender"));
+    u.setGenderAgreement(req.genderAgreement());
     u.setExtinct(req.extinct());
     u.setEnvironment(parseEnvironments(req.environment()));
     u.setTemporalRangeStart(req.temporalRangeStart());
@@ -771,6 +773,7 @@ public class NameUsageService {
     c.setPublishedInPage(source.getPublishedInPage());
     c.setPublishedInPageLink(source.getPublishedInPageLink());
     c.setGender(source.getGender());
+    c.setGenderAgreement(source.getGenderAgreement());
     c.setEtymology(source.getEtymology());
     c.setRemarks(source.getRemarks());
     c.setModifiedBy(userId);
@@ -799,7 +802,9 @@ public class NameUsageService {
     List<Integer> synonymIds = Status.ACCEPTED == u.getStatus()
         ? synonymAccepted.findSynonymsOf(u.getProjectId(), u.getId())
         : List.of();
-    return NameUsageResponse.of(u, formattedName, acceptedParentIds, synonymIds);
+    // The parent genus's gender, shown read-only on the form for a bi/trinomial. Detail path only.
+    String ancestorGenusGender = usages.findAncestorGenusGender(u.getProjectId(), u.getId());
+    return NameUsageResponse.of(u, formattedName, acceptedParentIds, synonymIds, ancestorGenusGender);
   }
 
   // Cheap response for list/search hot paths: avoids the full name-parser re-parse and the
@@ -811,7 +816,7 @@ public class NameUsageService {
     String formattedName = (authorship == null || authorship.isBlank())
         ? u.getScientificName()
         : u.getScientificName() + " " + authorship;
-    return NameUsageResponse.of(u, formattedName, List.of(), List.of());
+    return NameUsageResponse.of(u, formattedName, List.of(), List.of(), null);
   }
 
   // Centralizes the cycle/accepted-parent guards that the generic usage create/update endpoints

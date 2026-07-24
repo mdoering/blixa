@@ -126,6 +126,8 @@ public class NameUsageColdpWriter {
     row.put(ColdpTerm.namePublishedInPage, u.getPublishedInPage());
     row.put(ColdpTerm.namePublishedInPageLink, u.getPublishedInPageLink());
     row.put(ColdpTerm.gender, lower(u.getGender()));
+    row.put(ColdpTerm.genderAgreement,
+        u.getGenderAgreement() == null ? null : String.valueOf(u.getGenderAgreement()));
     row.put(ColdpTerm.etymology, u.getEtymology());
     row.put(ColdpTerm.code, code);
     row.put(ColdpTerm.nameStatus, lower(u.getNomStatus()));

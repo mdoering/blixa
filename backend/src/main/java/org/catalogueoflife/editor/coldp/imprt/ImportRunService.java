@@ -930,6 +930,8 @@ public class ImportRunService {
     u.setPublishedInPage(row.get(ColdpTerm.namePublishedInPage));
     u.setPublishedInPageLink(row.get(ColdpTerm.namePublishedInPageLink));
     u.setGender(ColdpParse.parseEnum(Gender.class, row.get(ColdpTerm.gender)));
+    String genderAgreementStr = row.get(ColdpTerm.genderAgreement);
+    u.setGenderAgreement(genderAgreementStr == null ? null : Boolean.valueOf(genderAgreementStr));
     u.setEtymology(row.get(ColdpTerm.etymology));
     u.setNomStatus(ColdpParse.parseEnum(NomStatus.class, row.get(ColdpTerm.nameStatus)));
     u.setOrdinal(ColdpParse.intOrNull(row.get(ColdpTerm.ordinal)));
@@ -1072,7 +1074,7 @@ public class ImportRunService {
       ColdpTerm.combinationAuthorshipYear, ColdpTerm.basionymAuthorship,
       ColdpTerm.basionymExAuthorship, ColdpTerm.basionymAuthorshipYear, ColdpTerm.namePhrase,
       ColdpTerm.nameReferenceID, ColdpTerm.namePublishedInYear, ColdpTerm.namePublishedInPage,
-      ColdpTerm.namePublishedInPageLink, ColdpTerm.gender, ColdpTerm.etymology,
+      ColdpTerm.namePublishedInPageLink, ColdpTerm.gender, ColdpTerm.genderAgreement, ColdpTerm.etymology,
       ColdpTerm.nameStatus, ColdpTerm.referenceID, ColdpTerm.ordinal, ColdpTerm.remarks,
       ColdpTerm.alternativeID, ColdpTerm.extinct, ColdpTerm.environment,
       ColdpTerm.temporalRangeStart, ColdpTerm.temporalRangeEnd);
@@ -1178,6 +1180,7 @@ public class ImportRunService {
     row.put(ColdpTerm.namePublishedInPage, nameRec.get(ColdpTerm.publishedInPage));
     row.put(ColdpTerm.namePublishedInPageLink, nameRec.get(ColdpTerm.publishedInPageLink));
     row.put(ColdpTerm.gender, nameRec.get(ColdpTerm.gender));
+    row.put(ColdpTerm.genderAgreement, nameRec.get(ColdpTerm.genderAgreement));
     row.put(ColdpTerm.etymology, nameRec.get(ColdpTerm.etymology));
     row.put(ColdpTerm.nameStatus, nameRec.get(ColdpTerm.status));
     row.put(ColdpTerm.referenceID, usageRec.get(ColdpTerm.referenceID));

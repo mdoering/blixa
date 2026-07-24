@@ -658,3 +658,36 @@ test('a warning issue shows its badge and message', async () => {
   await screen.findByText('Missing published-in reference');
   expect(screen.getByText('warning')).toBeInTheDocument();
 });
+
+test('gender is an editable Select on a genus, with no agreement checkbox', async () => {
+  mockCommon(
+    baseUsage({ rank: 'genus', scientificName: 'Panthera', specificEpithet: null, gender: 'FEMININE' }),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  // the editable gender Select shows the genus's own gender (Mantine renders a visible + hidden input)
+  expect((await screen.findAllByDisplayValue('FEMININE')).length).toBeGreaterThan(0);
+  expect(screen.queryByRole('checkbox', { name: 'Gender agreement' })).not.toBeInTheDocument();
+});
+
+test('a species shows the derived parent-genus gender read-only + an agreement checkbox', async () => {
+  mockCommon(baseUsage({ ancestorGenusGender: 'FEMININE', genderAgreement: true }));
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  const derived = await screen.findByLabelText('Gender (from parent genus)');
+  expect(derived).toHaveValue('FEMININE');
+  expect(derived).toHaveAttribute('readonly');
+  expect(screen.getByRole('checkbox', { name: 'Gender agreement' })).toBeChecked();
+  // no editable gender Select (the read-only one is labelled "... (from parent genus)")
+  expect(screen.queryByRole('textbox', { name: 'Gender' })).not.toBeInTheDocument();
+});
+
+test('a suprageneric name shows neither gender field', async () => {
+  mockCommon(baseUsage({ rank: 'family', scientificName: 'Felidae', specificEpithet: null }));
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  await screen.findByLabelText('Scientific name');
+  expect(screen.queryByLabelText('Gender')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Gender (from parent genus)')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Gender agreement')).not.toBeInTheDocument();
+});

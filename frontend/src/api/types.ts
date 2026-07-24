@@ -135,6 +135,11 @@ export interface NameUsage {
   publishedInPage: string | null;
   publishedInPageLink: string | null;
   gender: string | null;
+  // Whether a bi/trinomial's epithets follow the genus gender (only meaningful species-and-below).
+  genderAgreement: boolean | null;
+  // Read-only: the grammatical gender of the nearest genus ancestor, shown on the form for a
+  // bi/trinomial. Null on list/search responses (computed only on the detail path).
+  ancestorGenusGender: string | null;
   etymology: string | null;
   nameType: string | null;
   parseState: string | null;
@@ -164,6 +169,7 @@ export interface UpdateUsagePayload {
   publishedInPage?: string;
   publishedInPageLink?: string;
   gender?: string;
+  genderAgreement?: boolean;
   extinct?: boolean;
   environment?: string[];
   temporalRangeStart?: string;

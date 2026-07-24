@@ -221,6 +221,7 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
     felisCatus.setParentId(felidae.getId());
     felisCatus.setPublishedInReferenceId(ref1.getId());
     felisCatus.setReferenceId(List.of(ref1.getId(), ref2.getId()));
+    felisCatus.setGenderAgreement(true); // ColDP Name.genderAgreement must survive export -> reimport
     // Deliberately irregular whitespace -- see class javadoc for why the round-tripped value must
     // be the reader-normalized ("a double spaced remark"), not this raw string.
     felisCatus.setRemarks("  a   double  spaced   remark  ");
@@ -382,6 +383,7 @@ class ImportExportRoundTripIT extends AbstractPostgresIT {
 
     // taxon_info round-tripped on the accepted usage.
     assertThat(newFelisCatus.getExtinct()).isTrue();
+    assertThat(newFelisCatus.getGenderAgreement()).isTrue();
     assertThat(newFelisCatus.getEnvironment())
         .containsExactlyInAnyOrder(Environment.TERRESTRIAL, Environment.FRESHWATER);
     assertThat(newFelisCatus.getTemporalRangeStart()).isEqualTo("Pleistocene");

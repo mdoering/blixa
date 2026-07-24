@@ -17,6 +17,7 @@ public record UpdateNameUsageRequest(
     String publishedInPage,
     String publishedInPageLink,
     String gender,
+    Boolean genderAgreement,
     Boolean extinct,
     List<String> environment,
     String temporalRangeStart,

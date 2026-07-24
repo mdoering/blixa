@@ -168,6 +168,7 @@ public class BulkInsertService {
     CreateNameUsageRequest r = new CreateNameUsageRequest(
         node.name, null, rank, status, parentId,
         null, null, null, null, null, null, null,
+        null, // genderAgreement
         node.extinct ? Boolean.TRUE : null,
         null, null, null, null);
     NameUsageResponse created = usageService.create(userId, projectId, r);

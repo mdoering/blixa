@@ -2,7 +2,6 @@ package org.catalogueoflife.editor.release;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Map;
 import org.catalogueoflife.editor.support.AbstractPostgresIT;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
 import org.catalogueoflife.editor.name.NameUsageService;
@@ -30,11 +29,11 @@ class ReleaseMetricsIT extends AbstractPostgresIT {
     int pid = p.getId();
     // 1 accepted genus + 1 accepted species + 1 synonym species
     usages.create(u.getId(), pid, new CreateNameUsageRequest("Aus", null, "genus", "ACCEPTED",
-        null, null, null, null, null, null, null, null, null, null, null, null, null));
+        null, null, null, null, null, null, null, null, null, null, null, null, null, null));
     usages.create(u.getId(), pid, new CreateNameUsageRequest("Aus bus", null, "species", "ACCEPTED",
-        null, null, null, null, null, null, null, null, null, null, null, null, null));
+        null, null, null, null, null, null, null, null, null, null, null, null, null, null));
     usages.create(u.getId(), pid, new CreateNameUsageRequest("Aus cus", null, "species", "SYNONYM",
-        null, null, null, null, null, null, null, null, null, null, null, null, null));
+        null, null, null, null, null, null, null, null, null, null, null, null, null, null));
 
     JsonNode m = json.readTree(metrics.compute(pid, null));
     assertThat(m.get("acceptedByRank").get("genus").asInt()).isEqualTo(1);

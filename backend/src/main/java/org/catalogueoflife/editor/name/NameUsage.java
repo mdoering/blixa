@@ -54,6 +54,9 @@ public class NameUsage {
   private String publishedInPage;
   private String publishedInPageLink;
   private Gender gender;
+  // Whether a bi/trinomial's epithets follow the genus's grammatical gender (ColDP genderAgreement).
+  // Only meaningful for species and below; `gender` itself belongs to the genus.
+  private Boolean genderAgreement;
   private String etymology;
   private NameType nameType;
   private String parseState;
@@ -80,6 +83,8 @@ public class NameUsage {
   public void setReferenceId(List<Integer> referenceId) { this.referenceId = referenceId; }
   public Boolean getExtinct() { return extinct; }
   public void setExtinct(Boolean extinct) { this.extinct = extinct; }
+  public Boolean getGenderAgreement() { return genderAgreement; }
+  public void setGenderAgreement(Boolean genderAgreement) { this.genderAgreement = genderAgreement; }
   public List<Environment> getEnvironment() { return environment; }
   public void setEnvironment(List<Environment> environment) { this.environment = environment; }
   public String getTemporalRangeStart() { return temporalRangeStart; }

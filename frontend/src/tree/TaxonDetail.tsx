@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Divider,
   Group,
   NumberInput,
@@ -79,6 +80,10 @@ interface EditableFields {
   publishedInPage: string;
   publishedInPageLink: string;
   nomStatus: string;
+  // Grammatical gender: editable on a genus (its own gender); on a bi/trinomial the parent genus
+  // defines it and only genderAgreement is editable.
+  gender: string;
+  genderAgreement: boolean;
   etymology: string;
   remarks: string;
   // One entry per project.identifierScopes scope (e.g. "ipni"), keyed by the bare scope -- seeded
@@ -99,6 +104,8 @@ function toFormValues(u: NameUsage): EditableFields {
     publishedInPage: u.publishedInPage ?? '',
     publishedInPageLink: u.publishedInPageLink ?? '',
     nomStatus: u.nomStatus ?? '',
+    gender: u.gender ?? '',
+    genderAgreement: u.genderAgreement ?? false,
     etymology: u.etymology ?? '',
     remarks: u.remarks ?? '',
     // Seeded separately by the identifiers-seeding effect below, once the project's
@@ -138,6 +145,8 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
       publishedInPage: '',
       publishedInPageLink: '',
       nomStatus: '',
+      gender: '',
+      genderAgreement: false,
       etymology: '',
       remarks: '',
       identifiers: {},
@@ -275,7 +284,10 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
         publishedInYear: values.publishedInYear === '' ? undefined : values.publishedInYear,
         publishedInPage: values.publishedInPage || undefined,
         publishedInPageLink: values.publishedInPageLink || undefined,
-        gender: usage.gender ?? undefined,
+        // Gender belongs to the genus; a bi/trinomial only carries genderAgreement (its own gender
+        // stays null and is derived from the parent). Suprageneric: neither.
+        gender: values.rank === 'genus' ? values.gender || undefined : undefined,
+        genderAgreement: usage.specificEpithet ? values.genderAgreement : undefined,
         extinct: usage.extinct ?? undefined,
         environment: usage.environment ?? undefined,
         temporalRangeStart: usage.temporalRangeStart ?? undefined,
@@ -333,6 +345,11 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
   const rankInputProps = form.getInputProps('rank');
   const statusInputProps = form.getInputProps('status');
   const nomStatusInputProps = form.getInputProps('nomStatus');
+  const genderInputProps = form.getInputProps('gender');
+  // Gender is editable only on a genus; a bi/trinomial (has a specific epithet) derives it from the
+  // parent genus and only toggles agreement; suprageneric names show neither.
+  const isGenus = form.values.rank === 'genus';
+  const isBinomialOrBelow = !!usage.specificEpithet;
 
   return (
     <Box>
@@ -508,6 +525,39 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                     nomStatusInputProps.onChange(v);
                   }}
                 />
+                {isGenus ? (
+                  <Select
+                    label="Gender"
+                    placeholder="—"
+                    clearable
+                    data={vocab?.gender ?? []}
+                    disabled={!canEdit}
+                    {...genderInputProps}
+                    onChange={(v) => {
+                      claim();
+                      genderInputProps.onChange(v);
+                    }}
+                  />
+                ) : isBinomialOrBelow ? (
+                  <Group grow align="flex-start" gap="md">
+                    <TextInput
+                      label="Gender (from parent genus)"
+                      readOnly
+                      value={usage.ancestorGenusGender ?? '—'}
+                    />
+                    <Checkbox
+                      mt={30}
+                      label="Gender agreement"
+                      description="Epithets follow the genus gender (e.g. alba / albus)"
+                      disabled={!canEdit}
+                      checked={form.values.genderAgreement}
+                      onChange={(e) => {
+                        claim();
+                        form.setFieldValue('genderAgreement', e.currentTarget.checked);
+                      }}
+                    />
+                  </Group>
+                ) : null}
                 {((usage.alternativeId?.length ?? 0) > 0 || (canEdit && scopes.length > 0)) &&
                   (editingIds ? (
                     <SimpleGrid cols={Math.min(scopes.length, 3)}>

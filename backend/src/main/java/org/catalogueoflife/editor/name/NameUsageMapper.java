@@ -30,7 +30,7 @@ public interface NameUsageMapper {
           combination_authorship, combination_ex_authorship, combination_authorship_year,
           basionym_authorship, basionym_ex_authorship, basionym_authorship_year,
           sanctioning_author, nom_status, published_in_reference_id, published_in_year,
-          published_in_page, published_in_page_link, gender, etymology, name_type,
+          published_in_page, published_in_page_link, gender, gender_agreement, etymology, name_type,
           parse_state, remarks, modified_by)
       VALUES (
           #{projectId}, #{id},
@@ -43,7 +43,7 @@ public interface NameUsageMapper {
           #{combinationAuthorship}, #{combinationExAuthorship}, #{combinationAuthorshipYear},
           #{basionymAuthorship}, #{basionymExAuthorship}, #{basionymAuthorshipYear},
           #{sanctioningAuthor}, #{nomStatus}, #{publishedInReferenceId}, #{publishedInYear},
-          #{publishedInPage}, #{publishedInPageLink}, #{gender}, #{etymology}, #{nameType},
+          #{publishedInPage}, #{publishedInPageLink}, #{gender}, #{genderAgreement}, #{etymology}, #{nameType},
           #{parseState}, #{remarks}, #{modifiedBy})
       """)
   void insert(NameUsage u);
@@ -277,6 +277,21 @@ public interface NameUsageMapper {
       """)
   String findAncestorGenusName(@Param("projectId") int projectId, @Param("id") int id);
 
+  // Grammatical gender of the nearest STRICT genus ancestor -- the gender a bi/trinomial's epithets
+  // must agree with -- or null. Read-only display on the name form (NameUsageResponse.ancestorGenusGender).
+  @Select("""
+      WITH RECURSIVE anc AS (
+        SELECT project_id, id, parent_id, rank, gender, 0 AS depth
+        FROM name_usage WHERE project_id = #{projectId} AND id = #{id}
+        UNION ALL
+        SELECT n.project_id, n.id, n.parent_id, n.rank, n.gender, anc.depth + 1
+        FROM name_usage n JOIN anc ON n.project_id = anc.project_id AND n.id = anc.parent_id
+        WHERE anc.depth < 10000
+      )
+      SELECT gender FROM anc WHERE depth > 0 AND rank = 'genus' ORDER BY depth LIMIT 1
+      """)
+  String findAncestorGenusGender(@Param("projectId") int projectId, @Param("id") int id);
+
   // Full higher classification of a usage: every STRICT ancestor (depth > 0, self excluded),
   // root-first (ORDER BY depth DESC), skipping unranked ancestors -- fed to the COL name matcher
   // as higher-classification query params (see Task 4 / the bulk-match plan). Same
@@ -415,8 +430,8 @@ public interface NameUsageMapper {
           sanctioning_author = #{sanctioningAuthor}, nom_status = #{nomStatus},
           published_in_reference_id = #{publishedInReferenceId}, published_in_year = #{publishedInYear},
           published_in_page = #{publishedInPage}, published_in_page_link = #{publishedInPageLink},
-          gender = #{gender}, etymology = #{etymology}, name_type = #{nameType},
-          parse_state = #{parseState}, remarks = #{remarks},
+          gender = #{gender}, gender_agreement = #{genderAgreement}, etymology = #{etymology},
+          name_type = #{nameType}, parse_state = #{parseState}, remarks = #{remarks},
           modified = now(), modified_by = #{modifiedBy}, version = version + 1
       WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}
       """)
