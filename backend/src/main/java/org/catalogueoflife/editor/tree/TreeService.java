@@ -115,7 +115,9 @@ public class TreeService {
     // with respect to any other concurrent move/create/update touching this project's tree.
     tree.lockProject(projectId);
     NameUsage moved = usages.findByIdInProject(projectId, id);
-    if (moved == null || moved.getStatus() != Status.ACCEPTED) {
+    // Only tree nodes (ACCEPTED or UNASSESSED "provisionally accepted") carry a parent_id and can
+    // be reparented; synonyms/misapplied attach via synonym_accepted, not the tree.
+    if (moved == null || !moved.getStatus().isTaxon()) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "name usage not found");
     }
     Integer parentId = req.parentId();
@@ -124,8 +126,14 @@ public class TreeService {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "a usage cannot be its own parent");
       }
       NameUsage parent = usages.findByIdInProject(projectId, parentId);
-      if (parent == null || parent.getStatus() != Status.ACCEPTED) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "parent not found or not accepted");
+      // Same backbone rule as NameUsageService.requireValidParent: an accepted taxon's parent must
+      // be accepted; an unassessed taxon may hang under an accepted OR an unassessed parent.
+      boolean parentOk = parent != null && (parent.getStatus() == Status.ACCEPTED
+          || (moved.getStatus() == Status.UNASSESSED && parent.getStatus() == Status.UNASSESSED));
+      if (!parentOk) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, moved.getStatus() == Status.UNASSESSED
+            ? "the parent of an unassessed taxon must be accepted or unassessed"
+            : "the parent of an accepted taxon must be accepted");
       }
       if (tree.isDescendant(projectId, id, parentId)) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "would create a cycle");

@@ -27,8 +27,10 @@ export interface ClassificationBarProps {
 // (primary) accepted name for a synonym/misapplied usage -- so getPath's accepted-only walk always
 // applies and the last entry is the direct parent, not the focal taxon itself.
 export default function ClassificationBar({ pid, usage, canEdit, onNavigate }: ClassificationBarProps) {
-  const isAccepted = usage.status === 'ACCEPTED';
   const isSynonym = usage.status === 'SYNONYM' || usage.status === 'MISAPPLIED';
+  // a tree node (accepted or unassessed "provisionally accepted") -- reparentable, and its path is
+  // the parent_id chain; a synonym/misapplied usage's "parent" is its accepted name instead.
+  const isTaxon = usage.status === 'ACCEPTED' || usage.status === 'UNASSESSED';
   const anchorId = isSynonym ? usage.acceptedParentIds?.[0] ?? null : usage.parentId;
 
   const [moveOpen, setMoveOpen] = useState(false);
@@ -48,9 +50,8 @@ export default function ClassificationBar({ pid, usage, canEdit, onNavigate }: C
   const truncated = full.length > MAX_CRUMBS;
   const shown = truncated ? full.slice(full.length - MAX_CRUMBS) : full;
   const lastIndex = shown.length - 1;
-  // the change icon is available for a reparentable accepted taxon or a re-linkable synonym; an
-  // unassessed taxon shows the path but has no (accepted-only) reparent flow.
-  const canChange = canEdit && (isAccepted || isSynonym);
+  // the change icon reparents a taxon (accepted or unassessed) or re-links a synonym.
+  const canChange = canEdit && (isTaxon || isSynonym);
 
   const crumbs: ReactNode[] = [];
   if (truncated) crumbs.push(<Text key="ellipsis" size="sm" c="dimmed">…</Text>);
@@ -98,7 +99,7 @@ export default function ClassificationBar({ pid, usage, canEdit, onNavigate }: C
           </ActionIcon>
         </Tooltip>
       )}
-      {isAccepted && (
+      {isTaxon && (
         <MoveNameModal
           pid={pid}
           usage={{ id: usage.id, scientificName: usage.scientificName }}

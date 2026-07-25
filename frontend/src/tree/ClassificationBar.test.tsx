@@ -108,6 +108,25 @@ test('the change icon reparents an accepted taxon (opens the move modal)', async
   expect(await screen.findByRole('dialog')).toHaveTextContent('Move');
 });
 
+test('the change icon reparents an unassessed taxon (opens the move modal)', async () => {
+  server.use(
+    http.get('/api/projects/7/tree/path/100', () =>
+      HttpResponse.json([{ id: 100, scientificName: 'Panthera', rank: 'genus' }]),
+    ),
+    http.get('/api/projects/7/tree/roots', () => HttpResponse.json([])),
+  );
+  renderWithProviders(
+    <ClassificationBar
+      pid={7}
+      usage={makeUsage({ status: 'UNASSESSED', parentId: 100, scientificName: 'Panthera leo' })}
+      canEdit
+    />,
+  );
+  await screen.findByText('Panthera');
+  await userEvent.click(screen.getByRole('button', { name: 'Change parent' }));
+  expect(await screen.findByRole('dialog')).toHaveTextContent('Move');
+});
+
 test('the change icon changes the accepted name of a synonym', async () => {
   server.use(
     http.get('/api/projects/7/tree/path/50', () =>

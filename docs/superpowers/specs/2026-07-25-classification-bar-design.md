@@ -47,7 +47,9 @@ Props: `pid`, `usage: NameUsage`, `canEdit: boolean`, `onNavigate?: (id) => void
 - Each entry is an `Anchor` calling `onNavigate(id)`; with no `onNavigate` it's plain `Text`.
 - After the last entry (direct parent), when `canEdit` and the focal is accepted **or**
   synonym/misapplied, a small change `ActionIcon` (`IconArrowsExchange`) opens the right modal.
-  Unassessed focal: bar shows, no change icon (the backend reparent is accepted-only).
+  Unassessed focal: also reparentable — the change icon opens `MoveNameModal` (the backend move
+  and `isDescendant` cycle check were widened to the full taxon backbone; an unassessed taxon may
+  hang under an accepted or unassessed parent, an accepted one only under accepted).
 
 ### `ChangeAcceptedModal` (new, `tree/`)
 

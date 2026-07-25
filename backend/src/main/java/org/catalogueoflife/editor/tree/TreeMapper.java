@@ -77,10 +77,12 @@ public interface TreeMapper {
 
   // Is candidateId equal to rootId, or within rootId's accepted subtree? Used by TreeService.move
   // and NameUsageService's create/update parentId guard to reject a reparent that would create a
-  // cycle: a node can never become a descendant of its own descendant (or of itself). Restricted
-  // to status = 'ACCEPTED' like the rest of the tree -- parent_id only ever links
-  // accepted->accepted anyway (see V3__name_core.sql). The depth bound is the same defensive
-  // termination guarantee as findPath's.
+  // cycle: a node can never become a descendant of its own descendant (or of itself). Walks the
+  // FULL parent_id tree (any status) rather than the accepted-only backbone: unassessed
+  // ("provisionally accepted") taxa also carry a parent_id and may nest (unassessed under
+  // unassessed), so an accepted-only recursion would miss a cycle formed through the provisional
+  // layer. For an all-accepted subtree the result is identical. The depth bound is the same
+  // defensive termination guarantee as findPath's.
   @Select("""
       WITH RECURSIVE sub AS (
         SELECT project_id, id, 0 AS depth FROM name_usage
@@ -88,7 +90,7 @@ public interface TreeMapper {
         UNION ALL
         SELECT n.project_id, n.id, sub.depth + 1 FROM name_usage n
         JOIN sub ON n.project_id = sub.project_id AND n.parent_id = sub.id
-        WHERE n.status = 'ACCEPTED' AND sub.depth < 10000
+        WHERE sub.depth < 10000
       )
       SELECT EXISTS (SELECT 1 FROM sub WHERE id = #{candidateId})
       """)

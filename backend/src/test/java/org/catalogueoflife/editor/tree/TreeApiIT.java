@@ -69,6 +69,17 @@ class TreeApiIT extends AbstractPostgresIT {
     return ids;
   }
 
+  // children including the provisional (unassessed) layer -- needed to observe unassessed nodes,
+  // which the default (accepted-backbone-only) children endpoint hides.
+  private java.util.List<Long> childIdsUnassessed(long pid, long parentId) throws Exception {
+    String body = mvc.perform(get("/api/projects/" + pid + "/tree/children/" + parentId)
+            .param("unassessed", "true"))
+        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    java.util.List<Long> ids = new java.util.ArrayList<>();
+    for (JsonNode n : json.readTree(body)) ids.add(n.get("id").asLong());
+    return ids;
+  }
+
   @Test
   @WithMockUser(username = "treePagingOwner")
   void childrenPagingIsDeterministicAndNonOverlapping() throws Exception {
@@ -240,6 +251,39 @@ class TreeApiIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$[1].childCount").value(0))
         .andExpect(jsonPath("$[2].scientificName").value("Plantae"))
         .andExpect(jsonPath("$[2].childCount").value(1));
+  }
+
+  @Test
+  @WithMockUser(username = "treeUnaMoveOwner")
+  void unassessedTaxonCanBeReparented() throws Exception {
+    ensureUser("treeUnaMoveOwner");
+    long pid = createProject("treeunamoveproj");
+    // Accepted backbone: two genera. An unassessed ("provisionally accepted") species under Aus.
+    long genusA = createUsage(pid, "Aus", "genus", "accepted", null);
+    long genusB = createUsage(pid, "Bus", "genus", "accepted", null);
+    long prov = createUsage(pid, "Aus provisius", "species", "unassessed", genusA);
+
+    assertThat(childIdsUnassessed(pid, genusA)).containsExactly(prov);
+
+    // An unassessed taxon is a tree node and may be reparented (formerly accepted-only -> 404).
+    move(pid, prov, genusB, 0, null).andExpect(status().isOk());
+    assertThat(childIdsUnassessed(pid, genusA)).isEmpty();
+    assertThat(childIdsUnassessed(pid, genusB)).containsExactly(prov);
+
+    // It may also hang under an unassessed parent (the provisional layer may nest).
+    long provRoot = createUsage(pid, "Provisrootus", "genus", "unassessed", null);
+    move(pid, prov, provRoot, 1, null).andExpect(status().isOk());
+    assertThat(childIdsUnassessed(pid, provRoot)).containsExactly(prov);
+
+    // But an ACCEPTED taxon may never sit under an unassessed parent -- the accepted backbone stays
+    // self-contained.
+    move(pid, genusA, provRoot, 0, null).andExpect(status().isBadRequest());
+
+    // Cycle guard holds through the unassessed layer too: an unassessed chain U1 -> U2 cannot be
+    // looped by moving U1 under its own (unassessed) descendant U2.
+    long u1 = createUsage(pid, "Unoa", "genus", "unassessed", null);
+    long u2 = createUsage(pid, "Unoa duo", "species", "unassessed", u1);
+    move(pid, u1, u2, 0, null).andExpect(status().isBadRequest());
   }
 
   @Test
