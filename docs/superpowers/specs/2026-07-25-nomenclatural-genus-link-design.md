@@ -72,6 +72,16 @@ but the default action is fill-missing-only.)
 (the genus changed), set `genus_id = null` — the old link is stale and must be re-established (by the
 form or the job). No silent auto-re-resolve, so a curated link is never quietly changed under the user.
 
+## Validation rule: linked-genus spelling mismatch
+
+A new rule (`genus_link_spelling_mismatch`, WARNING) flags a usage whose `genus_id` is set but whose
+parsed `genus` token does **not exactly match** the linked genus usage's name (`uninomial`, falling
+back to `scientific_name`) — an exact, case-sensitive comparison. This catches a **mis-link** (a
+curator linked to the wrong genus) or **drift** (the linked genus was renamed while the binomial's
+token wasn't). It only fires when a link exists (an unlinked binomial is not this rule's concern —
+see the guardrails). Implemented as a pure `ValidationRule` over a new `RuleContext.linkedGenusName`
+field (the linked genus's name, or null when unlinked), built in `ValidationService.buildContext`.
+
 ## Scope guardrails (v1 excludes)
 
 Auto-on-import genus linking (deferred); per-taxon **issue flags** for unlinked/ambiguous genera (the
