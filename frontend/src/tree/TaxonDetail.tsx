@@ -823,7 +823,7 @@ export default function TaxonDetail({ pid, usageId, onNavigate }: TaxonDetailPro
 
         {isAccepted && (
           <Tabs.Panel value="synonyms" pt="md">
-            <Synonymy pid={pid} usageId={usageId} canEdit={canEdit} />
+            <Synonymy pid={pid} usageId={usageId} canEdit={canEdit} acceptedName={usage.scientificName} />
           </Tabs.Panel>
         )}
 

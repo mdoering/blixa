@@ -17,6 +17,9 @@ export interface BulkAddModalProps {
   opened: boolean;
   onClose: () => void;
   onDone: () => void;
+  // When set, the children/synonyms toggle is hidden and the mode is fixed -- used when the modal is
+  // opened from a context that already implies the mode (e.g. "Add synonyms" on the Synonyms tab).
+  fixedMode?: 'children' | 'synonyms';
 }
 
 function NodeView({ node, depth }: { node: BulkPreviewNode; depth: number }) {
@@ -43,19 +46,19 @@ function NodeView({ node, depth }: { node: BulkPreviewNode; depth: number }) {
 // Bulk-add a text-tree (or plain list) under `target`. Preview -> confirm: previewBulk parses and
 // validates server-side; the parsed tree renders here; insertBulk commits everything in one
 // transaction. Duplicates are shown but inserted anyway.
-export default function BulkAddModal({ pid, target, opened, onClose, onDone }: BulkAddModalProps) {
+export default function BulkAddModal({ pid, target, opened, onClose, onDone, fixedMode }: BulkAddModalProps) {
   const queryClient = useQueryClient();
-  const [mode, setMode] = useState<'children' | 'synonyms'>('children');
+  const [mode, setMode] = useState<'children' | 'synonyms'>(fixedMode ?? 'children');
   const [text, setText] = useState('');
   const [preview, setPreview] = useState<BulkPreview | null>(null);
 
   useEffect(() => {
     if (opened) {
-      setMode('children');
+      setMode(fixedMode ?? 'children');
       setText('');
       setPreview(null);
     }
-  }, [opened]);
+  }, [opened, fixedMode]);
 
   const previewMut = useMutation({
     mutationFn: () => previewBulk(pid, { targetId: target.id, mode, text }),
@@ -84,15 +87,20 @@ export default function BulkAddModal({ pid, target, opened, onClose, onDone }: B
 
   return (
     <Modal opened={opened} onClose={onClose} size="lg" title={
-      <Text fw={600}>Bulk add under <Text span fs="italic" inherit>{target.scientificName ?? '—'}</Text></Text>
+      <Text fw={600}>
+        {fixedMode === 'synonyms' ? 'Add synonyms of ' : 'Bulk add under '}
+        <Text span fs="italic" inherit>{target.scientificName ?? '—'}</Text>
+      </Text>
     }>
       <Stack gap="md">
-        <SegmentedControl
-          value={mode}
-          onChange={(v) => { setMode(v as 'children' | 'synonyms'); setPreview(null); }}
-          data={[{ label: 'As accepted children', value: 'children' },
-                 { label: 'As synonyms of target', value: 'synonyms' }]}
-        />
+        {!fixedMode && (
+          <SegmentedControl
+            value={mode}
+            onChange={(v) => { setMode(v as 'children' | 'synonyms'); setPreview(null); }}
+            data={[{ label: 'As accepted children', value: 'children' },
+                   { label: 'As synonyms of target', value: 'synonyms' }]}
+          />
+        )}
         <Textarea
           label={
             <InfoLabel

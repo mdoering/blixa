@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils';
 import { server, http, HttpResponse } from '../test/server';
 import Synonymy from './Synonymy';
@@ -38,11 +39,25 @@ describe('Synonymy', () => {
     expect(link).toHaveAttribute('href', '/projects/1/names?usage=2');
   });
 
-  it('shows the Group synonyms button only when editable', async () => {
+  it('shows the synonym-actions menu only when editable', async () => {
     const { rerender } = render(<Synonymy pid={1} usageId={1} canEdit={false} />);
     await screen.findByText(/Ochlopoa annua/);
-    expect(screen.queryByRole('button', { name: /group synonyms/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /synonym actions/i })).not.toBeInTheDocument();
     rerender(<Synonymy pid={1} usageId={1} canEdit />);
-    expect(await screen.findByRole('button', { name: /group synonyms/i })).toBeInTheDocument();
+    const menu = await screen.findByRole('button', { name: /synonym actions/i });
+    await userEvent.click(menu);
+    expect(await screen.findByRole('menuitem', { name: /group synonyms/i })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /add synonyms/i })).toBeInTheDocument();
+  });
+
+  it('opens the bulk add-synonyms modal (synonyms mode) from the actions menu', async () => {
+    render(<Synonymy pid={1} usageId={1} canEdit acceptedName="Poa annua" />);
+    await screen.findByText(/Ochlopoa annua/);
+    await userEvent.click(screen.getByRole('button', { name: /synonym actions/i }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /add synonyms/i }));
+    // the modal opens pre-scoped to adding synonyms of the accepted name (no children/synonyms toggle)
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(/add synonyms of\s*Poa annua/i);
+    expect(within(dialog).queryByText('As accepted children')).not.toBeInTheDocument();
   });
 });

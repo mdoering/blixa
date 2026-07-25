@@ -1,9 +1,11 @@
-import { Anchor, Box, Button, Group, List, Stack, Text } from '@mantine/core';
+import { ActionIcon, Anchor, Box, Group, List, Menu, Stack, Text } from '@mantine/core';
+import { IconDots, IconGitMerge, IconPlus } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { getSynonymy, type SynEntry } from '../api/usages';
 import HomotypicGroupModal from './HomotypicGroupModal';
+import BulkAddModal from '../names/BulkAddModal';
 
 // The name links to the synonym's own editor (the /names panel opens any usage via its `usage`
 // param) -- the accepted-only tree can't reach a synonym, so this is how a synonym's nomenclature +
@@ -28,18 +30,22 @@ export interface SynonymyProps {
   pid: number;
   usageId: number;
   canEdit?: boolean;
+  // the accepted usage's name, shown as the bulk-add target's heading
+  acceptedName?: string | null;
 }
 
 // Nested synonymy of an ACCEPTED usage (see backend name/homotypy). Recombinations homotypic to the
 // accepted name render first with ≡; each heterotypic group renders its basionym with = and its
 // recombinations indented with ≡; misapplied names come last. `Group synonyms` (editor) opens the
 // detect/confirm modal.
-export default function Synonymy({ pid, usageId, canEdit = false }: SynonymyProps) {
+export default function Synonymy({ pid, usageId, canEdit = false, acceptedName }: SynonymyProps) {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['synonymy', pid, usageId],
     queryFn: () => getSynonymy(pid, usageId),
   });
   const [opened, { open, close }] = useDisclosure(false);
+  const [bulkOpen, { open: openBulk, close: closeBulk }] = useDisclosure(false);
 
   if (isLoading) return <Text size="sm" c="dimmed">Loading…</Text>;
   const s = data;
@@ -50,7 +56,21 @@ export default function Synonymy({ pid, usageId, canEdit = false }: SynonymyProp
     <Stack gap="sm">
       {canEdit && (
         <Group justify="flex-end">
-          <Button size="xs" variant="light" onClick={open}>Group synonyms</Button>
+          <Menu position="bottom-end" withinPortal>
+            <Menu.Target>
+              <ActionIcon variant="subtle" color="gray" aria-label="Synonym actions">
+                <IconDots size={16} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconPlus size={14} />} onClick={openBulk}>
+                Add synonyms…
+              </Menu.Item>
+              <Menu.Item leftSection={<IconGitMerge size={14} />} onClick={open}>
+                Group synonyms
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
         </Group>
       )}
       {empty && <Text size="sm" c="dimmed">No synonyms</Text>}
@@ -83,6 +103,14 @@ export default function Synonymy({ pid, usageId, canEdit = false }: SynonymyProp
       {opened && (
         <HomotypicGroupModal pid={pid} usageId={usageId} onClose={close} />
       )}
+      <BulkAddModal
+        pid={pid}
+        target={{ id: usageId, scientificName: acceptedName ?? null }}
+        opened={bulkOpen}
+        fixedMode="synonyms"
+        onClose={closeBulk}
+        onDone={() => queryClient.invalidateQueries({ queryKey: ['synonymy', pid, usageId] })}
+      />
     </Stack>
   );
 }

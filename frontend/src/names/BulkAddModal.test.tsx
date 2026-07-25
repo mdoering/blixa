@@ -28,6 +28,21 @@ describe('BulkAddModal', () => {
     await waitFor(() => expect(insert).toHaveBeenCalled());
   });
 
+  it('locks to synonyms mode when fixedMode is set (no children/synonyms toggle)', async () => {
+    const preview = vi.spyOn(bulkApi, 'previewBulk').mockResolvedValue({
+      valid: true, error: null, total: 1, accepted: 0, synonyms: 1, duplicates: 0,
+      nodes: [{ name: 'Felis leo', rank: 'species', status: 'SYNONYM', extinct: false, duplicate: false, children: [], synonyms: [] }],
+    });
+    render(<BulkAddModal pid={1} target={target} opened fixedMode="synonyms" onClose={() => {}} onDone={() => {}} />);
+    // the mode toggle is hidden -- the mode is fixed to synonyms
+    expect(screen.queryByText('As accepted children')).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/names/i), 'Felis leo');
+    await userEvent.click(screen.getByRole('button', { name: /preview/i }));
+    await waitFor(() =>
+      expect(preview).toHaveBeenCalledWith(1, expect.objectContaining({ mode: 'synonyms', targetId: 7 })),
+    );
+  });
+
   it('shows a parse error and disables insert', async () => {
     vi.spyOn(bulkApi, 'previewBulk').mockResolvedValue({
       valid: false, error: 'not properly indented on line 2', total: 0, accepted: 0, synonyms: 0, duplicates: 0, nodes: [],
