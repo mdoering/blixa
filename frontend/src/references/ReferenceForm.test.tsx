@@ -256,3 +256,41 @@ test('Type is a searchable Select fed by the CSL-type vocab', async () => {
 
   expect(typeInput).toHaveValue('book');
 });
+
+test('the form shows only the detail rows relevant to the selected type (webpage hides them)', async () => {
+  renderWithProviders(
+    <ReferenceForm pid={3} reference={makeReference({ type: 'webpage' })} opened onClose={() => {}} />,
+  );
+  await screen.findByDisplayValue('Systema Naturae');
+  // webpage marks none of the container/numbering/identifiers rows relevant, and they're empty.
+  expect(screen.queryByLabelText('Container title')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Volume')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Publisher')).not.toBeInTheDocument();
+  // core fields stay.
+  expect(screen.getByLabelText('Year')).toBeInTheDocument();
+  expect(screen.getByLabelText('Link')).toBeInTheDocument();
+});
+
+test('an article-journal shows the serial/numbering/identifier detail rows', async () => {
+  renderWithProviders(
+    <ReferenceForm pid={3} reference={makeReference({ type: 'article-journal' })} opened onClose={() => {}} />,
+  );
+  await screen.findByDisplayValue('Systema Naturae');
+  expect(screen.getByLabelText('Container title')).toBeInTheDocument();
+  expect(screen.getByLabelText('Volume')).toBeInTheDocument();
+  expect(screen.getByLabelText('Publisher')).toBeInTheDocument();
+});
+
+test('a populated field keeps its row visible even when the type would hide it', async () => {
+  // webpage would hide the identifiers row, but a stored publisher must never be hidden.
+  renderWithProviders(
+    <ReferenceForm
+      pid={3}
+      reference={makeReference({ type: 'webpage', publisher: 'Acme' })}
+      opened
+      onClose={() => {}}
+    />,
+  );
+  await screen.findByDisplayValue('Systema Naturae');
+  expect(screen.getByLabelText('Publisher')).toHaveValue('Acme');
+});

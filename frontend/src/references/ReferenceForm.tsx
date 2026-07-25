@@ -46,6 +46,39 @@ type FormValues = Record<(typeof FIELDS)[number], string> & {
   editor: CslName[];
   citationManual: boolean;
 };
+
+// Type-driven fields: which detail rows are relevant per CSL type. The form shows a row when its
+// type lists it OR any of its fields already has a value (so editing an existing reference never
+// hides populated data). An unmapped or blank type shows every row (a safe default). Core fields
+// (citation, type, author/editor, title, year, DOI, link) always show.
+type DetailRow = 'container' | 'numbering' | 'identifiers';
+const ROW_FIELDS: Record<DetailRow, (typeof FIELDS)[number][]> = {
+  container: ['containerTitle', 'containerTitleShort'],
+  numbering: ['volume', 'issue', 'page'],
+  identifiers: ['publisher', 'isbn', 'issn'],
+};
+const ROWS_FOR_TYPE: Record<string, DetailRow[]> = {
+  'article-journal': ['container', 'numbering', 'identifiers'],
+  'article-magazine': ['container', 'numbering'],
+  'article-newspaper': ['container', 'numbering'],
+  article: ['container', 'numbering'],
+  chapter: ['container', 'numbering', 'identifiers'],
+  'paper-conference': ['container', 'numbering', 'identifiers'],
+  entry: ['container', 'numbering', 'identifiers'],
+  'entry-dictionary': ['container', 'numbering', 'identifiers'],
+  'entry-encyclopedia': ['container', 'numbering', 'identifiers'],
+  book: ['numbering', 'identifiers'],
+  thesis: ['identifiers'],
+  report: ['numbering', 'identifiers'],
+  dataset: ['identifiers'],
+  broadcast: ['container'],
+  webpage: [],
+  'post-weblog': [],
+  post: [],
+  manuscript: [],
+  speech: [],
+  personal_communication: [],
+};
 const EMPTY: FormValues = {
   ...(Object.fromEntries(FIELDS.map((f) => [f, ''])) as Record<(typeof FIELDS)[number], string>),
   author: [],
@@ -107,6 +140,14 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
     () => Array.from(new Set([...(vocab?.cslTypes ?? []), form.values.type].filter(Boolean))),
     [vocab?.cslTypes, form.values.type],
   );
+
+  // Show a detail row when the selected type marks it relevant, or when any of its fields already
+  // carries a value (never hide populated data). Unknown/blank type -> show every row.
+  const showRow = (row: DetailRow) => {
+    const rows = ROWS_FOR_TYPE[form.values.type];
+    if (rows === undefined) return true;
+    return rows.includes(row) || ROW_FIELDS[row].some((f) => form.values[f].trim() !== '');
+  };
 
   // The PDF control's own state, separate from the form's text fields: pdfUrl mirrors the loaded
   // reference but is updated locally on attach/remove success (rather than only via a parent
@@ -214,6 +255,15 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
             label="Enter citation manually"
             {...form.getInputProps('citationManual', { type: 'checkbox' })}
           />
+          {/* Type sits directly below the citation and drives which detail rows show (see showRow). */}
+          <Select
+            label="Type"
+            searchable
+            clearable
+            data={cslTypeData}
+            {...typeInputProps}
+            onChange={(v) => typeInputProps.onChange(v ?? '')}
+          />
           <CslNameEditor
             label="Author"
             value={form.values.author}
@@ -232,26 +282,28 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
               {...form.getInputProps('titleShort')}
             />
           </SimpleGrid>
+          {showRow('container') && (
+            <SimpleGrid cols={2}>
+              <TextInput label="Container title" {...form.getInputProps('containerTitle')} />
+              <TextInput label="Container title (short)" {...form.getInputProps('containerTitleShort')} />
+            </SimpleGrid>
+          )}
+          {showRow('numbering') && (
+            <SimpleGrid cols={3}>
+              <TextInput label="Volume" {...form.getInputProps('volume')} />
+              <TextInput label="Issue" {...form.getInputProps('issue')} />
+              <TextInput label="Page" {...form.getInputProps('page')} />
+            </SimpleGrid>
+          )}
+          {showRow('identifiers') && (
+            <SimpleGrid cols={3}>
+              <TextInput label="Publisher" {...form.getInputProps('publisher')} />
+              <TextInput label="ISBN" {...form.getInputProps('isbn')} />
+              <TextInput label="ISSN" {...form.getInputProps('issn')} />
+            </SimpleGrid>
+          )}
           <SimpleGrid cols={3}>
-            <TextInput label="Container title" {...form.getInputProps('containerTitle')} />
-            <TextInput label="Container title (short)" {...form.getInputProps('containerTitleShort')} />
-            <Select
-              label="Type"
-              searchable
-              clearable
-              data={cslTypeData}
-              {...typeInputProps}
-              onChange={(v) => typeInputProps.onChange(v ?? '')}
-            />
-          </SimpleGrid>
-          <SimpleGrid cols={4}>
             <TextInput label="Year" {...form.getInputProps('issued')} />
-            <TextInput label="Volume" {...form.getInputProps('volume')} />
-            <TextInput label="Issue" {...form.getInputProps('issue')} />
-            <TextInput label="Page" {...form.getInputProps('page')} />
-          </SimpleGrid>
-          <SimpleGrid cols={2}>
-            <TextInput label="Publisher" {...form.getInputProps('publisher')} />
             <Stack gap={2}>
               <TextInput label="DOI" {...form.getInputProps('doi')} />
               {reference && (
@@ -265,10 +317,6 @@ export default function ReferenceForm({ pid, reference, initial, opened, onClose
                 </Button>
               )}
             </Stack>
-          </SimpleGrid>
-          <SimpleGrid cols={3}>
-            <TextInput label="ISBN" {...form.getInputProps('isbn')} />
-            <TextInput label="ISSN" {...form.getInputProps('issn')} />
             <TextInput label="Link" {...form.getInputProps('link')} />
           </SimpleGrid>
           {/* PDF hosting: only meaningful for an already-saved reference -- a create form (no id
