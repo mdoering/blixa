@@ -166,27 +166,18 @@ test('a viewer sees no editing controls', async () => {
   await screen.findByText('Systema Naturae');
   expect(screen.queryByRole('button', { name: 'New reference' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Import DOI' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Import BibTeX' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Import RIS' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Import CSL-JSON' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument();
 });
 
-test('Import RIS parses pasted text and refreshes the list', async () => {
+test('the Import button opens the unified reference-import dialog with a format selector', async () => {
   mockProject();
-  server.use(
-    http.post('/api/projects/3/references/import-ris', async ({ request }) => {
-      const body = (await request.json()) as { ris: string };
-      expect(body.ris).toContain('TY  - JOUR');
-      return HttpResponse.json([{ id: 2 }]);
-    }),
-  );
   renderPage();
   await screen.findByText('Systema Naturae');
-  await userEvent.click(screen.getByRole('button', { name: 'Import RIS' }));
+  // A single "Import" button now (BibTeX/RIS/CSL-JSON live behind a format selector in the dialog;
+  // each format's parsing is covered in ImportReferencesModal.test). Import DOI stays separate.
+  await userEvent.click(screen.getByRole('button', { name: 'Import' }));
   const dialog = await screen.findByRole('dialog');
-  await userEvent.type(within(dialog).getByLabelText('RIS'), 'TY  - JOUR\nTI  - T\nER  - ');
-  await userEvent.click(within(dialog).getByRole('button', { name: 'Import' }));
-  expect(await screen.findByText('Imported 1 reference')).toBeInTheDocument();
+  expect(within(dialog).getByRole('textbox', { name: 'Format' })).toBeInTheDocument();
 });
 
 test('selecting 2 references opens the merge modal and refreshes the list on success', async () => {

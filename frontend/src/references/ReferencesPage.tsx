@@ -37,10 +37,8 @@ import {
   referenceExportTsvUrl,
 } from '../api/references';
 import type { CreateRefPayload, CslName, Reference } from '../api/types';
-import ImportBibtexModal from './ImportBibtexModal';
-import ImportCslJsonModal from './ImportCslJsonModal';
 import ImportDoiModal from './ImportDoiModal';
-import ImportRisModal from './ImportRisModal';
+import ImportReferencesModal from './ImportReferencesModal';
 import ReconcileJournalsModal from './ReconcileJournalsModal';
 import ReferenceForm from './ReferenceForm';
 import { parseYearFilter } from './parseYearFilter';
@@ -94,9 +92,7 @@ export default function ReferencesPage() {
   }, [linkedReference]);
 
   const [importDoi, setImportDoi] = useState(false);
-  const [importBib, setImportBib] = useState(false);
-  const [importRis, setImportRis] = useState(false);
-  const [importCsl, setImportCsl] = useState(false);
+  const [importRefs, setImportRefs] = useState(false);
   const [reconcileOpen, setReconcileOpen] = useState(false);
 
   // Multi-select for the "Merge N selected…" action (reference dedupe, reuses Task 3's
@@ -189,23 +185,9 @@ export default function ReferencesPage() {
             <Button
               variant="default"
               leftSection={<IconFileImport size={14} />}
-              onClick={() => setImportBib(true)}
+              onClick={() => setImportRefs(true)}
             >
-              Import BibTeX
-            </Button>
-            <Button
-              variant="default"
-              leftSection={<IconFileImport size={14} />}
-              onClick={() => setImportRis(true)}
-            >
-              Import RIS
-            </Button>
-            <Button
-              variant="default"
-              leftSection={<IconFileImport size={14} />}
-              onClick={() => setImportCsl(true)}
-            >
-              Import CSL-JSON
+              Import
             </Button>
             <Button
               variant="default"
@@ -360,9 +342,7 @@ export default function ReferencesPage() {
         onClose={() => setImportDoi(false)}
         onResolved={(payload) => setForm({ reference: null, initial: payload })}
       />
-      <ImportBibtexModal pid={pid} opened={importBib} onClose={() => setImportBib(false)} />
-      <ImportRisModal pid={pid} opened={importRis} onClose={() => setImportRis(false)} />
-      <ImportCslJsonModal pid={pid} opened={importCsl} onClose={() => setImportCsl(false)} />
+      <ImportReferencesModal pid={pid} opened={importRefs} onClose={() => setImportRefs(false)} />
       <ReconcileJournalsModal pid={pid} opened={reconcileOpen} onClose={() => setReconcileOpen(false)} />
       <MergeRecordsModal
         entity="reference"
