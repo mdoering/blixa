@@ -21,6 +21,9 @@ public class NameUsage {
   private Integer projectId;
   private List<String> alternativeId;
   private Integer parentId;
+  // The nomenclatural genus this bi/trinomial's genus token resolves to (a genus usage id), or null
+  // (unlinked / a uninomial). See the genus-link design; distinct from parentId (classification).
+  private Integer genusId;
   private Integer ordinal;
   // taxonomic
   private Status status;
@@ -71,6 +74,8 @@ public class NameUsage {
   public void setProjectId(Integer projectId) { this.projectId = projectId; }
   public List<String> getAlternativeId() { return alternativeId; }
   public void setAlternativeId(List<String> alternativeId) { this.alternativeId = alternativeId; }
+  public Integer getGenusId() { return genusId; }
+  public void setGenusId(Integer genusId) { this.genusId = genusId; }
   public Integer getParentId() { return parentId; }
   public void setParentId(Integer parentId) { this.parentId = parentId; }
   public Integer getOrdinal() { return ordinal; }

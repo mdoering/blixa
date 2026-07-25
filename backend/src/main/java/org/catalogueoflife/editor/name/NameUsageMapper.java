@@ -23,7 +23,7 @@ public interface NameUsageMapper {
   // an explicit NULL and violate the NOT NULL constraint instead of using the default.
   @Insert("""
       INSERT INTO name_usage (
-          project_id, id, alternative_id, parent_id, ordinal,
+          project_id, id, alternative_id, parent_id, genus_id, ordinal,
           status, name_phrase, reference_id,
           scientific_name, authorship, rank, uninomial, genus, infrageneric_epithet,
           specific_epithet, infraspecific_epithet, cultivar_epithet, notho,
@@ -35,7 +35,7 @@ public interface NameUsageMapper {
       VALUES (
           #{projectId}, #{id},
           #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
-          #{parentId}, #{ordinal},
+          #{parentId}, #{genusId}, #{ordinal},
           #{status}, #{namePhrase},
           #{referenceId,typeHandler=org.catalogueoflife.editor.name.IntegerArrayTypeHandler},
           #{scientificName}, #{authorship}, #{rank}, #{uninomial}, #{genus}, #{infragenericEpithet},
@@ -460,7 +460,7 @@ public interface NameUsageMapper {
   @Update("""
       UPDATE name_usage
       SET alternative_id = #{alternativeId,typeHandler=org.catalogueoflife.editor.name.StringArrayTypeHandler},
-          parent_id = #{parentId}, ordinal = #{ordinal},
+          parent_id = #{parentId}, genus_id = #{genusId}, ordinal = #{ordinal},
           status = #{status}, name_phrase = #{namePhrase},
           reference_id = #{referenceId,typeHandler=org.catalogueoflife.editor.name.IntegerArrayTypeHandler},
           scientific_name = #{scientificName}, authorship = #{authorship}, rank = #{rank},
@@ -510,6 +510,57 @@ public interface NameUsageMapper {
   int updateReferenceIds(@Param("projectId") int projectId, @Param("id") int id,
       @Param("referenceIds") List<Integer> referenceIds,
       @Param("modifiedBy") int modifiedBy, @Param("version") Integer version);
+
+  // Genus usages whose name equals a binomial's genus token, each with whether it's accepted -- the
+  // raw input to NameUsageService.resolveGenusId, which picks the single match / the single accepted
+  // one / null (ambiguous). uninomial is the parsed bare genus name; scientific_name is a fallback.
+  @Select("""
+      SELECT id, (status = 'ACCEPTED') AS accepted FROM name_usage
+      WHERE project_id = #{projectId} AND rank = 'genus'
+        AND (uninomial = #{genus} OR scientific_name = #{genus})
+      """)
+  List<GenusMatch> findGenusMatches(@Param("projectId") int projectId, @Param("genus") String genus);
+
+  record GenusMatch(int id, boolean accepted) {}
+
+  // The linked genus usage's name + gender (for NameUsageResponse.genusName + the authoritative gender
+  // derivation, and RuleContext.linkedGenusName). name is uninomial or, if unparsed, scientific_name.
+  @Select("""
+      SELECT coalesce(uninomial, scientific_name) AS name, gender FROM name_usage
+      WHERE project_id = #{projectId} AND id = #{id}
+      """)
+  LinkedGenus findLinkedGenus(@Param("projectId") int projectId, @Param("id") int id);
+
+  record LinkedGenus(String name, String gender) {}
+
+  // Every binomial with a genus token but no genus_id yet -- the fill-missing-only input to the
+  // project-wide "Link genera" batch (LinkGeneraService). Already-linked usages are excluded, so the
+  // batch never overrides an existing (manual or prior) link.
+  @Select("""
+      SELECT id, genus FROM name_usage
+      WHERE project_id = #{projectId} AND genus_id IS NULL AND genus IS NOT NULL AND genus <> ''
+      """)
+  List<UnlinkedBinomial> findUnlinkedBinomials(@Param("projectId") int projectId);
+
+  record UnlinkedBinomial(int id, String genus) {}
+
+  // Narrow CAS write of just genus_id (PUT /usages/{id}/genus and the "Link genera" batch): sets or
+  // clears (genusId null) a usage's nomenclatural-genus link without touching any name field. Bumps
+  // version/modified like every other name_usage write; 0 rows -> stale-version 409 (the batch passes
+  // the freshly-read version so it never conflicts with itself).
+  @Update("""
+      UPDATE name_usage SET genus_id = #{genusId}, modified = now(), modified_by = #{modifiedBy},
+          version = version + 1
+      WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}
+      """)
+  int updateGenusId(@Param("projectId") int projectId, @Param("id") int id,
+      @Param("genusId") Integer genusId, @Param("modifiedBy") int modifiedBy,
+      @Param("version") Integer version);
+
+  // The current version of a usage, for the batch's per-row CAS write (it reads then writes without a
+  // client-supplied version). null if the usage is gone.
+  @Select("SELECT version FROM name_usage WHERE project_id = #{projectId} AND id = #{id}")
+  Integer findVersion(@Param("projectId") int projectId, @Param("id") int id);
 
   // Version-guarded bump of just version/modified, touching no other name_usage column -- the CAS
   // half of NameUsageService.updateTaxonInfo (the taxon_info fields live in a separate table, so

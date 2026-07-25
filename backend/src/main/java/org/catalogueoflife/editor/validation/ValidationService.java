@@ -164,10 +164,17 @@ public class ValidationService {
     int danglingReferenceCount = countDanglingReferences(projectId, usage.getReferenceId());
     Set<String> duplicateChildTypes = new HashSet<>(nameUsages.duplicateChildTypes(projectId, usage.getId()));
     boolean synonymRankDiffers = nameUsages.synonymRankDiffers(projectId, usage.getId());
+    // The linked nomenclatural genus's name, for LinkedGenusSpellingRule (null when unlinked).
+    String linkedGenusName = usage.getGenusId() == null ? null
+        : genusNameOf(nameUsages.findLinkedGenus(projectId, usage.getGenusId()));
     return new RuleContext(usage, synonymAcceptedCount, publishedInReference, duplicateCount,
         ancestorGenusName, parentRank, ancestorGenusYear, ancestorSpeciesEpithet,
         synonymNonAcceptedTargetCount, hasSpeciesAncestor, danglingReferenceCount, duplicateChildTypes,
-        synonymRankDiffers);
+        synonymRankDiffers, linkedGenusName);
+  }
+
+  private static String genusNameOf(NameUsageMapper.LinkedGenus lg) {
+    return lg == null ? null : lg.name();
   }
 
   // How many distinct entries of the usage's taxonomic reference_id[] no longer resolve to a

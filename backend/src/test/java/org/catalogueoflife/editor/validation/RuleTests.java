@@ -13,6 +13,7 @@ import org.catalogueoflife.editor.name.Status;
 import org.catalogueoflife.editor.validation.rules.BinomialAboveGenusRule;
 import org.catalogueoflife.editor.validation.rules.DanglingReferenceRule;
 import org.catalogueoflife.editor.validation.rules.DuplicateChildRecordsRule;
+import org.catalogueoflife.editor.validation.rules.LinkedGenusSpellingRule;
 import org.catalogueoflife.editor.validation.rules.SynonymRankDiffersRule;
 import org.catalogueoflife.editor.validation.rules.SuperfluousAuthorshipRule;
 import org.catalogueoflife.editor.validation.rules.SuspiciousNameCharactersRule;
@@ -564,5 +565,29 @@ class RuleTests {
   @Test
   void synonymRankDiffersQuietWhenRanksMatch() {
     assertThat(new SynonymRankDiffersRule().evaluate(ctxSynonymRankDiffers(false))).isEmpty();
+  }
+
+  // --- LinkedGenusSpellingRule (genus_link_spelling_mismatch) ---
+
+  private static RuleContext ctxLinkedGenus(String genusToken, String linkedGenusName) {
+    NameUsage u = usage();
+    u.setGenus(genusToken);
+    return new RuleContext(u, 0, null, 0, null, null, null, null, 0, false, 0, Set.of(), false,
+        linkedGenusName);
+  }
+
+  @Test
+  void linkedGenusSpellingFlagsAMismatch() {
+    Optional<Finding> f = new LinkedGenusSpellingRule().evaluate(ctxLinkedGenus("Abies", "Pinus"));
+    assertThat(f).isPresent();
+    assertThat(f.get().rule()).isEqualTo("genus_link_spelling_mismatch");
+    assertThat(f.get().message()).contains("Pinus").contains("Abies");
+  }
+
+  @Test
+  void linkedGenusSpellingQuietWhenMatchingOrUnlinked() {
+    assertThat(new LinkedGenusSpellingRule().evaluate(ctxLinkedGenus("Abies", "Abies"))).isEmpty();
+    // unlinked (null linked name) -> not this rule's concern
+    assertThat(new LinkedGenusSpellingRule().evaluate(ctxLinkedGenus("Abies", null))).isEmpty();
   }
 }

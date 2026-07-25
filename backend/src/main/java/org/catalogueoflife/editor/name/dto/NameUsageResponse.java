@@ -50,6 +50,10 @@ public record NameUsageResponse(
     // name; for a bi/trinomial the epithets must agree with it) -- not the classification ancestor,
     // which diverges for synonyms. Computed only on the detail path -- null on list/search responses.
     String genusGender,
+    // The linked nomenclatural genus (genus_id) and its name, when the binomial is linked to a genus
+    // usage; null when unlinked (genusGender is then the unconfirmed name-match fallback). Detail only.
+    Integer genusId,
+    String genusName,
     String etymology,
     String nameType,
     String parseState,
@@ -60,7 +64,7 @@ public record NameUsageResponse(
     Integer version) {
 
   public static NameUsageResponse of(NameUsage u, String formattedName, List<Integer> acceptedParentIds,
-      List<Integer> synonymIds, String genusGender) {
+      List<Integer> synonymIds, String genusGender, Integer genusId, String genusName) {
     return new NameUsageResponse(u.getId(), u.getParentId(), u.getAlternativeId(), name(u.getStatus()),
         u.getNamePhrase(), u.getReferenceId(),
         u.getExtinct(), names(u.getEnvironment()), u.getTemporalRangeStart(), u.getTemporalRangeEnd(),
@@ -71,6 +75,7 @@ public record NameUsageResponse(
         u.getBasionymAuthorshipYear(), u.getSanctioningAuthor(), name(u.getNomStatus()),
         u.getPublishedInReferenceId(), u.getPublishedInYear(), u.getPublishedInPage(),
         u.getPublishedInPageLink(), name(u.getGender()), u.getGenderAgreement(), genusGender,
+        genusId, genusName,
         u.getEtymology(), name(u.getNameType()), u.getParseState(),
         u.getRemarks(), formattedName, acceptedParentIds, synonymIds, u.getVersion());
   }

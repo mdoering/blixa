@@ -18,7 +18,9 @@ import org.catalogueoflife.editor.lock.LockMapper;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.catalogueoflife.editor.name.dto.DemoteRequest;
+import org.catalogueoflife.editor.name.dto.GenusLinkRequest;
 import org.catalogueoflife.editor.name.dto.IdentifiersRequest;
+import org.catalogueoflife.editor.name.dto.LinkGeneraResponse;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.name.dto.PromoteRequest;
 import org.catalogueoflife.editor.name.dto.ReferenceIdsRequest;
@@ -269,6 +271,8 @@ public class NameUsageService {
     // subsequent mutation.
     @SuppressWarnings("unchecked")
     Map<String, Object> before = objectMapper.convertValue(u, Map.class);
+    // The loaded genus token, to detect a genus change below (clear-on-stale of genus_id).
+    String oldGenus = u.getGenus();
     boolean reparse = changed(u.getScientificName(), req.scientificName())
         || changed(u.getAuthorship(), req.authorship())
         || changed(u.getRank(), req.rank());
@@ -301,6 +305,12 @@ public class NameUsageService {
     u.setVersion(req.version());
     if (reparse) {
       parser.parseInto(u, project.getNomCode());
+    }
+    // Clear-on-stale: if the name's genus token changed, the old genus_id link no longer describes
+    // this name -- null it (the "Link genera" job or the form re-establishes it). genus_id otherwise
+    // rides through unchanged from the loaded row (update() writes genus_id = #{genusId}).
+    if (changed(oldGenus, u.getGenus())) {
+      u.setGenusId(null);
     }
     int updated = usages.update(u);
     if (updated == 0) {
@@ -454,6 +464,86 @@ public class NameUsageService {
     audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
     events.publishEvent(ValidationEvent.forUsage(projectId, id));
     return toResponse(after, project);
+  }
+
+  // The genus usage a binomial's genus token resolves to: the single match, or the single ACCEPTED
+  // one when several genera share the name, else null (none, or ambiguous). See the genus-link design.
+  Integer resolveGenusId(int projectId, String genus) {
+    if (genus == null || genus.isBlank()) {
+      return null;
+    }
+    List<NameUsageMapper.GenusMatch> ms = usages.findGenusMatches(projectId, genus);
+    if (ms.size() == 1) {
+      return ms.get(0).id();
+    }
+    if (ms.size() > 1) {
+      List<NameUsageMapper.GenusMatch> accepted =
+          ms.stream().filter(NameUsageMapper.GenusMatch::accepted).toList();
+      if (accepted.size() == 1) {
+        return accepted.get(0).id();
+      }
+    }
+    return null;
+  }
+
+  // PUT /usages/{id}/genus: the Nomenclatural-genus picker's narrow write path -- sets or clears
+  // (genusId null) a binomial's genus_id without touching any name field. genusId, when present, must
+  // reference a genus usage in this project. CAS on the usage version, like the taxon-info/references
+  // narrow writers. Publishes a ValidationEvent so the linked-genus spelling-mismatch rule re-checks.
+  @Transactional
+  public NameUsageResponse updateGenusId(int userId, int projectId, int id, GenusLinkRequest req) {
+    requireEditor(userId, projectId);
+    Project project = requireProject(projectId);
+    NameUsage before = requireInProject(projectId, id);
+    if (req.genusId() != null) {
+      NameUsage genus = usages.findByIdInProject(projectId, req.genusId());
+      if (genus == null || genus.getRank() == null || !"genus".equalsIgnoreCase(genus.getRank())) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "genusId must reference a genus usage");
+      }
+    }
+    if (usages.updateGenusId(projectId, id, req.genusId(), userId, req.version()) == 0) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "conflict: stale version");
+    }
+    NameUsage after = requireInProject(projectId, id);
+    audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
+    events.publishEvent(ValidationEvent.forUsage(projectId, id));
+    return toResponse(after, project);
+  }
+
+  // POST /projects/{pid}/link-genera: the project-wide "Link genera" batch. FILL-MISSING-ONLY -- it
+  // only ever sets a genus_id that is currently null (findUnlinkedBinomials excludes already-linked
+  // usages), so a curator's manual link is never overwritten. Synchronous (internal, DB-only). Each
+  // linked usage matches its genus token exactly, so the spelling-mismatch rule can't fire on them --
+  // no per-usage revalidation storm needed. Returns per-outcome counts.
+  @Transactional
+  public LinkGeneraResponse linkGenera(int userId, int projectId) {
+    requireEditor(userId, projectId);
+    int linked = 0;
+    int ambiguous = 0;
+    int unmatched = 0;
+    for (NameUsageMapper.UnlinkedBinomial b : usages.findUnlinkedBinomials(projectId)) {
+      List<NameUsageMapper.GenusMatch> ms = usages.findGenusMatches(projectId, b.genus());
+      Integer genusId;
+      if (ms.isEmpty()) {
+        unmatched++;
+        continue;
+      } else if (ms.size() == 1) {
+        genusId = ms.get(0).id();
+      } else {
+        List<NameUsageMapper.GenusMatch> accepted =
+            ms.stream().filter(NameUsageMapper.GenusMatch::accepted).toList();
+        if (accepted.size() != 1) {
+          ambiguous++;
+          continue;
+        }
+        genusId = accepted.get(0).id();
+      }
+      Integer version = usages.findVersion(projectId, b.id());
+      if (version != null && usages.updateGenusId(projectId, b.id(), genusId, userId, version) > 0) {
+        linked++;
+      }
+    }
+    return new LinkGeneraResponse(linked, ambiguous, unmatched);
   }
 
   // POST /usages/{id}/web-reference: creates a new type=webpage Reference from `url` (server-side
@@ -839,13 +929,24 @@ public class NameUsageService {
     List<Integer> synonymIds = Status.ACCEPTED == u.getStatus()
         ? synonymAccepted.findSynonymsOf(u.getProjectId(), u.getId())
         : List.of();
-    // The gender of the name's NOMENCLATURAL genus (its own genus token, not the classification
-    // ancestor), shown read-only on the form for a bi/trinomial. Null for a uninomial (no genus
-    // token) and when the genus isn't a usage here. Detail path only.
-    String genusGender = u.getGenus() == null || u.getGenus().isBlank()
-        ? null
-        : usages.findGenusGenderByName(u.getProjectId(), u.getGenus());
-    return NameUsageResponse.of(u, formattedName, acceptedParentIds, synonymIds, genusGender);
+    // The nomenclatural genus (its own genus token, not the classification ancestor) + its gender,
+    // shown on the form for a bi/trinomial. When the usage is LINKED to a genus (genus_id), that
+    // genus is authoritative; when unlinked, fall back to the name-match as an unconfirmed hint. Null
+    // for a uninomial (no genus token). Detail path only.
+    Integer genusId = u.getGenusId();
+    String genusName = null;
+    String genusGender;
+    if (genusId != null) {
+      NameUsageMapper.LinkedGenus lg = usages.findLinkedGenus(u.getProjectId(), genusId);
+      genusName = lg == null ? null : lg.name();
+      genusGender = lg == null ? null : lg.gender();
+    } else {
+      genusGender = u.getGenus() == null || u.getGenus().isBlank()
+          ? null
+          : usages.findGenusGenderByName(u.getProjectId(), u.getGenus());
+    }
+    return NameUsageResponse.of(u, formattedName, acceptedParentIds, synonymIds, genusGender,
+        genusId, genusName);
   }
 
   // Cheap response for list/search hot paths: avoids the full name-parser re-parse and the
@@ -857,7 +958,7 @@ public class NameUsageService {
     String formattedName = (authorship == null || authorship.isBlank())
         ? u.getScientificName()
         : u.getScientificName() + " " + authorship;
-    return NameUsageResponse.of(u, formattedName, List.of(), List.of(), null);
+    return NameUsageResponse.of(u, formattedName, List.of(), List.of(), null, null, null);
   }
 
   // Centralizes the cycle/accepted-parent guards that the generic usage create/update endpoints
