@@ -25,6 +25,10 @@ public class Change {
   // title is a read-only join for display (see ChangeMapper), never inserted.
   private Integer discussionId;
   private String discussionTitle;
+  // A resolved human label for the changed entity (name_usage scientific name + authorship, or a
+  // reference's abbreviated/full citation), or null for other/deleted entities. Read-only display
+  // join (see ChangeMapper.SELECT), never inserted.
+  private String entityLabel;
 
   public Integer getId() { return id; }
   public void setId(Integer id) { this.id = id; }
@@ -48,4 +52,6 @@ public class Change {
   public void setDiscussionId(Integer discussionId) { this.discussionId = discussionId; }
   public String getDiscussionTitle() { return discussionTitle; }
   public void setDiscussionTitle(String discussionTitle) { this.discussionTitle = discussionTitle; }
+  public String getEntityLabel() { return entityLabel; }
+  public void setEntityLabel(String entityLabel) { this.entityLabel = entityLabel; }
 }

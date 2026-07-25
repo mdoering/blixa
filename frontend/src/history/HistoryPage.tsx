@@ -31,7 +31,9 @@ function entityLink(change: Change, pid: number): string | null {
 }
 
 function ChangeRow({ change, pid }: { change: Change; pid: number }) {
-  const label = `${change.entityType} #${change.entityId}`;
+  // The resolved entity label (scientific name + authorship, or the reference citation) when the
+  // backend could resolve it; otherwise the raw "<entityType> #<id>" (other types, or deleted).
+  const label = change.entityLabel ?? `${change.entityType} #${change.entityId}`;
   const to = entityLink(change, pid);
   return (
     <Paper withBorder p="sm">

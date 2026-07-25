@@ -139,6 +139,14 @@ class ChangeApiIT extends AbstractPostgresIT {
     assertThat(all.get(7).get("operation").asString()).isEqualTo("CREATE");
     assertThat(all.get(7).get("entityId").asLong()).isEqualTo(refId);
 
+    // entity_label resolves the changed entity to a human label (for the History view): a name_usage
+    // to its scientific name (+ authorship when present), a reference to its citation. It reflects
+    // the entity's CURRENT state (the reference's citation was regenerated to "Revised title." by the
+    // update above). An unlinkable type (synonym_link) has no resolved label -> null.
+    assertThat(all.get(4).get("entityLabel").asString()).isEqualTo("Movus originalis");
+    assertThat(all.get(6).get("entityLabel").asString()).isEqualTo("Revised title.");
+    assertThat(all.get(0).get("entityLabel").isNull()).isTrue();
+
     // the reference-update entry's diff carries the title from/to. This reference is structured
     // (it has a title) and non-manual, so its citation is derived from its fields, not the resent
     // value -- changing the title therefore also regenerates the citation ("Original title." ->

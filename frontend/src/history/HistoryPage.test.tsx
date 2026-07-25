@@ -35,6 +35,7 @@ const change = (over: Record<string, unknown>) => ({
   diff: '{}',
   discussionId: null,
   discussionTitle: null,
+  entityLabel: null,
   ...over,
 });
 
@@ -97,4 +98,26 @@ test('links a name_usage change to Names, a reference change to References, and 
   expect(refLink).toHaveAttribute('href', '/projects/3/references?ref=42');
   expect(screen.getByText('name_usage #7')).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'name_usage #7' })).not.toBeInTheDocument();
+});
+
+test('shows the resolved entity label as the (linked) title when the backend provides one', async () => {
+  mockObjectives();
+  server.use(
+    http.get('/api/projects/3/changes', () =>
+      HttpResponse.json([
+        change({ id: 1, entityType: 'name_usage', entityId: 9, entityLabel: 'Panthera leo Linnaeus, 1758' }),
+        change({ id: 2, entityType: 'reference', entityId: 42, entityLabel: 'Mill. 1768' }),
+      ]),
+    ),
+  );
+  renderPage();
+
+  const usageLink = await screen.findByRole('link', { name: 'Panthera leo Linnaeus, 1758' });
+  expect(usageLink).toHaveAttribute('href', '/projects/3/names?usage=9');
+  expect(screen.getByRole('link', { name: 'Mill. 1768' })).toHaveAttribute(
+    'href',
+    '/projects/3/references?ref=42',
+  );
+  // the raw fallback is no longer shown for these.
+  expect(screen.queryByText('name_usage #9')).not.toBeInTheDocument();
 });

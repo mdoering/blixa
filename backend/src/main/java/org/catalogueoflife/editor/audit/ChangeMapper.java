@@ -14,15 +14,27 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface ChangeMapper {
 
-  // The change plus its author's username and its objective's (discussion's) title -- both LEFT
-  // JOINs so a change with no user / no objective still returns with nulls. `discussion_title` is
-  // read-only display (Change.discussionTitle), never inserted.
+  // The change plus its author's username, its objective's (discussion's) title, and a resolved
+  // human label for the changed entity -- all LEFT JOINs so a change with no user / no objective /
+  // a since-deleted entity still returns with nulls. `discussion_title` and `entity_label` are
+  // read-only display (Change.discussionTitle/entityLabel), never inserted. entity_label is resolved
+  // for the two linkable types the History view knows (see HistoryPage.entityLink): a name_usage's
+  // scientific name + authorship, and a reference's abbreviated (title-short) or full citation. Other
+  // types (and deleted entities) return null, and the UI falls back to "<entityType> #<id>".
   String SELECT = """
       SELECT c.id, c.project_id, c.user_id, u.username, c.at, c.entity_type, c.entity_id,
-             c.operation, c.diff, c.discussion_id, d.title AS discussion_title
+             c.operation, c.diff, c.discussion_id, d.title AS discussion_title,
+             CASE c.entity_type
+               WHEN 'name_usage' THEN nu.scientific_name || COALESCE(' ' || nu.authorship, '')
+               WHEN 'reference' THEN COALESCE(ref.title_short, ref.citation)
+             END AS entity_label
       FROM change c
       LEFT JOIN app_user u ON u.id = c.user_id
       LEFT JOIN discussion d ON d.project_id = c.project_id AND d.id = c.discussion_id
+      LEFT JOIN name_usage nu
+        ON c.entity_type = 'name_usage' AND nu.project_id = c.project_id AND nu.id = c.entity_id
+      LEFT JOIN reference ref
+        ON c.entity_type = 'reference' AND ref.project_id = c.project_id AND ref.id = c.entity_id
       """;
 
   @Insert("""

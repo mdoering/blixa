@@ -324,6 +324,9 @@ export interface Change {
   diff: string;
   discussionId: number | null;
   discussionTitle: string | null;
+  // A resolved human label for the entity (name_usage scientific name + authorship, or a reference
+  // citation), or null for other/deleted entities (the UI falls back to "<entityType> #<id>").
+  entityLabel: string | null;
 }
 
 // Mirrors backend LockResponse: a soft lock on an entity (e.g. a name_usage), held by a user for
