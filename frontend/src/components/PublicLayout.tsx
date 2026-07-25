@@ -11,7 +11,7 @@ export default function PublicLayout() {
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between">
           <Anchor component={Link} to="/" underline="never" c="inherit">
-            <BlixaLogo variant="header" height={28} />
+            <BlixaLogo variant="text" height={22} />
           </Anchor>
           {me ? (
             <Anchor component={Link} to="/projects">

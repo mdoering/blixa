@@ -62,9 +62,10 @@ export default function AppLayout() {
             size="sm"
             aria-label="Collapse navigation"
           />
-          {/* Brand slot (upper-left) — the full Blixa lockup, masked to inherit the header colour. */}
+          {/* Brand slot (upper-left) — the text-only Blixa wordmark (same as the landing page),
+              masked to inherit the header colour. */}
           <Anchor component={Link} to="/projects" underline="never" c="inherit">
-            <BlixaLogo variant="header" height={28} />
+            <BlixaLogo variant="text" height={22} />
           </Anchor>
           {/* Read-only current-project context; picking a project happens on the Projects list. */}
           <CurrentProjectName projectId={projectId} />

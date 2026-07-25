@@ -373,9 +373,8 @@ export default function ProjectMetadataPage() {
         <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
           <Stack gap="md">
             <TextInput label="Title" {...form.getInputProps('title')} />
-            <TextInput label="Alias" {...form.getInputProps('alias')} />
-            <Textarea label="Description" rows={3} {...form.getInputProps('description')} />
             <SimpleGrid cols={2}>
+              <TextInput label="Alias" {...form.getInputProps('alias')} />
               <Select
                 label="License"
                 clearable
@@ -383,10 +382,9 @@ export default function ProjectMetadataPage() {
                 {...form.getInputProps('license')}
               />
             </SimpleGrid>
-            <SimpleGrid cols={2}>
-              <TextInput label="Geographic scope" {...form.getInputProps('geographicScope')} />
-              <TextInput label="Taxonomic scope" {...form.getInputProps('taxonomicScope')} />
-            </SimpleGrid>
+            <Textarea label="Description" rows={3} {...form.getInputProps('description')} />
+            <TextInput label="Geographic scope" {...form.getInputProps('geographicScope')} />
+            <TextInput label="Taxonomic scope" {...form.getInputProps('taxonomicScope')} />
             <Button type="submit" loading={mutation.isPending} disabled={!canEdit}>
               Save
             </Button>
