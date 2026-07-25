@@ -9,7 +9,6 @@ import { subtreeTxtreeUrl } from '../api/tree';
 import CollapsibleSplit from '../components/CollapsibleSplit';
 import CreateNameModal from '../names/CreateNameModal';
 import { useNameActions } from '../names/useNameActions';
-import Breadcrumb from './Breadcrumb';
 import ClassificationTree from './ClassificationTree';
 import TaxonDetail from './TaxonDetail';
 
@@ -83,8 +82,7 @@ export default function TreePage() {
             <Text c="dimmed">Select a taxon in the tree to see its details.</Text>
           ) : (
             <Box>
-              <Group justify="space-between" wrap="nowrap" align="flex-start" gap="sm">
-                <Breadcrumb pid={pid} selectedId={selectedId} />
+              <Group justify="flex-end" wrap="nowrap" align="flex-start" gap="sm">
                 <Button
                   component="a"
                   href={subtreeTxtreeUrl(pid, selectedId)}
@@ -98,7 +96,7 @@ export default function TreePage() {
                 </Button>
               </Group>
               <Box mt="md">
-                <TaxonDetail pid={pid} usageId={selectedId} />
+                <TaxonDetail pid={pid} usageId={selectedId} onNavigate={setSelectedId} />
               </Box>
             </Box>
           )

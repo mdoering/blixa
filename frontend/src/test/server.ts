@@ -66,6 +66,9 @@ export const server = setupServer(
   http.get('/api/projects/:pid/changes', () => HttpResponse.json([])),
   // DeleteNameModal checks for accepted children before offering the reparent options.
   http.get('/api/projects/:pid/tree/children/:id', () => HttpResponse.json([])),
+  // Default empty ancestor path, so TaxonDetail's ClassificationBar (which fetches the focal
+  // taxon's parent path) doesn't need this mocked per-test unless it asserts the breadcrumb.
+  http.get('/api/projects/:pid/tree/path/:id', () => HttpResponse.json([])),
   // Default empty synonymy, so any accepted-usage render of TaxonDetail's Synonymy view doesn't
   // need this mocked per-test unless it cares about the actual nested groups.
   http.get('/api/projects/:pid/usages/:id/synonymy', () =>

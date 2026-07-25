@@ -383,7 +383,7 @@ export default function NameSearchPage() {
           selectedId == null ? (
             <Text c="dimmed">Select a name to see its details.</Text>
           ) : (
-            <TaxonDetail pid={pid} usageId={selectedId} />
+            <TaxonDetail pid={pid} usageId={selectedId} onNavigate={setSelectedId} />
           )
         }
       />

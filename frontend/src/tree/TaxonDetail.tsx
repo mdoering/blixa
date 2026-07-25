@@ -33,6 +33,7 @@ import BhlPageModal from './BhlPageModal';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import CurieId from '../components/CurieId';
 import InfoLabel from '../components/InfoLabel';
+import ClassificationBar from './ClassificationBar';
 import EntitySelect from '../child/EntitySelect';
 import NameRelationsTab, { referenceOptions } from '../child/NameRelationsTab';
 import { colIdFrom, scopedId, withScopedId } from '../child/map/mapUrls';
@@ -154,12 +155,15 @@ function toFormValues(u: NameUsage): EditableFields {
 export interface TaxonDetailProps {
   pid: number;
   usageId: number;
+  // Navigate the form to another usage (its owner holds the selected id) -- used by the
+  // classification bar's ancestor links. Without it the ancestors render as plain text.
+  onNavigate?: (id: number) => void;
 }
 
 // Views + edits one name usage's fields, plus its synonyms/accepted targets and validation
 // issues. Save is optimistic-locked on the loaded `version`: a 409 (someone else saved first)
 // reloads the usage and reseeds the form instead of clobbering their change.
-export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
+export default function TaxonDetail({ pid, usageId, onNavigate }: TaxonDetailProps) {
   const queryClient = useQueryClient();
 
   // Identifiers section view/edit toggle: view mode (default) shows usage.alternativeId as
@@ -512,6 +516,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
           {foreignLock.username} is editing this name — your changes may conflict.
         </Alert>
       )}
+      <ClassificationBar pid={pid} usage={usage} canEdit={canEdit} onNavigate={onNavigate} />
       <Tabs value={activeTab} onChange={setActiveTab} keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="details">Details</Tabs.Tab>
