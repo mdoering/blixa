@@ -32,6 +32,7 @@ import { getReference } from '../api/references';
 import BhlPageModal from './BhlPageModal';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import CurieId from '../components/CurieId';
+import InfoLabel from '../components/InfoLabel';
 import EntitySelect from '../child/EntitySelect';
 import NameRelationsTab, { referenceOptions } from '../child/NameRelationsTab';
 import { colIdFrom, scopedId, withScopedId } from '../child/map/mapUrls';
@@ -577,8 +578,8 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                     }}
                   />
                   <Select
-                    label="Status"
-                    description="Accepted ↔ synonym uses Demote/Promote"
+                    label={<InfoLabel label="Status" info="Accepted ↔ synonym uses Demote/Promote" />}
+                    aria-label="Status"
                     data={statusOptions}
                     {...statusInputProps}
                     onChange={(v) => {
@@ -674,8 +675,13 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                   <Stack gap="sm">
                     <Group grow align="flex-start" gap="md">
                       <Select
-                        label="Nomenclatural genus"
-                        description="The genus this name's epithet agrees with"
+                        label={
+                          <InfoLabel
+                            label="Nomenclatural genus"
+                            info="The genus this name's epithet agrees with"
+                          />
+                        }
+                        aria-label="Nomenclatural genus"
                         placeholder={usage.genus ?? 'genus'}
                         searchable
                         clearable
@@ -691,8 +697,13 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                       />
                     </Group>
                     <Checkbox
-                      label="Gender agreement"
-                      description="Epithets follow the genus gender (e.g. alba / albus)"
+                      label={
+                        <InfoLabel
+                          label="Gender agreement"
+                          info="Epithets follow the genus gender (e.g. alba / albus)"
+                        />
+                      }
+                      aria-label="Gender agreement"
                       disabled={!canEdit}
                       checked={form.values.genderAgreement}
                       onChange={(e) => {

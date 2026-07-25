@@ -1,5 +1,6 @@
 import { Alert, Badge, Button, FileButton, Group, Modal, SegmentedControl, Stack, Text, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import InfoLabel from '../components/InfoLabel';
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { messageFor } from '../api/client';
@@ -93,8 +94,13 @@ export default function BulkAddModal({ pid, target, opened, onClose, onDone }: B
                  { label: 'As synonyms of target', value: 'synonyms' }]}
         />
         <Textarea
-          label="Names"
-          description="One name per line. [rank] sets rank; 2-space indent nests children; = marks a synonym; † marks extinct."
+          label={
+            <InfoLabel
+              label="Names"
+              info="One name per line. [rank] sets rank; 2-space indent nests children; = marks a synonym; † marks extinct."
+            />
+          }
+          aria-label="Names"
           autosize minRows={6} maxRows={16}
           value={text}
           onChange={(e) => { setText(e.currentTarget.value); setPreview(null); }}
