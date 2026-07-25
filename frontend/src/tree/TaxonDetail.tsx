@@ -25,7 +25,7 @@ import { ApiError, messageFor } from '../api/client';
 import { getProject } from '../api/projects';
 import { getVocab } from '../api/coldp';
 import { listLocks } from '../api/locks';
-import { getUsage, updateUsage } from '../api/usages';
+import { getUsage, searchUsages, updateGenusId, updateUsage } from '../api/usages';
 import { getAiConfig } from '../api/ai';
 import { revalidateSubtree } from '../api/issues';
 import { getReference } from '../api/references';
@@ -400,6 +400,25 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usage, activeTab]);
 
+  // Genus options for a binomial's nomenclatural-genus picker: the project's genus usages. Loaded
+  // only when the usage is a bi/trinomial (has a specific epithet).
+  const { data: generaPage } = useQuery({
+    queryKey: ['genera', pid],
+    queryFn: () => searchUsages(pid, { rank: 'genus', limit: 500, offset: 0 }),
+    enabled: !!usage?.specificEpithet,
+    staleTime: 60_000,
+  });
+
+  // Pin/clear the nomenclatural genus link (a direct narrow write, not part of the Details Save).
+  const genusMutation = useMutation({
+    mutationFn: (genusId: number | null) => updateGenusId(pid, usageId, { genusId, version: usage!.version }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['usage', pid, usageId] });
+      await queryClient.invalidateQueries({ queryKey: ['usageIssues', pid, usageId] });
+    },
+    onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Linking the genus failed') }),
+  });
+
   if (usageQuery.isLoading) return <Text c="dimmed">Loading…</Text>;
   if (usageQuery.isError || !usage) return <Text c="red">Could not load this taxon</Text>;
 
@@ -426,6 +445,16 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
   // parent genus and only toggles agreement; suprageneric names show neither.
   const isGenus = form.values.rank === 'genus';
   const isBinomialOrBelow = !!usage.specificEpithet;
+
+  // Options for the nomenclatural-genus picker; ensure the currently-linked genus is present even if
+  // it falls outside the loaded page, so the Select can show its label.
+  const generaOptions = (generaPage?.items ?? []).map((g) => ({
+    value: String(g.id),
+    label: g.scientificName ?? String(g.id),
+  }));
+  if (usage.genusId != null && !generaOptions.some((o) => o.value === String(usage.genusId))) {
+    generaOptions.unshift({ value: String(usage.genusId), label: usage.genusName ?? String(usage.genusId) });
+  }
 
   return (
     <Box>
@@ -642,14 +671,26 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                     }}
                   />
                 ) : isBinomialOrBelow ? (
-                  <Group grow align="flex-start" gap="md">
-                    <TextInput
-                      label="Gender (from parent genus)"
-                      readOnly
-                      value={usage.genusGender ?? '—'}
-                    />
+                  <Stack gap="sm">
+                    <Group grow align="flex-start" gap="md">
+                      <Select
+                        label="Nomenclatural genus"
+                        description="The genus this name's epithet agrees with"
+                        placeholder={usage.genus ?? 'genus'}
+                        searchable
+                        clearable
+                        disabled={!canEdit || genusMutation.isPending}
+                        data={generaOptions}
+                        value={usage.genusId != null ? String(usage.genusId) : null}
+                        onChange={(v) => genusMutation.mutate(v ? Number(v) : null)}
+                      />
+                      <TextInput
+                        label={usage.genusId != null ? 'Gender' : 'Gender (unconfirmed)'}
+                        readOnly
+                        value={usage.genusGender ?? '—'}
+                      />
+                    </Group>
                     <Checkbox
-                      mt={30}
                       label="Gender agreement"
                       description="Epithets follow the genus gender (e.g. alba / albus)"
                       disabled={!canEdit}
@@ -659,7 +700,7 @@ export default function TaxonDetail({ pid, usageId }: TaxonDetailProps) {
                         form.setFieldValue('genderAgreement', e.currentTarget.checked);
                       }}
                     />
-                  </Group>
+                  </Stack>
                 ) : null}
                 {((usage.alternativeId?.length ?? 0) > 0 || (canEdit && scopes.length > 0)) &&
                   (editingIds ? (

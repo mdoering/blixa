@@ -643,6 +643,30 @@ test(
   10000,
 );
 
+test('the Tools tab links genera project-wide and shows the outcome counts', async () => {
+  let posted = false;
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    noLatestMatchRun,
+    noLatestExportRun,
+    http.post('/api/projects/3/link-genera', () => {
+      posted = true;
+      return HttpResponse.json({ linked: 5, ambiguous: 1, unmatched: 2 });
+    }),
+  );
+  renderPage();
+  const title = await screen.findByLabelText('Title');
+  await waitFor(() => expect(title).toHaveValue('Mammals'));
+
+  await openTab('Tools');
+  await userEvent.click(screen.getByRole('button', { name: 'Link genera' }));
+
+  await waitFor(() => expect(posted).toBe(true));
+  expect(await screen.findByText('linked 5')).toBeInTheDocument();
+  expect(screen.getByText('ambiguous 1')).toBeInTheDocument();
+  expect(screen.getByText('unmatched 2')).toBeInTheDocument();
+});
+
 test('owner can toggle public and publish a release', async () => {
   // `isPublic`/`published` are mutated by the PUT/POST handlers below and read back by the GET
   // handlers, so the switch flip and the release-history refresh are driven by the same

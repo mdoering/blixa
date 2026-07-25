@@ -82,6 +82,8 @@ function mockCommon(usage = baseUsage(), role = 'owner') {
   server.use(
     http.get('/api/projects/4', () => HttpResponse.json({ ...project, role })),
     http.get('/api/projects/4/usages/10', () => HttpResponse.json(usage)),
+    // The nomenclatural-genus picker searches the project's genera (rank=genus).
+    http.get('/api/projects/4/usages', () => HttpResponse.json({ items: [], total: 0 })),
     http.get('/api/projects/4/usages/10/synonyms', () => HttpResponse.json([])),
     http.get('/api/projects/4/usages/10/accepted', () => HttpResponse.json([])),
     http.get('/api/projects/4/usages/10/relations', () => HttpResponse.json([])),
@@ -703,16 +705,31 @@ test('gender is an editable Select on a genus, with no agreement checkbox', asyn
   expect(screen.queryByRole('checkbox', { name: 'Gender agreement' })).not.toBeInTheDocument();
 });
 
-test('a species shows the derived parent-genus gender read-only + an agreement checkbox', async () => {
+test('an unlinked species shows the unconfirmed genus gender, a genus picker, and an agreement checkbox', async () => {
   mockCommon(baseUsage({ genusGender: 'FEMININE', genderAgreement: true }));
   renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
 
-  const derived = await screen.findByLabelText('Gender (from parent genus)');
+  // Unlinked (no genusId): the gender field is read-only and flagged unconfirmed.
+  const derived = await screen.findByLabelText('Gender (unconfirmed)');
   expect(derived).toHaveValue('FEMININE');
   expect(derived).toHaveAttribute('readonly');
   expect(screen.getByRole('checkbox', { name: 'Gender agreement' })).toBeChecked();
-  // no editable gender Select (the read-only one is labelled "... (from parent genus)")
-  expect(screen.queryByRole('textbox', { name: 'Gender' })).not.toBeInTheDocument();
+  // the nomenclatural-genus picker is offered.
+  expect(screen.getByRole('textbox', { name: 'Nomenclatural genus' })).toBeInTheDocument();
+});
+
+test('a linked species labels the gender field confirmed and shows the linked genus', async () => {
+  mockCommon(baseUsage({ genusGender: 'FEMININE', genusId: 2, genusName: 'Panthera' }));
+  server.use(
+    http.get('/api/projects/4/usages', () =>
+      HttpResponse.json({ items: [{ id: 2, scientificName: 'Panthera' }], total: 1 }),
+    ),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  const gender = await screen.findByLabelText('Gender');
+  expect(gender).toHaveValue('FEMININE');
+  expect(screen.getByRole('textbox', { name: 'Nomenclatural genus' })).toHaveValue('Panthera');
 });
 
 test('a suprageneric name shows neither gender field', async () => {

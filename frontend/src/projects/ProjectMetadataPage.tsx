@@ -33,6 +33,7 @@ import { getIdScopes } from '../api/coldp';
 import { getColMatchRun, getLatestColMatch, startColMatch } from '../api/col';
 import { exportFileUrl, getExportRun, getLatestExport, startExport } from '../api/export';
 import { deleteRelease, listReleases, publishRelease } from '../api/releases';
+import { linkGenera, type LinkGeneraResult } from '../api/usages';
 import { messageFor } from '../api/client';
 import type { UpdateMetadataPayload } from '../api/types';
 import MergeModal from '../merge/MergeModal';
@@ -257,6 +258,19 @@ export default function ProjectMetadataPage() {
   // Supervised project merge (owner/editor only, same tier as "Match all identifiers"): opens
   // MergeModal, which owns its own start/poll/apply state scoped to this project as the target.
   const [merging, setMerging] = useState(false);
+
+  // "Link genera": a synchronous project-wide fill-missing-only genus link. Shows the outcome counts.
+  const [genusLinkResult, setGenusLinkResult] = useState<LinkGeneraResult | null>(null);
+  const linkGeneraMut = useMutation({
+    mutationFn: () => linkGenera(id),
+    onSuccess: (r) => {
+      setGenusLinkResult(r);
+      notifications.show({
+        message: `Linked ${r.linked} genera (${r.ambiguous} ambiguous, ${r.unmatched} unmatched)`,
+      });
+    },
+    onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Link genera failed') }),
+  });
   // PropertyKeysModal: manage the project's standard taxon property keys (describe + reconcile).
   const [propKeysOpen, setPropKeysOpen] = useState(false);
 
@@ -727,6 +741,40 @@ export default function ProjectMetadataPage() {
               <Alert color="red" title="Match all identifiers failed">
                 {matchRun.error ?? 'Unknown error'}
               </Alert>
+            )}
+          </Stack>
+        )}
+
+        {canEdit && (
+          <Stack gap="xs">
+            <Group justify="space-between">
+              <Title order={5} m={0}>
+                Link genera
+              </Title>
+              <Button
+                variant="default"
+                loading={linkGeneraMut.isPending}
+                onClick={() => linkGeneraMut.mutate()}
+              >
+                Link genera
+              </Button>
+            </Group>
+            <Text size="sm" c="dimmed">
+              Pin each binomial to its genus usage (for gender agreement). Only fills missing links —
+              never changes one you set per taxon.
+            </Text>
+            {genusLinkResult && (
+              <Group gap="xs">
+                <Badge color="green" variant="light">
+                  linked {genusLinkResult.linked}
+                </Badge>
+                <Badge color="yellow" variant="light">
+                  ambiguous {genusLinkResult.ambiguous}
+                </Badge>
+                <Badge color="red" variant="light">
+                  unmatched {genusLinkResult.unmatched}
+                </Badge>
+              </Group>
             )}
           </Stack>
         )}

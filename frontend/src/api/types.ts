@@ -140,6 +140,10 @@ export interface NameUsage {
   // Read-only: the grammatical gender of the nearest genus ancestor, shown on the form for a
   // bi/trinomial. Null on list/search responses (computed only on the detail path).
   genusGender: string | null;
+  // The linked nomenclatural genus (genus_id) + its name, when the binomial is pinned to a genus
+  // usage; null when unlinked (genusGender is then the unconfirmed name-match fallback).
+  genusId: number | null;
+  genusName: string | null;
   etymology: string | null;
   nameType: string | null;
   parseState: string | null;

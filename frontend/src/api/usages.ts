@@ -54,6 +54,28 @@ export function updateUsage(
   return api<NameUsage>(`/api/projects/${pid}/usages/${id}`, { method: 'PUT', json: payload });
 }
 
+// Pin (or clear) a binomial's nomenclatural genus link. genusId null clears it. `version` is the
+// usage's optimistic lock. Returns the updated usage (genusId/genusName/genusGender reflect the link).
+export function updateGenusId(
+  pid: number,
+  id: number,
+  payload: { genusId: number | null; version: number },
+): Promise<NameUsage> {
+  return api<NameUsage>(`/api/projects/${pid}/usages/${id}/genus`, { method: 'PUT', json: payload });
+}
+
+export interface LinkGeneraResult {
+  linked: number;
+  ambiguous: number;
+  unmatched: number;
+}
+
+// Project-wide "Link genera": links every still-unlinked binomial to its genus usage (never
+// overrides an existing link). Returns per-outcome counts.
+export function linkGenera(pid: number): Promise<LinkGeneraResult> {
+  return api<LinkGeneraResult>(`/api/projects/${pid}/link-genera`, { method: 'POST' });
+}
+
 // The Biology tab's taxon-level attributes (taxon_info): a narrow full-replace of the four fields,
 // separate from updateUsage so saving biology never rewrites the name. A null/omitted field CLEARS
 // it. `version` is the usage's shared optimistic lock (a stale value 409s).
