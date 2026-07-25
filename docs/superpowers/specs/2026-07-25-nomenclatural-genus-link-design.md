@@ -72,6 +72,17 @@ but the default action is fill-missing-only.)
 (the genus changed), set `genus_id = null` — the old link is stale and must be re-established (by the
 form or the job). No silent auto-re-resolve, so a curated link is never quietly changed under the user.
 
+## Accepted-name consistency with the classification
+
+For an **accepted** name the nomenclatural genus and the classification genus are the same, so the
+batch resolves an accepted binomial's `genus_id` from its **classification-parent genus** (by id —
+homonym-proof), name-matching only synonyms/misapplied (whose own genus isn't in the accepted tree).
+This makes accepted links consistent with the tree by construction. And a validation rule,
+`accepted_genus_link_not_classification` (WARNING), catches drift or a manual mis-link: an accepted
+binomial whose `genus_id` ≠ its classification-ancestor genus (compared by id, so a homonym of the
+same name doesn't hide it). It complements `genus_mismatch` (which compares the genus *token* to the
+classification at the name level). `RuleContext` gains `ancestorGenusId`.
+
 ## Validation rule: linked-genus spelling mismatch
 
 A new rule (`genus_link_spelling_mismatch`, WARNING) flags a usage whose `genus_id` is set but whose

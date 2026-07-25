@@ -106,6 +106,36 @@ class GenusLinkIT extends AbstractPostgresIT {
   }
 
   @Test
+  void batchLinksAnAcceptedNameToItsClassificationGenus() throws Exception {
+    ensureUser("genusLinkOwner");
+    long pid = createProject("genuslink-accepted-tree");
+    long abies = create(pid, "{\"scientificName\":\"Abies\",\"rank\":\"genus\",\"status\":\"accepted\",\"gender\":\"FEMININE\"}");
+    long alba = create(pid, "{\"scientificName\":\"Abies alba\",\"rank\":\"species\",\"status\":\"accepted\",\"parentId\":" + abies + "}");
+
+    mvc.perform(post("/api/projects/" + pid + "/link-genera").with(csrf())).andExpect(status().isOk());
+    // The accepted name is linked to the very genus usage it sits under (by id), not by name-match.
+    assertThat(getUsage(pid, alba).get("genusId").asInt()).isEqualTo((int) abies);
+  }
+
+  @Test
+  void acceptedGenusLinkRuleFlagsAHomonymMisLink() throws Exception {
+    ensureUser("genusLinkOwner");
+    long pid = createProject("genuslink-homonym");
+    long abies1 = create(pid, "{\"scientificName\":\"Abies\",\"rank\":\"genus\",\"status\":\"accepted\",\"gender\":\"FEMININE\"}");
+    long alba = create(pid, "{\"scientificName\":\"Abies alba\",\"rank\":\"species\",\"status\":\"accepted\",\"parentId\":" + abies1 + "}");
+    // A homonymous second "Abies" genus (same name, different usage), not alba's classification parent.
+    long abies2 = create(pid, "{\"scientificName\":\"Abies\",\"rank\":\"genus\",\"status\":\"accepted\",\"gender\":\"NEUTER\"}");
+
+    // Mis-link alba to the homonym abies2: the NAME matches its token, so the spelling rule stays
+    // quiet, but the id-level rule fires because genus_id (abies2) != the classification genus (abies1).
+    link(pid, alba, abies2, getUsage(pid, alba).get("version").asInt());
+    validationService.revalidateUsage((int) pid, (int) alba);
+    var found = issues.findByEntity((int) pid, "name_usage", (int) alba);
+    assertThat(found.stream().anyMatch(i -> "accepted_genus_link_not_classification".equals(i.getRule()))).isTrue();
+    assertThat(found.stream().anyMatch(i -> "genus_link_spelling_mismatch".equals(i.getRule()))).isFalse();
+  }
+
+  @Test
   void updateClearsTheLinkWhenTheGenusTokenChanges() throws Exception {
     ensureUser("genusLinkOwner");
     long pid = createProject("genuslink-stale");

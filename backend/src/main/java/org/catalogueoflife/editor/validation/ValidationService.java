@@ -167,10 +167,14 @@ public class ValidationService {
     // The linked nomenclatural genus's name, for LinkedGenusSpellingRule (null when unlinked).
     String linkedGenusName = usage.getGenusId() == null ? null
         : genusNameOf(nameUsages.findLinkedGenus(projectId, usage.getGenusId()));
+    // The classification-ancestor genus id, for AcceptedGenusLinkRule (an accepted binomial's
+    // genus_id should equal it).
+    Integer ancestorGenusId = usage.getGenusId() == null ? null
+        : nameUsages.findAncestorGenusId(projectId, usage.getId());
     return new RuleContext(usage, synonymAcceptedCount, publishedInReference, duplicateCount,
         ancestorGenusName, parentRank, ancestorGenusYear, ancestorSpeciesEpithet,
         synonymNonAcceptedTargetCount, hasSpeciesAncestor, danglingReferenceCount, duplicateChildTypes,
-        synonymRankDiffers, linkedGenusName);
+        synonymRankDiffers, linkedGenusName, ancestorGenusId);
   }
 
   private static String genusNameOf(NameUsageMapper.LinkedGenus lg) {

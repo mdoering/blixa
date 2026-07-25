@@ -522,21 +522,27 @@ public class NameUsageService {
     int ambiguous = 0;
     int unmatched = 0;
     for (NameUsageMapper.UnlinkedBinomial b : usages.findUnlinkedBinomials(projectId)) {
-      List<NameUsageMapper.GenusMatch> ms = usages.findGenusMatches(projectId, b.genus());
+      // Accepted names take the genus they're filed under in the classification (guaranteeing
+      // genus_id == classification genus, homonym-proof); if a genus-less placement leaves no genus
+      // ancestor, fall back to a name-match. Synonyms/misapplied have no useful classification genus,
+      // so they always name-match their own nomenclatural genus.
       Integer genusId;
-      if (ms.isEmpty()) {
-        unmatched++;
-        continue;
-      } else if (ms.size() == 1) {
-        genusId = ms.get(0).id();
-      } else {
-        List<NameUsageMapper.GenusMatch> accepted =
-            ms.stream().filter(NameUsageMapper.GenusMatch::accepted).toList();
-        if (accepted.size() != 1) {
-          ambiguous++;
-          continue;
+      if ("ACCEPTED".equalsIgnoreCase(b.status())) {
+        genusId = usages.findAncestorGenusId(projectId, b.id());
+        if (genusId == null) {
+          genusId = resolveGenusId(projectId, b.genus());
         }
-        genusId = accepted.get(0).id();
+      } else {
+        genusId = resolveGenusId(projectId, b.genus());
+      }
+      if (genusId == null) {
+        // Distinguish "several genera, no unique pick" (ambiguous) from "no genus of that name".
+        if (usages.findGenusMatches(projectId, b.genus()).isEmpty()) {
+          unmatched++;
+        } else {
+          ambiguous++;
+        }
+        continue;
       }
       Integer version = usages.findVersion(projectId, b.id());
       if (version != null && usages.updateGenusId(projectId, b.id(), genusId, userId, version) > 0) {

@@ -12,6 +12,7 @@ import org.catalogueoflife.editor.name.Reference;
 import org.catalogueoflife.editor.name.Status;
 import org.catalogueoflife.editor.validation.rules.BinomialAboveGenusRule;
 import org.catalogueoflife.editor.validation.rules.DanglingReferenceRule;
+import org.catalogueoflife.editor.validation.rules.AcceptedGenusLinkRule;
 import org.catalogueoflife.editor.validation.rules.DuplicateChildRecordsRule;
 import org.catalogueoflife.editor.validation.rules.LinkedGenusSpellingRule;
 import org.catalogueoflife.editor.validation.rules.SynonymRankDiffersRule;
@@ -589,5 +590,28 @@ class RuleTests {
     assertThat(new LinkedGenusSpellingRule().evaluate(ctxLinkedGenus("Abies", "Abies"))).isEmpty();
     // unlinked (null linked name) -> not this rule's concern
     assertThat(new LinkedGenusSpellingRule().evaluate(ctxLinkedGenus("Abies", null))).isEmpty();
+  }
+
+  // --- AcceptedGenusLinkRule (accepted_genus_link_not_classification) ---
+
+  private static RuleContext ctxAcceptedGenusLink(Integer genusId, Integer ancestorGenusId) {
+    NameUsage u = usage(); // ACCEPTED
+    u.setGenusId(genusId);
+    return new RuleContext(u, 0, null, 0, null, null, null, null, 0, false, 0, Set.of(), false, null,
+        ancestorGenusId);
+  }
+
+  @Test
+  void acceptedGenusLinkFlagsWhenLinkedGenusIsNotTheClassificationGenus() {
+    Optional<Finding> f = new AcceptedGenusLinkRule().evaluate(ctxAcceptedGenusLink(5, 6));
+    assertThat(f).isPresent();
+    assertThat(f.get().rule()).isEqualTo("accepted_genus_link_not_classification");
+  }
+
+  @Test
+  void acceptedGenusLinkQuietWhenMatchingOrUnlinked() {
+    assertThat(new AcceptedGenusLinkRule().evaluate(ctxAcceptedGenusLink(5, 5))).isEmpty(); // same genus
+    assertThat(new AcceptedGenusLinkRule().evaluate(ctxAcceptedGenusLink(null, 6))).isEmpty(); // unlinked
+    assertThat(new AcceptedGenusLinkRule().evaluate(ctxAcceptedGenusLink(5, null))).isEmpty(); // no ancestor
   }
 }

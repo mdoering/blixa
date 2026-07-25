@@ -277,6 +277,22 @@ public interface NameUsageMapper {
       """)
   String findAncestorGenusName(@Param("projectId") int projectId, @Param("id") int id);
 
+  // The id (not name) of the nearest STRICT genus ancestor -- for an accepted name, the genus usage
+  // it sits under in the tree, which its genus_id should equal (see AcceptedGenusLinkRule and the
+  // "Link genera" batch's accepted-name resolution). Null when there is none. Same cycle guard.
+  @Select("""
+      WITH RECURSIVE anc AS (
+        SELECT project_id, id, parent_id, rank, 0 AS depth
+        FROM name_usage WHERE project_id = #{projectId} AND id = #{id}
+        UNION ALL
+        SELECT n.project_id, n.id, n.parent_id, n.rank, anc.depth + 1
+        FROM name_usage n JOIN anc ON n.project_id = anc.project_id AND n.id = anc.parent_id
+        WHERE anc.depth < 10000
+      )
+      SELECT id FROM anc WHERE depth > 0 AND rank = 'genus' ORDER BY depth LIMIT 1
+      """)
+  Integer findAncestorGenusId(@Param("projectId") int projectId, @Param("id") int id);
+
   // Grammatical gender of a bi/trinomial's NOMENCLATURAL genus -- the gender its epithets must agree
   // with -- looked up by the genus token in the name (not the classification ancestor: the two
   // coincide for an accepted name but diverge for a synonym, whose own genus usually differs from the
@@ -537,12 +553,12 @@ public interface NameUsageMapper {
   // project-wide "Link genera" batch (LinkGeneraService). Already-linked usages are excluded, so the
   // batch never overrides an existing (manual or prior) link.
   @Select("""
-      SELECT id, genus FROM name_usage
+      SELECT id, genus, status FROM name_usage
       WHERE project_id = #{projectId} AND genus_id IS NULL AND genus IS NOT NULL AND genus <> ''
       """)
   List<UnlinkedBinomial> findUnlinkedBinomials(@Param("projectId") int projectId);
 
-  record UnlinkedBinomial(int id, String genus) {}
+  record UnlinkedBinomial(int id, String genus, String status) {}
 
   // Narrow CAS write of just genus_id (PUT /usages/{id}/genus and the "Link genera" batch): sets or
   // clears (genusId null) a usage's nomenclatural-genus link without touching any name field. Bumps

@@ -26,32 +26,34 @@ import org.catalogueoflife.editor.name.Reference;
 //    (SynonymRankDiffersRule).
 //  - linkedGenusName: the name of the genus usage this binomial is linked to (genus_id), or null when
 //    unlinked (LinkedGenusSpellingRule compares it to the parsed genus token).
+//  - ancestorGenusId: the id of the nearest classification-ancestor genus (via parent_id), or null --
+//    an accepted binomial's genus_id should equal it (AcceptedGenusLinkRule).
 //
-// The 4-, 5-, 9-, 11-, and 13-arg convenience constructors default the later fields, so the
+// The 4-, 5-, 9-, 11-, 13-, and 14-arg convenience constructors default the later fields, so the
 // hand-built contexts in RuleTests don't need updating.
 public record RuleContext(NameUsage usage, Integer synonymAcceptedCount, Reference publishedInReference,
     int duplicateCount, String ancestorGenusName, String parentRank, Integer ancestorGenusYear,
     String ancestorSpeciesEpithet, int synonymNonAcceptedTargetCount, boolean hasSpeciesAncestor,
     int danglingReferenceCount, Set<String> duplicateChildTypes, boolean synonymRankDiffers,
-    String linkedGenusName) {
+    String linkedGenusName, Integer ancestorGenusId) {
 
   public RuleContext(NameUsage usage, Integer synonymAcceptedCount, Reference publishedInReference,
       int duplicateCount) {
     this(usage, synonymAcceptedCount, publishedInReference, duplicateCount, null, null, null, null, 0,
-        false, 0, Set.of(), false, null);
+        false, 0, Set.of(), false, null, null);
   }
 
   public RuleContext(NameUsage usage, Integer synonymAcceptedCount, Reference publishedInReference,
       int duplicateCount, String ancestorGenusName) {
     this(usage, synonymAcceptedCount, publishedInReference, duplicateCount, ancestorGenusName, null, null,
-        null, 0, false, 0, Set.of(), false, null);
+        null, 0, false, 0, Set.of(), false, null, null);
   }
 
   public RuleContext(NameUsage usage, Integer synonymAcceptedCount, Reference publishedInReference,
       int duplicateCount, String ancestorGenusName, String parentRank, Integer ancestorGenusYear,
       String ancestorSpeciesEpithet, int synonymNonAcceptedTargetCount) {
     this(usage, synonymAcceptedCount, publishedInReference, duplicateCount, ancestorGenusName, parentRank,
-        ancestorGenusYear, ancestorSpeciesEpithet, synonymNonAcceptedTargetCount, false, 0, Set.of(), false, null);
+        ancestorGenusYear, ancestorSpeciesEpithet, synonymNonAcceptedTargetCount, false, 0, Set.of(), false, null, null);
   }
 
   public RuleContext(NameUsage usage, Integer synonymAcceptedCount, Reference publishedInReference,
@@ -60,7 +62,7 @@ public record RuleContext(NameUsage usage, Integer synonymAcceptedCount, Referen
       int danglingReferenceCount) {
     this(usage, synonymAcceptedCount, publishedInReference, duplicateCount, ancestorGenusName, parentRank,
         ancestorGenusYear, ancestorSpeciesEpithet, synonymNonAcceptedTargetCount, hasSpeciesAncestor,
-        danglingReferenceCount, Set.of(), false, null);
+        danglingReferenceCount, Set.of(), false, null, null);
   }
 
   public RuleContext(NameUsage usage, Integer synonymAcceptedCount, Reference publishedInReference,
@@ -69,6 +71,16 @@ public record RuleContext(NameUsage usage, Integer synonymAcceptedCount, Referen
       int danglingReferenceCount, Set<String> duplicateChildTypes, boolean synonymRankDiffers) {
     this(usage, synonymAcceptedCount, publishedInReference, duplicateCount, ancestorGenusName, parentRank,
         ancestorGenusYear, ancestorSpeciesEpithet, synonymNonAcceptedTargetCount, hasSpeciesAncestor,
-        danglingReferenceCount, duplicateChildTypes, synonymRankDiffers, null);
+        danglingReferenceCount, duplicateChildTypes, synonymRankDiffers, null, null);
+  }
+
+  public RuleContext(NameUsage usage, Integer synonymAcceptedCount, Reference publishedInReference,
+      int duplicateCount, String ancestorGenusName, String parentRank, Integer ancestorGenusYear,
+      String ancestorSpeciesEpithet, int synonymNonAcceptedTargetCount, boolean hasSpeciesAncestor,
+      int danglingReferenceCount, Set<String> duplicateChildTypes, boolean synonymRankDiffers,
+      String linkedGenusName) {
+    this(usage, synonymAcceptedCount, publishedInReference, duplicateCount, ancestorGenusName, parentRank,
+        ancestorGenusYear, ancestorSpeciesEpithet, synonymNonAcceptedTargetCount, hasSpeciesAncestor,
+        danglingReferenceCount, duplicateChildTypes, synonymRankDiffers, linkedGenusName, null);
   }
 }
