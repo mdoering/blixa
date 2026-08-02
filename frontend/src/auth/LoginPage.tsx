@@ -44,7 +44,7 @@ export default function LoginPage() {
             <Loader />
           </Center>
         ) : config?.orcidEnabled ? (
-          <Button fullWidth component="a" href={orcidLoginUrl()}>
+          <Button fullWidth variant="default" component="a" href={orcidLoginUrl()}>
             Sign in with ORCID
           </Button>
         ) : (
