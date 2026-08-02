@@ -38,7 +38,7 @@ export default function LoginPage() {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
       <Card withBorder style={{ width: 380 }}>
-        <BlixaLogo variant="header" height={40} style={{ display: 'block', margin: '4px auto 20px' }} />
+        <BlixaLogo variant="text" height={32} style={{ display: 'block', margin: '4px auto 20px' }} />
         {isLoading ? (
           <Center py="md">
             <Loader />
