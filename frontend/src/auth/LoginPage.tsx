@@ -19,7 +19,7 @@ function LocalLoginForm() {
             autoComplete="current-password"
             {...form.getInputProps('password')}
           />
-          <Button fullWidth type="submit" loading={submitting}>
+          <Button fullWidth variant="default" type="submit" loading={submitting}>
             Sign in
           </Button>
         </Stack>
