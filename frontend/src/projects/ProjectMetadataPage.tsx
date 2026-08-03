@@ -33,6 +33,7 @@ import { getIdScopes } from '../api/coldp';
 import { getColMatchRun, getLatestColMatch, startColMatch } from '../api/col';
 import { exportFileUrl, getExportRun, getLatestExport, startExport } from '../api/export';
 import { deleteRelease, listReleases, publishRelease } from '../api/releases';
+import ProjectMetrics from './ProjectMetrics';
 import { linkGenera, type LinkGeneraResult } from '../api/usages';
 import { messageFor } from '../api/client';
 import type { UpdateMetadataPayload } from '../api/types';
@@ -291,7 +292,6 @@ export default function ProjectMetadataPage() {
   const { data: releases } = useQuery({
     queryKey: ['releases', id],
     queryFn: () => listReleases(id),
-    enabled: isOwner,
     refetchInterval: (query) =>
       query.state.data?.some((r) => r.status === 'BUILDING') ? RELEASE_POLL_MS : false,
   });
@@ -348,7 +348,7 @@ export default function ProjectMetadataPage() {
         <Tabs.List>
           <Tabs.Tab value="metadata">Metadata</Tabs.Tab>
           <Tabs.Tab value="settings">Settings</Tabs.Tab>
-          {isOwner && <Tabs.Tab value="releases">Releases</Tabs.Tab>}
+          <Tabs.Tab value="releases">Releases</Tabs.Tab>
           <Tabs.Tab value="tools">Tools</Tabs.Tab>
         </Tabs.List>
 
@@ -393,11 +393,12 @@ export default function ProjectMetadataPage() {
       </form>
         </Tabs.Panel>
 
-        {/* Releases (owner-only): publish form + release list (publishing gated on a license, B2,
-            see ReleaseService.publish). */}
-        {isOwner && (
-          <Tabs.Panel value="releases" pt="md">
-            <Stack gap="xs">
+        {/* Releases: live metrics (all members) + publish form & release list. Publishing/deleting
+            is owner-only (see ReleaseService.publish/delete); the history is readable by any member. */}
+        <Tabs.Panel value="releases" pt="md">
+            <Stack gap="md">
+          <ProjectMetrics pid={id} />
+          {isOwner && (
           <Group align="flex-end" gap="xs">
             <TextInput
               label="Version"
@@ -415,8 +416,9 @@ export default function ProjectMetadataPage() {
               Publish release
             </Button>
           </Group>
+          )}
           {/* B2: a license is required before a release can be published -- see ReleaseService.publish. */}
-          {!data?.license && (
+          {isOwner && !data?.license && (
             <Text size="sm" c="dimmed">
               Set a license first to publish a release.
             </Text>
@@ -440,16 +442,18 @@ export default function ProjectMetadataPage() {
                     <Table.Td>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}</Table.Td>
                     <Table.Td>{r.fileSize != null ? formatFileSize(r.fileSize) : ''}</Table.Td>
                     <Table.Td>
-                      <ActionIcon
-                        type="button"
-                        variant="subtle"
-                        color="red"
-                        aria-label={`Delete release ${r.version}`}
-                        loading={deleteReleaseMut.isPending}
-                        onClick={() => deleteReleaseMut.mutate(r.id)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
+                      {isOwner && (
+                        <ActionIcon
+                          type="button"
+                          variant="subtle"
+                          color="red"
+                          aria-label={`Delete release ${r.version}`}
+                          loading={deleteReleaseMut.isPending}
+                          onClick={() => deleteReleaseMut.mutate(r.id)}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      )}
                     </Table.Td>
                   </Table.Tr>
                 ))}
@@ -458,7 +462,6 @@ export default function ProjectMetadataPage() {
           )}
             </Stack>
           </Tabs.Panel>
-        )}
 
         {/* Settings: public visibility + project-level configuration (GBIF occurrence map toggle,
             citation style, identifier scopes). The form-bound fields target the metadata form by id,

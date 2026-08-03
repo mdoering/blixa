@@ -69,6 +69,11 @@ export const server = setupServer(
   // Default empty ancestor path, so TaxonDetail's ClassificationBar (which fetches the focal
   // taxon's parent path) doesn't need this mocked per-test unless it asserts the breadcrumb.
   http.get('/api/projects/:pid/tree/path/:id', () => HttpResponse.json([])),
+  // Default empty metrics, so the ProjectMetrics block on the Releases tab doesn't need this
+  // mocked per-test unless it asserts specific numbers.
+  http.get('/api/projects/:pid/metrics', () =>
+    HttpResponse.json({ acceptedByRank: {}, synonymsByRank: {}, supplementary: {},
+      changesSinceLastRelease: {}, contributions: [] })),
   // Default empty synonymy, so any accepted-usage render of TaxonDetail's Synonymy view doesn't
   // need this mocked per-test unless it cares about the actual nested groups.
   http.get('/api/projects/:pid/usages/:id/synonymy', () =>
