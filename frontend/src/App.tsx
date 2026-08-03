@@ -6,6 +6,7 @@ import PublicLayout from './components/PublicLayout';
 import LandingPage from './pages/LandingPage';
 import PublicProjectPage from './pages/PublicProjectPage';
 import PublicDiscussionPage from './pages/PublicDiscussionPage';
+import DashboardPage from './dashboard/DashboardPage';
 import ProjectListPage from './projects/ProjectListPage';
 import ProjectLayout from './projects/ProjectLayout';
 import ProjectMetadataPage from './projects/ProjectMetadataPage';
@@ -34,6 +35,7 @@ export default function App() {
       </Route>
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="projects" element={<ProjectListPage />} />
           <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="projects/:projectId" element={<ProjectLayout />}>

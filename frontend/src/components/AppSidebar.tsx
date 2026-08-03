@@ -4,6 +4,7 @@ import {
   IconBinaryTree2,
   IconBooks,
   IconFolders,
+  IconLayoutDashboard,
   IconHistory,
   IconList,
   IconLock,
@@ -87,11 +88,18 @@ export default function AppSidebar({ projectId, collapsed, onNavigate }: AppSide
   return (
     <Stack gap={4}>
       <NavItem
+        icon={<IconLayoutDashboard size={ICON} />}
+        label="Dashboard"
+        active={pathname === '/dashboard'}
+        collapsed={collapsed}
+        onClick={() => go('/dashboard')}
+      />
+      <NavItem
         icon={<IconFolders size={ICON} />}
         label="Projects"
-        active={pathname === '/'}
+        active={pathname === '/projects'}
         collapsed={collapsed}
-        onClick={() => go('/')}
+        onClick={() => go('/projects')}
       />
       {me?.admin && (
         <NavItem

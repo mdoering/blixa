@@ -25,7 +25,7 @@ export function useLocalLogin() {
     try {
       await localLogin(values.username, values.password);
       await queryClient.invalidateQueries({ queryKey: ['me'] });
-      navigate('/projects', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (e) {
       setError(e instanceof ApiError && e.status === 401 ? 'Invalid username or password' : 'Login failed');
     } finally {

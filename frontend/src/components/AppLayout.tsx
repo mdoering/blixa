@@ -64,7 +64,7 @@ export default function AppLayout() {
           />
           {/* Brand slot (upper-left) — the text-only Blixa wordmark (same as the landing page),
               masked to inherit the header colour. */}
-          <Anchor component={Link} to="/projects" underline="never" c="inherit">
+          <Anchor component={Link} to="/dashboard" underline="never" c="inherit">
             <BlixaLogo variant="text" height={22} />
           </Anchor>
           {/* Read-only current-project context; picking a project happens on the Projects list. */}

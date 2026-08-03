@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders, screen } from '../test/utils';
 import { server, http, HttpResponse } from '../test/server';
 import LandingPage from './LandingPage';
@@ -21,15 +22,19 @@ describe('LandingPage', () => {
     expect(screen.queryByRole('link', { name: /sign in with orcid/i })).not.toBeInTheDocument();
   });
 
-  it('shows a My projects link for signed-in visitors', async () => {
+  it('redirects signed-in visitors to their dashboard', async () => {
     server.use(
       http.get('/api/me', () =>
         HttpResponse.json({ id: 1, username: 'alice', orcid: '', displayName: 'Alice' }),
       ),
       http.get('/api/public/projects', () => HttpResponse.json([])),
     );
-    renderWithProviders(<LandingPage />);
-    expect(await screen.findByRole('link', { name: /my projects/i })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /^log in$/i })).not.toBeInTheDocument();
+    renderWithProviders(
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/dashboard" element={<div>DASHBOARD HOME</div>} />
+      </Routes>,
+    );
+    expect(await screen.findByText('DASHBOARD HOME')).toBeInTheDocument();
   });
 });
