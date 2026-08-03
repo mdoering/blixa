@@ -48,4 +48,8 @@ public interface AppUserMapper {
       WHERE id = #{id}
       """)
   void update(AppUser u);
+
+  // Stamp the personal-dashboard "last seen" marker to now(), resetting the "new pings" count.
+  @Update("UPDATE app_user SET dashboard_seen_at = now() WHERE id = #{id}")
+  void touchDashboardSeen(int id);
 }

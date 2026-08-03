@@ -1,5 +1,7 @@
 package org.catalogueoflife.editor.user;
 
+import java.time.OffsetDateTime;
+
 public class AppUser {
   private Integer id;
   private String orcid;
@@ -11,6 +13,8 @@ public class AppUser {
   private String passwordHash;
   private boolean admin;
   private String state;
+  // When the user last opened their personal dashboard; the "new pings" boundary. Null = never.
+  private OffsetDateTime dashboardSeenAt;
 
   public Integer getId() { return id; }
   public void setId(Integer id) { this.id = id; }
@@ -32,4 +36,6 @@ public class AppUser {
   public void setAdmin(boolean admin) { this.admin = admin; }
   public String getState() { return state; }
   public void setState(String state) { this.state = state; }
+  public OffsetDateTime getDashboardSeenAt() { return dashboardSeenAt; }
+  public void setDashboardSeenAt(OffsetDateTime dashboardSeenAt) { this.dashboardSeenAt = dashboardSeenAt; }
 }
