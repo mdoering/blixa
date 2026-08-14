@@ -3,9 +3,12 @@ import { Link, Outlet } from 'react-router-dom';
 import BlixaLogo from './BlixaLogo';
 import AppFooter from './AppFooter';
 import { useMe } from '../auth/useMe';
+import { useConfig } from '../api/config';
+import { orcidLoginUrl } from '../api/auth';
 
 export default function PublicLayout() {
   const { data: me } = useMe();
+  const { data: config } = useConfig();
   return (
     <AppShell header={{ height: 56 }} footer={{ height: 32 }} padding="md">
       <AppShell.Header>
@@ -17,6 +20,10 @@ export default function PublicLayout() {
             <Anchor component={Link} to="/projects">
               My projects
             </Anchor>
+          ) : config?.orcidEnabled ? (
+            // ORCID lives at a backend route, so this is a plain full-page anchor, not a
+            // react-router Link. Skips the intermediate /signin page for ORCID users.
+            <Anchor href={orcidLoginUrl()}>Sign in</Anchor>
           ) : (
             <Anchor component={Link} to="/signin">
               Sign in

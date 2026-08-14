@@ -1,7 +1,6 @@
 import { Alert, Button, Card, Center, Loader, PasswordInput, Stack, TextInput } from '@mantine/core';
-import { useQuery } from '@tanstack/react-query';
 import BlixaLogo from '../components/BlixaLogo';
-import { getConfig } from '../api/config';
+import { useConfig } from '../api/config';
 import { orcidLoginUrl } from '../api/auth';
 import { useLocalLogin } from './useLocalLogin';
 
@@ -29,11 +28,7 @@ function LocalLoginForm() {
 }
 
 export default function LoginPage() {
-  const { data: config, isLoading } = useQuery({
-    queryKey: ['config'],
-    queryFn: getConfig,
-    staleTime: Infinity,
-  });
+  const { data: config, isLoading } = useConfig();
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
