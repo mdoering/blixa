@@ -16,6 +16,8 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class AppUserService implements UserDetailsService {
 
+  public record ApplicationResult(AppUser user, boolean notifyAdmins) {}
+
   // A username must be mention-friendly (@username): start alphanumeric, then alphanumeric/_/-,
   // at least 2 chars. Keeps handles usable as inline mentions in discussions.
   private static final Pattern USERNAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]+");
@@ -80,6 +82,27 @@ public class AppUserService implements UserDetailsService {
     me.setEmail(email);
     mapper.update(me);
     return me;
+  }
+
+  // A PENDING applicant supplies their (required) email and an optional message. Returns the updated
+  // user plus whether this was the first completed submission (email was previously blank) so the
+  // caller notifies admins exactly once, not on every later edit.
+  @Transactional
+  public ApplicationResult submitApplication(int userId, String rawEmail, String rawNote) {
+    String email = rawEmail == null ? "" : rawEmail.trim();
+    if (!EMAIL.matcher(email).matches()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "a valid email address is required");
+    }
+    AppUser me = mapper.findById(userId);
+    if (me == null) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "user not found");
+    }
+    boolean wasIncomplete = me.getEmail() == null || me.getEmail().isBlank();
+    String note = rawNote == null || rawNote.isBlank() ? null : rawNote.trim();
+    me.setEmail(email);
+    me.setApplicationNote(note);
+    mapper.update(me);
+    return new ApplicationResult(me, wasIncomplete);
   }
 
   public AppUser createLocal(String username, String rawPassword, String displayName) {

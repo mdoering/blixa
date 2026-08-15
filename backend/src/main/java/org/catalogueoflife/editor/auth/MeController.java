@@ -13,10 +13,13 @@ public class MeController {
 
   private final CurrentUser currentUser;
   private final AppUserService users;
+  private final org.catalogueoflife.editor.notify.UserNotifier userNotifier;
 
-  public MeController(CurrentUser currentUser, AppUserService users) {
+  public MeController(CurrentUser currentUser, AppUserService users,
+      org.catalogueoflife.editor.notify.UserNotifier userNotifier) {
     this.currentUser = currentUser;
     this.users = users;
+    this.userNotifier = userNotifier;
   }
 
   @GetMapping("/api/me")
@@ -36,6 +39,19 @@ public class MeController {
   public Map<String, Object> updateEmail(@RequestBody Map<String, String> body) {
     AppUser me = currentUser.require();
     return meMap(users.updateEmail(me.getId(), body.get("email")));
+  }
+
+  // A PENDING applicant submits/updates their required email + optional message. Admins are emailed
+  // once, on the first completed application.
+  @PutMapping("/api/me/application")
+  public Map<String, Object> submitApplication(@RequestBody Map<String, String> body) {
+    AppUser me = currentUser.require();
+    AppUserService.ApplicationResult result =
+        users.submitApplication(me.getId(), body.get("email"), body.get("note"));
+    if (result.notifyAdmins()) {
+      userNotifier.notifyAdminsOfApplication(result.user());
+    }
+    return meMap(result.user());
   }
 
   private static Map<String, Object> meMap(AppUser u) {

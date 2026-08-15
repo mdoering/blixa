@@ -15,12 +15,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 // Blocks authenticated but non-ACTIVE accounts (PENDING/DISABLED) from the protected API with a 403,
-// EXCEPT /api/me and logout -- so a pending user can still load the SPA and see the "awaiting admin
-// approval" screen (and log out). The permitAll surface (public/auth/ping/config) is skipped.
+// EXCEPT /api/me, /api/me/application and logout -- so a pending user can still load the SPA, see
+// the "awaiting admin approval" screen, submit their access request, and log out. The permitAll
+// surface (public/auth/ping/config) is skipped.
 public class ActiveUserFilter extends OncePerRequestFilter {
 
   private static final Set<String> ALLOW =
-      Set.of("/api/me", "/api/auth/logout", "/api/ping", "/api/config");
+      Set.of("/api/me", "/api/me/application", "/api/auth/logout", "/api/ping", "/api/config");
 
   private final AppUserMapper users;
 
