@@ -31,10 +31,18 @@ public class MeController {
     return meMap(users.updateUsername(me.getId(), body.get("username")));
   }
 
+  // Let the signed-in user set/update their contact email.
+  @PutMapping("/api/me/email")
+  public Map<String, Object> updateEmail(@RequestBody Map<String, String> body) {
+    AppUser me = currentUser.require();
+    return meMap(users.updateEmail(me.getId(), body.get("email")));
+  }
+
   private static Map<String, Object> meMap(AppUser u) {
     return Map.of(
         "id", u.getId(),
         "username", u.getUsername(),
+        "email", u.getEmail() == null ? "" : u.getEmail(),
         "orcid", u.getOrcid() == null ? "" : u.getOrcid(),
         "displayName", u.getDisplayName() == null ? "" : u.getDisplayName(),
         "admin", u.isAdmin(),

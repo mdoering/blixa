@@ -22,6 +22,8 @@ public class AppUserService implements UserDetailsService {
   // An ORCID iD (16 digits in 4 groups, last char may be an X checksum) -- disallowed as a custom
   // username so it can't collide with the orcid-based login-principal resolution.
   private static final Pattern ORCID_SHAPED = Pattern.compile("\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]");
+  // A permissive email shape check -- we don't verify deliverability, just reject obvious junk.
+  private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
 
   private final AppUserMapper mapper;
   private final PasswordEncoder encoder;
@@ -61,6 +63,21 @@ public class AppUserService implements UserDetailsService {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "user not found");
     }
     me.setUsername(username);
+    mapper.update(me);
+    return me;
+  }
+
+  @Transactional
+  public AppUser updateEmail(int userId, String rawEmail) {
+    String email = rawEmail == null ? "" : rawEmail.trim();
+    if (!EMAIL.matcher(email).matches()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "a valid email address is required");
+    }
+    AppUser me = mapper.findById(userId);
+    if (me == null) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "user not found");
+    }
+    me.setEmail(email);
     mapper.update(me);
     return me;
   }
