@@ -16,12 +16,14 @@ import org.springframework.web.server.ResponseStatusException;
 public class AdminUserService {
 
   private final AppUserMapper users;
-  private final org.catalogueoflife.editor.notify.UserNotifier notifier;
 
-  public AdminUserService(AppUserMapper users, org.catalogueoflife.editor.notify.UserNotifier notifier) {
+  public AdminUserService(AppUserMapper users) {
     this.users = users;
-    this.notifier = notifier;
   }
+
+  // Result of setState: the updated user plus whether this transition was a PENDING->ACTIVE
+  // approval, so the caller can send the approval email after the transaction commits.
+  public record StateResult(AppUser user, boolean justApproved) {}
 
   public List<AppUser> list(int actorId) {
     requireAdmin(actorId);
@@ -29,7 +31,7 @@ public class AdminUserService {
   }
 
   @Transactional
-  public AppUser setState(int actorId, int userId, String stateRaw) {
+  public StateResult setState(int actorId, int userId, String stateRaw) {
     requireAdmin(actorId);
     UserState state = parseState(stateRaw);
     AppUser target = requireUser(userId);
@@ -39,10 +41,8 @@ public class AdminUserService {
     String oldState = target.getState();
     target.setState(state.name());
     users.update(target);
-    if (UserState.PENDING.name().equals(oldState) && state == UserState.ACTIVE) {
-      notifier.notifyApproved(target);
-    }
-    return target;
+    boolean justApproved = UserState.PENDING.name().equals(oldState) && state == UserState.ACTIVE;
+    return new StateResult(target, justApproved);
   }
 
   @Transactional

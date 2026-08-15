@@ -18,10 +18,13 @@ public class AdminUserController {
 
   private final AdminUserService service;
   private final CurrentUser currentUser;
+  private final org.catalogueoflife.editor.notify.UserNotifier userNotifier;
 
-  public AdminUserController(AdminUserService service, CurrentUser currentUser) {
+  public AdminUserController(AdminUserService service, CurrentUser currentUser,
+      org.catalogueoflife.editor.notify.UserNotifier userNotifier) {
     this.service = service;
     this.currentUser = currentUser;
+    this.userNotifier = userNotifier;
   }
 
   @GetMapping
@@ -31,7 +34,9 @@ public class AdminUserController {
 
   @PostMapping("/{id}/state")
   public AdminUserResponse setState(@PathVariable int id, @RequestBody StateRequest req) {
-    return AdminUserResponse.of(service.setState(currentUser.require().getId(), id, req.state()));
+    var r = service.setState(currentUser.require().getId(), id, req.state());
+    if (r.justApproved()) userNotifier.notifyApproved(r.user());
+    return AdminUserResponse.of(r.user());
   }
 
   @PostMapping("/{id}/admin")
