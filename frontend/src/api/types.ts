@@ -3,6 +3,7 @@ export type Role = 'owner' | 'editor' | 'viewer';
 export interface Me {
   id: number;
   username: string;
+  email: string;
   orcid: string;
   displayName: string;
   admin: boolean;
