@@ -16,9 +16,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class AdminUserService {
 
   private final AppUserMapper users;
+  private final org.catalogueoflife.editor.notify.UserNotifier notifier;
 
-  public AdminUserService(AppUserMapper users) {
+  public AdminUserService(AppUserMapper users, org.catalogueoflife.editor.notify.UserNotifier notifier) {
     this.users = users;
+    this.notifier = notifier;
   }
 
   public List<AppUser> list(int actorId) {
@@ -34,8 +36,12 @@ public class AdminUserService {
     if (userId == actorId && state != UserState.ACTIVE) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "you can't deactivate your own account");
     }
+    String oldState = target.getState();
     target.setState(state.name());
     users.update(target);
+    if (UserState.PENDING.name().equals(oldState) && state == UserState.ACTIVE) {
+      notifier.notifyApproved(target);
+    }
     return target;
   }
 
