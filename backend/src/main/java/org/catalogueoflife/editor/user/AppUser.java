@@ -13,6 +13,7 @@ public class AppUser {
   private String passwordHash;
   private boolean admin;
   private String state;
+  private String applicationNote;
   // When the user last opened their personal dashboard; the "new pings" boundary. Null = never.
   private OffsetDateTime dashboardSeenAt;
 
@@ -36,6 +37,8 @@ public class AppUser {
   public void setAdmin(boolean admin) { this.admin = admin; }
   public String getState() { return state; }
   public void setState(String state) { this.state = state; }
+  public String getApplicationNote() { return applicationNote; }
+  public void setApplicationNote(String applicationNote) { this.applicationNote = applicationNote; }
   public OffsetDateTime getDashboardSeenAt() { return dashboardSeenAt; }
   public void setDashboardSeenAt(OffsetDateTime dashboardSeenAt) { this.dashboardSeenAt = dashboardSeenAt; }
 }

@@ -11,9 +11,9 @@ public interface AppUserMapper {
 
   @Insert("""
       INSERT INTO app_user (orcid, username, email, display_name, given, family, password_hash,
-                            admin, state)
+                            admin, state, application_note)
       VALUES (#{orcid}, #{username}, #{email}, #{displayName}, #{given}, #{family}, #{passwordHash},
-              #{admin}, COALESCE(#{state}, 'ACTIVE'))
+              #{admin}, COALESCE(#{state}, 'ACTIVE'), #{applicationNote})
       """)
   @Options(useGeneratedKeys = true, keyProperty = "id")
   void insert(AppUser u);
@@ -44,7 +44,8 @@ public interface AppUserMapper {
       UPDATE app_user
       SET orcid = #{orcid}, username = #{username}, email = #{email},
           display_name = #{displayName}, given = #{given}, family = #{family},
-          password_hash = #{passwordHash}, admin = #{admin}, state = #{state}, updated_at = now()
+          password_hash = #{passwordHash}, admin = #{admin}, state = #{state},
+          application_note = #{applicationNote}, updated_at = now()
       WHERE id = #{id}
       """)
   void update(AppUser u);
