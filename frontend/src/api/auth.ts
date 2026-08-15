@@ -15,6 +15,11 @@ export function updateEmail(email: string): Promise<Me> {
   return api<Me>('/api/me/email', { method: 'PUT', json: { email } });
 }
 
+// A pending applicant submits their required email + optional message. Returns the updated Me.
+export function submitApplication(email: string, note: string): Promise<Me> {
+  return api<Me>('/api/me/application', { method: 'PUT', json: { email, note } });
+}
+
 export function localLogin(username: string, password: string): Promise<void> {
   return api<void>('/api/auth/login', { method: 'POST', form: { username, password } });
 }
