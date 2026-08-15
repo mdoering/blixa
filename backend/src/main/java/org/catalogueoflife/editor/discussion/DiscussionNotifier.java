@@ -1,5 +1,6 @@
 package org.catalogueoflife.editor.discussion;
 
+import org.catalogueoflife.editor.notify.EmailService;
 import org.catalogueoflife.editor.user.AppUser;
 import org.catalogueoflife.editor.user.AppUserMapper;
 import org.springframework.beans.factory.annotation.Value;

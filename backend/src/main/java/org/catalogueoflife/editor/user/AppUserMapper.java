@@ -53,4 +53,10 @@ public interface AppUserMapper {
   // Stamp the personal-dashboard "last seen" marker to now(), resetting the "new pings" count.
   @Update("UPDATE app_user SET dashboard_seen_at = now() WHERE id = #{id}")
   void touchDashboardSeen(int id);
+
+  @Select("""
+      SELECT * FROM app_user
+      WHERE admin = true AND state = 'ACTIVE' AND email IS NOT NULL AND email <> ''
+      """)
+  java.util.List<AppUser> findActiveAdminsWithEmail();
 }

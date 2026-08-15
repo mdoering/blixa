@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.catalogueoflife.editor.notify.EmailService;
 import org.catalogueoflife.editor.project.ProjectMember;
 import org.catalogueoflife.editor.project.ProjectMemberMapper;
 import org.catalogueoflife.editor.project.Role;

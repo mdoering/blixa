@@ -1,4 +1,4 @@
-package org.catalogueoflife.editor.discussion;
+package org.catalogueoflife.editor.notify;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
