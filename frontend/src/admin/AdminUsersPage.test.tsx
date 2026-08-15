@@ -6,9 +6,9 @@ import { server, http, HttpResponse } from '../test/server';
 import AdminUsersPage from './AdminUsersPage';
 
 const USERS = [
-  { id: 1, username: 'me-admin', orcid: '0000-0001-0000-0001', displayName: 'Me Admin', state: 'ACTIVE', admin: true },
-  { id: 2, username: '0000-0003-1111-2222', orcid: '0000-0003-1111-2222', displayName: 'Pending Person', state: 'PENDING', admin: false },
-  { id: 3, username: 'active-user', orcid: null, displayName: 'Active User', state: 'ACTIVE', admin: false },
+  { id: 1, username: 'me-admin', orcid: '0000-0001-0000-0001', displayName: 'Me Admin', email: 'admin@example.org', applicationNote: null, state: 'ACTIVE', admin: true },
+  { id: 2, username: '0000-0003-1111-2222', orcid: '0000-0003-1111-2222', displayName: 'Pending Person', email: 'pending@example.org', applicationNote: 'I curate beetles', state: 'PENDING', admin: false },
+  { id: 3, username: 'active-user', orcid: null, displayName: 'Active User', email: null, applicationNote: null, state: 'ACTIVE', admin: false },
 ];
 
 describe('AdminUsersPage', () => {
@@ -52,5 +52,11 @@ describe('AdminUsersPage', () => {
     const toggle = await screen.findByRole('switch', { name: /admin-active-user/i });
     await userEvent.click(toggle);
     await waitFor(() => expect(posted).toEqual({ admin: true }));
+  });
+
+  it('shows email and application message', async () => {
+    render(<AdminUsersPage />);
+    expect(await screen.findByText('pending@example.org')).toBeInTheDocument();
+    expect(screen.getByText('I curate beetles')).toBeInTheDocument();
   });
 });

@@ -48,6 +48,8 @@ export default function AdminUsersPage() {
           <Table.Tr>
             <Table.Th>User</Table.Th>
             <Table.Th>ORCID</Table.Th>
+            <Table.Th>Email</Table.Th>
+            <Table.Th>Message</Table.Th>
             <Table.Th>Status</Table.Th>
             <Table.Th>Admin</Table.Th>
             <Table.Th />
@@ -67,6 +69,16 @@ export default function AdminUsersPage() {
                   )}
                 </Table.Td>
                 <Table.Td>{u.orcid ?? '—'}</Table.Td>
+                <Table.Td>{u.email || '—'}</Table.Td>
+                <Table.Td>
+                  {u.applicationNote ? (
+                    <Text size="xs" style={{ maxWidth: 260, whiteSpace: 'pre-wrap' }}>
+                      {u.applicationNote}
+                    </Text>
+                  ) : (
+                    '—'
+                  )}
+                </Table.Td>
                 <Table.Td>
                   <Badge color={STATE_COLOR[u.state] ?? 'gray'} variant="light">
                     {u.state}

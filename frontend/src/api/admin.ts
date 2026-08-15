@@ -5,6 +5,8 @@ export interface AdminUser {
   username: string;
   orcid: string | null;
   displayName: string | null;
+  email: string | null;
+  applicationNote: string | null;
   state: string; // PENDING | ACTIVE | DISABLED
   admin: boolean;
 }
