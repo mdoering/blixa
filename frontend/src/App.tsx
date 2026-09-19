@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import LoginPage from './auth/LoginPage';
 import RequireAuth from './auth/RequireAuth';
+import InviteAcceptPage from './invite/InviteAcceptPage';
 import AppLayout from './components/AppLayout';
 import PublicLayout from './components/PublicLayout';
 import LandingPage from './pages/LandingPage';
@@ -28,6 +29,9 @@ export default function App() {
       {/* /login is a backend path (Spring OAuth2 callback + local-login POST, proxied to the API in
           both dev and prod), so the SPA login page lives at /signin to avoid being shadowed. */}
       <Route path="/signin" element={<LoginPage />} />
+      {/* Emailed project invitations: public (works signed out), outside RequireAuth so a brand-new
+          PENDING account can accept rather than hit the approval gate. */}
+      <Route path="/invite/:token" element={<InviteAcceptPage />} />
       <Route element={<PublicLayout />}>
         <Route index element={<LandingPage />} />
         <Route path="p/:idOrAlias" element={<PublicProjectPage />} />
