@@ -26,16 +26,23 @@ public class EmailService {
   }
 
   public void send(String to, String subject, String text) {
+    send(to, null, null, subject, text);
+  }
+
+  // cc / replyTo are optional: null or blank -> the header is simply not set.
+  public void send(String to, String cc, String replyTo, String subject, String text) {
     if (to == null || to.isBlank()) return;
     JavaMailSender sender = mailSender.getIfAvailable();
     if (sender == null || from == null || from.isBlank()) {
-      log.info("email suppressed (mail not configured): to={} subject=\"{}\"", to, subject);
+      log.info("email suppressed (mail not configured): to={} cc={} subject=\"{}\"", to, cc, subject);
       return;
     }
     try {
       SimpleMailMessage msg = new SimpleMailMessage();
       msg.setFrom(from);
       msg.setTo(to);
+      if (cc != null && !cc.isBlank()) msg.setCc(cc);
+      if (replyTo != null && !replyTo.isBlank()) msg.setReplyTo(replyTo);
       msg.setSubject(subject);
       msg.setText(text);
       sender.send(msg);
