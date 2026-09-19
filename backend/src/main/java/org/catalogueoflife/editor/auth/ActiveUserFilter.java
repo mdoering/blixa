@@ -15,9 +15,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 // Blocks authenticated but non-ACTIVE accounts (PENDING/DISABLED) from the protected API with a 403,
-// EXCEPT /api/me, /api/me/application and logout -- so a pending user can still load the SPA, see
-// the "awaiting admin approval" screen, submit their access request, and log out. The permitAll
-// surface (public/auth/ping/config) is skipped.
+// EXCEPT /api/me, /api/me/application, logout and /api/invitations/** -- so a pending user can still
+// load the SPA, see the "awaiting admin approval" screen, submit their access request, accept a
+// project invitation (which activates them; InvitationService rejects DISABLED accounts itself), and
+// log out. The permitAll surface (public/auth/ping/config) is skipped.
 public class ActiveUserFilter extends OncePerRequestFilter {
 
   private static final Set<String> ALLOW =
@@ -34,7 +35,8 @@ public class ActiveUserFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
     String path = req.getRequestURI();
     boolean gated = path.startsWith("/api/") && !ALLOW.contains(path)
-        && !path.startsWith("/api/public/") && !path.startsWith("/api/auth/");
+        && !path.startsWith("/api/public/") && !path.startsWith("/api/auth/")
+        && !path.startsWith("/api/invitations/");
     Authentication a = SecurityContextHolder.getContext().getAuthentication();
     if (gated && a != null && a.isAuthenticated() && !(a instanceof AnonymousAuthenticationToken)) {
       AppUser u = users.findByUsernameOrOrcid(a.getName());

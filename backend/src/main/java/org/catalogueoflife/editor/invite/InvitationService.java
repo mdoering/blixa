@@ -7,8 +7,14 @@ import java.util.Base64;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.catalogueoflife.editor.invite.dto.CreateInvitationRequest;
+import org.catalogueoflife.editor.invite.dto.InvitationPreview;
+import org.catalogueoflife.editor.project.ProjectMember;
+import org.catalogueoflife.editor.project.ProjectMemberMapper;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
+import org.catalogueoflife.editor.user.AppUser;
+import org.catalogueoflife.editor.user.AppUserMapper;
+import org.catalogueoflife.editor.user.UserState;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,10 +33,15 @@ public class InvitationService {
 
   private final InvitationMapper invitations;
   private final ProjectService projectService;
+  private final AppUserMapper users;
+  private final ProjectMemberMapper members;
 
-  public InvitationService(InvitationMapper invitations, ProjectService projectService) {
+  public InvitationService(InvitationMapper invitations, ProjectService projectService,
+      AppUserMapper users, ProjectMemberMapper members) {
     this.invitations = invitations;
     this.projectService = projectService;
+    this.users = users;
+    this.members = members;
   }
 
   @Transactional
@@ -80,6 +91,55 @@ public class InvitationService {
     if (invitations.deletePending(projectId, id) == 0) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "invitation not found");
     }
+  }
+
+  public InvitationPreview preview(String token) {
+    ProjectInvitation inv = requireByToken(token);
+    String status = inv.getAcceptedAt() != null ? "ACCEPTED" : inv.isExpired() ? "EXPIRED" : "VALID";
+    return new InvitationPreview(inv.getProjectTitle(), inv.getInvitedByName(), inv.getRole(),
+        inv.getMessage(), status);
+  }
+
+  // The signed-in user redeems the link. The owner's invitation vouches for them: a PENDING account
+  // becomes ACTIVE (no admin approval), and a blank account email is filled from the invitation (it
+  // demonstrably reached them). An existing member keeps their role -- an invitation never downgrades.
+  // A DISABLED account stays locked out: an invite must not undo an admin's decision.
+  @Transactional
+  public int accept(int userId, String token) {
+    ProjectInvitation inv = requireByToken(token);
+    if (inv.getAcceptedAt() != null || inv.isExpired()) {
+      throw new ResponseStatusException(HttpStatus.GONE, "this invitation has expired or was already used");
+    }
+    AppUser user = users.findById(userId);
+    if (UserState.DISABLED.name().equals(user.getState())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "account disabled");
+    }
+    if (invitations.markAccepted(inv.getId(), userId) == 0) {
+      // lost a race with a concurrent accept of the same link
+      throw new ResponseStatusException(HttpStatus.GONE, "this invitation has expired or was already used");
+    }
+    boolean changed = false;
+    if (UserState.PENDING.name().equals(user.getState())) {
+      user.setState(UserState.ACTIVE.name());
+      changed = true;
+    }
+    if (user.getEmail() == null || user.getEmail().isBlank()) {
+      user.setEmail(inv.getEmail());
+      changed = true;
+    }
+    if (changed) users.update(user);
+    if (members.findRole(inv.getProjectId(), userId) == null) {
+      members.upsert(new ProjectMember(inv.getProjectId(), userId, inv.getRole()));
+    }
+    return inv.getProjectId();
+  }
+
+  private ProjectInvitation requireByToken(String token) {
+    ProjectInvitation inv = token == null ? null : invitations.findByToken(token);
+    if (inv == null) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "invitation not found");
+    }
+    return inv;
   }
 
   // 32 random bytes, base64url without padding (43 chars) -- the link is the credential.
