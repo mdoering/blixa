@@ -78,6 +78,11 @@ export const server = setupServer(
   // need this mocked per-test unless it cares about the actual nested groups.
   http.get('/api/projects/:pid/usages/:id/synonymy', () =>
     HttpResponse.json({ homotypic: [], heterotypicGroups: [], misapplied: [] })),
+  // Default all-zero tab counts, so any TaxonDetail render shows plain tab labels unless a test
+  // mocks specific counts.
+  http.get('/api/projects/:pid/usages/:id/counts', () =>
+    HttpResponse.json({ synonyms: 0, nameRelations: 0, typeMaterial: 0, vernaculars: 0,
+      distributions: 0, media: 0, estimates: 0, properties: 0, issues: 0, discussions: 0 })),
   // Default empty pending-invitations list, so any owner-role render of MembersPage doesn't need
   // this mocked per-test unless it asserts the list.
   http.get('/api/projects/:pid/invitations', () => HttpResponse.json([])),

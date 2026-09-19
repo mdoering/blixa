@@ -184,6 +184,29 @@ export function getAccepted(pid: number, id: number): Promise<NameUsage[]> {
   return api<NameUsage[]>(`/api/projects/${pid}/usages/${id}/accepted`);
 }
 
+// Record counts behind each TaxonDetail tab (GET .../usages/{id}/counts); `properties` backs the
+// Biology tab. References aren't counted here -- the usage's own referenceId list already gives it.
+export interface UsageCounts {
+  synonyms: number;
+  nameRelations: number;
+  typeMaterial: number;
+  vernaculars: number;
+  distributions: number;
+  media: number;
+  estimates: number;
+  properties: number;
+  issues: number;
+  discussions: number;
+}
+
+// Nested under ['usage', pid, id] so every existing invalidation of the usage (all child-entity
+// tab mutations do one) refreshes the counts too.
+export const usageCountsKey = (pid: number, id: number) => ['usage', pid, id, 'counts'] as const;
+
+export function getUsageCounts(pid: number, id: number): Promise<UsageCounts> {
+  return api<UsageCounts>(`/api/projects/${pid}/usages/${id}/counts`);
+}
+
 // Matches a single usage against the published COL checklist (backend ColMatchService, GET
 // .../col-match) -- best match first (matchType = the CLB response's overall match type, e.g.
 // EXACT), followed by each of its alternatives (matchType "ALTERNATIVE"). Empty array when

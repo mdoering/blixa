@@ -27,6 +27,7 @@ import org.catalogueoflife.editor.name.dto.LinkGeneraResponse;
 import org.catalogueoflife.editor.name.dto.NameUsageResponse;
 import org.catalogueoflife.editor.name.dto.PromoteRequest;
 import org.catalogueoflife.editor.name.dto.ReferenceIdsRequest;
+import org.catalogueoflife.editor.name.dto.UsageCounts;
 import org.catalogueoflife.editor.name.dto.TaxonInfoRequest;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.UsagePage;
@@ -182,6 +183,14 @@ public class NameUsageService {
         .map(sid -> toResponse(requireInProject(projectId, sid), project))
         .sorted(Comparator.comparing(NameUsageResponse::scientificName, Comparator.nullsLast(String::compareTo)))
         .toList();
+  }
+
+  // Record counts behind each TaxonDetail tab. Any project member may read; 404 if `id` isn't in
+  // the project.
+  public UsageCounts counts(int userId, int projectId, int id) {
+    projects.requireRole(userId, projectId);
+    requireInProject(projectId, id);
+    return usages.countTabRecords(projectId, id);
   }
 
   // The accepted usages that `id` points to (synonym_accepted.synonym_id = id), ordered by

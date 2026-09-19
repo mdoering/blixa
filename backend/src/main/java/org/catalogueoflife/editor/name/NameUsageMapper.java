@@ -12,6 +12,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.catalogueoflife.editor.name.dto.RankName;
 import org.catalogueoflife.editor.name.dto.ScoredId;
+import org.catalogueoflife.editor.name.dto.UsageCounts;
 
 @Mapper
 public interface NameUsageMapper {
@@ -282,6 +283,25 @@ public interface NameUsageMapper {
   @ResultMap("nameUsageResult")
   List<NameUsage> findSynonymsOfAccepted(@Param("projectId") int projectId,
       @Param("acceptedId") int acceptedId);
+
+  // Per-tab record counts for one usage in a single round trip (the TaxonDetail tab labels). Each
+  // subquery mirrors the WHERE of the list its tab shows: synonyms = synonym_accepted rows pointing
+  // at it (incl. misapplied), relations = those it owns (usage_id), issues = all statuses (IssueList).
+  @Select("""
+      SELECT
+        (SELECT count(*) FROM synonym_accepted WHERE project_id = #{projectId} AND accepted_id = #{id}) AS synonyms,
+        (SELECT count(*) FROM name_relation WHERE project_id = #{projectId} AND usage_id = #{id}) AS name_relations,
+        (SELECT count(*) FROM type_material WHERE project_id = #{projectId} AND usage_id = #{id}) AS type_material,
+        (SELECT count(*) FROM vernacular WHERE project_id = #{projectId} AND usage_id = #{id}) AS vernaculars,
+        (SELECT count(*) FROM distribution WHERE project_id = #{projectId} AND usage_id = #{id}) AS distributions,
+        (SELECT count(*) FROM media WHERE project_id = #{projectId} AND usage_id = #{id}) AS media,
+        (SELECT count(*) FROM estimate WHERE project_id = #{projectId} AND usage_id = #{id}) AS estimates,
+        (SELECT count(*) FROM property WHERE project_id = #{projectId} AND usage_id = #{id}) AS properties,
+        (SELECT count(*) FROM issue WHERE project_id = #{projectId} AND entity_type = 'name_usage'
+           AND entity_id = #{id}) AS issues,
+        (SELECT count(*) FROM discussion_usage WHERE project_id = #{projectId} AND usage_id = #{id}) AS discussions
+      """)
+  UsageCounts countTabRecords(@Param("projectId") int projectId, @Param("id") int id);
 
   // Scientific name of the nearest STRICT ancestor of rank genus (depth > 0 skips the node itself),
   // or null if there is none -- the classification genus that GenusMismatchRule compares a usage's

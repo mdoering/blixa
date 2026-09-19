@@ -25,7 +25,14 @@ import { ApiError, messageFor } from '../api/client';
 import { getProject } from '../api/projects';
 import { getVocab } from '../api/coldp';
 import { listLocks } from '../api/locks';
-import { getUsage, searchUsages, updateGenusId, updateUsage } from '../api/usages';
+import {
+  getUsage,
+  getUsageCounts,
+  searchUsages,
+  updateGenusId,
+  updateUsage,
+  usageCountsKey,
+} from '../api/usages';
 import { getAiConfig } from '../api/ai';
 import { revalidateSubtree } from '../api/issues';
 import { getReference } from '../api/references';
@@ -84,6 +91,12 @@ const NAME_TYPE_LABEL: Record<string, string> = {
   IDENTIFIER: 'Identifier',
   OTHER: 'Other / unparsable',
 };
+
+// A tab label with its record count in brackets, e.g. "Synonyms (3)"; the count is omitted when
+// zero or not (yet) known.
+function tabLabel(name: string, count: number | undefined): string {
+  return count ? `${name} (${count})` : name;
+}
 
 // The name-quality warning for a usage: a hard flag when it isn't a scientific name at all, else a
 // softer one when a scientific name only partially parsed. Null when the name atomised cleanly.
@@ -273,6 +286,10 @@ export default function TaxonDetail({ pid, usageId, onNavigate }: TaxonDetailPro
     queryFn: () => getUsage(pid, usageId),
   });
   const usage = usageQuery.data;
+  const { data: counts } = useQuery({
+    queryKey: usageCountsKey(pid, usageId),
+    queryFn: () => getUsageCounts(pid, usageId),
+  });
 
   useEffect(() => {
     if (usage) {
@@ -379,6 +396,7 @@ export default function TaxonDetail({ pid, usageId, onNavigate }: TaxonDetailPro
     mutationFn: () => revalidateSubtree(pid, usageId),
     onSuccess: async (summary) => {
       await queryClient.invalidateQueries({ queryKey: ['usageIssues', pid, usageId] });
+      await queryClient.invalidateQueries({ queryKey: usageCountsKey(pid, usageId) });
       await queryClient.invalidateQueries({ queryKey: ['issueSummary', pid] });
       const errors = summary.bySeverity.error ?? 0;
       const warnings = summary.bySeverity.warning ?? 0;
@@ -531,17 +549,21 @@ export default function TaxonDetail({ pid, usageId, onNavigate }: TaxonDetailPro
       <Tabs value={activeTab} onChange={setActiveTab} keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="details">Details</Tabs.Tab>
-          {isAccepted && <Tabs.Tab value="synonyms">Synonyms</Tabs.Tab>}
-          <Tabs.Tab value="names">Relations</Tabs.Tab>
-          <Tabs.Tab value="types">Types</Tabs.Tab>
-          {isAccepted && <Tabs.Tab value="vernaculars">Vernaculars</Tabs.Tab>}
-          {isAccepted && <Tabs.Tab value="distribution">Distribution</Tabs.Tab>}
-          {isAccepted && <Tabs.Tab value="media">Media</Tabs.Tab>}
-          {isAccepted && <Tabs.Tab value="estimates">Estimates</Tabs.Tab>}
-          {isAccepted && <Tabs.Tab value="properties">Biology</Tabs.Tab>}
-          <Tabs.Tab value="issues">Issues</Tabs.Tab>
-          <Tabs.Tab value="references">References</Tabs.Tab>
-          <Tabs.Tab value="discussions">Discussions</Tabs.Tab>
+          {isAccepted && <Tabs.Tab value="synonyms">{tabLabel('Synonyms', counts?.synonyms)}</Tabs.Tab>}
+          <Tabs.Tab value="names">{tabLabel('Relations', counts?.nameRelations)}</Tabs.Tab>
+          <Tabs.Tab value="types">{tabLabel('Types', counts?.typeMaterial)}</Tabs.Tab>
+          {isAccepted && (
+            <Tabs.Tab value="vernaculars">{tabLabel('Vernaculars', counts?.vernaculars)}</Tabs.Tab>
+          )}
+          {isAccepted && (
+            <Tabs.Tab value="distribution">{tabLabel('Distribution', counts?.distributions)}</Tabs.Tab>
+          )}
+          {isAccepted && <Tabs.Tab value="media">{tabLabel('Media', counts?.media)}</Tabs.Tab>}
+          {isAccepted && <Tabs.Tab value="estimates">{tabLabel('Estimates', counts?.estimates)}</Tabs.Tab>}
+          {isAccepted && <Tabs.Tab value="properties">{tabLabel('Biology', counts?.properties)}</Tabs.Tab>}
+          <Tabs.Tab value="issues">{tabLabel('Issues', counts?.issues)}</Tabs.Tab>
+          <Tabs.Tab value="references">{tabLabel('References', usage.referenceId?.length)}</Tabs.Tab>
+          <Tabs.Tab value="discussions">{tabLabel('Discussions', counts?.discussions)}</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="details" pt="md">

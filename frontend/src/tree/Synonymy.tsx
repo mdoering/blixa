@@ -3,7 +3,7 @@ import { IconDots, IconGitMerge, IconPlus } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { getSynonymy, type SynEntry } from '../api/usages';
+import { getSynonymy, usageCountsKey, type SynEntry } from '../api/usages';
 import HomotypicGroupModal from './HomotypicGroupModal';
 import BulkAddModal from '../names/BulkAddModal';
 
@@ -109,7 +109,10 @@ export default function Synonymy({ pid, usageId, canEdit = false, acceptedName }
         opened={bulkOpen}
         fixedMode="synonyms"
         onClose={closeBulk}
-        onDone={() => queryClient.invalidateQueries({ queryKey: ['synonymy', pid, usageId] })}
+        onDone={() => {
+          queryClient.invalidateQueries({ queryKey: ['synonymy', pid, usageId] });
+          queryClient.invalidateQueries({ queryKey: usageCountsKey(pid, usageId) });
+        }}
       />
     </Stack>
   );

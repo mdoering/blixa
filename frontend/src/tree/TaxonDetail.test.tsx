@@ -137,6 +137,27 @@ test('shows the full name with authorship as a heading above the form', async ()
   ).toBeInTheDocument();
 });
 
+test('tab labels show their record counts in brackets, omitting zero counts', async () => {
+  mockCommon(baseUsage({ referenceId: [5, 6] }));
+  server.use(
+    http.get('/api/projects/4/usages/10/counts', () =>
+      HttpResponse.json({ synonyms: 3, nameRelations: 0, typeMaterial: 1, vernaculars: 2,
+        distributions: 0, media: 0, estimates: 0, properties: 4, issues: 0, discussions: 1 })),
+  );
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  expect(await screen.findByRole('tab', { name: 'Synonyms (3)' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Types (1)' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Vernaculars (2)' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Biology (4)' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Discussions (1)' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'References (2)' })).toBeInTheDocument();
+  // zero counts keep the bare name
+  expect(screen.getByRole('tab', { name: 'Relations' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Distribution' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Issues' })).toBeInTheDocument();
+});
+
 test('editing authorship and saving PUTs the update with the loaded version', async () => {
   mockCommon();
   let putBody: Record<string, unknown> | undefined;

@@ -16,6 +16,7 @@ import org.catalogueoflife.editor.name.dto.PromoteRequest;
 import org.catalogueoflife.editor.name.dto.ReferenceIdsRequest;
 import org.catalogueoflife.editor.name.dto.TaxonInfoRequest;
 import org.catalogueoflife.editor.name.dto.UpdateNameUsageRequest;
+import org.catalogueoflife.editor.name.dto.UsageCounts;
 import org.catalogueoflife.editor.name.dto.UsagePage;
 import org.catalogueoflife.editor.name.dto.WebReferenceRequest;
 import org.springframework.http.HttpStatus;
@@ -131,6 +132,13 @@ public class NameUsageController {
   public List<NameUsageResponse> listSynonyms(@PathVariable int pid, @PathVariable int id) {
     int uid = currentUser.require().getId();
     return service.listSynonyms(uid, pid, id);
+  }
+
+  // Record counts for the TaxonDetail tab labels ("Synonyms (3)").
+  @GetMapping("/{id}/counts")
+  public UsageCounts counts(@PathVariable int pid, @PathVariable int id) {
+    int uid = currentUser.require().getId();
+    return service.counts(uid, pid, id);
   }
 
   @GetMapping("/{id}/accepted")
