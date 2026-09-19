@@ -417,3 +417,52 @@ test('bulk status change is greyed out when the selection mixes statuses', async
   expect(await screen.findByRole('button', { name: /merge 2 selected/i })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /change status/i })).toBeDisabled();
 });
+
+test('select all matching: a status-filtered selection spanning pages posts the filter', async () => {
+  let posted: unknown = null;
+  const una1 = { ...abiesAlba, status: 'UNASSESSED' };
+  const una2 = { ...abiesNigra, status: 'UNASSESSED' };
+  server.use(
+    http.get('/api/projects/9', () => HttpResponse.json(project)),
+    http.get('/api/projects/9/usages', () => HttpResponse.json({ items: [una1, una2], total: 25 })),
+    http.post('/api/projects/9/usages/bulk-status', async ({ request }) => {
+      posted = await request.json();
+      return HttpResponse.json({ changed: 25 });
+    }),
+  );
+  renderPage();
+  await screen.findByText('Abies alba');
+  await userEvent.click(screen.getByPlaceholderText('Status'));
+  await userEvent.click(await screen.findByRole('option', { name: 'Unassessed' }));
+
+  // tick the whole page ([0] is the header select-all), then widen to every match
+  await userEvent.click(screen.getAllByRole('checkbox')[0]);
+  await userEvent.click(await screen.findByRole('button', { name: /select all 25 matching/i }));
+  expect(await screen.findByText(/all 25 matching names are selected/i)).toBeInTheDocument();
+  // merging needs concrete rows, so it's not offered for a filter selection
+  expect(screen.queryByRole('button', { name: /merge/i })).not.toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: /mark 25 as accepted/i }));
+  await waitFor(() =>
+    expect(posted).toEqual({ filter: { status: 'UNASSESSED' }, status: 'ACCEPTED' }),
+  );
+});
+
+test('select all matching needs a status filter to know the target status', async () => {
+  server.use(
+    http.get('/api/projects/9', () => HttpResponse.json(project)),
+    http.get('/api/projects/9/usages', () =>
+      HttpResponse.json({ items: [abiesAlba, { ...abiesNigra, status: 'ACCEPTED' }], total: 25 }),
+    ),
+  );
+  renderPage();
+  await screen.findByText('Abies alba');
+
+  await userEvent.click(screen.getAllByRole('checkbox')[0]);
+  await userEvent.click(await screen.findByRole('button', { name: /select all 25 matching/i }));
+  expect(screen.getByRole('button', { name: /change status/i })).toBeDisabled();
+
+  // clearing the selection leaves the filter mode
+  await userEvent.click(screen.getByRole('button', { name: /clear selection/i }));
+  expect(screen.queryByText(/all 25 matching names are selected/i)).not.toBeInTheDocument();
+});

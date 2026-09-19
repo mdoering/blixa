@@ -130,3 +130,34 @@ test('a confirmed delete calls onAfterDelete with the deleted usage id', async (
 
   await waitFor(() => expect(onAfterDelete).toHaveBeenCalledWith(10));
 });
+
+test('"Accept subtree…" accepts the unassessed names below after confirmation', async () => {
+  let posted: unknown = null;
+  server.use(
+    http.post('/api/projects/3/usages/bulk-status', async ({ request }) => {
+      posted = await request.json();
+      return HttpResponse.json({ changed: 4 });
+    }),
+  );
+  renderWithProviders(
+    <NameActionMenu pid={3} usage={{ ...usage, status: 'UNASSESSED' }} canEdit onSelect={() => {}} />,
+  );
+
+  await userEvent.click(screen.getByLabelText('Actions'));
+  await userEvent.click(await screen.findByText('Accept subtree…'));
+
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog).toHaveTextContent('Panthera leo');
+  expect(posted).toBeNull(); // not yet -- still awaiting confirmation
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Accept' }));
+
+  await waitFor(() => expect(posted).toEqual({ subtreeOf: 10, status: 'ACCEPTED' }));
+  expect(await screen.findByText('4 names accepted')).toBeInTheDocument();
+});
+
+test('"Accept subtree…" is offered on taxa only, not on synonyms', async () => {
+  renderWithProviders(<NameActionMenu pid={3} usage={synonymUsage} canEdit onSelect={() => {}} />);
+  await userEvent.click(screen.getByLabelText('Actions'));
+  await screen.findByText('Delete');
+  expect(screen.queryByText('Accept subtree…')).not.toBeInTheDocument();
+});

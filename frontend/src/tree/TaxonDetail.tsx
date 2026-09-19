@@ -34,6 +34,7 @@ import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import CurieId from '../components/CurieId';
 import InfoLabel from '../components/InfoLabel';
 import ClassificationBar from './ClassificationBar';
+import NameHeader from './NameHeader';
 import EntitySelect from '../child/EntitySelect';
 import NameRelationsTab, { referenceOptions } from '../child/NameRelationsTab';
 import { colIdFrom, scopedId, withScopedId } from '../child/map/mapUrls';
@@ -463,40 +464,50 @@ export default function TaxonDetail({ pid, usageId, onNavigate }: TaxonDetailPro
 
   return (
     <Box>
-      <Group justify="flex-end" mb="xs">
-        {canEdit && (
-          <ActionIcon
-            variant="light"
-            size="lg"
-            color="gray"
-            aria-label="Revalidate this group"
-            title="Revalidate this group (recompute the subtree's issues)"
-            loading={revalidateMutation.isPending}
-            onClick={() => revalidateMutation.mutate()}
-          >
-            <IconRefresh size={18} />
-          </ActionIcon>
-        )}
-        {canEdit && aiConfig?.available && (
-          <ActionIcon
-            variant="light"
-            size="lg"
-            aria-label="AI suggestions"
-            title="AI suggestions"
-            onClick={() => setAiOpen(true)}
-          >
-            <IconBrain size={18} />
-          </ActionIcon>
-        )}
-        <Button
-          variant="default"
-          size="xs"
-          leftSection={<IconWorld size={14} />}
-          onClick={() => setCompareOpen(true)}
-        >
-          Compare with CLB…
-        </Button>
-      </Group>
+      <Box mb="xs">
+        <NameHeader
+          pid={pid}
+          usage={usage}
+          canEdit={canEdit}
+          onNavigate={onNavigate}
+          actions={
+            <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+              {canEdit && (
+                <ActionIcon
+                  variant="light"
+                  size="lg"
+                  color="gray"
+                  aria-label="Revalidate this group"
+                  title="Revalidate this group (recompute the subtree's issues)"
+                  loading={revalidateMutation.isPending}
+                  onClick={() => revalidateMutation.mutate()}
+                >
+                  <IconRefresh size={18} />
+                </ActionIcon>
+              )}
+              {canEdit && aiConfig?.available && (
+                <ActionIcon
+                  variant="light"
+                  size="lg"
+                  aria-label="AI suggestions"
+                  title="AI suggestions"
+                  onClick={() => setAiOpen(true)}
+                >
+                  <IconBrain size={18} />
+                </ActionIcon>
+              )}
+              <Button
+                variant="default"
+                size="xs"
+                leftSection={<IconWorld size={14} />}
+                onClick={() => setCompareOpen(true)}
+              >
+                Compare with CLB…
+              </Button>
+            </Group>
+          }
+        />
+      </Box>
       <CompareClbModal
         pid={pid}
         usageId={usageId}

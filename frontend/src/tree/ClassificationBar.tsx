@@ -4,9 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { getPath } from '../api/tree';
+import { getUsage } from '../api/usages';
 import type { NameUsage } from '../api/types';
 import MoveNameModal from './MoveNameModal';
-import ChangeAcceptedModal from './ChangeAcceptedModal';
 
 // How many of the closest ancestors to show before collapsing the rest behind a leading "…".
 const MAX_CRUMBS = 4;
@@ -21,20 +21,27 @@ export interface ClassificationBarProps {
 }
 
 // A one-line classification of the focal taxon shown in the edit form: the closest ancestors
-// (higher ones collapsed into "…"), each a link, ending at the direct parent which carries a
-// change icon opening the move flow (reparent an accepted taxon, or change a synonym's accepted
-// name). The path shown is that of the focal taxon's *parent*: parent_id for a tree node, or the
-// (primary) accepted name for a synonym/misapplied usage -- so getPath's accepted-only walk always
-// applies and the last entry is the direct parent, not the focal taxon itself.
+// (higher ones collapsed into "…"), each a link. For a tree node (accepted or unassessed) the path
+// is that of its *parent*, ending at the direct parent, which carries a change icon opening the
+// reparent flow. A synonym/misapplied usage shows the classification of its (primary) accepted
+// name instead -- the path of that name's parent, since the accepted name itself (and the icon
+// re-pointing the synonym) sits on NameHeader's "Synonym of" line right above.
 export default function ClassificationBar({ pid, usage, canEdit, onNavigate }: ClassificationBarProps) {
   const isSynonym = usage.status === 'SYNONYM' || usage.status === 'MISAPPLIED';
   // a tree node (accepted or unassessed "provisionally accepted") -- reparentable, and its path is
-  // the parent_id chain; a synonym/misapplied usage's "parent" is its accepted name instead.
+  // the parent_id chain.
   const isTaxon = usage.status === 'ACCEPTED' || usage.status === 'UNASSESSED';
-  const anchorId = isSynonym ? usage.acceptedParentIds?.[0] ?? null : usage.parentId;
+  const acceptedId = isSynonym ? usage.acceptedParentIds?.[0] ?? null : null;
 
   const [moveOpen, setMoveOpen] = useState(false);
-  const [changeOpen, setChangeOpen] = useState(false);
+
+  // Same ['usage', pid, id] key as NameHeader/TaxonDetail, so this is served from their cache.
+  const { data: accepted } = useQuery({
+    queryKey: ['usage', pid, acceptedId],
+    queryFn: () => getUsage(pid, acceptedId as number),
+    enabled: acceptedId != null,
+  });
+  const anchorId = isSynonym ? accepted?.parentId ?? null : usage.parentId;
 
   const { data: path, isLoading } = useQuery({
     queryKey: ['treePath', pid, anchorId],
@@ -50,8 +57,7 @@ export default function ClassificationBar({ pid, usage, canEdit, onNavigate }: C
   const truncated = full.length > MAX_CRUMBS;
   const shown = truncated ? full.slice(full.length - MAX_CRUMBS) : full;
   const lastIndex = shown.length - 1;
-  // the change icon reparents a taxon (accepted or unassessed) or re-links a synonym.
-  const canChange = canEdit && (isTaxon || isSynonym);
+  const canChange = canEdit && isTaxon;
 
   const crumbs: ReactNode[] = [];
   if (truncated) crumbs.push(<Text key="ellipsis" size="sm" c="dimmed">…</Text>);
@@ -87,13 +93,13 @@ export default function ClassificationBar({ pid, usage, canEdit, onNavigate }: C
     <Group gap={6} wrap="wrap" align="center" mb="xs">
       {crumbs}
       {canChange && (
-        <Tooltip label={isSynonym ? 'Change accepted name' : 'Move to another parent'} withArrow>
+        <Tooltip label="Move to another parent" withArrow>
           <ActionIcon
             variant="subtle"
             color="gray"
             size="sm"
             aria-label="Change parent"
-            onClick={() => (isSynonym ? setChangeOpen(true) : setMoveOpen(true))}
+            onClick={() => setMoveOpen(true)}
           >
             <IconArrowsExchange size={15} />
           </ActionIcon>
@@ -105,15 +111,6 @@ export default function ClassificationBar({ pid, usage, canEdit, onNavigate }: C
           usage={{ id: usage.id, scientificName: usage.scientificName }}
           opened={moveOpen}
           onClose={() => setMoveOpen(false)}
-        />
-      )}
-      {isSynonym && (
-        <ChangeAcceptedModal
-          pid={pid}
-          usage={{ id: usage.id, scientificName: usage.scientificName }}
-          currentAcceptedId={anchorId}
-          opened={changeOpen}
-          onClose={() => setChangeOpen(false)}
         />
       )}
     </Group>

@@ -4,58 +4,7 @@ import { expect, test, vi } from 'vitest';
 import { renderWithProviders } from '../test/utils';
 import { server, http, HttpResponse } from '../test/server';
 import ClassificationBar from './ClassificationBar';
-import type { NameUsage } from '../api/types';
-
-function makeUsage(partial: Partial<NameUsage>): NameUsage {
-  return {
-    id: 200,
-    parentId: null,
-    status: 'ACCEPTED',
-    scientificName: 'Panthera leo',
-    authorship: null,
-    rank: 'species',
-    acceptedParentIds: null,
-    synonymIds: null,
-    version: 0,
-    // remaining fields are unused by ClassificationBar
-    namePhrase: null,
-    referenceId: null,
-    extinct: null,
-    environment: null,
-    temporalRangeStart: null,
-    temporalRangeEnd: null,
-    uninomial: null,
-    genus: null,
-    infragenericEpithet: null,
-    specificEpithet: 'leo',
-    infraspecificEpithet: null,
-    cultivarEpithet: null,
-    notho: null,
-    combinationAuthorship: null,
-    combinationExAuthorship: null,
-    combinationAuthorshipYear: null,
-    basionymAuthorship: null,
-    basionymExAuthorship: null,
-    basionymAuthorshipYear: null,
-    sanctioningAuthor: null,
-    nomStatus: null,
-    publishedInReferenceId: null,
-    publishedInYear: null,
-    publishedInPage: null,
-    publishedInPageLink: null,
-    gender: null,
-    genderAgreement: null,
-    genusGender: null,
-    genusId: null,
-    genusName: null,
-    etymology: null,
-    nameType: null,
-    parseState: null,
-    remarks: null,
-    formattedName: null,
-    ...partial,
-  } as NameUsage;
-}
+import { makeUsage } from '../test/fixtures';
 
 const sixDeep = [
   { id: 1, scientificName: 'Animalia', rank: 'kingdom' },
@@ -127,23 +76,31 @@ test('the change icon reparents an unassessed taxon (opens the move modal)', asy
   expect(await screen.findByRole('dialog')).toHaveTextContent('Move');
 });
 
-test('the change icon changes the accepted name of a synonym', async () => {
+test('a synonym shows the classification of its accepted name, without a change icon', async () => {
+  // the accepted name itself sits on NameHeader's "Synonym of" line (which also owns the change
+  // icon), so the bar shows the path above it: the path of the accepted name's parent.
   server.use(
-    http.get('/api/projects/7/tree/path/50', () =>
-      HttpResponse.json([{ id: 50, scientificName: 'Panthera', rank: 'genus' }]),
+    http.get('/api/projects/7/usages/50', () =>
+      HttpResponse.json(makeUsage({ id: 50, scientificName: 'Panthera leo', parentId: 40 })),
     ),
-    http.get('/api/projects/7/tree/roots', () => HttpResponse.json([])),
+    http.get('/api/projects/7/tree/path/40', () =>
+      HttpResponse.json([
+        { id: 30, scientificName: 'Felidae', rank: 'family' },
+        { id: 40, scientificName: 'Panthera', rank: 'genus' },
+      ]),
+    ),
   );
   renderWithProviders(
     <ClassificationBar
       pid={7}
-      usage={makeUsage({ status: 'SYNONYM', parentId: null, acceptedParentIds: [50] })}
+      usage={makeUsage({ id: 60, status: 'SYNONYM', scientificName: 'Felis leo', acceptedParentIds: [50] })}
       canEdit
     />,
   );
-  await screen.findByText('Panthera');
-  await userEvent.click(screen.getByRole('button', { name: 'Change parent' }));
-  expect(await screen.findByRole('dialog')).toHaveTextContent('Change accepted name');
+  expect(await screen.findByText('Panthera')).toBeInTheDocument();
+  expect(screen.getByText('Felidae')).toBeInTheDocument();
+  expect(screen.queryByText('Panthera leo')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Change parent' })).not.toBeInTheDocument();
 });
 
 test('renders nothing for an accepted root (no parent)', () => {

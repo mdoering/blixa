@@ -128,6 +128,15 @@ test('loads a usage and prefills the form fields', async () => {
   expect(screen.getByLabelText('Published in year')).toHaveValue('1758');
 });
 
+test('shows the full name with authorship as a heading above the form', async () => {
+  mockCommon();
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+
+  expect(
+    await screen.findByRole('heading', { name: 'Panthera leo Linnaeus, 1758' }),
+  ).toBeInTheDocument();
+});
+
 test('editing authorship and saving PUTs the update with the loaded version', async () => {
   mockCommon();
   let putBody: Record<string, unknown> | undefined;

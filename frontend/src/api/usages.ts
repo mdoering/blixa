@@ -95,17 +95,25 @@ export function updateTaxonInfo(
   return api<NameUsage>(`/api/projects/${pid}/usages/${id}/taxon-info`, { method: 'PUT', json: payload });
 }
 
+// Which usages a bulk status change applies to: explicit ids, every match of the Names search
+// filter ("select all matching"), or a taxon's whole subtree (itself included).
+export type BulkSelection =
+  | { ids: number[] }
+  | { filter: { q?: string; rank?: string; status?: string } }
+  | { subtreeOf: number };
+
 // POST /usages/bulk-status -- change the taxonomic status of several usages at once. The backend
 // only accepts parent-preserving transitions (accepted<->unassessed, synonym<->misapplied) and
-// rejects anything else with 400; returns how many usages were actually changed.
+// rejects anything else with 400; it resolves parent/child order within the batch itself (top-down
+// towards accepted, bottom-up towards unassessed). Returns how many usages were actually changed.
 export function bulkChangeStatus(
   pid: number,
-  ids: number[],
+  selection: BulkSelection,
   status: string,
 ): Promise<{ changed: number }> {
   return api<{ changed: number }>(`/api/projects/${pid}/usages/bulk-status`, {
     method: 'POST',
-    json: { ids, status },
+    json: { ...selection, status },
   });
 }
 

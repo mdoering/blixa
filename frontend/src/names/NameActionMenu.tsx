@@ -1,8 +1,10 @@
-import { ActionIcon, Menu } from '@mantine/core';
+import { ActionIcon, Menu, Text } from '@mantine/core';
+import { modals } from '@mantine/modals';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   IconArrowsMove,
+  IconCircleCheck,
   IconChevronRight,
   IconCloudDownload,
   IconDotsVertical,
@@ -51,7 +53,7 @@ export interface NameActionMenuProps {
 }
 
 // Shared ⋮ (+ right-click, via the caller's `opened`/`onChange`) action menu for a single name
-// usage: add child, add synonym, change status, delete. Used by the Tree's rows and (later) the
+// usage: add child, add synonym, change status, accept subtree, delete. Used by the Tree's rows and (later) the
 // Names search table's rows. Writes are owner/editor-only, so the whole menu is hidden for
 // anyone else rather than shown-but-disabled.
 export default function NameActionMenu({
@@ -91,6 +93,23 @@ export default function NameActionMenu({
   const canHaveChildrenOrSynonyms = usage.status === 'ACCEPTED';
 
   const confirmDelete = () => setDeleteOpen(true);
+
+  // A tree node (accepted or unassessed) can have unassessed names below it to accept in one go.
+  const isTaxon = usage.status === 'ACCEPTED' || usage.status === 'UNASSESSED';
+  const confirmAcceptSubtree = () =>
+    modals.openConfirmModal({
+      title: 'Accept subtree',
+      children: (
+        <Text size="sm">
+          {usage.status === 'UNASSESSED' ? 'Accept ' : 'Accept every unassessed name below '}
+          <b>{usage.scientificName}</b>
+          {usage.status === 'UNASSESSED' ? ' and every unassessed name below it' : ''}? Parents are
+          accepted before their children.
+        </Text>
+      ),
+      labels: { confirm: 'Accept', cancel: 'Cancel' },
+      onConfirm: () => actions.acceptSubtree(usage),
+    });
 
   return (
     <>
@@ -183,6 +202,11 @@ export default function NameActionMenu({
               ))}
             </Menu.Dropdown>
           </Menu>
+          {isTaxon && (
+            <Menu.Item leftSection={<IconCircleCheck size={14} />} onClick={confirmAcceptSubtree}>
+              Accept subtree…
+            </Menu.Item>
+          )}
           <Menu.Divider />
           <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={confirmDelete}>
             Delete

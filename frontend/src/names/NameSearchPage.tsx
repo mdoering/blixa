@@ -22,6 +22,7 @@ import TaxonDetail from '../tree/TaxonDetail';
 import CreateNameModal from './CreateNameModal';
 import NameActionMenu from './NameActionMenu';
 import { useNameActions } from './useNameActions';
+import { STATUS_META, statusMeta } from './statusMeta';
 
 // Same common ranks as CreateNameModal's RANK_OPTIONS (lower-case wire form).
 const RANK_OPTIONS = [
@@ -44,15 +45,6 @@ const STATUS_OPTIONS = [
   { value: 'MISAPPLIED', label: 'Misapplied' },
   { value: 'UNASSESSED', label: 'Unassessed' },
 ];
-
-// Compact, colour-coded status chips for the table's narrow Status column: a 3-letter,
-// title-case abbreviation (scannable by colour) instead of the space-hungry full label.
-const STATUS_META: Record<string, { abbr: string; color: string; label: string }> = {
-  ACCEPTED: { abbr: 'Acc', color: 'green', label: 'Accepted' },
-  SYNONYM: { abbr: 'Syn', color: 'gray', label: 'Synonym' },
-  MISAPPLIED: { abbr: 'Mis', color: 'orange', label: 'Misapplied' },
-  UNASSESSED: { abbr: 'Una', color: 'blue', label: 'Unassessed' },
-};
 
 // The parent-preserving partner status for a bulk change: staying inside a pair keeps every usage's
 // parent (accepted<->unassessed keep the taxonomic parent; synonym<->misapplied keep the accepted
@@ -160,6 +152,29 @@ export default function NameSearchPage() {
     });
   }, [rowSelection, data]);
 
+  // "Select all matching": widens a fully-selected page to every usage matching the current filter,
+  // across pages. That selection is sent to the backend as the filter itself (not as ids), so it
+  // only drives the bulk status change -- merging needs concrete rows. Its target status comes from
+  // the Status filter, since the off-page rows' statuses are unknown here. Any filter change
+  // redefines "all matching", so it drops back to the plain row selection.
+  const [allMatching, setAllMatching] = useState(false);
+  useEffect(() => {
+    setAllMatching(false);
+  }, [debouncedQ, rank, status]);
+  const total = data?.total ?? 0;
+  const pageIds = (data?.items ?? []).map((r) => String(r.id));
+  const pageFullySelected = pageIds.length > 0 && pageIds.every((id) => rowSelection[id]);
+  const offerAllMatching = !allMatching && pageFullySelected && total > pageIds.length;
+  // While all matching are selected, the current page shows fully ticked.
+  const shownSelection: MRT_RowSelectionState = allMatching
+    ? Object.fromEntries(pageIds.map((id) => [id, true]))
+    : rowSelection;
+  const allMatchingTarget = status ? STATUS_PARTNER[status] ?? null : null;
+  const clearSelection = () => {
+    setAllMatching(false);
+    setRowSelection({});
+  };
+
   // The bulk status change is offered only when every selected row shares one status, so the single
   // parent-preserving target (its STATUS_PARTNER) is unambiguous. A mixed selection -> null -> the
   // button is greyed out.
@@ -173,12 +188,19 @@ export default function NameSearchPage() {
   }, [rowSelection, selectedStatuses]);
 
   const bulkStatusMutation = useMutation({
-    mutationFn: (status: string) =>
-      bulkChangeStatus(pid, Object.keys(rowSelection).map(Number), status),
+    mutationFn: (target: string) =>
+      bulkChangeStatus(
+        pid,
+        allMatching
+          ? { filter: { q: debouncedQ.trim() || undefined, rank: rank ?? undefined, status: status ?? undefined } }
+          : { ids: Object.keys(rowSelection).map(Number) },
+        target,
+      ),
     onSuccess: async (res) => {
       notifications.show({ message: `${res.changed} name${res.changed === 1 ? '' : 's'} updated` });
-      setRowSelection({});
+      clearSelection();
       await queryClient.invalidateQueries({ queryKey: ['usageSearch', pid] });
+      await queryClient.invalidateQueries({ queryKey: ['usage', pid] });
       await queryClient.invalidateQueries({ queryKey: ['treeRoots', pid] });
       await queryClient.invalidateQueries({ queryKey: ['treeChildren', pid] });
     },
@@ -236,7 +258,7 @@ export default function NameSearchPage() {
         Cell: ({ cell }) => {
           const v = cell.getValue<string | null>();
           if (!v) return '—';
-          const m = STATUS_META[v] ?? { abbr: v.slice(0, 3), color: 'gray', label: v };
+          const m = statusMeta(v);
           return (
             <Badge color={m.color} variant="light" size="sm" radius="sm">
               {m.abbr}
@@ -256,8 +278,12 @@ export default function NameSearchPage() {
     manualFiltering: true,
     rowCount: data?.total ?? 0,
     onPaginationChange: setPagination,
-    onRowSelectionChange: setRowSelection,
-    state: { pagination, isLoading, showProgressBars: isFetching, rowSelection },
+    // Changing any row while all matching are selected falls back to that page's explicit selection.
+    onRowSelectionChange: (updater) => {
+      if (allMatching) setAllMatching(false);
+      setRowSelection(typeof updater === 'function' ? updater(shownSelection) : updater);
+    },
+    state: { pagination, isLoading, showProgressBars: isFetching, rowSelection: shownSelection },
     enableRowSelection: true,
     enableColumnActions: false,
     enableColumnFilters: false,
@@ -355,24 +381,60 @@ export default function NameSearchPage() {
           w={160}
         />
       </Group>
-      {selectedIds.length >= 2 && canEdit && (
+      {canEdit && (selectedIds.length >= 2 || allMatching || offerAllMatching) && (
         <Group mb="md">
-          <Button variant="light" size="xs" onClick={() => setMergeOpen(true)}>
-            Merge {selectedIds.length} selected…
-          </Button>
-          {/* Bulk status change: enabled only when the selected rows share one status (so the single
-              parent-preserving target is unambiguous); greyed out for a mixed selection. */}
-          <Button
-            variant="light"
-            size="xs"
-            disabled={!bulkStatusTarget}
-            loading={bulkStatusMutation.isPending}
-            onClick={() => bulkStatusTarget && bulkStatusMutation.mutate(bulkStatusTarget)}
-          >
-            {bulkStatusTarget
-              ? `Mark ${selectedIds.length} as ${STATUS_META[bulkStatusTarget].label}`
-              : 'Change status'}
-          </Button>
+          {allMatching ? (
+            <>
+              <Text size="sm">All {total} matching names are selected.</Text>
+              <Button
+                variant="light"
+                size="xs"
+                disabled={!allMatchingTarget}
+                loading={bulkStatusMutation.isPending}
+                onClick={() => allMatchingTarget && bulkStatusMutation.mutate(allMatchingTarget)}
+              >
+                {allMatchingTarget
+                  ? `Mark ${total} as ${STATUS_META[allMatchingTarget].label}`
+                  : 'Change status'}
+              </Button>
+              {!allMatchingTarget && (
+                <Text size="xs" c="dimmed">
+                  Filter by status to change them all.
+                </Text>
+              )}
+              <Button variant="subtle" size="xs" onClick={clearSelection}>
+                Clear selection
+              </Button>
+            </>
+          ) : (
+            <>
+              {selectedIds.length >= 2 && (
+                <>
+                  <Button variant="light" size="xs" onClick={() => setMergeOpen(true)}>
+                    Merge {selectedIds.length} selected…
+                  </Button>
+                  {/* Bulk status change: enabled only when the selected rows share one status (so the
+                      single parent-preserving target is unambiguous); greyed out for a mixed selection. */}
+                  <Button
+                    variant="light"
+                    size="xs"
+                    disabled={!bulkStatusTarget}
+                    loading={bulkStatusMutation.isPending}
+                    onClick={() => bulkStatusTarget && bulkStatusMutation.mutate(bulkStatusTarget)}
+                  >
+                    {bulkStatusTarget
+                      ? `Mark ${selectedIds.length} as ${STATUS_META[bulkStatusTarget].label}`
+                      : 'Change status'}
+                  </Button>
+                </>
+              )}
+              {offerAllMatching && (
+                <Button variant="subtle" size="xs" onClick={() => setAllMatching(true)}>
+                  Select all {total} matching
+                </Button>
+              )}
+            </>
+          )}
         </Group>
       )}
       <CollapsibleSplit

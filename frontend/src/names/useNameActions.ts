@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
 import { ApiError, messageFor } from '../api/client';
-import { deleteUsage, getUsage, updateUsage, type DeleteMode } from '../api/usages';
+import { bulkChangeStatus, deleteUsage, getUsage, updateUsage, type DeleteMode } from '../api/usages';
 import type { NameUsage, UpdateUsagePayload } from '../api/types';
 import type { CreateNameAnchor, CreateNameMode } from './CreateNameModal';
 
@@ -103,6 +103,20 @@ export function useNameActions(pid: number) {
     },
   });
 
+  // Accept a taxon and every unassessed name below it in one go (the backend applies it top-down).
+  // Invalidates every loaded usage detail, since any descendant may be open somewhere.
+  const acceptSubtreeMutation = useMutation({
+    mutationFn: (usage: ActionableUsage) => bulkChangeStatus(pid, { subtreeOf: usage.id }, 'ACCEPTED'),
+    onSuccess: async (res, usage) => {
+      await invalidate(usage.id);
+      await queryClient.invalidateQueries({ queryKey: ['usage', pid] });
+      notifications.show({ message: `${res.changed} name${res.changed === 1 ? '' : 's'} accepted` });
+    },
+    onError: (e) => {
+      notifications.show({ color: 'red', message: messageFor(e, 'Could not accept the subtree') });
+    },
+  });
+
   const removeMutation = useMutation({
     mutationFn: (vars: { usage: ActionableUsage; mode?: DeleteMode; reparentTo?: number | null }) =>
       deleteUsage(pid, vars.usage.id, { mode: vars.mode, reparentTo: vars.reparentTo }),
@@ -151,6 +165,7 @@ export function useNameActions(pid: number) {
     closeBulk: () => setBulkTarget(null),
     changeStatus: (usage: ActionableUsage, status: string) =>
       changeStatusMutation.mutate({ usage, status }),
+    acceptSubtree: (usage: ActionableUsage) => acceptSubtreeMutation.mutate(usage),
     // `onSuccess` here (rather than baked into removeMutation above) lets callers react to a
     // specific delete -- e.g. NameActionMenu's onAfterDelete clearing the selection if the
     // deleted usage was the one selected -- without every caller needing its own mutation.

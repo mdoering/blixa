@@ -187,6 +187,16 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
   centralizes expand state + child fetching and splits `TreeNodeRow` into a presentational row; only
   worth it if profiling at Lepidoptera scale shows React reconciliation (not paint) is the bottleneck.
 - **nomStatus as a Select** — currently a free-text input showing the enum name.
+- **Name header + bulk status in tree order** — *shipped.* The edit form opens with a `NameHeader`
+  (full name + authorship, rank, status); a synonym/misapplied name adds a "Synonym of" line
+  listing every accepted name with a red status badge when a target is not actually accepted
+  (the `synonym_of_non_accepted` case, previously invisible because `/tree/path` 404'd on a
+  non-accepted anchor). `findPath` now anchors on accepted **or unassessed** taxa, so unassessed
+  chains get a classification line too. `POST /usages/bulk-status` selects by ids, the Names
+  **filter** ("Select all N matching") or a **subtree** ("Accept subtree…" in the ⋮ menu), checks
+  the backbone guards against the batch's end state and applies it top-down (→ accepted) /
+  bottom-up (→ unassessed); capped at 10k names, revalidated as one `BulkValidationEvent`
+  including the synonyms of changed names.
 - **Link tracked changes to the current work objective** — *shipped* (spec
   `docs/superpowers/specs/2026-07-24-work-objective-as-discussion-design.md`). Design pivot: the
   work objective **is a discussion** — the redundant `task` entity was retired (no data migration;
