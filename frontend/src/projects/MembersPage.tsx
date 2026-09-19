@@ -5,18 +5,18 @@ import { notifications } from '@mantine/notifications';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { MantineReactTable, useMantineReactTable, type MRT_ColumnDef } from 'mantine-react-table';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { getProject, listMembers, removeMember, setMember } from '../api/projects';
 import { dismissJoinRequest, listJoinRequests } from '../api/join';
 import { messageFor } from '../api/client';
 import type { Member, Role } from '../api/types';
+import InviteMemberModal from './InviteMemberModal';
+import PendingInvitations from './PendingInvitations';
+import { ROLE_DATA } from './roles';
 
 dayjs.extend(relativeTime);
-
-const ROLES: Role[] = ['owner', 'editor', 'viewer'];
-const ROLE_DATA = ROLES.map((r) => ({ value: r, label: r }));
 
 export default function MembersPage() {
   const { projectId } = useParams();
@@ -32,6 +32,7 @@ export default function MembersPage() {
   const { data: project } = useQuery({ queryKey: ['project', id], queryFn: () => getProject(id) });
   const { data: members, isLoading } = useQuery({ queryKey: ['members', id], queryFn: () => listMembers(id) });
   const canManage = project?.role === 'owner';
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const { data: joinRequests } = useQuery({
     queryKey: ['joinRequests', id],
@@ -118,17 +119,25 @@ export default function MembersPage() {
   return (
     <div>
       {canManage && (
-        <form onSubmit={form.onSubmit((v) => setMut.mutate(v))}>
-          <Group align="flex-end" mb="md">
-            <TextInput placeholder="username" {...form.getInputProps('username')} />
-            <Select data={ROLE_DATA} w={140} {...form.getInputProps('role')} />
-            <Button type="submit" loading={setMut.isPending}>
-              Add / update
-            </Button>
-          </Group>
-        </form>
+        <>
+          <form onSubmit={form.onSubmit((v) => setMut.mutate(v))}>
+            <Group align="flex-end" mb="md">
+              <TextInput placeholder="username" {...form.getInputProps('username')} />
+              <Select data={ROLE_DATA} w={140} {...form.getInputProps('role')} />
+              <Button type="submit" loading={setMut.isPending}>
+                Add / update
+              </Button>
+              <Button variant="light" onClick={() => setInviteOpen(true)}>
+                Invite by email
+              </Button>
+            </Group>
+          </form>
+          <InviteMemberModal projectId={id} opened={inviteOpen} onClose={() => setInviteOpen(false)} />
+        </>
       )}
       <MantineReactTable table={table} />
+
+      {canManage && <PendingInvitations projectId={id} />}
 
       {canManage && joinRequests && joinRequests.length > 0 && (
         <Stack gap="xs" mt="xl">

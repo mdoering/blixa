@@ -78,6 +78,9 @@ export const server = setupServer(
   // need this mocked per-test unless it cares about the actual nested groups.
   http.get('/api/projects/:pid/usages/:id/synonymy', () =>
     HttpResponse.json({ homotypic: [], heterotypicGroups: [], misapplied: [] })),
+  // Default empty pending-invitations list, so any owner-role render of MembersPage doesn't need
+  // this mocked per-test unless it asserts the list.
+  http.get('/api/projects/:pid/invitations', () => HttpResponse.json([])),
 );
 
 export { http, HttpResponse };
