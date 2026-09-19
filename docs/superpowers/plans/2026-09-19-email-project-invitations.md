@@ -778,7 +778,7 @@ class InvitationApiIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.expired").value(false))
         .andReturn().getResponse().getContentAsString();
     int id = json.readTree(created).get("id").asInt();
-    String firstUrl = json.readTree(created).get("acceptUrl").asText();
+    String firstUrl = json.readTree(created).get("acceptUrl").asString();
     assertThat(firstUrl).contains("/invite/");
     verify(email).send(eq("New.Person@example.org"), eq("owner@example.org"), eq("owner@example.org"),
         contains("Invitations IT"), contains(firstUrl));
@@ -808,7 +808,7 @@ class InvitationApiIT extends AbstractPostgresIT {
             .with(csrf()).with(user("invApiOwner")))
         .andExpect(status().isOk())
         .andReturn().getResponse().getContentAsString();
-    String secondUrl = json.readTree(resent).get("acceptUrl").asText();
+    String secondUrl = json.readTree(resent).get("acceptUrl").asString();
     assertThat(secondUrl).isNotEqualTo(firstUrl);
     verify(email, times(2)).send(eq("New.Person@example.org"), anyString(), anyString(),
         anyString(), anyString());
@@ -1138,7 +1138,7 @@ class InvitationAcceptIT extends AbstractPostgresIT {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"email\":\"" + mail + "\",\"role\":\"" + role + "\",\"message\":\"Join us\"}"))
         .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-    String url = json.readTree(b).get("acceptUrl").asText();
+    String url = json.readTree(b).get("acceptUrl").asString();
     return url.substring(url.lastIndexOf('/') + 1);
   }
 
