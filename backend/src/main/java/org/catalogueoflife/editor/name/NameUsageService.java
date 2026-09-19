@@ -2,6 +2,8 @@ package org.catalogueoflife.editor.name;
 
 import java.util.Comparator;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -15,6 +17,7 @@ import life.catalogue.api.vocab.NomStatus;
 import org.catalogueoflife.editor.audit.AuditService;
 import org.catalogueoflife.editor.audit.Operation;
 import org.catalogueoflife.editor.lock.LockMapper;
+import org.catalogueoflife.editor.name.dto.BulkStatusRequest;
 import org.catalogueoflife.editor.name.dto.CreateNameUsageRequest;
 import org.catalogueoflife.editor.name.dto.CreateReferenceRequest;
 import org.catalogueoflife.editor.name.dto.DemoteRequest;
@@ -34,6 +37,7 @@ import org.catalogueoflife.editor.project.ProjectMapper;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
 import org.catalogueoflife.editor.tree.TreeMapper;
+import org.catalogueoflife.editor.validation.BulkValidationEvent;
 import org.catalogueoflife.editor.validation.IssueMapper;
 import org.catalogueoflife.editor.validation.ValidationEvent;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -264,6 +268,7 @@ public class NameUsageService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
           "changing between accepted and synonym requires Demote/Promote, not a plain status edit");
     }
+    boolean statusChanged = u.getStatus() != status;
     // Snapshot BEFORE mutating u's fields in place below: MyBatis's session-scoped local cache
     // would hand back this SAME cached instance from a second identical findByIdInProject call
     // (no intervening write to invalidate it yet), so re-fetching would alias rather than give an
@@ -320,6 +325,12 @@ public class NameUsageService {
     NameUsage after = requireInProject(projectId, id);
     audit.record(projectId, userId, ENTITY, id, Operation.UPDATE, before, after);
     events.publishEvent(ValidationEvent.forUsage(projectId, id));
+    if (statusChanged) {
+      // synonym_of_non_accepted is judged on the synonym but depends on its target's status.
+      for (int synId : synonymAccepted.findSynonymsOf(projectId, id)) {
+        events.publishEvent(ValidationEvent.forUsage(projectId, synId));
+      }
+    }
     return toResponse(after, project);
   }
 
@@ -335,36 +346,58 @@ public class NameUsageService {
         || (SYNONYM_STATUSES.contains(from) && SYNONYM_STATUSES.contains(to));
   }
 
-  // Bulk status change (POST /usages/bulk-status): set several usages to {@code statusStr} at once.
-  // Only parent-preserving transitions are allowed (see parentPreserving) -- one that would move a
-  // usage between the taxon and synonym groups rejects the whole request with 400, so the batch is
-  // all-or-nothing and never leaves a half-applied change. Usages already at the target status are
-  // silently skipped. Each actual change mirrors a single update: it re-uses writeTaxonInfo (so
-  // e.g. accepted->unassessed drops the now-orphaned taxon-level children just as the per-row edit
-  // does), records an audit entry, and republishes the usage's validation. Returns how many changed.
+  // Upper bound on one bulk status change: every name is validated, written and audited inside a
+  // single transaction, so an unbounded "select all matching" must be narrowed first.
+  static final int BULK_STATUS_CAP = 10_000;
+
+  // Bulk status change (POST /usages/bulk-status): set the selected usages to req.status() at once.
+  // The selection is exactly one of explicit ids, the Names search filter, or a subtree (see
+  // BulkStatusRequest). Only parent-preserving transitions are allowed (see parentPreserving) -- one
+  // that would move a usage between the taxon and synonym groups rejects the whole request with 400,
+  // so the batch is all-or-nothing and never leaves a half-applied change. Usages already at the
+  // target status are silently skipped.
+  //
+  // The backbone guards are checked against the batch's END state, not the pre-batch one: a usage
+  // may be accepted when its unassessed parent is accepted in the same batch, and made unassessed
+  // when its accepted children are made unassessed with it. The changes are then applied in tree
+  // order -- top-down towards ACCEPTED, bottom-up towards UNASSESSED -- so every intermediate state
+  // is valid too. Each change mirrors a single update: writeTaxonInfo (e.g. accepted->unassessed
+  // drops the now-orphaned taxon-level children), an audit entry, and revalidation of the usage and
+  // of the synonyms hanging under it (synonym_of_non_accepted depends on the target's status).
   @Transactional
-  public int bulkChangeStatus(int userId, int projectId, List<Integer> ids, String statusStr) {
+  public int bulkChangeStatus(int userId, int projectId, BulkStatusRequest req) {
     requireEditor(userId, projectId);
     requireProject(projectId);
-    Status target = VocabParsing.requireParse(Status.class, statusStr, "status");
+    Status target = VocabParsing.requireParse(Status.class, req.status(), "status");
+    // See TreeMapper.lockProject: serializes against concurrent moves/status edits while the
+    // backbone guards below are checked against the tree.
+    tree.lockProject(projectId);
+    List<Integer> ids = bulkSelection(projectId, req);
+    if (ids.size() > BULK_STATUS_CAP) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "too many names selected ("
+          + ids.size() + ") -- a bulk status change is limited to " + BULK_STATUS_CAP);
+    }
+    Map<Integer, NameUsage> batch = new LinkedHashMap<>();
+    for (int id : ids) {
+      batch.put(id, requireInProject(projectId, id));
+    }
     List<NameUsage> toChange = new ArrayList<>();
-    for (int id : new LinkedHashSet<>(ids)) {
-      NameUsage u = requireInProject(projectId, id);
+    for (NameUsage u : batch.values()) {
       if (u.getStatus() == target) {
         continue; // already there -- nothing to do for this one
       }
       if (!parentPreserving(u.getStatus(), target)) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-            "cannot change " + u.getStatus() + " to " + target + " in bulk: only accepted<->unassessed"
-                + " and synonym<->misapplied keep the parent");
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cannot change "
+            + u.getScientificName() + " from " + label(u.getStatus()) + " to " + label(target)
+            + " in bulk: only accepted<->unassessed and synonym<->misapplied keep the parent");
       }
-      // Keep the accepted backbone intact: an accepted taxon may never sit under an unassessed
-      // parent. bulk keeps each usage's parent, so re-use requireValidParent against the current one.
-      if (u.getParentId() != null) {
-        requireValidParent(projectId, id, u.getParentId(), target);
-      }
-      requireNoAcceptedChildrenIfUnassessed(projectId, id, target);
       toChange.add(u);
+    }
+    if (TAXON_STATUSES.contains(target)) {
+      requireBatchBackbone(projectId, target, toChange, batch.keySet());
+      Map<Integer, Integer> depth = new HashMap<>();
+      Comparator<NameUsage> topDown = Comparator.comparingInt(u -> batchDepth(u, batch, depth));
+      toChange.sort(target == Status.ACCEPTED ? topDown : topDown.reversed());
     }
     for (NameUsage u : toChange) {
       @SuppressWarnings("unchecked")
@@ -378,9 +411,88 @@ public class NameUsageService {
       writeTaxonInfo(u);
       NameUsage after = requireInProject(projectId, u.getId());
       audit.record(projectId, userId, ENTITY, u.getId(), Operation.UPDATE, before, after);
-      events.publishEvent(ValidationEvent.forUsage(projectId, u.getId()));
+    }
+    if (!toChange.isEmpty()) {
+      List<Integer> changedIds = toChange.stream().map(NameUsage::getId).toList();
+      Set<Integer> revalidate = new LinkedHashSet<>(changedIds);
+      revalidate.addAll(synonymAccepted.synonymIdsForAccepted(projectId, changedIds));
+      events.publishEvent(new BulkValidationEvent(projectId, List.copyOf(revalidate)));
     }
     return toChange.size();
+  }
+
+  // Resolves the bulk selection to distinct usage ids (see BulkStatusRequest): exactly one source.
+  private List<Integer> bulkSelection(int projectId, BulkStatusRequest req) {
+    boolean byIds = req.ids() != null && !req.ids().isEmpty();
+    int sources = (byIds ? 1 : 0) + (req.filter() != null ? 1 : 0) + (req.subtreeOf() != null ? 1 : 0);
+    if (sources != 1) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "select the names by exactly one of ids, filter or subtreeOf");
+    }
+    if (byIds) {
+      return List.copyOf(new LinkedHashSet<>(req.ids()));
+    }
+    if (req.subtreeOf() != null) {
+      requireInProject(projectId, req.subtreeOf());
+      return usages.findSubtreeIds(projectId, req.subtreeOf());
+    }
+    BulkStatusRequest.Filter f = req.filter();
+    String q = (f.q() == null || f.q().isBlank()) ? null : f.q();
+    return usages.searchIds(projectId, q, normalizeRankFilter(f.rank()), normalizeStatusFilter(f.status()));
+  }
+
+  // The backbone guards of requireValidParent / requireNoAcceptedChildrenIfUnassessed, judged on the
+  // batch's end state: a parent in the batch counts as already having the target status, and an
+  // accepted child in the batch as already unassessed. (No cycle check: the parents don't change.)
+  private void requireBatchBackbone(int projectId, Status target, List<NameUsage> toChange,
+      Set<Integer> batchIds) {
+    Map<Integer, NameUsage> parents = new HashMap<>();
+    for (NameUsage u : toChange) {
+      if (u.getParentId() != null) {
+        NameUsage parent = parents.computeIfAbsent(u.getParentId(),
+            pid -> usages.findByIdInProject(projectId, pid));
+        Status parentAfter = batchIds.contains(parent.getId()) ? target : parent.getStatus();
+        boolean parentOk = parentAfter == Status.ACCEPTED
+            || (target == Status.UNASSESSED && parentAfter == Status.UNASSESSED);
+        if (!parentOk) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cannot make "
+              + u.getScientificName() + " " + label(target) + ": its parent " + parent.getScientificName()
+              + " is " + label(parent.getStatus()) + " -- include it in the selection or change it first");
+        }
+      }
+      if (target == Status.UNASSESSED) {
+        for (int childId : usages.findChildIdsWithStatus(projectId, u.getId(), Status.ACCEPTED.name())) {
+          if (!batchIds.contains(childId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cannot make "
+                + u.getScientificName() + " unassessed: its accepted child "
+                + usages.findScientificName(projectId, childId)
+                + " would be stranded -- include it in the selection or change it first");
+          }
+        }
+      }
+    }
+  }
+
+  // How many of a usage's ancestors are in the batch too -- its depth within the batch's own
+  // forest, the sort key that applies a bulk change in tree order. Memoized in `depth`; bounded by
+  // the batch size, a defensive guard should a cycle ever slip past the move/update guards.
+  private static int batchDepth(NameUsage u, Map<Integer, NameUsage> batch, Map<Integer, Integer> depth) {
+    Integer known = depth.get(u.getId());
+    if (known != null) {
+      return known;
+    }
+    int d = 0;
+    NameUsage p = u.getParentId() == null ? null : batch.get(u.getParentId());
+    while (p != null && d < batch.size()) {
+      d++;
+      p = p.getParentId() == null ? null : batch.get(p.getParentId());
+    }
+    depth.put(u.getId(), d);
+    return d;
+  }
+
+  private static String label(Status s) {
+    return s.name().toLowerCase(Locale.ROOT);
   }
 
   // Narrow write of just alternative_id (PUT /usages/{id}/identifiers): a full replace of the

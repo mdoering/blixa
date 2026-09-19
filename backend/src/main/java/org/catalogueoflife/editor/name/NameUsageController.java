@@ -187,11 +187,12 @@ public class NameUsageController {
     return service.promote(uid, pid, id, req);
   }
 
-  // Bulk status change for several usages at once (see NameUsageService.bulkChangeStatus): only
-  // parent-preserving transitions (accepted<->unassessed, synonym<->misapplied); returns {changed:N}.
+  // Bulk status change for several usages at once (see NameUsageService.bulkChangeStatus), selected
+  // by ids, the search filter, or a subtree: only parent-preserving transitions (accepted<->unassessed,
+  // synonym<->misapplied), applied in tree order; returns {changed:N}.
   @PostMapping("/bulk-status")
   public Map<String, Integer> bulkStatus(@PathVariable int pid, @Valid @RequestBody BulkStatusRequest req) {
     int uid = currentUser.require().getId();
-    return Map.of("changed", service.bulkChangeStatus(uid, pid, req.ids(), req.status()));
+    return Map.of("changed", service.bulkChangeStatus(uid, pid, req));
   }
 }

@@ -80,6 +80,13 @@ public interface NameUsageMapper {
   int countChildrenWithStatus(@Param("projectId") int projectId, @Param("parentId") int parentId,
       @Param("status") String status);
 
+  // The ids of a usage's direct children with the given status -- bulkChangeStatus' variant of the
+  // guard above, which lets accepted children through when they are changed in the same batch.
+  @Select("SELECT id FROM name_usage WHERE project_id = #{projectId}"
+      + " AND parent_id = #{parentId} AND status = #{status} ORDER BY id")
+  List<Integer> findChildIdsWithStatus(@Param("projectId") int projectId,
+      @Param("parentId") int parentId, @Param("status") String status);
+
   // The same full-row projection findByIdInProject uses (including the taxon_info LEFT JOIN), but
   // for every usage in the project rather than a single id, id-ordered for a stable/deterministic
   // file -- ColDP export's NameUsage.tsv source (coldp/export/NameUsageColdpWriter.write).
@@ -135,6 +142,21 @@ public interface NameUsageMapper {
       </script>
       """)
   long countMatches(@Param("projectId") int projectId, @Param("q") String q,
+      @Param("rank") String rank, @Param("status") String status);
+
+  // Same filter set as searchItems/countMatches (q/rank/status), ids only and unpaged -- the
+  // selection behind a "select all matching" bulk status change (NameUsageService.bulkChangeStatus).
+  @Select("""
+      <script>
+      SELECT id FROM name_usage
+      WHERE project_id = #{projectId}
+      <if test="q != null">AND scientific_name % #{q}</if>
+      <if test="rank != null">AND rank = #{rank}</if>
+      <if test="status != null">AND status = #{status}</if>
+      ORDER BY id
+      </script>
+      """)
+  List<Integer> searchIds(@Param("projectId") int projectId, @Param("q") String q,
       @Param("rank") String rank, @Param("status") String status);
 
   // Best trigram-similar usage in targetProjectId for a source name that had no exact

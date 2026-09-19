@@ -146,6 +146,52 @@ class AutoRevalidateIT extends AbstractPostgresIT {
     assertThat(hasIssue(cleared, synId, "synonym_without_accepted", "error")).isFalse();
   }
 
+  // synonym_of_non_accepted is a property of the synonym that depends on its TARGET's status: accepting
+  // that target (here in bulk, the path a curator uses to settle a whole unassessed group) must also
+  // re-check the synonyms hanging under it, or their ERROR would linger until a manual revalidate.
+  @Test
+  @WithMockUser(username = "autoRevalidateBulkOwner")
+  void acceptingATargetInBulkRevalidatesItsSynonyms() throws Exception {
+    ensureUser("autoRevalidateBulkOwner");
+    long pid = createProject("autorevalidatebulkproj");
+
+    long unaId = createUsage(pid, "Bulkrevalidus alpha", "L.", "species", "unassessed");
+    long synId = createUsage(pid, "Bulkrevalidus beta", "Mill.", "species", "synonym");
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + synId + "/synonym-of/" + unaId).with(csrf()))
+        .andExpect(status().isNoContent());
+    pollUntil(pid, issues -> hasIssue(issues, synId, "synonym_of_non_accepted", "error"));
+
+    mvc.perform(post("/api/projects/" + pid + "/usages/bulk-status").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"ids\":[" + unaId + "],\"status\":\"ACCEPTED\"}"))
+        .andExpect(status().isOk());
+    JsonNode cleared = pollUntil(pid, issues -> !hasIssue(issues, synId, "synonym_of_non_accepted", "error"));
+    assertThat(hasIssue(cleared, synId, "synonym_of_non_accepted", "error")).isFalse();
+  }
+
+  // Same dependency through the single-name path: the form's plain status edit (unassessed ->
+  // accepted) must re-check the synonyms of the edited name as well.
+  @Test
+  @WithMockUser(username = "autoRevalidateEditOwner")
+  void acceptingATargetViaUpdateRevalidatesItsSynonyms() throws Exception {
+    ensureUser("autoRevalidateEditOwner");
+    long pid = createProject("autorevalidateeditproj");
+
+    long unaId = createUsage(pid, "Editrevalidus alpha", "L.", "species", "unassessed");
+    long synId = createUsage(pid, "Editrevalidus beta", "Mill.", "species", "synonym");
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + synId + "/synonym-of/" + unaId).with(csrf()))
+        .andExpect(status().isNoContent());
+    pollUntil(pid, issues -> hasIssue(issues, synId, "synonym_of_non_accepted", "error"));
+
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + unaId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"scientificName\":\"Editrevalidus alpha\",\"authorship\":\"L.\","
+                + "\"rank\":\"species\",\"status\":\"ACCEPTED\",\"version\":0}"))
+        .andExpect(status().isOk());
+    JsonNode cleared = pollUntil(pid, issues -> !hasIssue(issues, synId, "synonym_of_non_accepted", "error"));
+    assertThat(hasIssue(cleared, synId, "synonym_of_non_accepted", "error")).isFalse();
+  }
+
   // Fix 3: deleting a reference nulls every citing usage's published_in_reference_id via
   // ON DELETE SET NULL (see ReferenceService.delete / V3__name_core.sql) -- which should clear
   // year_vs_reference and trip missing_published_in -- but ONLY update() published a ValidationEvent

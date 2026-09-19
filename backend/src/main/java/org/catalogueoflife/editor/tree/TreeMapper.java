@@ -55,17 +55,19 @@ public interface TreeMapper {
       @Param("includeUnassessed") boolean includeUnassessed);
 
   // Root-first ancestor path (including the node itself) via a recursive walk up parent_id.
-  // The anchor (base case) IS filtered to status = 'ACCEPTED': the target id itself must be a
-  // tree node, otherwise a synonym's id would leak a (bogus) path out of /tree/path -- see
-  // TreeService.path's isEmpty()->404 check, which relies on a non-accepted target producing no
-  // rows here. Every ancestor above the anchor is necessarily ACCEPTED anyway since parent_id
-  // only ever links accepted->accepted. The depth bound on the recursive member is a defensive
+  // The anchor (base case) IS filtered to the taxon statuses (ACCEPTED or UNASSESSED): the target
+  // id itself must be a tree node, otherwise a synonym's id would leak a (bogus) path out of
+  // /tree/path -- see TreeService.path's isEmpty()->404 check, which relies on a synonym/misapplied
+  // target producing no rows here. Unassessed ("provisionally accepted") taxa carry a parent_id
+  // and may nest under unassessed parents, so the ancestors above the anchor are accepted or
+  // unassessed. The depth bound on the recursive member is a defensive
   // termination guarantee (statement-timeout DoS guard) in case a cycle ever slips past the
   // create/update/move guards -- it does not change behavior for any valid (acyclic) tree.
   @Select("""
       WITH RECURSIVE anc AS (
         SELECT project_id, id, parent_id, scientific_name, rank, 0 AS depth
-        FROM name_usage WHERE project_id = #{projectId} AND id = #{id} AND status = 'ACCEPTED'
+        FROM name_usage WHERE project_id = #{projectId} AND id = #{id}
+          AND status IN ('ACCEPTED', 'UNASSESSED')
         UNION ALL
         SELECT n.project_id, n.id, n.parent_id, n.scientific_name, n.rank, anc.depth + 1
         FROM name_usage n JOIN anc ON n.project_id = anc.project_id AND n.id = anc.parent_id

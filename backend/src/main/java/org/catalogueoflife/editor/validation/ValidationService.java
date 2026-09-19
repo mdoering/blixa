@@ -132,6 +132,14 @@ public class ValidationService {
     }
   }
 
+  // Revalidates just the given usages -- BulkValidationEvent's entry point, for a write that changed
+  // many usages at once. Same `self`-proxy per-usage transaction model as revalidateProject.
+  public void revalidateUsages(int projectId, List<Integer> usageIds) {
+    for (int usageId : usageIds) {
+      self.revalidateUsage(projectId, usageId);
+    }
+  }
+
   // Revalidates every usage in the subtree rooted at rootUsageId (the root included), returning the
   // ids it processed so a caller can summarize just that scope. The middle granularity between
   // revalidateUsage (one node) and revalidateProject (everything): a curator working a locked group,

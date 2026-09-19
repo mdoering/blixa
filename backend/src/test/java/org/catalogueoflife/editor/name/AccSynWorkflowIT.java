@@ -263,4 +263,131 @@ class AccSynWorkflowIT extends AbstractPostgresIT {
             .content("{\"ids\":[" + una2 + "],\"status\":\"ACCEPTED\"}"))
         .andExpect(status().isBadRequest());
   }
+
+  private org.springframework.test.web.servlet.ResultActions bulkStatus(long pid, String body) throws Exception {
+    return mvc.perform(post("/api/projects/" + pid + "/usages/bulk-status").with(csrf())
+        .contentType(MediaType.APPLICATION_JSON).content(body));
+  }
+
+  @Test
+  void treePathWalksUnassessedChains() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("unassessedpath");
+    long fam = createUsage(pid, "Famidae", "family", "accepted", null);
+    long gen = createUsage(pid, "Genusu", "genus", "unassessed", fam);
+    long sp = createUsage(pid, "Genusu speciesu", "species", "unassessed", gen);
+
+    // an unassessed taxon is a tree node too: its path runs up through unassessed and accepted
+    // ancestors alike, root-first.
+    mvc.perform(get("/api/projects/" + pid + "/tree/path/" + sp))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(3))
+        .andExpect(jsonPath("$[0].id").value((int) fam))
+        .andExpect(jsonPath("$[1].id").value((int) gen))
+        .andExpect(jsonPath("$[2].id").value((int) sp));
+  }
+
+  @Test
+  void bulkAcceptResolvesParentsWithinTheBatchTopDown() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("bulktopdown");
+    long gen = createUsage(pid, "Genust", "genus", "unassessed", null);
+    long sp = createUsage(pid, "Genust speciest", "species", "unassessed", gen);
+    long ssp = createUsage(pid, "Genust speciest subt", "subspecies", "unassessed", sp);
+
+    // listed bottom-up on purpose: each parent is only unassessed BEFORE the batch, so validating
+    // against the batch's end state (and applying top-down) must accept all three together.
+    bulkStatus(pid, "{\"ids\":[" + ssp + "," + sp + "," + gen + "],\"status\":\"ACCEPTED\"}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.changed").value(3));
+    for (long id : new long[] {gen, sp, ssp}) {
+      mvc.perform(get("/api/projects/" + pid + "/usages/" + id))
+          .andExpect(jsonPath("$.status").value("ACCEPTED"));
+    }
+  }
+
+  @Test
+  void bulkAcceptNamesTheUnassessedParentLeftOutOfTheBatch() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("bulkmissingparent");
+    long gen = createUsage(pid, "Genusm", "genus", "unassessed", null);
+    long sp = createUsage(pid, "Genusm speciesm", "species", "unassessed", gen);
+
+    bulkStatus(pid, "{\"ids\":[" + sp + "],\"status\":\"ACCEPTED\"}")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.allOf(
+            org.hamcrest.Matchers.containsString("Genusm speciesm"),
+            org.hamcrest.Matchers.containsString("Genusm"))));
+  }
+
+  @Test
+  void bulkUnassessResolvesAcceptedChildrenWithinTheBatch() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("bulkbottomup");
+    long gen = createUsage(pid, "Genusb", "genus", "accepted", null);
+    long sp = createUsage(pid, "Genusb speciesb", "species", "accepted", gen);
+
+    // the genus alone can't go unassessed (its accepted species would be stranded), but together
+    // with that species it can.
+    bulkStatus(pid, "{\"ids\":[" + gen + "," + sp + "],\"status\":\"UNASSESSED\"}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.changed").value(2));
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + gen))
+        .andExpect(jsonPath("$.status").value("UNASSESSED"));
+  }
+
+  @Test
+  void bulkAcceptSubtreeAcceptsOnlyThatSubtree() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("bulksubtree");
+    long fam = createUsage(pid, "Famidaes", "family", "accepted", null);
+    long gen = createUsage(pid, "Genuss", "genus", "unassessed", fam);
+    long sp = createUsage(pid, "Genuss speciess", "species", "unassessed", gen);
+    long other = createUsage(pid, "Otherus", "genus", "unassessed", null);
+
+    // rooted at an ACCEPTED node: its unassessed descendants are accepted, the node itself skipped.
+    bulkStatus(pid, "{\"subtreeOf\":" + fam + ",\"status\":\"ACCEPTED\"}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.changed").value(2));
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + sp))
+        .andExpect(jsonPath("$.status").value("ACCEPTED"));
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + other))
+        .andExpect(jsonPath("$.status").value("UNASSESSED"));
+  }
+
+  @Test
+  void bulkStatusByFilterChangesEveryMatch() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("bulkfilter");
+    long gen = createUsage(pid, "Genusf", "genus", "unassessed", null);
+    long sp = createUsage(pid, "Genusf speciesf", "species", "unassessed", gen);
+    long root = createUsage(pid, "Rootus speciesr", "species", "unassessed", null);
+    long acc = createUsage(pid, "Accus", "genus", "accepted", null);
+
+    // rank-only filter leaves the genus out -> its species can't be accepted -> 400, nothing changed.
+    bulkStatus(pid, "{\"filter\":{\"rank\":\"species\",\"status\":\"unassessed\"},\"status\":\"ACCEPTED\"}")
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + root))
+        .andExpect(jsonPath("$.status").value("UNASSESSED"));
+
+    // every unassessed name in the project, across "pages": all three accepted.
+    bulkStatus(pid, "{\"filter\":{\"status\":\"UNASSESSED\"},\"status\":\"ACCEPTED\"}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.changed").value(3));
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + sp))
+        .andExpect(jsonPath("$.status").value("ACCEPTED"));
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + acc))
+        .andExpect(jsonPath("$.status").value("ACCEPTED"));
+  }
+
+  @Test
+  void bulkStatusNeedsExactlyOneSelection() throws Exception {
+    ensureUser("accsynOwner");
+    long pid = createProject("bulksource");
+    long gen = createUsage(pid, "Genuso", "genus", "unassessed", null);
+
+    bulkStatus(pid, "{\"status\":\"ACCEPTED\"}").andExpect(status().isBadRequest());
+    bulkStatus(pid, "{\"ids\":[" + gen + "],\"subtreeOf\":" + gen + ",\"status\":\"ACCEPTED\"}")
+        .andExpect(status().isBadRequest());
+  }
 }

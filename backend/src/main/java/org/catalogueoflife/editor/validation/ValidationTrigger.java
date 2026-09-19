@@ -41,6 +41,19 @@ public class ValidationTrigger {
     }
   }
 
+  // Batch counterpart of onValidationEvent (see BulkValidationEvent): same async/exception-swallowing
+  // contract, one task for the whole batch.
+  @Async(ValidationAsyncConfig.EXECUTOR_BEAN)
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void onBulkValidationEvent(BulkValidationEvent event) {
+    try {
+      validationService.revalidateUsages(event.projectId(), event.usageIds());
+    } catch (Exception e) {
+      log.warn("auto-revalidate of {} usages failed for project {}: {}", event.usageIds().size(),
+          event.projectId(), e.getMessage(), e);
+    }
+  }
+
   // Subtree recompute when an objective-tagged lock is released or swept (SubtreeValidationEvent).
   // Same async/exception-swallowing contract as onValidationEvent, but fallbackExecution = true:
   // LockService.release publishes from inside a transaction (so AFTER_COMMIT applies), while
