@@ -5,6 +5,7 @@ import ChildEntityTab, { type ColumnDef, type FieldDef } from './ChildEntityTab'
 import type { Option } from './EntitySelect';
 import DistributionMapPanel from './map/DistributionMapPanel';
 import { referenceOptions } from './NameRelationsTab';
+import { useCountryName, useCountryOptions, useLanguageName, useLanguageOptions } from '../vocab/useVocab';
 
 // Suggestion loader for the Property key field -- the project's standard + used property keys, so
 // spellings stay consistent (managed via PropertyKeysModal). Free-text, so new keys stay typeable.
@@ -40,15 +41,20 @@ interface Vernacular {
 const vernacularApi = childApi<Vernacular>('vernaculars');
 
 export function VernacularTab({ pid, usageId, canEdit }: TabProps) {
+  const languageName = useLanguageName();
+  const countryName = useCountryName();
+  const languageOptions = useLanguageOptions();
+  const countryOptions = useCountryOptions();
   const columns: ColumnDef<Vernacular>[] = [
     { header: 'Name', cell: (r) => r.name ?? '—' },
-    { header: 'Language', cell: (r) => r.language ?? '—' },
+    { header: 'Language', cell: (r) => (r.language ? <span title={r.language}>{languageName(r.language)}</span> : '—') },
+    { header: 'Country', cell: (r) => (r.country ? <span title={r.country}>{countryName(r.country)}</span> : '—') },
     { header: 'Preferred', cell: (r) => (r.preferred ? 'Yes' : '—') },
   ];
   const fields: FieldDef<Vernacular>[] = [
     { name: 'name', label: 'Name', span: 6 },
-    { name: 'language', label: 'Language', span: 3 },
-    { name: 'country', label: 'Country', span: 3 },
+    { name: 'language', label: 'Language', type: 'select', options: languageOptions, span: 3 },
+    { name: 'country', label: 'Country', type: 'select', options: countryOptions, span: 3 },
     { name: 'sex', label: 'Sex', type: 'select', options: opt(['male', 'female']), span: 3 },
     { name: 'preferred', label: 'Preferred', type: 'boolean', span: 3 },
     {
@@ -102,8 +108,19 @@ interface Distribution {
 const distributionApi = childApi<Distribution>('distributions');
 
 export function DistributionTab({ pid, usageId, canEdit }: TabProps) {
+  const countryName = useCountryName();
   const columns: ColumnDef<Distribution>[] = [
-    { header: 'Area', cell: (r) => r.area ?? r.areaId ?? '—' },
+    // An ISO-gazetteer area id is a country code -- show the country's name.
+    {
+      header: 'Area',
+      cell: (r) =>
+        r.area ??
+        (r.areaId && (r.gazetteer ?? '').toLowerCase() === 'iso' ? (
+          <span title={r.areaId}>{countryName(r.areaId)}</span>
+        ) : (
+          r.areaId ?? '—'
+        )),
+    },
     { header: 'Gazetteer', cell: (r) => r.gazetteer ?? '—' },
     { header: 'Establishment', cell: (r) => r.establishmentMeans ?? '—' },
   ];

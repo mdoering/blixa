@@ -11,6 +11,7 @@ import { useState } from 'react';
 import ChildEntityTab, { type ColumnDef, type FieldDef } from './ChildEntityTab';
 import GbifTypesModal from './GbifTypesModal';
 import { referenceOptions } from './NameRelationsTab';
+import { useCountryName, useCountryOptions } from '../vocab/useVocab';
 
 // ColDP TypeStatus (common values); TEXT on the wire.
 const TYPE_STATUS = [
@@ -36,6 +37,8 @@ export default function TypeMaterialTab({
   usageId: number;
   canEdit: boolean;
 }) {
+  const countryName = useCountryName();
+  const countryOptions = useCountryOptions();
   const columns: ColumnDef<TypeMaterial>[] = [
     { header: 'Status', cell: (r) => r.status ?? '—' },
     { header: 'Citation', cell: (r) => r.citation ?? '—' },
@@ -44,7 +47,7 @@ export default function TypeMaterialTab({
       cell: (r) =>
         [r.institutionCode, r.catalogNumber].filter(Boolean).join(' ') || '—',
     },
-    { header: 'Country', cell: (r) => r.country ?? '—' },
+    { header: 'Country', cell: (r) => (r.country ? <span title={r.country}>{countryName(r.country)}</span> : '—') },
   ];
 
   const fields: FieldDef<TypeMaterial>[] = [
@@ -54,7 +57,7 @@ export default function TypeMaterialTab({
     { name: 'catalogNumber', label: 'Catalog number', span: 4 },
     { name: 'occurrenceId', label: 'GBIF occurrenceID', span: 4 },
     { name: 'locality', label: 'Locality', span: 6 },
-    { name: 'country', label: 'Country', span: 3 },
+    { name: 'country', label: 'Country', type: 'select', options: countryOptions, span: 3 },
     { name: 'collector', label: 'Collector', span: 3 },
     { name: 'date', label: 'Date', span: 6 },
     { name: 'sex', label: 'Sex', type: 'select', options: SEX, span: 6 },

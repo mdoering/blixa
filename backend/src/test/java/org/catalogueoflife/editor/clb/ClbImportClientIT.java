@@ -103,6 +103,25 @@ class ClbImportClientIT {
   }
 
   @Test
+  void languagesParsesTheFlatCodeToNameMap() {
+    server.expect(requestTo(BASE + "/vocab/language"))
+        .andRespond(withSuccess("{\"nld\":\"Dutch\",\"eng\":\"English\"}", MediaType.APPLICATION_JSON));
+
+    assertThat(client.languages()).containsEntry("nld", "Dutch").containsEntry("eng", "English").hasSize(2);
+    server.verify();
+  }
+
+  @Test
+  void countriesAreKeyedByBothIsoCodes() {
+    server.expect(requestTo(BASE + "/vocab/country"))
+        .andRespond(withSuccess("[{\"alpha2\":\"DE\",\"alpha3\":\"DEU\",\"name\":\"Germany\"}]",
+            MediaType.APPLICATION_JSON));
+
+    assertThat(client.countries()).containsEntry("DE", "Germany").containsEntry("DEU", "Germany").hasSize(2);
+    server.verify();
+  }
+
+  @Test
   void usageInfo404MapsToNotFound() {
     server.expect(requestTo(BASE + "/dataset/3LXR/taxon/MISSING/info"))
         .andRespond(withStatus(HttpStatus.NOT_FOUND));

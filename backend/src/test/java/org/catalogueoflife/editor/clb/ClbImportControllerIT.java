@@ -123,4 +123,28 @@ class ClbImportControllerIT extends AbstractPostgresIT {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("nothing selected to copy"));
   }
+
+  @Test
+  void languagesAreFetchedFromClbOnceAndServedWithACacheHeader() throws Exception {
+    ensureUser("clbSuggestUser");
+    when(clb.languages()).thenReturn(java.util.Map.of("nld", "Dutch"));
+
+    for (int i = 0; i < 2; i++) {
+      mvc.perform(get("/api/clb/vocab/languages"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.nld").value("Dutch"))
+          .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+              .string("Cache-Control", org.hamcrest.Matchers.containsString("max-age=86400")));
+    }
+    org.mockito.Mockito.verify(clb, org.mockito.Mockito.times(1)).languages();
+  }
+
+  @Test
+  void countriesAreServed() throws Exception {
+    ensureUser("clbSuggestUser");
+    when(clb.countries()).thenReturn(java.util.Map.of("DE", "Germany", "DEU", "Germany"));
+    mvc.perform(get("/api/clb/vocab/countries"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.DE").value("Germany"));
+  }
 }

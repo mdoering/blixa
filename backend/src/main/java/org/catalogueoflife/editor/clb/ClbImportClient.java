@@ -8,6 +8,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import life.catalogue.api.jackson.ApiModule;
 import life.catalogue.api.model.NameUsageBase;
 import life.catalogue.api.model.Synonym;
@@ -140,6 +141,32 @@ public class ClbImportClient {
   private static boolean isInaccessible(RestClientResponseException e) {
     int code = e.getStatusCode().value();
     return code == 401 || code == 403 || code == 404;
+  }
+
+  /** GET /vocab/language: ISO 639-3 code -> English language name (~8k entries, one flat object). */
+  public Map<String, String> languages() {
+    JsonNode root = getPage(UriComponentsBuilder.fromPath("/vocab/language"));
+    Map<String, String> out = new java.util.TreeMap<>();
+    root.properties().forEach(e -> out.put(e.getKey(), e.getValue().asText()));
+    return out;
+  }
+
+  /**
+   * GET /vocab/country: ISO 3166 code -> English country name, keyed by both the 2-letter and the
+   * 3-letter code (upper case), so either form a record carries resolves.
+   */
+  public Map<String, String> countries() {
+    JsonNode root = getPage(UriComponentsBuilder.fromPath("/vocab/country"));
+    Map<String, String> out = new java.util.TreeMap<>();
+    for (JsonNode c : root) {
+      String name = text(c, "name");
+      if (name == null) continue;
+      for (String f : List.of("alpha2", "alpha3")) {
+        String code = text(c, f);
+        if (code != null && !code.isBlank()) out.put(code.toUpperCase(java.util.Locale.ROOT), name);
+      }
+    }
+    return out;
   }
 
   /** GET /dataset?q={q}&limit=20, parsing the ResultPage's {@code .result[]} into hits. */

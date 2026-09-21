@@ -2,6 +2,7 @@ import { ActionIcon, Anchor, Badge, Button, Group, ScrollArea, Stack, Table, Tex
 import type { ReactNode } from 'react';
 import type { ClbComparison } from '../../api/clb';
 import DatasetLabel from '../../clb/DatasetLabel';
+import { useLanguageName } from '../../vocab/useVocab';
 
 // The "editor" side of the comparison, shaped to line up with ClbComparison.
 export interface OursSide {
@@ -73,8 +74,6 @@ function rankMap(items: { rank: string | null; name: string | null }[]): Map<str
 
 const typeLabel = (t: { status: string | null; citation: string | null; catalogNumber: string | null }) =>
   [t.status, t.citation ?? t.catalogNumber].filter(Boolean).join(': ');
-const vernacularLabel = (v: { name: string | null; language: string | null }) =>
-  v.language ? `${v.name ?? ''} (${v.language})` : v.name ?? '';
 const relationLabel = (r: { type: string | null; relatedName: string | null }) =>
   `${r.type ?? ''}: ${r.relatedName ?? ''}`;
 // Relations compare on type + related scientific name: our side's label carries no authorship.
@@ -98,6 +97,9 @@ export default function ClbComparisonView({
   clb: ClbComparison;
   copy?: CopyHandlers;
 }) {
+  const languageName = useLanguageName();
+  const vernacularLabel = (v: { name: string | null; language: string | null }) =>
+    v.language ? `${v.name ?? ''} (${languageName(v.language)})` : v.name ?? '';
   const clbByRank = rankMap(clb.classification);
   const oursByRank = rankMap(ours.classification);
 

@@ -31,6 +31,11 @@ export type FieldType =
   | 'entity'
   | 'autocomplete';
 
+// A stored value the options don't know (e.g. a legacy code) stays selectable instead of vanishing.
+function withCurrent(options: Option[], current: string): Option[] {
+  return current && !options.some((o) => o.value === current) ? [{ value: current, label: current }, ...options] : options;
+}
+
 export interface FieldDef<T = unknown> {
   name: string;
   label: string;
@@ -251,11 +256,13 @@ export default function ChildEntityTab<T>({
                   ) : f.type === 'select' || f.type === 'boolean' ? (
                     <Select
                       label={f.label}
-                      data={f.type === 'boolean' ? BOOL_OPTIONS : f.options ?? []}
+                      data={f.type === 'boolean' ? BOOL_OPTIONS : withCurrent(f.options ?? [], val)}
                       value={val || null}
                       onChange={(v) => set(v ?? '')}
                       clearable
                       searchable
+                      // long vocabularies (e.g. ~8k languages): search narrows, only render a page
+                      limit={(f.options?.length ?? 0) > 200 ? 100 : undefined}
                     />
                   ) : f.type === 'entity' ? (
                     <EntitySelect

@@ -2,6 +2,7 @@ package org.catalogueoflife.editor.clb;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import life.catalogue.api.model.Name;
 import life.catalogue.api.model.NameUsageBase;
 import life.catalogue.api.model.UsageInfo;
@@ -45,12 +46,14 @@ public class ClbImportController {
   private final ClbCompareService compareService;
   private final ClbDatasetLabelService datasetLabels;
   private final ClbClassificationService classification;
+  private final ClbVocabService vocab;
   private final CurrentUser currentUser;
 
   public ClbImportController(ClbImportService service, ClbImportClient client,
       ClbCompareService compareService, ClbDatasetLabelService datasetLabels,
-      ClbClassificationService classification, CurrentUser currentUser) {
+      ClbClassificationService classification, ClbVocabService vocab, CurrentUser currentUser) {
     this.service = service;
+    this.vocab = vocab;
     this.classification = classification;
     this.client = client;
     this.compareService = compareService;
@@ -92,6 +95,26 @@ public class ClbImportController {
   public ClbClassificationResult classificationApply(@PathVariable int pid, @PathVariable int focalId,
       @RequestBody ClbClassificationRequest req) {
     return classification.apply(currentUser.require().getId(), pid, focalId, req);
+  }
+
+  // ISO 639-3 code -> English language name (CLB's /vocab/language), cached server-side; the SPA loads
+  // it once per session to render vernacular languages by name.
+  @GetMapping("/api/clb/vocab/languages")
+  public org.springframework.http.ResponseEntity<Map<String, String>> languages() {
+    currentUser.require();
+    return org.springframework.http.ResponseEntity.ok()
+        .cacheControl(org.springframework.http.CacheControl.maxAge(java.time.Duration.ofDays(1)).cachePrivate())
+        .body(vocab.languages());
+  }
+
+  // ISO 3166 code (2- and 3-letter, upper case) -> English country name (CLB's /vocab/country), same
+  // caching as languages.
+  @GetMapping("/api/clb/vocab/countries")
+  public org.springframework.http.ResponseEntity<Map<String, String>> countries() {
+    currentUser.require();
+    return org.springframework.http.ResponseEntity.ok()
+        .cacheControl(org.springframework.http.CacheControl.maxAge(java.time.Duration.ofDays(1)).cachePrivate())
+        .body(vocab.countries());
   }
 
   @GetMapping("/api/clb/datasets")

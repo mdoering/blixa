@@ -633,7 +633,8 @@ test('the Vernaculars tab (accepted only) lists a vernacular name', async () => 
   await screen.findByLabelText('Scientific name');
   await userEvent.click(screen.getByRole('tab', { name: /vernaculars/i }));
   await screen.findByText('Lion');
-  expect(screen.getByText('eng')).toBeInTheDocument();
+  // the ISO 639-3 code renders with its English name (CLB vocab, default test handler)
+  expect(await screen.findByText('English')).toBeInTheDocument();
 });
 
 test('a synonym usage hides the taxon-level tabs', async () => {

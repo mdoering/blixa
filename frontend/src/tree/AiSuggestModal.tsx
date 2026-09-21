@@ -19,6 +19,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { messageFor } from '../api/client';
 import { requestSuggestions, type AiReferenceCard, type AiSynonymCard } from '../api/ai';
 import { createUsage, linkSynonym } from '../api/usages';
+import { useLanguageName } from '../vocab/useVocab';
 
 interface AiSuggestModalProps {
   pid: number;
@@ -62,6 +63,7 @@ export default function AiSuggestModal({
   onClose,
 }: AiSuggestModalProps) {
   const queryClient = useQueryClient();
+  const languageName = useLanguageName();
   const [done, setDone] = useState<Set<string>>(new Set());
   const suggest = useMutation({ mutationFn: () => requestSuggestions(pid, usageId) });
 
@@ -195,7 +197,7 @@ export default function AiSuggestModal({
             </Box>
           )}
 
-          <AiFactList title="Vernacular names" items={data.vernacularNames.map((v) => v.language ? `${v.name} (${v.language})` : v.name)} />
+          <AiFactList title="Vernacular names" items={data.vernacularNames.map((v) => v.language ? `${v.name} (${languageName(v.language)})` : v.name)} />
           <AiFactList title="Distribution" items={data.distributions.map((d) => d.area)} />
           <AiFactList title="Description" items={data.descriptions} />
           <AiFactList title="Etymology" items={data.etymology ? [data.etymology] : []} />

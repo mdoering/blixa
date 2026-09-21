@@ -33,6 +33,11 @@ export const server = setupServer(
       cslTypes: ['article-journal', 'book', 'chapter', 'thesis'],
     }),
   ),
+  // Default CLB language / country vocabularies (useVocab), a small slice so labels render by name.
+  http.get('/api/clb/vocab/languages', () => HttpResponse.json({ eng: 'English', nld: 'Dutch', deu: 'German' })),
+  http.get('/api/clb/vocab/countries', () =>
+    HttpResponse.json({ DE: 'Germany', DEU: 'Germany', NL: 'Netherlands', NLD: 'Netherlands' }),
+  ),
   // Default empty release history, so any owner-role render of ProjectMetadataPage's Releases
   // section doesn't need this mocked per-test unless it cares about the actual list.
   http.get('/api/projects/:id/releases', () => HttpResponse.json([])),
