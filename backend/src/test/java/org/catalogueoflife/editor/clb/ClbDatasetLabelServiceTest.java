@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import org.catalogueoflife.editor.clb.ClbImportClient.ClbDatasetRef;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,20 +18,26 @@ class ClbDatasetLabelServiceTest {
   @Test
   void resolvesLabelCachesSuccessAndFallsBackToKeyOnFailure() {
     ClbImportClient client = mock(ClbImportClient.class);
-    when(client.datasetLabel("3LXR")).thenReturn("COL"); // alias preferred by the client
-    when(client.datasetLabel("BAD"))
+    when(client.dataset("3LXR")).thenReturn(new ClbDatasetRef("Catalogue of Life", "COL", true));
+    when(client.dataset("PRIV")).thenReturn(ClbDatasetRef.INACCESSIBLE);
+    when(client.dataset("BAD"))
         .thenThrow(new ResponseStatusException(HttpStatus.BAD_GATEWAY, "CLB unavailable"));
     ClbDatasetLabelService svc = new ClbDatasetLabelService(client);
 
-    // A resolved label is returned and then served from cache -- only one CLB call for repeats.
+    // A resolved label (alias preferred) is returned and then served from cache.
     assertThat(svc.label("3LXR")).isEqualTo("COL");
     assertThat(svc.label("3LXR")).isEqualTo("COL");
-    verify(client, times(1)).datasetLabel("3LXR");
+    verify(client, times(1)).dataset("3LXR");
+
+    // A private dataset has no label (falls back to the key), is marked inaccessible, and is cached.
+    assertThat(svc.label("PRIV")).isEqualTo("PRIV");
+    assertThat(svc.dataset("PRIV").accessible()).isFalse();
+    verify(client, times(1)).dataset("PRIV");
 
     // A failed lookup falls back to the key itself and is NOT cached (so it retries next time).
     assertThat(svc.label("BAD")).isEqualTo("BAD");
     assertThat(svc.label("BAD")).isEqualTo("BAD");
-    verify(client, times(2)).datasetLabel("BAD");
+    verify(client, times(2)).dataset("BAD");
 
     // Blank/null keys pass through untouched, never hitting CLB.
     assertThat(svc.label("")).isEmpty();

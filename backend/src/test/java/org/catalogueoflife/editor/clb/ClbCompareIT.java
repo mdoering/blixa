@@ -98,4 +98,33 @@ class ClbCompareIT extends AbstractPostgresIT {
        .andExpect(jsonPath("$[0].datasetTitle").value("Catalogue of Life"))
        .andExpect(jsonPath("$[0].scientificName").value("Panthera leo"));
   }
+
+  @Test
+  @WithMockUser(username = "cmpUser3")
+  void globalUsageSearchHidesPrivateDatasetsAndFillsTitles() throws Exception {
+    ensureUser("cmpUser3");
+    when(clb.searchUsagesAllDatasets(eq("Anoiapithecus"), isNull()))
+        .thenReturn(List.of(
+            new ClbGlobalUsageHit("201890", null, "3607727", "Anoiapithecus", null, "unranked", "accepted"),
+            new ClbGlobalUsageHit("310869", null, "4457929", "Anoiapithecus", null, "unranked", "accepted")));
+    when(clb.dataset(eq("201890"))).thenReturn(new ClbImportClient.ClbDatasetRef("Paleobiology Database", "PBDB", true));
+    when(clb.dataset(eq("310869"))).thenReturn(ClbImportClient.ClbDatasetRef.INACCESSIBLE);
+
+    mvc.perform(get("/api/clb/usages").param("q", "Anoiapithecus"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.length()").value(1))
+       .andExpect(jsonPath("$[0].datasetKey").value("201890"))
+       .andExpect(jsonPath("$[0].datasetTitle").value("Paleobiology Database"));
+  }
+
+  @Test
+  @WithMockUser(username = "cmpUser4")
+  void compareOnPrivateDatasetIs403() throws Exception {
+    ensureUser("cmpUser4");
+    when(clb.usageInfo(eq("310869"), eq("4457929")))
+        .thenThrow(new org.springframework.web.server.ResponseStatusException(
+            org.springframework.http.HttpStatus.FORBIDDEN, "This ChecklistBank dataset is private"));
+
+    mvc.perform(get("/api/clb/310869/compare/4457929")).andExpect(status().isForbidden());
+  }
 }

@@ -3,12 +3,14 @@ package org.catalogueoflife.editor.clb;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import life.catalogue.api.model.Name;
 import life.catalogue.api.model.NameUsageBase;
 import life.catalogue.api.model.SimpleName;
 import life.catalogue.api.model.Synonym;
 import life.catalogue.api.model.Synonymy;
 import life.catalogue.api.model.UsageInfo;
+import org.catalogueoflife.editor.clb.ClbImportClient.ClbDatasetRef;
 import org.catalogueoflife.editor.clb.ClbImportClient.ClbGlobalUsageHit;
 import org.catalogueoflife.editor.clb.dto.ClbComparison;
 import org.catalogueoflife.editor.clb.dto.ClbRankName;
@@ -21,9 +23,11 @@ import org.springframework.stereotype.Service;
 public class ClbCompareService {
 
   private final ClbImportClient client;
+  private final ClbDatasetLabelService datasets;
 
-  public ClbCompareService(ClbImportClient client) {
+  public ClbCompareService(ClbImportClient client, ClbDatasetLabelService datasets) {
     this.client = client;
+    this.datasets = datasets;
   }
 
   public ClbComparison compare(String datasetKey, String taxonId) {
@@ -31,8 +35,25 @@ public class ClbCompareService {
     return map(info, datasetKey, client.datasetTitle(datasetKey));
   }
 
+  /**
+   * CLB's global name search also lists usages of private datasets, which our anonymous client can
+   * then not open (the comparison 401s). Drop those hits, and fill in each hit's dataset title from
+   * the (cached) dataset lookup. A dataset CLB couldn't be asked about is kept, as before.
+   */
   public List<ClbGlobalUsageHit> searchAllDatasets(String q, String rank) {
-    return client.searchUsagesAllDatasets(q, rank);
+    List<ClbGlobalUsageHit> hits = client.searchUsagesAllDatasets(q, rank);
+    Map<String, ClbDatasetRef> refs = datasets.datasets(hits.stream().map(ClbGlobalUsageHit::datasetKey).toList());
+    List<ClbGlobalUsageHit> out = new ArrayList<>();
+    for (ClbGlobalUsageHit h : hits) {
+      ClbDatasetRef ref = refs.get(h.datasetKey());
+      if (ref == null) {
+        out.add(h);
+      } else if (ref.accessible()) {
+        out.add(new ClbGlobalUsageHit(h.datasetKey(), ref.title() != null ? ref.title() : h.datasetTitle(),
+            h.id(), h.scientificName(), h.authorship(), h.rank(), h.status()));
+      }
+    }
+    return out;
   }
 
   static ClbComparison map(UsageInfo info, String datasetKey, String datasetTitle) {

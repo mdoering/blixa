@@ -13,6 +13,7 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
+import { messageFor } from '../../api/client';
 import { getSynonyms, getUsage } from '../../api/usages';
 import { getProject } from '../../api/projects';
 import { getPath } from '../../api/tree';
@@ -267,6 +268,11 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
               ← Pick another target
             </Button>
             {comparison.isLoading && <Loader />}
+            {comparison.isError && (
+              <Text size="sm" c="red">
+                {messageFor(comparison.error, 'Could not load this taxon from ChecklistBank')}
+              </Text>
+            )}
             {comparison.data && ours && <ClbComparisonView ours={ours} clb={comparison.data} />}
           </>
         )}

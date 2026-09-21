@@ -141,3 +141,24 @@ test('by dataset: pick a dataset, then click a name hit to compare; no hits show
   await userEvent.click(await screen.findByText('Panthera leo'));
   expect(await screen.findByText('Mill.')).toBeInTheDocument();
 });
+
+test('a failing comparison shows the error instead of an empty pane', async () => {
+  server.use(
+    http.get('/api/projects/3/usages/5', () => HttpResponse.json(usage)),
+    http.get('/api/projects/3', () => HttpResponse.json({ id: 3, role: 'editor', favoriteClbDatasets: [] })),
+    http.get('/api/projects/3/tree/path/5', () => HttpResponse.json([])),
+    http.get('/api/projects/3/usages/5/synonyms', () => HttpResponse.json([])),
+    http.get('/api/clb/usages', () =>
+      HttpResponse.json([
+        { datasetKey: '9', datasetTitle: 'X', id: 't1', scientificName: 'Panthera leo', authorship: null, rank: 'species', status: 'accepted' },
+      ]),
+    ),
+    http.get('/api/clb/dataset-labels', () => HttpResponse.json({ '9': 'X' })),
+    http.get('/api/clb/9/compare/t1', () =>
+      HttpResponse.json({ error: 'This ChecklistBank dataset is private' }, { status: 403 }),
+    ),
+  );
+  renderWithProviders(<CompareClbModal pid={3} usageId={5} opened onClose={() => {}} />);
+  await userEvent.click(await screen.findByText(/Panthera leo/));
+  expect(await screen.findByText(/private|could not load/i)).toBeInTheDocument();
+});

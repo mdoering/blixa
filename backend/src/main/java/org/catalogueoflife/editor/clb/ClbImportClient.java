@@ -100,14 +100,43 @@ public class ClbImportClient {
   }
 
   /**
-   * GET /dataset/{key}, returning a human-readable label to show in place of the opaque key: the
-   * dataset's short {@code alias} when set, else its {@code title} (null if neither / unavailable).
-   * Reads only those two fields off the response, not the full dataset metadata.
+   * A CLB dataset as our (anonymous) client sees it. {@code accessible} is false when CLB refuses it
+   * (private: 401/403) or it doesn't exist (404) -- its usages can then be neither compared nor
+   * imported, even though CLB's global name search may still list them.
    */
-  public String datasetLabel(String key) {
-    JsonNode ds = getPage(UriComponentsBuilder.fromPath("/dataset/{ds}"), key);
-    String alias = text(ds, "alias");
-    return alias != null && !alias.isBlank() ? alias : text(ds, "title");
+  public record ClbDatasetRef(String title, String alias, boolean accessible) {
+    public static final ClbDatasetRef INACCESSIBLE = new ClbDatasetRef(null, null, false);
+
+    /** Human-readable label in place of the opaque key: the short alias when set, else the title. */
+    public String label() {
+      return alias != null && !alias.isBlank() ? alias : title;
+    }
+  }
+
+  /**
+   * GET /dataset/{key}, reading just its alias + title. A private/unknown dataset comes back as
+   * {@link ClbDatasetRef#INACCESSIBLE}; any other failure (CLB down, 5xx) throws.
+   */
+  public ClbDatasetRef dataset(String key) {
+    String uri = UriComponentsBuilder.fromPath("/dataset/{ds}").encode().buildAndExpand(key).toUriString();
+    try {
+      JsonNode ds = mapper.readTree(http.get().uri(uri).retrieve().body(String.class));
+      return new ClbDatasetRef(text(ds, "title"), text(ds, "alias"), true);
+    } catch (RestClientResponseException e) {
+      if (isInaccessible(e)) {
+        return ClbDatasetRef.INACCESSIBLE;
+      }
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "CLB request failed");
+    } catch (RestClientException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "CLB unavailable");
+    } catch (IOException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "could not parse CLB response");
+    }
+  }
+
+  private static boolean isInaccessible(RestClientResponseException e) {
+    int code = e.getStatusCode().value();
+    return code == 401 || code == 403 || code == 404;
   }
 
   /** GET /dataset?q={q}&limit=20, parsing the ResultPage's {@code .result[]} into hits. */
@@ -196,6 +225,10 @@ public class ClbImportClient {
     } catch (RestClientResponseException e) {
       if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
         throw new ResponseStatusException(HttpStatus.NOT_FOUND, "CLB taxon not found");
+      }
+      int code = e.getStatusCode().value();
+      if (code == 401 || code == 403) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This ChecklistBank dataset is private");
       }
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "CLB taxon lookup failed");
     } catch (RestClientException e) {
