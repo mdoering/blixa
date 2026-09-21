@@ -14,14 +14,20 @@ import org.catalogueoflife.editor.child.dto.NameRelationResponse;
 public interface NameRelationMapper {
 
   String SELECT = """
-      SELECT nr.id, nr.usage_id, nr.related_usage_id, r.scientific_name AS related_name,
-             nr.type, nr.reference_id, nr.page, nr.remarks, nr.version
+      SELECT nr.id, nr.usage_id, u.scientific_name AS usage_name, nr.related_usage_id,
+             r.scientific_name AS related_name, nr.type, nr.reference_id, nr.page, nr.remarks,
+             nr.version
       FROM name_relation nr
+      LEFT JOIN name_usage u ON u.project_id = nr.project_id AND u.id = nr.usage_id
       LEFT JOIN name_usage r ON r.project_id = nr.project_id AND r.id = nr.related_usage_id
       """;
 
   @Select(SELECT + " WHERE nr.project_id = #{projectId} AND nr.usage_id = #{usageId} ORDER BY nr.id")
   List<NameRelationResponse> findByUsage(@Param("projectId") int projectId, @Param("usageId") int usageId);
+
+  // Reverse direction: relations other usages hold that point AT this usage (related_usage_id).
+  @Select(SELECT + " WHERE nr.project_id = #{projectId} AND nr.related_usage_id = #{usageId} ORDER BY nr.id")
+  List<NameRelationResponse> findByRelated(@Param("projectId") int projectId, @Param("usageId") int usageId);
 
   @Select(SELECT + " WHERE nr.project_id = #{projectId} ORDER BY nr.id")
   List<NameRelationResponse> findByProject(@Param("projectId") int projectId);

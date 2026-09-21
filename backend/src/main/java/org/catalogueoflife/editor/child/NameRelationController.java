@@ -32,6 +32,11 @@ public class NameRelationController {
     return service.list(currentUser.require().getId(), pid, uid);
   }
 
+  @GetMapping("/reverse")
+  public List<NameRelationResponse> listReverse(@PathVariable int pid, @PathVariable int uid) {
+    return service.listReverse(currentUser.require().getId(), pid, uid);
+  }
+
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public NameRelationResponse create(@PathVariable int pid, @PathVariable int uid,

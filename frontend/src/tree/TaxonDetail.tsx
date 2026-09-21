@@ -807,7 +807,7 @@ export default function TaxonDetail({ pid, usageId, onNavigate }: TaxonDetailPro
         </Tabs.Panel>
 
         <Tabs.Panel value="names" pt="md">
-          <NameRelationsTab pid={pid} usageId={usageId} canEdit={canEdit} />
+          <NameRelationsTab pid={pid} usageId={usageId} canEdit={canEdit} onNavigate={onNavigate} />
         </Tabs.Panel>
 
         <Tabs.Panel value="types" pt="md">

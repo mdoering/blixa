@@ -69,6 +69,15 @@ class NameRelationIT extends AbstractPostgresIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].id").value((int) relId));
 
+    // reverse: b sees the relation a holds pointing at it, with a's name; a has none pointing at it
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + b + "/relations/reverse"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value((int) relId))
+        .andExpect(jsonPath("$[0].usageId").value((int) a))
+        .andExpect(jsonPath("$[0].usageName").value("Aus bus"));
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + a + "/relations/reverse"))
+        .andExpect(jsonPath("$.length()").value(0));
+
     // update (version CAS)
     mvc.perform(put("/api/projects/" + pid + "/usages/" + a + "/relations/" + relId).with(csrf())
             .contentType(MediaType.APPLICATION_JSON)

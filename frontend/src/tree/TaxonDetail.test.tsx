@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { notifications } from '@mantine/notifications';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { renderWithProviders } from '../test/utils';
 
 // Mantine's notification store is a module-level singleton, not reset when the Notifications
@@ -87,6 +87,7 @@ function mockCommon(usage = baseUsage(), role = 'owner') {
     http.get('/api/projects/4/usages/10/synonyms', () => HttpResponse.json([])),
     http.get('/api/projects/4/usages/10/accepted', () => HttpResponse.json([])),
     http.get('/api/projects/4/usages/10/relations', () => HttpResponse.json([])),
+    http.get('/api/projects/4/usages/10/relations/reverse', () => HttpResponse.json([])),
     http.get('/api/projects/4/usages/10/type-material', () => HttpResponse.json([])),
     http.get('/api/projects/4/usages/10/vernaculars', () => HttpResponse.json([])),
     http.get('/api/projects/4/usages/10/distributions', () => HttpResponse.json([])),
@@ -365,7 +366,7 @@ test('a synonym shows no taxon-level tabs (Synonyms, Vernaculars, Distribution, 
   expect(screen.queryByRole('tab', { name: 'Biology' })).not.toBeInTheDocument();
 });
 
-test('the Relations tab lists a basionym relation with the joined related name', async () => {
+test('the Relations tab links related names both ways and navigates on click', async () => {
   mockCommon();
   server.use(
     http.get('/api/projects/4/usages/10/relations', () =>
@@ -373,6 +374,7 @@ test('the Relations tab lists a basionym relation with the joined related name',
         {
           id: 5,
           usageId: 10,
+          usageName: 'Panthera leo',
           relatedUsageId: 12,
           relatedName: 'Felis leo Linnaeus, 1758',
           type: 'basionym',
@@ -383,14 +385,38 @@ test('the Relations tab lists a basionym relation with the joined related name',
         },
       ]),
     ),
+    http.get('/api/projects/4/usages/10/relations/reverse', () =>
+      HttpResponse.json([
+        {
+          id: 7,
+          usageId: 13,
+          usageName: 'Leo leo',
+          relatedUsageId: 10,
+          relatedName: 'Panthera leo',
+          type: 'homotypic',
+          referenceId: null,
+          page: null,
+          remarks: null,
+          version: 0,
+        },
+      ]),
+    ),
   );
-  renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
+  const onNavigate = vi.fn();
+  renderWithProviders(<TaxonDetail pid={4} usageId={10} onNavigate={onNavigate} />);
 
   await screen.findByLabelText('Scientific name');
   await userEvent.click(screen.getByRole('tab', { name: /relations/i }));
   await screen.findByText('basionym');
-  expect(screen.getByText('Felis leo Linnaeus, 1758')).toBeInTheDocument();
   expect(screen.getByText('42')).toBeInTheDocument();
+  await userEvent.click(screen.getByText('Felis leo Linnaeus, 1758'));
+  expect(onNavigate).toHaveBeenCalledWith(12);
+
+  // reverse: the relation Leo leo holds pointing at this name
+  expect(await screen.findByText('Relations from other names')).toBeInTheDocument();
+  expect(screen.getByText('homotypic')).toBeInTheDocument();
+  await userEvent.click(screen.getByText('Leo leo'));
+  expect(onNavigate).toHaveBeenCalledWith(13);
 });
 
 test('the Types tab lists a holotype with its institution and occurrenceID', async () => {

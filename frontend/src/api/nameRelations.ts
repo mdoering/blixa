@@ -3,6 +3,7 @@ import { api } from './client';
 export interface NameRelation {
   id: number;
   usageId: number;
+  usageName: string | null;
   relatedUsageId: number | null;
   relatedName: string | null;
   type: string | null;
@@ -16,6 +17,10 @@ const base = (pid: number, usageId: number) => `/api/projects/${pid}/usages/${us
 
 export function listNameRelations(pid: number, usageId: number): Promise<NameRelation[]> {
   return api<NameRelation[]>(base(pid, usageId));
+}
+// Relations other names hold that point AT this usage (read-only; edit them on the owning name).
+export function listReverseNameRelations(pid: number, usageId: number): Promise<NameRelation[]> {
+  return api<NameRelation[]>(`${base(pid, usageId)}/reverse`);
 }
 export function createNameRelation(
   pid: number,

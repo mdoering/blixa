@@ -46,6 +46,13 @@ public class NameRelationService {
     return mapper.findByUsage(projectId, usageId);
   }
 
+  // Relations owned by other usages whose target is this usage (read-only reverse view).
+  public List<NameRelationResponse> listReverse(int userId, int projectId, int usageId) {
+    projects.requireRole(userId, projectId);
+    requireUsage(projectId, usageId);
+    return mapper.findByRelated(projectId, usageId);
+  }
+
   @Transactional
   public NameRelationResponse create(int userId, int projectId, int usageId, NameRelationRequest req) {
     requireEditor(userId, projectId);
