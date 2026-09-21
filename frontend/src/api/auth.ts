@@ -1,4 +1,5 @@
 import { api } from './client';
+import { isSignedOut } from '../auth/signedOut';
 import type { Me } from './types';
 
 export function getMe(): Promise<Me> {
@@ -28,6 +29,8 @@ export function logout(): Promise<void> {
   return api<void>('/api/auth/logout', { method: 'POST' });
 }
 
+// After an explicit sign-out, ask ORCID to re-authenticate: our logout only ends the Blixa session,
+// and ORCID's own session would otherwise sign the same person straight back in.
 export function orcidLoginUrl(): string {
-  return '/oauth2/authorization/orcid';
+  return isSignedOut() ? '/oauth2/authorization/orcid?prompt=login' : '/oauth2/authorization/orcid';
 }

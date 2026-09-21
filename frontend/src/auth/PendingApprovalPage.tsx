@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
 import { messageFor } from '../api/client';
 import { logout, submitApplication } from '../api/auth';
+import { markSignedOut } from './signedOut';
 import { useMe } from './useMe';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -99,6 +100,7 @@ export default function PendingApprovalPage({ state }: { state: string }) {
         <Button
           variant="default"
           onClick={async () => {
+            markSignedOut();
             await logout();
             window.location.assign('/signin');
           }}

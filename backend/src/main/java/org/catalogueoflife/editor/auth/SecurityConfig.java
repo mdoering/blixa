@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
@@ -21,7 +22,8 @@ public class SecurityConfig {
   @Bean
   SecurityFilterChain filterChain(HttpSecurity http,
                                   org.catalogueoflife.editor.user.OrcidUserService orcidUserService,
-                                  org.catalogueoflife.editor.user.AppUserMapper appUserMapper) throws Exception {
+                                  org.catalogueoflife.editor.user.AppUserMapper appUserMapper,
+                                  ClientRegistrationRepository clientRegistrations) throws Exception {
     http
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/ping").permitAll()
@@ -54,7 +56,11 @@ public class SecurityConfig {
         // auth -- typically the SPA's own unauthenticated GET /api/me (which the ExceptionTranslation
         // filter still saves before the 401 entry point), sending the user to `/api/me?continue`
         // (raw JSON) instead of the app. alwaysUse=true ignores the saved request.
+        // prompt=login pass-through: after an explicit sign-out the SPA asks ORCID to re-authenticate
+        // (see PromptLoginAuthorizationRequestResolver).
         .oauth2Login(o -> o
+            .authorizationEndpoint(a -> a.authorizationRequestResolver(
+                new PromptLoginAuthorizationRequestResolver(clientRegistrations)))
             .userInfoEndpoint(u -> u.oidcUserService(orcidUserService))
             .defaultSuccessUrl("/projects", true))
         .logout(out -> out.logoutUrl("/api/auth/logout")

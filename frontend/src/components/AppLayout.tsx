@@ -1,10 +1,11 @@
 import { Anchor, AppShell, Burger, Group, Menu, UnstyledButton } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { IconLogout, IconUser } from '@tabler/icons-react';
-import { Link, Outlet, useMatch, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useMatch } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMe } from '../auth/useMe';
 import { logout } from '../api/auth';
+import { markSignedOut } from '../auth/signedOut';
 import CurrentProjectName from './CurrentProjectName';
 import AppSidebar from './AppSidebar';
 import AppFooter from './AppFooter';
@@ -16,7 +17,6 @@ import UserAvatar from './UserAvatar';
 
 export default function AppLayout() {
   const { data: me } = useMe();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [mobileOpened, { toggle: toggleMobile, close: closeMobile }] = useDisclosure(false);
@@ -31,11 +31,14 @@ export default function AppLayout() {
   const projectId = projectMatch ? Number(projectMatch.params.projectId) : null;
 
   async function onLogout() {
+    markSignedOut();
     try {
       await logout();
     } finally {
       queryClient.clear();
-      navigate('/signin', { replace: true });
+      // A full page load rather than an in-app navigate: while still mounted, RequireAuth would see
+      // the cleared/401 /api/me and bounce straight back into the ORCID sign-in redirect.
+      window.location.assign('/signin');
     }
   }
 

@@ -1,12 +1,18 @@
+import { useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { Center, Loader } from '@mantine/core';
 import { useMe } from './useMe';
 import PendingApprovalPage from './PendingApprovalPage';
 import SignInRedirect from './SignInRedirect';
+import { clearSignedOut } from './signedOut';
 import { readPendingInvite } from '../invite/pendingInvite';
 
 export default function RequireAuth() {
   const { data, isLoading, isError } = useMe();
+  // Signed in again: later sign-ins no longer need to force ORCID re-authentication.
+  useEffect(() => {
+    if (data) clearSignedOut();
+  }, [data]);
   if (isLoading)
     return (
       <Center style={{ margin: 48 }}>
