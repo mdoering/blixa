@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
+import life.catalogue.api.model.Synonym;
 import life.catalogue.api.model.UsageInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,25 @@ class ClbImportClientIT {
     assertThat(info.getSynonyms().getHomotypic().get(0).getName().getScientificName()).isEqualTo("Felis leo");
     assertThat(info.getDistributions()).hasSize(1);
     assertThat(info.getVernacularNames()).hasSize(1);
+    server.verify();
+  }
+
+  @Test
+  void usageInfoOfASynonymDeserializesItAsSynonymWithItsAcceptedName() {
+    // Trimmed from a live GET /dataset/3LXR/taxon/CFSCR/info: .../taxon/{id}/info also answers for a
+    // synonym id, with `usage` being the synonym (status + nested `accepted` taxon).
+    server.expect(requestTo(BASE + "/dataset/3LXR/taxon/CFSCR/info"))
+        .andRespond(withSuccess(SYNONYM_INFO_JSON, MediaType.APPLICATION_JSON));
+
+    UsageInfo info = client.usageInfo("3LXR", "CFSCR");
+
+    assertThat(info.getUsage()).isInstanceOf(Synonym.class);
+    Synonym syn = (Synonym) info.getUsage();
+    assertThat(syn.getName().getScientificName()).isEqualTo("Felis leo");
+    assertThat(syn.getStatus().name()).isEqualTo("SYNONYM");
+    assertThat(syn.getAccepted().getId()).isEqualTo("4CGXP");
+    assertThat(syn.getAccepted().getName().getScientificName()).isEqualTo("Panthera leo");
+    assertThat(info.getClassification()).hasSize(3);
     server.verify();
   }
 
@@ -197,6 +217,71 @@ class ClbImportClientIT {
           "ref-1": {"id": "ref-1", "citation": "Syst. Nat., 10th ed. vol.1 p.41"},
           "ref-2": {"id": "ref-2", "citation": "Some other reference"}
         }
+      }
+      """;
+
+  private static final String SYNONYM_INFO_JSON = """
+      {
+        "usage": {
+          "datasetKey": 316165,
+          "id": "CFSCR",
+          "name": {
+            "id": "QLng8qk1pMuP8xK3HoTYj0",
+            "scientificName": "Felis leo",
+            "authorship": "Linnaeus, 1758",
+            "rank": "species",
+            "genus": "Felis",
+            "specificEpithet": "leo",
+            "code": "zoological"
+          },
+          "status": "synonym",
+          "origin": "source",
+          "parentId": "4CGXP",
+          "accepted": {
+            "datasetKey": 316165,
+            "id": "4CGXP",
+            "name": {
+              "id": "oPaKiQti0n9X68Co9cBF81",
+              "scientificName": "Panthera leo",
+              "authorship": "(Linnaeus, 1758)",
+              "rank": "species",
+              "genus": "Panthera",
+              "specificEpithet": "leo",
+              "code": "zoological"
+            },
+            "status": "accepted",
+            "parentId": "6DBT"
+          }
+        },
+        "classification": [
+          {
+            "id": "628LP",
+            "name": "Pantherinae",
+            "authorship": "Pocock, 1917",
+            "rank": "subfamily",
+            "label": "Pantherinae Pocock, 1917",
+            "labelHtml": "Pantherinae Pocock, 1917"
+          },
+          {
+            "id": "6DBT",
+            "name": "Panthera",
+            "authorship": "Oken, 1816",
+            "rank": "genus",
+            "label": "Panthera Oken, 1816",
+            "labelHtml": "<i>Panthera</i> Oken, 1816"
+          },
+          {
+            "id": "4CGXP",
+            "name": "Panthera leo",
+            "authorship": "(Linnaeus, 1758)",
+            "rank": "species",
+            "code": "zoological",
+            "status": "accepted",
+            "label": "Panthera leo (Linnaeus, 1758)",
+            "labelHtml": "<i>Panthera leo</i> (Linnaeus, 1758)",
+            "parentId": "6DBT"
+          }
+        ]
       }
       """;
 }

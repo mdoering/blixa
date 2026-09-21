@@ -23,6 +23,7 @@ const clbComparison = {
   authorship: '(Linnaeus, 1758)',
   rank: 'species',
   status: 'ACCEPTED',
+  acceptedName: null,
   classification: [{ rank: 'family', name: 'Felidae' }],
   synonyms: [],
 };
@@ -161,4 +162,35 @@ test('a failing comparison shows the error instead of an empty pane', async () =
   renderWithProviders(<CompareClbModal pid={3} usageId={5} opened onClose={() => {}} />);
   await userEvent.click(await screen.findByText(/Panthera leo/));
   expect(await screen.findByText(/private|could not load/i)).toBeInTheDocument();
+});
+
+test('comparing a CLB synonym shows its accepted name', async () => {
+  server.use(
+    http.get('/api/projects/3/usages/5', () => HttpResponse.json(usage)),
+    http.get('/api/projects/3', () => HttpResponse.json({ id: 3, role: 'editor', favoriteClbDatasets: [] })),
+    http.get('/api/projects/3/tree/path/5', () => HttpResponse.json([])),
+    http.get('/api/projects/3/usages/5/synonyms', () => HttpResponse.json([])),
+    http.get('/api/clb/usages', () =>
+      HttpResponse.json([
+        { datasetKey: '3LXR', datasetTitle: null, id: 'CFSCR', scientificName: 'Felis leo', authorship: 'Linnaeus, 1758', rank: 'species', status: 'synonym' },
+      ]),
+    ),
+    http.get('/api/clb/dataset-labels', () => HttpResponse.json({ '3LXR': 'COL' })),
+    http.get('/api/clb/3LXR/compare/CFSCR', () =>
+      HttpResponse.json({
+        ...clbComparison,
+        taxonId: 'CFSCR',
+        link: 'https://www.checklistbank.org/dataset/3LXR/nameusage/CFSCR',
+        scientificName: 'Felis leo',
+        authorship: 'Linnaeus, 1758',
+        status: 'SYNONYM',
+        acceptedName: 'Panthera leo (Linnaeus, 1758)',
+      }),
+    ),
+  );
+  renderWithProviders(<CompareClbModal pid={3} usageId={5} opened onClose={() => {}} />);
+  await userEvent.click(await screen.findByText(/Felis leo/));
+
+  expect(await screen.findByText('Accepted name')).toBeInTheDocument();
+  expect(screen.getByText('Panthera leo (Linnaeus, 1758)')).toBeInTheDocument();
 });

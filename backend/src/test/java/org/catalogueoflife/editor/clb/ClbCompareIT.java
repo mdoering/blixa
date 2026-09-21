@@ -127,4 +127,33 @@ class ClbCompareIT extends AbstractPostgresIT {
 
     mvc.perform(get("/api/clb/310869/compare/4457929")).andExpect(status().isForbidden());
   }
+
+  @Test
+  @WithMockUser(username = "cmpUser5")
+  void compareASynonymShowsItsAcceptedNameAndNameusageLink() throws Exception {
+    ensureUser("cmpUser5");
+    Name an = new Name();
+    an.setScientificName("Panthera leo");
+    an.setAuthorship("(Linnaeus, 1758)");
+    an.setRank(Rank.SPECIES);
+    Taxon acc = new Taxon(an);
+    acc.setId("4CGXP");
+    Name sn = new Name();
+    sn.setScientificName("Felis leo");
+    sn.setAuthorship("Linnaeus, 1758");
+    sn.setRank(Rank.SPECIES);
+    Synonym syn = new Synonym(sn);
+    syn.setId("CFSCR");
+    syn.setStatus(TaxonomicStatus.SYNONYM);
+    syn.setAccepted(acc);
+    when(clb.usageInfo(eq("3LXR"), eq("CFSCR"))).thenReturn(new UsageInfo(syn));
+    when(clb.datasetTitle(eq("3LXR"))).thenReturn("Catalogue of Life");
+
+    mvc.perform(get("/api/clb/3LXR/compare/CFSCR"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.scientificName").value("Felis leo"))
+       .andExpect(jsonPath("$.status").value("SYNONYM"))
+       .andExpect(jsonPath("$.acceptedName").value("Panthera leo (Linnaeus, 1758)"))
+       .andExpect(jsonPath("$.link").value("https://www.checklistbank.org/dataset/3LXR/nameusage/CFSCR"));
+  }
 }

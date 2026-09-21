@@ -55,6 +55,13 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
     enabled: opened,
   });
   const isAccepted = (usage?.status ?? '').toUpperCase() === 'ACCEPTED';
+  // Our focal's accepted name when it is a synonym, lined up against CLB's (see ClbComparisonView).
+  const acceptedId = !isAccepted ? usage?.acceptedParentIds?.[0] ?? null : null;
+  const { data: accepted } = useQuery({
+    queryKey: ['usage', pid, acceptedId],
+    queryFn: () => getUsage(pid, acceptedId as number),
+    enabled: opened && acceptedId != null,
+  });
   const { data: path } = useQuery({
     queryKey: ['path', pid, usageId],
     queryFn: () => getPath(pid, usageId),
@@ -81,6 +88,9 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
       authorship: usage.authorship,
       rank: usage.rank,
       status: usage.status,
+      acceptedName: accepted
+        ? [accepted.scientificName, accepted.authorship].filter(Boolean).join(' ')
+        : null,
       // path is root>leaf including the focal itself; drop the focal for the higher classification
       classification: (path ?? [])
         .filter((p) => p.id !== usageId)
@@ -91,7 +101,7 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
         status: s.status,
       })),
     };
-  }, [usage, path, synonyms, usageId]);
+  }, [usage, accepted, path, synonyms, usageId]);
 
   const [mode, setMode] = useState<'all' | 'dataset'>('all');
   const [nameQ, setNameQ] = useState('');

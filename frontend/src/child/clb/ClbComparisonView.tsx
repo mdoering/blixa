@@ -8,6 +8,8 @@ export interface OursSide {
   authorship: string | null;
   rank: string | null;
   status: string | null;
+  // "scientificName authorship" of the accepted name when the focal usage is a synonym.
+  acceptedName?: string | null;
   classification: { rank: string | null; name: string | null }[];
   synonyms: { scientificName: string | null; authorship: string | null; status: string | null }[];
 }
@@ -113,6 +115,8 @@ export default function ClbComparisonView({ ours, clb }: { ours: OursSide; clb: 
         {scalar('Authorship', ours.authorship, clb.authorship)}
         {scalar('Rank', ours.rank, clb.rank)}
         {scalar('Status', ours.status, clb.status)}
+        {(ours.acceptedName || clb.acceptedName) &&
+          scalar('Accepted name', ours.acceptedName ?? null, clb.acceptedName)}
         <Table.Tr>
           <Table.Th>Classification</Table.Th>
           <Table.Td>{classificationCell(ours.classification, clbByRank)}</Table.Td>

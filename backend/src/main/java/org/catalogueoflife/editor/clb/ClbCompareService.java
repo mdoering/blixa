@@ -59,7 +59,16 @@ public class ClbCompareService {
   static ClbComparison map(UsageInfo info, String datasetKey, String datasetTitle) {
     NameUsageBase u = info.getUsage();
     Name n = u.getName();
-    String link = "https://www.checklistbank.org/dataset/" + datasetKey + "/taxon/" + u.getId();
+    // CLB's UI serves a synonym under /nameusage/ (its /taxon/ route is for accepted taxa only).
+    String acceptedName = null;
+    if (u instanceof Synonym s && s.getAccepted() != null && s.getAccepted().getName() != null) {
+      Name an = s.getAccepted().getName();
+      acceptedName = an.getAuthorship() == null || an.getAuthorship().isBlank()
+          ? an.getScientificName()
+          : an.getScientificName() + " " + an.getAuthorship();
+    }
+    String link = "https://www.checklistbank.org/dataset/" + datasetKey
+        + (u instanceof Synonym ? "/nameusage/" : "/taxon/") + u.getId();
 
     List<ClbRankName> classification = new ArrayList<>();
     if (info.getClassification() != null) {
@@ -80,7 +89,7 @@ public class ClbCompareService {
     return new ClbComparison(datasetKey, datasetTitle, u.getId(), link,
         n == null ? null : n.getScientificName(), n == null ? null : n.getAuthorship(),
         lower(n == null || n.getRank() == null ? null : n.getRank().name()),
-        u.getStatus() == null ? null : u.getStatus().name(), classification, synonyms);
+        u.getStatus() == null ? null : u.getStatus().name(), acceptedName, classification, synonyms);
   }
 
   private static void addSyns(List<ClbSynonym> out, List<Synonym> syns) {

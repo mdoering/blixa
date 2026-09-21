@@ -13,5 +13,7 @@ public record ClbComparison(
     String authorship,
     String rank,
     String status,
+    // "scientificName authorship" of the accepted name when this CLB usage is a synonym, else null.
+    String acceptedName,
     List<ClbRankName> classification,
     List<ClbSynonym> synonyms) {}

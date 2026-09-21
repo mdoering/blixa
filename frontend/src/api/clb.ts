@@ -132,6 +132,8 @@ export interface ClbComparison {
   authorship: string | null;
   rank: string | null;
   status: string | null;
+  // "scientificName authorship" of the accepted name when this CLB usage is a synonym, else null.
+  acceptedName: string | null;
   classification: ClbRankName[];
   synonyms: ClbComparisonSynonym[];
 }

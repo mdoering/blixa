@@ -8,6 +8,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import life.catalogue.api.jackson.ApiModule;
+import life.catalogue.api.model.NameUsageBase;
+import life.catalogue.api.model.Synonym;
 import life.catalogue.api.model.Taxon;
 import life.catalogue.api.model.UsageInfo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,8 +51,8 @@ public class ClbImportClient {
   // InvalidDefinitionException -- CLB itself apparently never round-trips UsageInfo back through
   // Jackson, only ever serializes it out, so this path was never exercised upstream). This mixin
   // tells Jackson to skip "usage" entirely when populating an already-constructed UsageInfo (see
-  // usageInfo() below, which deserializes `usage` separately as a concrete Taxon -- the only type
-  // GET .../taxon/{id}/info can ever return -- and passes it to UsageInfo's one constructor first).
+  // usageInfo() below, which deserializes `usage` separately as a concrete Taxon, or Synonym for a
+  // synonym id, and passes it to UsageInfo's one constructor first).
   @JsonIgnoreProperties({"usage"})
   private interface UsageInfoMixin {}
 
@@ -236,13 +238,27 @@ public class ClbImportClient {
     }
     try {
       JsonNode root = mapper.readTree(body);
-      Taxon usage = mapper.treeToValue(root.path("usage"), Taxon.class);
+      JsonNode usageNode = root.path("usage");
+      NameUsageBase usage = isSynonym(usageNode)
+          ? mapper.treeToValue(usageNode, Synonym.class)
+          : mapper.treeToValue(usageNode, Taxon.class);
       UsageInfo info = new UsageInfo(usage);
       mapper.readerForUpdating(info).readValue(root);
       return info;
     } catch (IOException e) {
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "could not parse CLB taxon info");
     }
+  }
+
+  // .../taxon/{id}/info also answers for a synonym id (verified live): `usage` is then the synonym,
+  // carrying its nested `accepted` taxon. Taxon can't hold that (its status must be a taxon status).
+  private static boolean isSynonym(JsonNode usage) {
+    if (usage.hasNonNull("accepted")) {
+      return true;
+    }
+    String status = text(usage, "status");
+    return status != null && (status.toLowerCase(java.util.Locale.ROOT).contains("synonym")
+        || status.equalsIgnoreCase("misapplied"));
   }
 
   /**
