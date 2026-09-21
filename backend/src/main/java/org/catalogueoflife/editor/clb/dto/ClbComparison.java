@@ -16,4 +16,13 @@ public record ClbComparison(
     // "scientificName authorship" of the accepted name when this CLB usage is a synonym, else null.
     String acceptedName,
     List<ClbRankName> classification,
-    List<ClbSynonym> synonyms) {}
+    List<ClbSynonym> synonyms,
+    List<ClbVernacular> vernacularNames,
+    String etymology,
+    // lower-case gender of the name (genus-level names), e.g. "feminine"
+    String gender,
+    // citation of the name's published-in reference, and the page within it
+    String publishedIn,
+    String publishedInPage,
+    List<ClbTypeMaterial> typeMaterial,
+    List<ClbNameRelation> nameRelations) {}

@@ -213,13 +213,14 @@ public final class ClbUsageMapper {
     return new MappedDistribution(r, d.getReferenceId());
   }
 
-  public record MappedVernacular(VernacularRequest request, String clbReferenceId) {}
+  // clbId: the CLB vernacular's own id, so a single record can be picked (Compare-with-CLB copy).
+  public record MappedVernacular(VernacularRequest request, String clbReferenceId, String clbId) {}
 
   public static MappedVernacular toVernacularRequest(VernacularName vn) {
     VernacularRequest r = new VernacularRequest(vn.getName(), vn.getLanguage(),
         vn.getCountry() == null ? null : vn.getCountry().getIso2LetterCode(),
         lower(vn.getSex()), vn.isPreferred(), null, vn.getRemarks(), null);
-    return new MappedVernacular(r, vn.getReferenceId());
+    return new MappedVernacular(r, vn.getReferenceId(), vn.getId() == null ? null : String.valueOf(vn.getId()));
   }
 
   // Media has no reference linkage in our own model at all (MediaRequest carries no referenceId
@@ -257,7 +258,8 @@ public final class ClbUsageMapper {
   // these two need the owning CLB name/usage id carried alongside the request, since either the
   // accepted taxon's OR any synonym's name can own one.
 
-  public record MappedTypeMaterial(TypeMaterialRequest request, String clbReferenceId) {}
+  // clbId: the CLB type material's own id, so a single record can be picked (Compare-with-CLB copy).
+  public record MappedTypeMaterial(TypeMaterialRequest request, String clbReferenceId, String clbId) {}
 
   public static MappedTypeMaterial toTypeMaterialRequest(TypeMaterial tm) {
     TypeMaterialRequest r = new TypeMaterialRequest(
@@ -277,7 +279,7 @@ public final class ClbUsageMapper {
         parseDouble(tm.getLatitude()),
         parseDouble(tm.getLongitude()),
         null);
-    return new MappedTypeMaterial(r, tm.getReferenceId());
+    return new MappedTypeMaterial(r, tm.getReferenceId(), tm.getId());
   }
 
   /** {@code UsageInfo.getTypeMaterial()} is already keyed by CLB nameID; this just maps each value list. */

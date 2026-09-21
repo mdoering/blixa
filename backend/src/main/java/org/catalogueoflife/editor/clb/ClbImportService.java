@@ -10,6 +10,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.IntConsumer;
+import java.util.function.UnaryOperator;
 import org.catalogueoflife.editor.child.DistributionMapper;
 import org.catalogueoflife.editor.child.EstimateMapper;
 import org.catalogueoflife.editor.child.MediaMapper;
@@ -32,6 +34,8 @@ import org.catalogueoflife.editor.clb.ClbUsageMapper.MappedProperty;
 import org.catalogueoflife.editor.clb.ClbUsageMapper.MappedTypeMaterial;
 import org.catalogueoflife.editor.clb.ClbUsageMapper.MappedUsage;
 import org.catalogueoflife.editor.clb.ClbUsageMapper.MappedVernacular;
+import org.catalogueoflife.editor.clb.dto.ClbCopyRequest;
+import org.catalogueoflife.editor.clb.dto.ClbCopyResult;
 import org.catalogueoflife.editor.clb.dto.ClbImportRequest;
 import org.catalogueoflife.editor.clb.dto.ClbImportSummary;
 import org.catalogueoflife.editor.clb.dto.ClbImportSummary.ClbImportIssue;
@@ -175,6 +179,53 @@ public class ClbImportService {
   }
 
   public ClbImportSummary importFromClb(int userId, int projectId, int focalUsageId, ClbImportRequest req) {
+    return importFromClb(userId, projectId, focalUsageId, req, UnaryOperator.identity(), null);
+  }
+
+  /**
+   * The Compare-with-CLB per-record copy ("«"): the chosen synonym / vernacular records of one CLB
+   * taxon, attached to the accepted focal usage. Rides the UPDATE_FOCAL path with the fetched bundle
+   * narrowed to exactly those CLB ids, so each copy is the full record the importer would bring
+   * (parsed name, references, CLB-scoped provenance id).
+   */
+  public ClbCopyResult copyFromClb(int userId, int projectId, int focalUsageId, ClbCopyRequest req) {
+    Set<String> synIds = req.synonymIds() == null ? Set.of() : Set.copyOf(req.synonymIds());
+    Set<String> vnIds = req.vernacularIds() == null ? Set.of() : Set.copyOf(req.vernacularIds());
+    Set<String> tmIds = req.typeMaterialIds() == null ? Set.of() : Set.copyOf(req.typeMaterialIds());
+    if (synIds.isEmpty() && vnIds.isEmpty() && tmIds.isEmpty() && !req.wantsPublishedIn()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "nothing selected to copy");
+    }
+    Set<String> types = new HashSet<>();
+    if (!synIds.isEmpty()) types.add(T_SYNONYMS);
+    if (!vnIds.isEmpty()) types.add(T_VERNACULAR);
+    if (!tmIds.isEmpty()) types.add(T_TYPE_MATERIAL);
+    ClbImportRequest asImport =
+        new ClbImportRequest(req.datasetKey(), req.taxonId(), ImportMode.UPDATE_FOCAL, types);
+    Integer[] publishedIn = new Integer[1];
+    ClbImportSummary summary = importFromClb(userId, projectId, focalUsageId, asImport, b -> {
+      // Type material: only the focal name's own records (what the comparison lists).
+      String focalNameId = b.usage().clbNameId();
+      Map<String, List<MappedTypeMaterial>> ownTypes = new LinkedHashMap<>();
+      List<MappedTypeMaterial> own = b.typeMaterialByNameId().get(focalNameId);
+      if (own != null && focalNameId != null) {
+        ownTypes.put(focalNameId, own.stream().filter(tm -> tmIds.contains(tm.clbId())).toList());
+      }
+      return new MappedImport(
+          b.usage(),
+          b.synonyms().stream().filter(sy -> synIds.contains(sy.clbUsageId())).toList(),
+          b.distributions(),
+          b.vernaculars().stream().filter(vn -> vnIds.contains(vn.clbId())).toList(),
+          b.media(), b.estimates(), b.properties(), ownTypes, b.nameRelations(),
+          b.references());
+    }, req.wantsPublishedIn() ? id -> publishedIn[0] = id : null);
+    return new ClbCopyResult(summary, publishedIn[0]);
+  }
+
+  // `focalBundleFilter` narrows the fetched bundle in UPDATE_FOCAL mode, and a non-null
+  // `publishedInSink` receives the id of the (newly inserted) published-in reference of the CLB
+  // name -- both only used by copyFromClb.
+  private ClbImportSummary importFromClb(int userId, int projectId, int focalUsageId, ClbImportRequest req,
+      UnaryOperator<MappedImport> focalBundleFilter, IntConsumer publishedInSink) {
     Project project = requireEditorProject(userId, projectId);
     NameUsage focal = usages.findByIdInProject(projectId, focalUsageId);
     if (focal == null || focal.getStatus() != Status.ACCEPTED) {
@@ -208,7 +259,8 @@ public class ClbImportService {
     List<PendingNameRelation> pendingNameRelations = new ArrayList<>();
 
     if (req.mode() == ImportMode.UPDATE_FOCAL) {
-      MappedImport bundle = ClbUsageMapper.toCreateRequest(client.usageInfo(req.datasetKey(), req.sourceTaxonId()));
+      MappedImport bundle = focalBundleFilter.apply(
+          ClbUsageMapper.toCreateRequest(client.usageInfo(req.datasetKey(), req.sourceTaxonId())));
       RefResolver refResolver = new RefResolver(projectId, userId, scope, bundle.references(), refIdMap);
       MappedUsage mu = bundle.usage();
       if (mu.usage() == null) {
@@ -219,6 +271,10 @@ public class ClbImportService {
         // to the focal usage, not a new one -- there is no new "accepted usage" insert in this mode.
         usageIdMap.put(mu.clbUsageId(), focalUsageId);
         nameIdMap.put(mu.clbNameId(), focalUsageId);
+        if (publishedInSink != null) {
+          Integer refId = refResolver.resolve(mu.clbPublishedInReferenceId());
+          if (refId != null) publishedInSink.accept(refId);
+        }
       }
 
       int synonymCount = 0;

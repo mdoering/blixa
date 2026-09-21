@@ -1,6 +1,6 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, test } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 import { renderWithProviders } from '../../test/utils';
 import { server, http, HttpResponse } from '../../test/server';
 import CompareClbModal from './CompareClbModal';
@@ -27,6 +27,15 @@ const clbComparison = {
   classification: [{ rank: 'family', name: 'Felidae' }],
   synonyms: [],
 };
+
+// Our side's supplementary lists -- empty unless a test overrides them.
+beforeEach(() => {
+  server.use(
+    http.get('/api/projects/3/usages/5/vernaculars', () => HttpResponse.json([])),
+    http.get('/api/projects/3/usages/5/type-material', () => HttpResponse.json([])),
+    http.get('/api/projects/3/usages/5/relations', () => HttpResponse.json([])),
+  );
+});
 
 test('picks a global CLB hit and shows the side-by-side comparison', async () => {
   server.use(
@@ -205,4 +214,51 @@ test('all datasets: a search with no hits says so', async () => {
   );
   renderWithProviders(<CompareClbModal pid={3} usageId={5} opened onClose={() => {}} />);
   expect(await screen.findByText(/no matching names — try another spelling/i)).toBeInTheDocument();
+});
+
+test('copying a CLB synonym posts it to clb-copy; copying a value hands it to the form', async () => {
+  let posted: unknown = null;
+  const onCopyField = vi.fn();
+  server.use(
+    http.get('/api/projects/3/usages/5', () => HttpResponse.json(usage)),
+    http.get('/api/projects/3', () => HttpResponse.json({ id: 3, role: 'editor', favoriteClbDatasets: [] })),
+    http.get('/api/projects/3/tree/path/5', () => HttpResponse.json([])),
+    http.get('/api/projects/3/usages/5/synonyms', () => HttpResponse.json([])),
+    http.get('/api/projects/3/usages/5/vernaculars', () => HttpResponse.json([])),
+    http.get('/api/projects/3/usages/5/type-material', () => HttpResponse.json([])),
+    http.get('/api/projects/3/usages/5/relations', () => HttpResponse.json([])),
+    http.get('/api/clb/usages', () =>
+      HttpResponse.json([
+        { datasetKey: '3LXR', datasetTitle: null, id: '6W3C4', scientificName: 'Panthera leo', authorship: null, rank: 'species', status: 'accepted' },
+      ]),
+    ),
+    http.get('/api/clb/dataset-labels', () => HttpResponse.json({ '3LXR': 'COL' })),
+    http.get('/api/clb/3LXR/compare/6W3C4', () =>
+      HttpResponse.json({
+        ...clbComparison,
+        synonyms: [{ scientificName: 'Felis leo', authorship: 'L.', status: 'SYNONYM', id: 'S1' }],
+      }),
+    ),
+    http.post('/api/projects/3/usages/5/clb-copy', async ({ request }) => {
+      posted = await request.json();
+      return HttpResponse.json({
+        summary: { nameUsages: 0, synonyms: 1, references: 0, children: {}, issues: [] },
+        publishedInReferenceId: null,
+      });
+    }),
+  );
+  renderWithProviders(
+    <CompareClbModal pid={3} usageId={5} opened onClose={() => {}} onCopyField={onCopyField} />,
+  );
+  await userEvent.click(await screen.findByText(/Panthera leo/));
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Copy to ours' }));
+  await waitFor(() =>
+    expect(posted).toEqual({ datasetKey: '3LXR', taxonId: '6W3C4', synonymIds: ['S1'] }),
+  );
+
+  await userEvent.click(screen.getByRole('button', { name: 'Copy authorship from CLB' }));
+  expect(onCopyField).toHaveBeenCalledWith('authorship', '(Linnaeus, 1758)');
+  // now shown as ours (unsaved), so the row no longer differs
+  expect(screen.queryByRole('button', { name: 'Copy authorship from CLB' })).not.toBeInTheDocument();
 });

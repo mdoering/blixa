@@ -72,6 +72,7 @@ class ClbImportServiceIT extends AbstractPostgresIT {
   @Autowired IdSeqMapper idSeq;
   @Autowired IssueMapper issueMapper;
   @Autowired ClbImportService service;
+  @Autowired org.catalogueoflife.editor.child.TypeMaterialMapper typeMaterials;
 
   @MockitoBean ClbImportClient clb;
 
@@ -531,5 +532,78 @@ class ClbImportServiceIT extends AbstractPostgresIT {
     verify(clb, never()).usageInfo(ds, "GEN");
     assertThat(usages.findAllByProject(pid).stream()
         .anyMatch(u -> u.getScientificName().equals("Cyclus unus"))).isTrue();
+  }
+
+  @Test
+  void copyFromClbAttachesExactlyTheChosenRecordsAndCreatesThePublishedInReference() {
+    int userId = createUser("clb-copy");
+    int pid = createProject(userId, "clb-copy-project");
+    int focalId = createFocalUsage(pid, userId);
+
+    String ds = "3LXR";
+    Taxon t = new Taxon(name("CP-N", "Copyus testis", "L.", Rank.SPECIES));
+    t.setId("CP");
+    t.setStatus(TaxonomicStatus.ACCEPTED);
+    t.getName().setPublishedInId("PUB");
+    UsageInfo src = new UsageInfo(t);
+    Synonym s1 = new Synonym(name("S1-N", "Copyus primus", null, Rank.SPECIES));
+    s1.setId("S1");
+    Synonym s2 = new Synonym(name("S2-N", "Copyus secundus", "Mill.", Rank.SPECIES));
+    s2.setId("S2");
+    src.setSynonyms(new Synonymy());
+    src.getSynonyms().getHeterotypic().add(s1);
+    src.getSynonyms().getHeterotypic().add(s2);
+    VernacularName v1 = new VernacularName();
+    v1.setId(11);
+    v1.setName("Copy Bug");
+    v1.setLanguage("eng");
+    VernacularName v2 = new VernacularName();
+    v2.setId(12);
+    v2.setName("Kopierkäfer");
+    v2.setLanguage("deu");
+    src.setVernacularNames(List.of(v1, v2));
+    life.catalogue.api.model.TypeMaterial tm1 = new life.catalogue.api.model.TypeMaterial();
+    tm1.setId("T1");
+    tm1.setCitation("holotype one");
+    life.catalogue.api.model.TypeMaterial tm2 = new life.catalogue.api.model.TypeMaterial();
+    tm2.setId("T2");
+    tm2.setCitation("paratype two");
+    src.getTypeMaterial().put("CP-N", new java.util.ArrayList<>(List.of(tm1, tm2)));
+    life.catalogue.api.model.Reference pub = new life.catalogue.api.model.Reference();
+    pub.setId("PUB");
+    pub.setCitation("Syst. Nat. 1758");
+    src.setReferences(Map.of("PUB", pub));
+    when(clb.usageInfo(ds, "CP")).thenReturn(src);
+
+    var result = service.copyFromClb(userId, pid, focalId, new org.catalogueoflife.editor.clb.dto.ClbCopyRequest(
+        ds, "CP", List.of("S2"), List.of("12"), List.of("T1"), Boolean.TRUE));
+
+    assertThat(result.summary().synonyms()).isEqualTo(1);
+    NameUsage copied = findByName(pid, "Copyus secundus");
+    assertThat(copied.getAuthorship()).isEqualTo("Mill.");
+    assertThat(synonymAccepted.findAcceptedFor(pid, copied.getId())).containsExactly(focalId);
+    assertThat(usages.findAllByProject(pid).stream().map(NameUsage::getScientificName))
+        .doesNotContain("Copyus primus");
+
+    assertThat(vernaculars.findByUsage(pid, focalId)).extracting(VernacularResponse::name)
+        .containsExactly("Kopierkäfer");
+    assertThat(typeMaterials.findByUsage(pid, focalId))
+        .extracting(org.catalogueoflife.editor.child.dto.TypeMaterialResponse::citation)
+        .containsExactly("holotype one");
+
+    assertThat(result.publishedInReferenceId()).isNotNull();
+    assertThat(references.findByIdInProject(pid, result.publishedInReferenceId()).getCitation())
+        .isEqualTo("Syst. Nat. 1758");
+  }
+
+  @Test
+  void copyFromClbWithNothingSelectedIsRejected() {
+    int userId = createUser("clb-copy-none");
+    int pid = createProject(userId, "clb-copy-none-project");
+    int focalId = createFocalUsage(pid, userId);
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.copyFromClb(userId, pid, focalId,
+            new org.catalogueoflife.editor.clb.dto.ClbCopyRequest("3LXR", "CP", List.of(), null, null, null)))
+        .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+        .hasMessageContaining("nothing selected");
   }
 }

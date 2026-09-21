@@ -1,5 +1,11 @@
 package org.catalogueoflife.editor.clb;
 
+import org.springframework.http.MediaType;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -104,5 +110,17 @@ class ClbImportControllerIT extends AbstractPostgresIT {
 
     mvc.perform(get("/api/clb/3LXR/resolve/bogus"))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void clbCopyAcceptsABodyWithoutPublishedIn() throws Exception {
+    ensureUser("clbSuggestUser");
+    // The SPA omits publishedIn when copying records -- the body must still parse (it used to 400 on
+    // the missing primitive before reaching the service); an empty selection is the service's 400.
+    mvc.perform(post("/api/projects/1/usages/1/clb-copy").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"datasetKey\":\"3LXR\",\"taxonId\":\"X\",\"synonymIds\":[]}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("nothing selected to copy"));
   }
 }

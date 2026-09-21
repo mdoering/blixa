@@ -121,6 +121,29 @@ export interface ClbComparisonSynonym {
   scientificName: string | null;
   authorship: string | null;
   status: string | null;
+  // CLB usage id -- what the copy action sends
+  id: string | null;
+}
+
+export interface ClbComparisonVernacular {
+  id: string | null;
+  name: string | null;
+  language: string | null;
+  country: string | null;
+}
+
+export interface ClbComparisonTypeMaterial {
+  id: string | null;
+  status: string | null;
+  citation: string | null;
+  catalogNumber: string | null;
+  institutionCode: string | null;
+  locality: string | null;
+}
+
+export interface ClbComparisonNameRelation {
+  type: string | null;
+  relatedName: string | null;
 }
 
 export interface ClbComparison {
@@ -136,6 +159,37 @@ export interface ClbComparison {
   acceptedName: string | null;
   classification: ClbRankName[];
   synonyms: ClbComparisonSynonym[];
+  vernacularNames: ClbComparisonVernacular[];
+  etymology: string | null;
+  gender: string | null;
+  // citation of the name's published-in reference, and the page within it
+  publishedIn: string | null;
+  publishedInPage: string | null;
+  typeMaterial: ClbComparisonTypeMaterial[];
+  nameRelations: ClbComparisonNameRelation[];
+}
+
+export interface ClbCopyPayload {
+  datasetKey: string;
+  taxonId: string;
+  synonymIds?: string[];
+  vernacularIds?: string[];
+  typeMaterialIds?: string[];
+  publishedIn?: boolean;
+}
+
+export interface ClbCopyResult {
+  summary: ClbImportSummary;
+  // the reference created for the CLB published-in citation, when requested
+  publishedInReferenceId: number | null;
+}
+
+// POST .../clb-copy -- the Compare-with-CLB "«" actions: copy chosen CLB records onto the focal usage.
+export function copyFromClb(pid: number, usageId: number, payload: ClbCopyPayload): Promise<ClbCopyResult> {
+  return api<ClbCopyResult>(`/api/projects/${pid}/usages/${usageId}/clb-copy`, {
+    method: 'POST',
+    json: payload,
+  });
 }
 
 export interface ClbGlobalUsageHit {

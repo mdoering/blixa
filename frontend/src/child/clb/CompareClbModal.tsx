@@ -12,25 +12,37 @@ import {
 } from '@mantine/core';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useDebouncedValue } from '@mantine/hooks';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { notifications } from '@mantine/notifications';
 import { messageFor } from '../../api/client';
-import { getSynonyms, getUsage } from '../../api/usages';
+import { getSynonyms, getUsage, usageCountsKey } from '../../api/usages';
+import { childApi } from '../../api/childApi';
+import { listTypeMaterial } from '../../api/typeMaterial';
+import { listNameRelations } from '../../api/nameRelations';
+import { getReference } from '../../api/references';
 import { getProject } from '../../api/projects';
 import { getPath } from '../../api/tree';
 import {
   compareClbTaxon,
+  copyFromClb,
+  type ClbCopyPayload,
   searchClbAllDatasets,
   searchClbDatasets,
   searchClbUsages,
 } from '../../api/clb';
 import DatasetLabel from '../../clb/DatasetLabel';
-import ClbComparisonView, { type OursSide } from './ClbComparisonView';
+import ClbComparisonView, { type CopyField, type CopyHandlers, type OursSide } from './ClbComparisonView';
+
+const vernacularApi = childApi<{ name: string | null; language: string | null }>('vernaculars');
 
 interface Props {
   pid: number;
   usageId: number;
   opened: boolean;
   onClose: () => void;
+  // Puts a copied CLB value into the (open) edit form as an unsaved change -- see TaxonDetail. When
+  // absent, single-value copying is not offered.
+  onCopyField?: (field: CopyField | 'publishedInReferenceId', value: string | number) => void;
 }
 
 function HitRow({ label, sub, onClick }: { label: string; sub?: ReactNode; onClick: () => void }) {
@@ -48,7 +60,8 @@ function HitRow({ label, sub, onClick }: { label: string; sub?: ReactNode; onCli
 
 // Compare the focal taxon against a taxon in ChecklistBank: pick a target (across all datasets, or
 // within a chosen dataset), then a side-by-side comparison (ClbComparisonView).
-export default function CompareClbModal({ pid, usageId, opened, onClose }: Props) {
+export default function CompareClbModal({ pid, usageId, opened, onClose, onCopyField }: Props) {
+  const queryClient = useQueryClient();
   const { data: usage } = useQuery({
     queryKey: ['usage', pid, usageId],
     queryFn: () => getUsage(pid, usageId),
@@ -78,6 +91,35 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
     enabled: opened,
   });
   const favorites = project?.favoriteClbDatasets ?? [];
+  const canEdit = project ? ['owner', 'editor'].includes(project.role) : false;
+
+  // Our side of the supplementary rows -- same query keys as the TaxonDetail tabs, so these are
+  // shared with (and refreshed alongside) them.
+  const { data: vernaculars } = useQuery({
+    queryKey: ['vernacular name', pid, usageId],
+    queryFn: () => vernacularApi.list(pid, usageId),
+    enabled: opened && isAccepted,
+  });
+  const { data: typeMaterial } = useQuery({
+    queryKey: ['type material', pid, usageId],
+    queryFn: () => listTypeMaterial(pid, usageId),
+    enabled: opened,
+  });
+  const { data: nameRelations } = useQuery({
+    queryKey: ['name relation', pid, usageId],
+    queryFn: () => listNameRelations(pid, usageId),
+    enabled: opened,
+  });
+  const pubRefId = usage?.publishedInReferenceId ?? null;
+  const { data: pubRef } = useQuery({
+    queryKey: ['reference', pid, pubRefId],
+    queryFn: () => getReference(pid, pubRefId as number),
+    enabled: opened && pubRefId != null,
+  });
+
+  // Values copied into the edit form but not saved yet: shown on our side so the row reads as
+  // resolved (and its "«" goes away). Reset whenever the modal (re)opens.
+  const [copied, setCopied] = useState<Partial<Record<CopyField | 'publishedIn', string>>>({});
 
   const focalName = usage?.scientificName ?? '';
 
@@ -100,8 +142,16 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
         authorship: s.authorship,
         status: s.status,
       })),
+      gender: usage.gender,
+      etymology: usage.etymology,
+      publishedIn: pubRef?.citation ?? null,
+      publishedInPage: usage.publishedInPage,
+      vernacularNames: vernaculars ?? [],
+      typeMaterial: typeMaterial ?? [],
+      nameRelations: (nameRelations ?? []).map((r) => ({ type: r.type, relatedName: r.relatedName })),
+      ...copied,
     };
-  }, [usage, accepted, path, synonyms, usageId]);
+  }, [usage, accepted, path, synonyms, usageId, pubRef, vernaculars, typeMaterial, nameRelations, copied]);
 
   const [mode, setMode] = useState<'all' | 'dataset'>('all');
   const [nameQ, setNameQ] = useState('');
@@ -114,6 +164,7 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
 
   useEffect(() => {
     if (opened) {
+      setCopied({});
       setNameQ(focalName);
       setTarget(null);
       setDatasetKey(null);
@@ -143,6 +194,61 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
     queryFn: () => compareClbTaxon(target!.datasetKey, target!.taxonId),
     enabled: !!target,
   });
+
+  // Record copies (synonyms / vernaculars / type material / the published-in reference) go straight
+  // to the server; the affected lists are then refetched.
+  const copyMutation = useMutation({
+    mutationFn: (payload: Omit<ClbCopyPayload, 'datasetKey' | 'taxonId'>) =>
+      copyFromClb(pid, usageId, { datasetKey: target!.datasetKey, taxonId: target!.taxonId, ...payload }),
+    onSuccess: async (result, payload) => {
+      if (payload.publishedIn && result.publishedInReferenceId != null) {
+        onCopyField?.('publishedInReferenceId', result.publishedInReferenceId);
+        setCopied((c) => ({ ...c, publishedIn: comparison.data?.publishedIn ?? '' }));
+        await queryClient.invalidateQueries({ queryKey: ['refOptions', pid] });
+      }
+      for (const key of [
+        ['synonyms', pid, usageId],
+        ['synonymy', pid, usageId],
+        ['vernacular name', pid, usageId],
+        ['type material', pid, usageId],
+        usageCountsKey(pid, usageId),
+        ['changes', pid],
+      ]) {
+        await queryClient.invalidateQueries({ queryKey: key });
+      }
+      const s = result.summary;
+      const n = s.synonyms + Object.values(s.children).reduce((a, b) => a + b, 0);
+      notifications.show({
+        color: s.issues.length ? 'orange' : undefined,
+        message: payload.publishedIn
+          ? 'Published-in reference created — save the form to keep it'
+          : `Copied ${n} record${n === 1 ? '' : 's'} from ChecklistBank${s.issues.length ? ` (${s.issues.length} skipped)` : ''}`,
+      });
+    },
+    onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Copy failed') }),
+  });
+
+  const copyHandlers: CopyHandlers = {
+    busy: copyMutation.isPending,
+    ...(canEdit && onCopyField
+      ? {
+          field: (field: CopyField, value: string) => {
+            onCopyField(field, value);
+            setCopied((c) => ({ ...c, [field]: value }));
+            notifications.show({ message: 'Copied into the form — save to keep it' });
+          },
+          publishedIn: () => copyMutation.mutate({ publishedIn: true }),
+        }
+      : {}),
+    // Records attach to an accepted taxon only (same rule as Import from CLB).
+    ...(canEdit && isAccepted
+      ? {
+          synonyms: (ids: string[]) => copyMutation.mutate({ synonymIds: ids }),
+          vernaculars: (ids: string[]) => copyMutation.mutate({ vernacularIds: ids }),
+          typeMaterial: (ids: string[]) => copyMutation.mutate({ typeMaterialIds: ids }),
+        }
+      : {}),
+  };
 
   return (
     <Modal opened={opened} onClose={onClose} title="Compare with ChecklistBank" size="xl">
@@ -283,7 +389,9 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
                 {messageFor(comparison.error, 'Could not load this taxon from ChecklistBank')}
               </Text>
             )}
-            {comparison.data && ours && <ClbComparisonView ours={ours} clb={comparison.data} />}
+            {comparison.data && ours && (
+              <ClbComparisonView ours={ours} clb={comparison.data} copy={copyHandlers} />
+            )}
           </>
         )}
       </Stack>

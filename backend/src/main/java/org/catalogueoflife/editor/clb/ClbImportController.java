@@ -10,6 +10,8 @@ import org.catalogueoflife.editor.clb.ClbImportClient.ClbDatasetHit;
 import org.catalogueoflife.editor.clb.ClbImportClient.ClbGlobalUsageHit;
 import org.catalogueoflife.editor.clb.ClbImportClient.ClbUsageHit;
 import org.catalogueoflife.editor.clb.dto.ClbComparison;
+import org.catalogueoflife.editor.clb.dto.ClbCopyRequest;
+import org.catalogueoflife.editor.clb.dto.ClbCopyResult;
 import org.catalogueoflife.editor.clb.dto.ClbImportRequest;
 import org.catalogueoflife.editor.clb.dto.ClbImportSummary;
 import org.catalogueoflife.editor.clb.dto.ClbResolvedTaxon;
@@ -63,6 +65,13 @@ public class ClbImportController {
   public ClbImportSummary importFromClb(@PathVariable int pid, @PathVariable int focalId,
       @RequestBody ClbImportRequest req) {
     return service.importFromClb(currentUser.require().getId(), pid, focalId, req);
+  }
+
+  // Compare-with-CLB "«": copy chosen synonym / vernacular records of a CLB taxon onto the focal usage.
+  @PostMapping("/api/projects/{pid}/usages/{focalId}/clb-copy")
+  public ClbCopyResult copyFromClb(@PathVariable int pid, @PathVariable int focalId,
+      @RequestBody ClbCopyRequest req) {
+    return service.copyFromClb(currentUser.require().getId(), pid, focalId, req);
   }
 
   @GetMapping("/api/clb/datasets")

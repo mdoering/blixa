@@ -9,12 +9,19 @@ import life.catalogue.api.model.NameUsageBase;
 import life.catalogue.api.model.SimpleName;
 import life.catalogue.api.model.Synonym;
 import life.catalogue.api.model.Synonymy;
+import life.catalogue.api.model.NameUsageRelation;
+import life.catalogue.api.model.Reference;
+import life.catalogue.api.model.TypeMaterial;
 import life.catalogue.api.model.UsageInfo;
+import life.catalogue.api.model.VernacularName;
 import org.catalogueoflife.editor.clb.ClbImportClient.ClbDatasetRef;
 import org.catalogueoflife.editor.clb.ClbImportClient.ClbGlobalUsageHit;
 import org.catalogueoflife.editor.clb.dto.ClbComparison;
+import org.catalogueoflife.editor.clb.dto.ClbNameRelation;
 import org.catalogueoflife.editor.clb.dto.ClbRankName;
+import org.catalogueoflife.editor.clb.dto.ClbTypeMaterial;
 import org.catalogueoflife.editor.clb.dto.ClbSynonym;
+import org.catalogueoflife.editor.clb.dto.ClbVernacular;
 import org.springframework.stereotype.Service;
 
 // Builds the CLB side of a focal-taxon comparison from a fetched UsageInfo (name/authorship/rank/
@@ -62,10 +69,7 @@ public class ClbCompareService {
     // CLB's UI serves a synonym under /nameusage/ (its /taxon/ route is for accepted taxa only).
     String acceptedName = null;
     if (u instanceof Synonym s && s.getAccepted() != null && s.getAccepted().getName() != null) {
-      Name an = s.getAccepted().getName();
-      acceptedName = an.getAuthorship() == null || an.getAuthorship().isBlank()
-          ? an.getScientificName()
-          : an.getScientificName() + " " + an.getAuthorship();
+      acceptedName = label(s.getAccepted().getName());
     }
     String link = "https://www.checklistbank.org/dataset/" + datasetKey
         + (u instanceof Synonym ? "/nameusage/" : "/taxon/") + u.getId();
@@ -86,10 +90,50 @@ public class ClbCompareService {
       addSyns(synonyms, syn.getMisapplied());
     }
 
+    List<ClbVernacular> vernaculars = new ArrayList<>();
+    if (info.getVernacularNames() != null) {
+      for (VernacularName vn : info.getVernacularNames()) {
+        vernaculars.add(new ClbVernacular(vn.getId() == null ? null : String.valueOf(vn.getId()),
+            vn.getName(), vn.getLanguage(),
+            vn.getCountry() == null ? null : vn.getCountry().getIso2LetterCode()));
+      }
+    }
+
+    String nameId = n == null ? null : n.getId();
+    List<ClbTypeMaterial> types = new ArrayList<>();
+    List<TypeMaterial> tms = nameId == null || info.getTypeMaterial() == null
+        ? null : info.getTypeMaterial().get(nameId);
+    if (tms != null) {
+      for (TypeMaterial tm : tms) {
+        types.add(new ClbTypeMaterial(tm.getId(), lower(tm.getStatus() == null ? null : tm.getStatus().name()),
+            tm.getCitation(), tm.getCatalogNumber(), tm.getInstitutionCode(), tm.getLocality()));
+      }
+    }
+
+    // Only the focal name's own relations; the related name is looked up in the info's name map.
+    List<ClbNameRelation> relations = new ArrayList<>();
+    if (info.getNameRelations() != null) {
+      for (NameUsageRelation rel : info.getNameRelations()) {
+        if (nameId != null && rel.getNameId() != null && !nameId.equals(rel.getNameId())) continue;
+        Name related = info.getNames() == null || rel.getRelatedNameId() == null
+            ? null : info.getNames().get(rel.getRelatedNameId());
+        String relatedLabel = related == null ? rel.getRelatedNameId() : label(related);
+        relations.add(new ClbNameRelation(
+            rel.getType() == null ? null : lower(rel.getType().name()).replace('_', ' '), relatedLabel));
+      }
+    }
+
+    Reference pub = info.getPublishedIn();
     return new ClbComparison(datasetKey, datasetTitle, u.getId(), link,
         n == null ? null : n.getScientificName(), n == null ? null : n.getAuthorship(),
         lower(n == null || n.getRank() == null ? null : n.getRank().name()),
-        u.getStatus() == null ? null : u.getStatus().name(), acceptedName, classification, synonyms);
+        u.getStatus() == null ? null : u.getStatus().name(), acceptedName, classification, synonyms,
+        vernaculars,
+        n == null ? null : n.getEtymology(),
+        n == null || n.getGender() == null ? null : lower(n.getGender().name()),
+        pub == null ? null : pub.getCitation(),
+        n == null ? null : n.getPublishedInPage(),
+        types, relations);
   }
 
   private static void addSyns(List<ClbSynonym> out, List<Synonym> syns) {
@@ -98,8 +142,13 @@ public class ClbCompareService {
       Name sn = s.getName();
       if (sn == null) continue;
       out.add(new ClbSynonym(sn.getScientificName(), sn.getAuthorship(),
-          s.getStatus() == null ? null : s.getStatus().name()));
+          s.getStatus() == null ? null : s.getStatus().name(), s.getId()));
     }
+  }
+
+  private static String label(Name n) {
+    return n.getAuthorship() == null || n.getAuthorship().isBlank()
+        ? n.getScientificName() : n.getScientificName() + " " + n.getAuthorship();
   }
 
   private static String lower(String s) {

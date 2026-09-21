@@ -531,6 +531,12 @@ export default function TaxonDetail({ pid, usageId, onNavigate }: TaxonDetailPro
         usageId={usageId}
         opened={compareOpen}
         onClose={() => setCompareOpen(false)}
+        onCopyField={(field, value) => {
+          // A copied CLB value lands in the form as an unsaved edit -- like typing it, so it also
+          // claims the edit lock; the user reviews and saves as usual.
+          form.setFieldValue(field, value as never);
+          claim();
+        }}
       />
       <AiSuggestModal
         pid={pid}

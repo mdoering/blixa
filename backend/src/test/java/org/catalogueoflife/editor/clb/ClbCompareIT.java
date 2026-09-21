@@ -156,4 +156,61 @@ class ClbCompareIT extends AbstractPostgresIT {
        .andExpect(jsonPath("$.acceptedName").value("Panthera leo (Linnaeus, 1758)"))
        .andExpect(jsonPath("$.link").value("https://www.checklistbank.org/dataset/3LXR/nameusage/CFSCR"));
   }
+
+  @Test
+  @WithMockUser(username = "cmpUser6")
+  void comparisonCarriesEtymologyGenderPublishedInTypesRelationsAndVernaculars() throws Exception {
+    ensureUser("cmpUser6");
+    Name n = new Name();
+    n.setId("N1");
+    n.setScientificName("Panthera");
+    n.setAuthorship("Oken, 1816");
+    n.setRank(Rank.GENUS);
+    n.setEtymology("from Greek panther");
+    n.setGender(life.catalogue.api.vocab.Gender.FEMININE);
+    n.setPublishedInPage("1052");
+    Taxon t = new Taxon(n);
+    t.setId("6DBT");
+    t.setStatus(TaxonomicStatus.ACCEPTED);
+    UsageInfo info = new UsageInfo(t);
+    life.catalogue.api.model.Reference pub = new life.catalogue.api.model.Reference();
+    pub.setId("PUB");
+    pub.setCitation("Oken, Lehrbuch 1816");
+    info.setPublishedIn(pub);
+    life.catalogue.api.model.TypeMaterial tm = new life.catalogue.api.model.TypeMaterial();
+    tm.setId("TM1");
+    tm.setCitation("type species: Felis pardus");
+    info.getTypeMaterial().put("N1", new java.util.ArrayList<>(List.of(tm)));
+    life.catalogue.api.model.VernacularName vn = new life.catalogue.api.model.VernacularName();
+    vn.setId(7);
+    vn.setName("Big cats");
+    vn.setLanguage("eng");
+    info.setVernacularNames(List.of(vn));
+    Name bas = new Name();
+    bas.setId("N2");
+    bas.setScientificName("Pantherus");
+    bas.setAuthorship("Smith");
+    life.catalogue.api.model.NameUsageRelation rel = new life.catalogue.api.model.NameUsageRelation();
+    rel.setNameId("N1");
+    rel.setRelatedNameId("N2");
+    rel.setType(life.catalogue.api.vocab.NomRelType.BASIONYM);
+    info.setNameRelations(List.of(rel));
+    info.getNames().put("N2", bas);
+
+    when(clb.usageInfo(eq("3LXR"), eq("6DBT"))).thenReturn(info);
+    when(clb.datasetTitle(eq("3LXR"))).thenReturn("Catalogue of Life");
+
+    mvc.perform(get("/api/clb/3LXR/compare/6DBT"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.etymology").value("from Greek panther"))
+       .andExpect(jsonPath("$.gender").value("feminine"))
+       .andExpect(jsonPath("$.publishedIn").value("Oken, Lehrbuch 1816"))
+       .andExpect(jsonPath("$.publishedInPage").value("1052"))
+       .andExpect(jsonPath("$.typeMaterial[0].id").value("TM1"))
+       .andExpect(jsonPath("$.typeMaterial[0].citation").value("type species: Felis pardus"))
+       .andExpect(jsonPath("$.nameRelations[0].type").value("basionym"))
+       .andExpect(jsonPath("$.nameRelations[0].relatedName").value("Pantherus Smith"))
+       .andExpect(jsonPath("$.vernacularNames[0].id").value("7"))
+       .andExpect(jsonPath("$.vernacularNames[0].name").value("Big cats"));
+  }
 }
