@@ -24,6 +24,8 @@ export interface ClassificationTreeProps {
   // When true, the tree also shows UNASSESSED ("provisionally accepted") nodes (visually marked);
   // default (false) shows only the accepted backbone. Threaded through to every children fetch.
   includeUnassessed?: boolean;
+  // Ids of the nodes to expand so the selected usage is visible (its ancestors).
+  revealIds?: ReadonlySet<number>;
 }
 
 // Lazy classification tree: only the root level is fetched eagerly (paged); every other level is
@@ -38,6 +40,7 @@ export default function ClassificationTree({
   onAfterDelete,
   disabledId,
   includeUnassessed = false,
+  revealIds,
 }: ClassificationTreeProps) {
   const {
     data: rootPages,
@@ -75,6 +78,7 @@ export default function ClassificationTree({
           onAfterDelete={onAfterDelete}
           disabledId={disabledId}
           includeUnassessed={includeUnassessed}
+          revealIds={revealIds}
         />
       ))}
       {hasNextPage && (

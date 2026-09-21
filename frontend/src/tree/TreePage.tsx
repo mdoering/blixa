@@ -1,21 +1,23 @@
 import { Box, Button, Group, Switch, Text } from '@mantine/core';
 import { IconDownload, IconPlus } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getProject } from '../api/projects';
 import { getUsage } from '../api/usages';
-import { subtreeTxtreeUrl } from '../api/tree';
+import { getPath, subtreeTxtreeUrl } from '../api/tree';
 import CollapsibleSplit from '../components/CollapsibleSplit';
 import CreateNameModal from '../names/CreateNameModal';
 import { useNameActions } from '../names/useNameActions';
 import ClassificationTree from './ClassificationTree';
 import TaxonDetail from './TaxonDetail';
+import { useSelectedUsage } from './useSelectedUsage';
 
 export default function TreePage() {
   const { projectId } = useParams();
   const pid = Number(projectId);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // In the URL (?usage=<id>): shareable, and kept when switching to/from the Names search.
+  const [selectedId, setSelectedId] = useSelectedUsage();
   // The tree defaults to the accepted backbone only; this toggles the provisional (UNASSESSED)
   // layer on so a curator can browse and review it.
   const [showUnassessed, setShowUnassessed] = useState(false);
@@ -32,6 +34,30 @@ export default function TreePage() {
     queryFn: () => getUsage(pid, selectedId as number),
     enabled: selectedId != null,
   });
+
+  // Reveal the selection in the lazy tree: expand every ancestor on its path. A synonym/misapplied
+  // name isn't a tree node, so its (primary) accepted name is revealed instead. Same ['treePath']
+  // key as ClassificationBar, so it usually comes from cache.
+  const isSynonym = selectedUsage?.status === 'SYNONYM' || selectedUsage?.status === 'MISAPPLIED';
+  const anchorId = selectedUsage
+    ? isSynonym
+      ? selectedUsage.acceptedParentIds?.[0] ?? null
+      : selectedUsage.id
+    : null;
+  const { data: anchorPath } = useQuery({
+    queryKey: ['treePath', pid, anchorId],
+    queryFn: () => getPath(pid, anchorId as number),
+    enabled: anchorId != null,
+  });
+  // The path runs root..anchor; the anchor itself needn't be opened.
+  const revealIds = useMemo(
+    () => new Set((anchorPath ?? []).map((n) => n.id).filter((id) => id !== anchorId)),
+    [anchorPath, anchorId],
+  );
+  // A provisional (UNASSESSED) selection is hidden in the default backbone-only tree -- show that layer.
+  useEffect(() => {
+    if (selectedUsage?.status === 'UNASSESSED') setShowUnassessed(true);
+  }, [selectedUsage?.status]);
 
   const actions = useNameActions(pid);
 
@@ -72,6 +98,7 @@ export default function TreePage() {
             onSelect={setSelectedId}
             canEdit={canEdit}
             includeUnassessed={showUnassessed}
+            revealIds={revealIds}
             onAfterDelete={(id) => {
               if (id === selectedId) setSelectedId(null);
             }}

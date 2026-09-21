@@ -10,7 +10,8 @@ import {
 import { notifications } from '@mantine/notifications';
 import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { useSelectedUsage } from '../tree/useSelectedUsage';
 import { getProject } from '../api/projects';
 import { listLocks } from '../api/locks';
 import { bulkChangeStatus, searchUsages, usageExportTsvUrl } from '../api/usages';
@@ -79,16 +80,10 @@ export default function NameSearchPage() {
   const [mergeOpen, setMergeOpen] = useState(false);
   const selectedIds = Object.keys(rowSelection).map(Number);
 
-  // Deep-link support: ?usage=<id> (e.g. from the Issues dashboard) preselects that usage's detail,
-  // even if it isn't on the current filtered table page. Re-syncs when the param changes.
-  const [searchParams] = useSearchParams();
-  const usageParam = searchParams.get('usage');
-  const [selectedId, setSelectedId] = useState<number | null>(
-    usageParam ? Number(usageParam) : null,
-  );
-  useEffect(() => {
-    if (usageParam) setSelectedId(Number(usageParam));
-  }, [usageParam]);
+  // The selected usage lives in the URL (?usage=<id>) -- a shareable deep link (e.g. from the Issues
+  // dashboard), even if it isn't on the current filtered table page, and kept when switching to
+  // the Tree (see useSelectedUsage).
+  const [selectedId, setSelectedId] = useSelectedUsage();
   // Which row's ⋮ menu is open -- a single id, since only one menu can be open at a time; also
   // driven by right-click on the row (mirrors TreeNodeRow's onContextMenu handling).
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);

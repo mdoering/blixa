@@ -61,3 +61,26 @@ test('does not query join-request count for a non-owner', async () => {
   await screen.findByText('Members');
   expect(counted).toBe(false);
 });
+
+test('switching between Tree and Names keeps the selected ?usage=, other sections drop it', async () => {
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json({ id: 3, title: 'T', role: 'editor' })),
+  );
+  function FullLocation() {
+    const { pathname, search } = useLocation();
+    return <div data-testid="loc">{pathname + search}</div>;
+  }
+  renderWithProviders(
+    <>
+      <AppSidebar projectId={3} collapsed={false} />
+      <FullLocation />
+    </>,
+    { route: '/projects/3/tree?usage=42' },
+  );
+  await userEvent.click(screen.getByText('Names'));
+  expect(screen.getByTestId('loc')).toHaveTextContent('/projects/3/names?usage=42');
+  await userEvent.click(screen.getByText('Tree'));
+  expect(screen.getByTestId('loc')).toHaveTextContent('/projects/3/tree?usage=42');
+  await userEvent.click(screen.getByText('References'));
+  expect(screen.getByTestId('loc')).toHaveTextContent(/^\/projects\/3\/references$/);
+});

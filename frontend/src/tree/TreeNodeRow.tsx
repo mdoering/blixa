@@ -1,6 +1,6 @@
 import { ActionIcon, Badge, Box, Group, Loader, Stack, Text, ThemeIcon, Tooltip, UnstyledButton } from '@mantine/core';
 import { IconChevronDown, IconChevronRight, IconLock } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { getChildren } from '../api/tree';
 
@@ -28,6 +28,8 @@ export interface TreeNodeRowProps {
   // Threaded down from the "Show unassessed" toggle so every children fetch includes (or excludes)
   // UNASSESSED nodes consistently with the level above.
   includeUnassessed?: boolean;
+  // Ancestor ids to expand so a selected (e.g. deep-linked) usage becomes visible; see TreePage.
+  revealIds?: ReadonlySet<number>;
 }
 
 export default function TreeNodeRow({
@@ -40,8 +42,10 @@ export default function TreeNodeRow({
   onAfterDelete,
   disabledId,
   includeUnassessed = false,
+  revealIds,
 }: TreeNodeRowProps) {
   const [expanded, setExpanded] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState(false);
   const [menuOpened, setMenuOpened] = useState(false);
   const disabled = disabledId === node.id;
@@ -51,6 +55,16 @@ export default function TreeNodeRow({
   // UNASSESSED ("provisionally accepted") nodes only appear when the toggle is on; mark them so they
   // read as provisional/awaiting-review rather than part of the accepted backbone.
   const unassessed = node.status === 'UNASSESSED';
+
+  // Open this node when it lies on the path to the selected usage (it stays user-collapsible), and
+  // bring the selected row into view once it renders -- a no-op when it's already visible.
+  const onRevealPath = revealIds?.has(node.id) ?? false;
+  useEffect(() => {
+    if (onRevealPath) setExpanded(true);
+  }, [onRevealPath]);
+  useEffect(() => {
+    if (selected) rowRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [selected]);
 
   // Lazy + paged: children are only fetched once this node is expanded (and stay cached
   // afterwards), a page of CHILDREN_PAGE at a time. node.childCount is the true total, so we know
@@ -95,6 +109,7 @@ export default function TreeNodeRow({
     // cost, not React reconciliation; a full react-virtual windowing is the heavier follow-up.
     <Stack gap={0} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 32px' }}>
       <Group
+        ref={rowRef}
         gap={4}
         wrap="nowrap"
         pl={depth * INDENT_PX}
@@ -201,6 +216,7 @@ export default function TreeNodeRow({
               onAfterDelete={onAfterDelete}
               disabledId={disabledId}
               includeUnassessed={includeUnassessed}
+              revealIds={revealIds}
             />
           ))}
           {remaining > 0 && !isLoading && (

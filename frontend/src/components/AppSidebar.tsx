@@ -42,7 +42,7 @@ export interface AppSidebarProps {
 // page (see plan: metadata is one facet of a growing project-settings section).
 export default function AppSidebar({ projectId, collapsed, onNavigate }: AppSidebarProps) {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const { data: me } = useMe();
   const go = (to: string) => {
     navigate(to);
@@ -64,11 +64,17 @@ export default function AppSidebar({ projectId, collapsed, onNavigate }: AppSide
     enabled: projectId != null && isOwner,
   });
 
+  // Tree and Names share the selected-usage pane (?usage=<id>): switching between the two keeps the
+  // selected name open. Other sections open clean.
+  const usageParam = new URLSearchParams(search).get('usage');
+  const onUsageView = /\/projects\/[^/]+\/(tree|names)$/.test(pathname);
+  const carryUsage = onUsageView && usageParam ? `?usage=${encodeURIComponent(usageParam)}` : '';
+
   const sections: Section[] =
     projectId != null
       ? [
-          { key: 'tree', label: 'Tree', icon: <IconBinaryTree2 size={ICON} />, to: `/projects/${projectId}/tree` },
-          { key: 'names', label: 'Names', icon: <IconList size={ICON} />, to: `/projects/${projectId}/names` },
+          { key: 'tree', label: 'Tree', icon: <IconBinaryTree2 size={ICON} />, to: `/projects/${projectId}/tree${carryUsage}` },
+          { key: 'names', label: 'Names', icon: <IconList size={ICON} />, to: `/projects/${projectId}/names${carryUsage}` },
           { key: 'references', label: 'References', icon: <IconBooks size={ICON} />, to: `/projects/${projectId}/references` },
           { key: 'issues', label: 'Issues', icon: <IconAlertTriangle size={ICON} />, to: `/projects/${projectId}/issues` },
           { key: 'discussions', label: 'Discussions', icon: <IconMessages size={ICON} />, to: `/projects/${projectId}/discussions` },
@@ -122,7 +128,7 @@ export default function AppSidebar({ projectId, collapsed, onNavigate }: AppSide
               key={s.key}
               icon={s.icon}
               label={s.label}
-              active={pathname.startsWith(s.to)}
+              active={pathname.startsWith(s.to.split('?')[0])}
               collapsed={collapsed}
               badge={s.badge}
               onClick={() => go(s.to)}
