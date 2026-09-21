@@ -82,6 +82,27 @@ class ClbImportClientIT {
   }
 
   @Test
+  void multiWordQueryIsEncodedOnlyOnce() {
+    // A space must reach CLB as %20 -- a double-encoded %2520 makes CLB search for the literal
+    // "Homo%20neanderthalensis" and return nothing (single-word queries were unaffected).
+    server.expect(requestTo(BASE
+            + "/nameusage/search?q=Homo%20neanderthalensis&content=SCIENTIFIC_NAME&limit=20"))
+        .andRespond(withSuccess("""
+            {"offset":0,"limit":20,"total":1,"result":[
+              {"id":"PDVG4","usage":{"id":"PDVG4","datasetKey":3,"status":"accepted",
+                "name":{"scientificName":"Homo neanderthalensis","rank":"species"}}}
+            ]}
+            """, MediaType.APPLICATION_JSON));
+    server.expect(requestTo(BASE
+            + "/dataset/3LXR/nameusage/search?q=Homo%20neanderthalensis&content=SCIENTIFIC_NAME&type=PREFIX&limit=20"))
+        .andRespond(withSuccess("{\"result\":[]}", MediaType.APPLICATION_JSON));
+
+    assertThat(client.searchUsagesAllDatasets("Homo neanderthalensis", null)).hasSize(1);
+    assertThat(client.searchUsages("3LXR", "Homo neanderthalensis", null)).isEmpty();
+    server.verify();
+  }
+
+  @Test
   void usageInfo404MapsToNotFound() {
     server.expect(requestTo(BASE + "/dataset/3LXR/taxon/MISSING/info"))
         .andRespond(withStatus(HttpStatus.NOT_FOUND));

@@ -111,10 +111,11 @@ public class ClbMatchClient {
     }
     try {
       // .encode() before expanding: scientific names/authorships routinely contain spaces and other
-      // characters that are not legal, unescaped, in a URI -- left unencoded, RestClient's
-      // uri(String) would reject the resulting string outright.
+      // characters that are not legal, unescaped, in a URI. Handed over as a URI (not a String),
+      // since RestClient re-encodes a String -- a space's %20 became %2520 and CLB then matched the
+      // literal "Homo%20sapiens", i.e. nothing.
       String body = http.get()
-          .uri(uri.encode().buildAndExpand(datasetKey).toUriString())
+          .uri(uri.encode().buildAndExpand(datasetKey).toUri())
           .retrieve()
           .body(String.class);
       return objectMapper.readTree(body);

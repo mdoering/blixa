@@ -194,3 +194,15 @@ test('comparing a CLB synonym shows its accepted name', async () => {
   expect(await screen.findByText('Accepted name')).toBeInTheDocument();
   expect(screen.getByText('Panthera leo (Linnaeus, 1758)')).toBeInTheDocument();
 });
+
+test('all datasets: a search with no hits says so', async () => {
+  server.use(
+    http.get('/api/projects/3/usages/5', () => HttpResponse.json(usage)),
+    http.get('/api/projects/3', () => HttpResponse.json({ id: 3, role: 'editor', favoriteClbDatasets: [] })),
+    http.get('/api/projects/3/tree/path/5', () => HttpResponse.json([])),
+    http.get('/api/projects/3/usages/5/synonyms', () => HttpResponse.json([])),
+    http.get('/api/clb/usages', () => HttpResponse.json([])),
+  );
+  renderWithProviders(<CompareClbModal pid={3} usageId={5} opened onClose={() => {}} />);
+  expect(await screen.findByText(/no matching names — try another spelling/i)).toBeInTheDocument();
+});

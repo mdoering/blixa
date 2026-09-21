@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -120,7 +121,7 @@ public class ClbImportClient {
    * {@link ClbDatasetRef#INACCESSIBLE}; any other failure (CLB down, 5xx) throws.
    */
   public ClbDatasetRef dataset(String key) {
-    String uri = UriComponentsBuilder.fromPath("/dataset/{ds}").encode().buildAndExpand(key).toUriString();
+    URI uri = UriComponentsBuilder.fromPath("/dataset/{ds}").encode().buildAndExpand(key).toUri();
     try {
       JsonNode ds = mapper.readTree(http.get().uri(uri).retrieve().body(String.class));
       return new ClbDatasetRef(text(ds, "title"), text(ds, "alias"), true);
@@ -219,8 +220,8 @@ public class ClbImportClient {
    * why a single {@code readValue(body, UsageInfo.class)} call cannot work here).
    */
   public UsageInfo usageInfo(String datasetKey, String id) {
-    String uri = UriComponentsBuilder.fromPath("/dataset/{ds}/taxon/{id}/info").encode()
-        .buildAndExpand(datasetKey, id).toUriString();
+    URI uri = UriComponentsBuilder.fromPath("/dataset/{ds}/taxon/{id}/info").encode()
+        .buildAndExpand(datasetKey, id).toUri();
     String body;
     try {
       body = http.get().uri(uri).retrieve().body(String.class);
@@ -304,7 +305,9 @@ public class ClbImportClient {
   // here since its 404 needs a distinct, more specific message ("CLB taxon not found") than the
   // generic mapping below.
   private JsonNode getPage(UriComponentsBuilder uri, Object... pathVars) {
-    String u = uri.encode().buildAndExpand(pathVars).toUriString();
+    // A URI (not a String): RestClient would re-encode an already-encoded string, turning e.g. a
+    // space's %20 into %2520 -- CLB then searches for the literal "Homo%20sapiens" and finds nothing.
+    URI u = uri.encode().buildAndExpand(pathVars).toUri();
     try {
       String body = http.get().uri(u).retrieve().body(String.class);
       return mapper.readTree(body);
