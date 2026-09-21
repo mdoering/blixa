@@ -9,6 +9,9 @@ import org.catalogueoflife.editor.auth.CurrentUser;
 import org.catalogueoflife.editor.clb.ClbImportClient.ClbDatasetHit;
 import org.catalogueoflife.editor.clb.ClbImportClient.ClbGlobalUsageHit;
 import org.catalogueoflife.editor.clb.ClbImportClient.ClbUsageHit;
+import org.catalogueoflife.editor.clb.dto.ClbClassificationPreview;
+import org.catalogueoflife.editor.clb.dto.ClbClassificationRequest;
+import org.catalogueoflife.editor.clb.dto.ClbClassificationResult;
 import org.catalogueoflife.editor.clb.dto.ClbComparison;
 import org.catalogueoflife.editor.clb.dto.ClbCopyRequest;
 import org.catalogueoflife.editor.clb.dto.ClbCopyResult;
@@ -41,11 +44,14 @@ public class ClbImportController {
   private final ClbImportClient client;
   private final ClbCompareService compareService;
   private final ClbDatasetLabelService datasetLabels;
+  private final ClbClassificationService classification;
   private final CurrentUser currentUser;
 
   public ClbImportController(ClbImportService service, ClbImportClient client,
-      ClbCompareService compareService, ClbDatasetLabelService datasetLabels, CurrentUser currentUser) {
+      ClbCompareService compareService, ClbDatasetLabelService datasetLabels,
+      ClbClassificationService classification, CurrentUser currentUser) {
     this.service = service;
+    this.classification = classification;
     this.client = client;
     this.compareService = compareService;
     this.datasetLabels = datasetLabels;
@@ -72,6 +78,20 @@ public class ClbImportController {
   public ClbCopyResult copyFromClb(@PathVariable int pid, @PathVariable int focalId,
       @RequestBody ClbCopyRequest req) {
     return service.copyFromClb(currentUser.require().getId(), pid, focalId, req);
+  }
+
+  // Compare-with-CLB "wire into tree": preview how the CLB higher classification maps onto our tree...
+  @GetMapping("/api/projects/{pid}/usages/{focalId}/clb-classification")
+  public ClbClassificationPreview classificationPreview(@PathVariable int pid, @PathVariable int focalId,
+      @RequestParam String datasetKey, @RequestParam String taxonId) {
+    return classification.preview(currentUser.require().getId(), pid, focalId, datasetKey, taxonId);
+  }
+
+  // ...and apply it: create the chosen missing ancestors and re-parent the focal usage.
+  @PostMapping("/api/projects/{pid}/usages/{focalId}/clb-classification")
+  public ClbClassificationResult classificationApply(@PathVariable int pid, @PathVariable int focalId,
+      @RequestBody ClbClassificationRequest req) {
+    return classification.apply(currentUser.require().getId(), pid, focalId, req);
   }
 
   @GetMapping("/api/clb/datasets")

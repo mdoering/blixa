@@ -295,8 +295,17 @@ public final class ClbUsageMapper {
     return out;
   }
 
+  // relatedScientificName/relatedAuthorship: the related name as CLB has it (from the info's name
+  // map), so a single relation can be copied onto an existing usage of ours by name.
   public record MappedNameRelation(
-      NameRelationRequest request, String clbUsageId, String clbRelatedUsageId, String clbReferenceId) {}
+      NameRelationRequest request, String clbUsageId, String clbRelatedUsageId, String clbReferenceId,
+      String relatedScientificName, String relatedAuthorship) {
+
+    /** The id the Compare-with-CLB view lists this relation under: {@code relatedUsageId|type}. */
+    public String copyId() {
+      return clbRelatedUsageId + "|" + request.type();
+    }
+  }
 
   // NameUsageRelation (not the plainer NameRelation) is what UsageInfo.getNameRelations() actually
   // returns -- it additionally resolves usageId/relatedUsageId (not just the underlying nameId/
@@ -304,13 +313,22 @@ public final class ClbUsageMapper {
   // extra name->usage resolution is required here. NameRelationRequest has no CLB analogue for
   // `page` -- CLB's NameRelation carries no page field -- so it's always left null.
   public static MappedNameRelation toNameRelationRequest(NameUsageRelation rel) {
+    return toNameRelationRequest(rel, null);
+  }
+
+  static MappedNameRelation toNameRelationRequest(NameUsageRelation rel, Name related) {
     NameRelationRequest r = new NameRelationRequest(null, lower(rel.getType()), null, null, rel.getRemarks(), null);
-    return new MappedNameRelation(r, rel.getUsageId(), rel.getRelatedUsageId(), rel.getReferenceId());
+    return new MappedNameRelation(r, rel.getUsageId(), rel.getRelatedUsageId(), rel.getReferenceId(),
+        related == null ? null : related.getScientificName(), related == null ? null : related.getAuthorship());
   }
 
   public static List<MappedNameRelation> toNameRelations(UsageInfo info) {
     List<NameUsageRelation> rels = info.getNameRelations();
-    return rels == null ? List.of() : rels.stream().map(ClbUsageMapper::toNameRelationRequest).toList();
+    Map<String, Name> names = info.getNames() == null ? Map.of() : info.getNames();
+    return rels == null ? List.of() : rels.stream()
+        .map(rel -> toNameRelationRequest(rel,
+            rel.getRelatedNameId() == null ? null : names.get(rel.getRelatedNameId())))
+        .toList();
   }
 
   // --- references -------------------------------------------------------------------------------

@@ -272,6 +272,25 @@ public interface NameUsageMapper {
   List<NameUsage> findChildrenByParent(@Param("projectId") int projectId,
       @Param("parentId") int parentId);
 
+  // ACCEPTED usages with exactly this name and rank (rank compared case-insensitively) -- the
+  // Compare-with-CLB classification wiring's "does this higher taxon already exist?" lookup.
+  @Select("""
+      SELECT * FROM name_usage
+      WHERE project_id = #{projectId} AND scientific_name = #{scientificName}
+        AND lower(rank) = lower(#{rank}) AND status = 'ACCEPTED'
+      ORDER BY id
+      """)
+  @ResultMap("nameUsageResult")
+  List<NameUsage> findAcceptedByNameAndRank(@Param("projectId") int projectId,
+      @Param("scientificName") String scientificName, @Param("rank") String rank);
+
+  // Every usage (any status) with exactly this scientific name -- resolving the related name of a
+  // name relation copied from CLB.
+  @Select("SELECT * FROM name_usage WHERE project_id = #{projectId} AND scientific_name = #{scientificName} ORDER BY id")
+  @ResultMap("nameUsageResult")
+  List<NameUsage> findByScientificName(@Param("projectId") int projectId,
+      @Param("scientificName") String scientificName);
+
   // Every synonym of an accepted usage, full row (same projection/mapping as findByIdInProject) --
   // bulk-insert's (BulkInsertService, SYNONYMS mode) source of existing usages to canonical-key
   // against, mirroring findChildrenByParent above for the CHILDREN-mode case.

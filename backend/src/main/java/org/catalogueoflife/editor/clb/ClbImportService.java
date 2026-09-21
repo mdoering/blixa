@@ -179,29 +179,38 @@ public class ClbImportService {
   }
 
   public ClbImportSummary importFromClb(int userId, int projectId, int focalUsageId, ClbImportRequest req) {
-    return importFromClb(userId, projectId, focalUsageId, req, UnaryOperator.identity(), null);
+    return importFromClb(userId, projectId, focalUsageId, req, UnaryOperator.identity(), null, Map.of());
   }
 
   /**
-   * The Compare-with-CLB per-record copy ("«"): the chosen synonym / vernacular records of one CLB
-   * taxon, attached to the accepted focal usage. Rides the UPDATE_FOCAL path with the fetched bundle
-   * narrowed to exactly those CLB ids, so each copy is the full record the importer would bring
-   * (parsed name, references, CLB-scoped provenance id).
+   * The Compare-with-CLB per-record copy ("«"): the chosen synonym / vernacular / type-material /
+   * name-relation records of one CLB taxon, attached to the accepted focal usage. Rides the
+   * UPDATE_FOCAL path with the fetched bundle narrowed to exactly those CLB ids, so each copy is the
+   * full record the importer would bring (parsed name, references, CLB-scoped provenance id).
+   *
+   * <p>A name relation needs its related name in the project: an existing usage with that scientific
+   * name (a synonym of the focal name first, then same authorship, then any), else -- when the
+   * related CLB usage is one of the focal taxon's synonyms, the usual basionym case -- that synonym is
+   * copied along with it. Anything still unresolved is skipped and reported as an issue.
    */
   public ClbCopyResult copyFromClb(int userId, int projectId, int focalUsageId, ClbCopyRequest req) {
-    Set<String> synIds = req.synonymIds() == null ? Set.of() : Set.copyOf(req.synonymIds());
+    Set<String> synIds = req.synonymIds() == null ? new HashSet<>() : new HashSet<>(req.synonymIds());
     Set<String> vnIds = req.vernacularIds() == null ? Set.of() : Set.copyOf(req.vernacularIds());
     Set<String> tmIds = req.typeMaterialIds() == null ? Set.of() : Set.copyOf(req.typeMaterialIds());
-    if (synIds.isEmpty() && vnIds.isEmpty() && tmIds.isEmpty() && !req.wantsPublishedIn()) {
+    Set<String> relIds = req.nameRelationIds() == null ? Set.of() : Set.copyOf(req.nameRelationIds());
+    if (synIds.isEmpty() && vnIds.isEmpty() && tmIds.isEmpty() && relIds.isEmpty() && !req.wantsPublishedIn()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "nothing selected to copy");
     }
     Set<String> types = new HashSet<>();
-    if (!synIds.isEmpty()) types.add(T_SYNONYMS);
+    // synonyms too when relations are picked: a relation may bring its related synonym along
+    if (!synIds.isEmpty() || !relIds.isEmpty()) types.add(T_SYNONYMS);
     if (!vnIds.isEmpty()) types.add(T_VERNACULAR);
     if (!tmIds.isEmpty()) types.add(T_TYPE_MATERIAL);
+    if (!relIds.isEmpty()) types.add(T_NAME_RELATION);
     ClbImportRequest asImport =
         new ClbImportRequest(req.datasetKey(), req.taxonId(), ImportMode.UPDATE_FOCAL, types);
     Integer[] publishedIn = new Integer[1];
+    Map<String, Integer> preResolved = new HashMap<>();
     ClbImportSummary summary = importFromClb(userId, projectId, focalUsageId, asImport, b -> {
       // Type material: only the focal name's own records (what the comparison lists).
       String focalNameId = b.usage().clbNameId();
@@ -210,22 +219,56 @@ public class ClbImportService {
       if (own != null && focalNameId != null) {
         ownTypes.put(focalNameId, own.stream().filter(tm -> tmIds.contains(tm.clbId())).toList());
       }
+      // Name relations: the focal name's own, as picked; resolve each related name (see javadoc).
+      String focalClbId = b.usage().clbUsageId();
+      List<MappedNameRelation> rels = b.nameRelations().stream()
+          .filter(r -> focalClbId != null && focalClbId.equals(r.clbUsageId()) && relIds.contains(r.copyId()))
+          .toList();
+      Set<String> clbSynonymIds = new HashSet<>();
+      b.synonyms().forEach(sy -> clbSynonymIds.add(sy.clbUsageId()));
+      for (MappedNameRelation r : rels) {
+        Integer existing = findRelatedUsage(projectId, focalUsageId, r);
+        if (existing != null) {
+          preResolved.put(r.clbRelatedUsageId(), existing);
+        } else if (clbSynonymIds.contains(r.clbRelatedUsageId())) {
+          synIds.add(r.clbRelatedUsageId());
+        }
+      }
       return new MappedImport(
           b.usage(),
           b.synonyms().stream().filter(sy -> synIds.contains(sy.clbUsageId())).toList(),
           b.distributions(),
           b.vernaculars().stream().filter(vn -> vnIds.contains(vn.clbId())).toList(),
-          b.media(), b.estimates(), b.properties(), ownTypes, b.nameRelations(),
+          b.media(), b.estimates(), b.properties(), ownTypes, rels,
           b.references());
-    }, req.wantsPublishedIn() ? id -> publishedIn[0] = id : null);
+    }, req.wantsPublishedIn() ? id -> publishedIn[0] = id : null, preResolved);
     return new ClbCopyResult(summary, publishedIn[0]);
   }
 
-  // `focalBundleFilter` narrows the fetched bundle in UPDATE_FOCAL mode, and a non-null
-  // `publishedInSink` receives the id of the (newly inserted) published-in reference of the CLB
-  // name -- both only used by copyFromClb.
+  // An existing usage of ours for a CLB relation's related name: same scientific name, preferring a
+  // synonym of the focal usage, then an exact authorship match, then the first.
+  private Integer findRelatedUsage(int projectId, int focalUsageId, MappedNameRelation r) {
+    if (r.relatedScientificName() == null) return null;
+    List<NameUsage> candidates = usages.findByScientificName(projectId, r.relatedScientificName()).stream()
+        .filter(u -> u.getId() != focalUsageId)
+        .toList();
+    if (candidates.isEmpty()) return null;
+    for (NameUsage u : candidates) {
+      if (synonymAccepted.findAcceptedFor(projectId, u.getId()).contains(focalUsageId)) return u.getId();
+    }
+    for (NameUsage u : candidates) {
+      if (java.util.Objects.equals(u.getAuthorship(), r.relatedAuthorship())) return u.getId();
+    }
+    return candidates.get(0).getId();
+  }
+
+  // `focalBundleFilter` narrows the fetched bundle in UPDATE_FOCAL mode, a non-null `publishedInSink`
+  // receives the id of the (newly inserted) published-in reference of the CLB name, and
+  // `preResolvedUsageIds` (CLB usage id -> our existing usage id, filled by the filter) lets name
+  // relations point at usages already in the project -- all only used by copyFromClb.
   private ClbImportSummary importFromClb(int userId, int projectId, int focalUsageId, ClbImportRequest req,
-      UnaryOperator<MappedImport> focalBundleFilter, IntConsumer publishedInSink) {
+      UnaryOperator<MappedImport> focalBundleFilter, IntConsumer publishedInSink,
+      Map<String, Integer> preResolvedUsageIds) {
     Project project = requireEditorProject(userId, projectId);
     NameUsage focal = usages.findByIdInProject(projectId, focalUsageId);
     if (focal == null || focal.getStatus() != Status.ACCEPTED) {
@@ -271,6 +314,7 @@ public class ClbImportService {
         // to the focal usage, not a new one -- there is no new "accepted usage" insert in this mode.
         usageIdMap.put(mu.clbUsageId(), focalUsageId);
         nameIdMap.put(mu.clbNameId(), focalUsageId);
+        usageIdMap.putAll(preResolvedUsageIds);
         if (publishedInSink != null) {
           Integer refId = refResolver.resolve(mu.clbPublishedInReferenceId());
           if (refId != null) publishedInSink.accept(refId);

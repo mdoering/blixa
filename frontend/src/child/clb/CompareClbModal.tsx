@@ -31,6 +31,7 @@ import {
   searchClbUsages,
 } from '../../api/clb';
 import DatasetLabel from '../../clb/DatasetLabel';
+import ClbClassificationPanel from './ClbClassificationPanel';
 import ClbComparisonView, { type CopyField, type CopyHandlers, type OursSide } from './ClbComparisonView';
 
 const vernacularApi = childApi<{ name: string | null; language: string | null }>('vernaculars');
@@ -68,6 +69,7 @@ export default function CompareClbModal({ pid, usageId, opened, onClose, onCopyF
     enabled: opened,
   });
   const isAccepted = (usage?.status ?? '').toUpperCase() === 'ACCEPTED';
+  const isTreeNode = isAccepted || (usage?.status ?? '').toUpperCase() === 'UNASSESSED';
   // Our focal's accepted name when it is a synonym, lined up against CLB's (see ClbComparisonView).
   const acceptedId = !isAccepted ? usage?.acceptedParentIds?.[0] ?? null : null;
   const { data: accepted } = useQuery({
@@ -120,6 +122,8 @@ export default function CompareClbModal({ pid, usageId, opened, onClose, onCopyF
   // Values copied into the edit form but not saved yet: shown on our side so the row reads as
   // resolved (and its "«" goes away). Reset whenever the modal (re)opens.
   const [copied, setCopied] = useState<Partial<Record<CopyField | 'publishedIn', string>>>({});
+  // showing the "wire into tree" panel instead of the comparison table
+  const [wiring, setWiring] = useState(false);
 
   const focalName = usage?.scientificName ?? '';
 
@@ -165,6 +169,7 @@ export default function CompareClbModal({ pid, usageId, opened, onClose, onCopyF
   useEffect(() => {
     if (opened) {
       setCopied({});
+      setWiring(false);
       setNameQ(focalName);
       setTarget(null);
       setDatasetKey(null);
@@ -211,6 +216,7 @@ export default function CompareClbModal({ pid, usageId, opened, onClose, onCopyF
         ['synonymy', pid, usageId],
         ['vernacular name', pid, usageId],
         ['type material', pid, usageId],
+        ['name relation', pid, usageId],
         usageCountsKey(pid, usageId),
         ['changes', pid],
       ]) {
@@ -227,6 +233,10 @@ export default function CompareClbModal({ pid, usageId, opened, onClose, onCopyF
     },
     onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Copy failed') }),
   });
+
+  // A synonym target has no classification of its own to follow (the server rejects it too).
+  const clbStatus = (comparison.data?.status ?? '').toUpperCase();
+  const isClbTaxon = clbStatus === 'ACCEPTED' || clbStatus === 'PROVISIONALLY_ACCEPTED';
 
   const copyHandlers: CopyHandlers = {
     busy: copyMutation.isPending,
@@ -246,8 +256,11 @@ export default function CompareClbModal({ pid, usageId, opened, onClose, onCopyF
           synonyms: (ids: string[]) => copyMutation.mutate({ synonymIds: ids }),
           vernaculars: (ids: string[]) => copyMutation.mutate({ vernacularIds: ids }),
           typeMaterial: (ids: string[]) => copyMutation.mutate({ typeMaterialIds: ids }),
+          nameRelations: (ids: string[]) => copyMutation.mutate({ nameRelationIds: ids }),
         }
       : {}),
+    // Only a taxon sits in the tree, and only an accepted CLB target has a classification to follow.
+    ...(canEdit && isTreeNode && isClbTaxon ? { classification: () => setWiring(true) } : {}),
   };
 
   return (
@@ -389,8 +402,24 @@ export default function CompareClbModal({ pid, usageId, opened, onClose, onCopyF
                 {messageFor(comparison.error, 'Could not load this taxon from ChecklistBank')}
               </Text>
             )}
-            {comparison.data && ours && (
+            {comparison.data && ours && !wiring && (
               <ClbComparisonView ours={ours} clb={comparison.data} copy={copyHandlers} />
+            )}
+            {comparison.data && wiring && target && (
+              <ClbClassificationPanel
+                pid={pid}
+                usageId={usageId}
+                usageName={usage?.scientificName ?? ''}
+                datasetKey={target.datasetKey}
+                taxonId={target.taxonId}
+                blockedReason={
+                  Object.keys(copied).length > 0
+                    ? 'Save the values copied into the edit form first — moving the name reloads it.'
+                    : undefined
+                }
+                onDone={() => setWiring(false)}
+                onCancel={() => setWiring(false)}
+              />
             )}
           </>
         )}

@@ -33,6 +33,9 @@ export interface CopyHandlers {
   synonyms?: (ids: string[]) => void;
   vernaculars?: (ids: string[]) => void;
   typeMaterial?: (ids: string[]) => void;
+  nameRelations?: (ids: string[]) => void;
+  // opens the "wire into tree" panel for the CLB classification
+  classification?: () => void;
   // a record copy is in flight -- disables the record buttons
   busy?: boolean;
 }
@@ -74,6 +77,8 @@ const vernacularLabel = (v: { name: string | null; language: string | null }) =>
   v.language ? `${v.name ?? ''} (${v.language})` : v.name ?? '';
 const relationLabel = (r: { type: string | null; relatedName: string | null }) =>
   `${r.type ?? ''}: ${r.relatedName ?? ''}`;
+// Relations compare on type + related scientific name: our side's label carries no authorship.
+const relKey = (type: string | null, scientificName: string | null) => `${norm(type)}|${norm(scientificName)}`;
 
 interface ListItem {
   key: string; // normalized identity, compared across sides
@@ -189,7 +194,6 @@ export default function ClbComparisonView({
   const synKey = (s: { scientificName: string | null }) => norm(s.scientificName);
   const vnKey = (v: { name: string | null; language: string | null }) => `${norm(v.name)}|${norm(v.language)}`;
   const tmKey = (t: { citation: string | null; catalogNumber: string | null }) => norm(t.citation ?? t.catalogNumber);
-  const relKey = (r: { type: string | null; relatedName: string | null }) => `${norm(r.type)}|${norm(r.relatedName)}`;
 
   return (
     <Table withRowBorders verticalSpacing="xs">
@@ -220,7 +224,15 @@ export default function ClbComparisonView({
           <Table.Tr>
             <Table.Th>Classification</Table.Th>
             <Table.Td>{classificationCell(ours.classification, clbByRank)}</Table.Td>
-            <Table.Td />
+            <Table.Td>
+              {copy.classification && clb.classification.length > 0 && (
+                <Tooltip label="Wire into our tree along this classification…" withArrow>
+                  <ActionIcon variant="light" size="sm" aria-label="Wire into tree" onClick={copy.classification}>
+                    «
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </Table.Td>
             <Table.Td>{classificationCell(clb.classification, oursByRank)}</Table.Td>
           </Table.Tr>
         )}
@@ -232,8 +244,13 @@ export default function ClbComparisonView({
         )}
         {listRow(
           'Name relations',
-          (ours.nameRelations ?? []).map((r) => ({ key: relKey(r), label: relationLabel(r) })),
-          (clb.nameRelations ?? []).map((r) => ({ key: relKey(r), label: relationLabel(r) })),
+          (ours.nameRelations ?? []).map((r) => ({ key: relKey(r.type, r.relatedName), label: relationLabel(r) })),
+          (clb.nameRelations ?? []).map((r) => ({
+            key: relKey(r.type, r.relatedScientificName ?? r.relatedName),
+            label: relationLabel(r),
+            copyId: r.id,
+          })),
+          copy.nameRelations,
         )}
         {listRow(
           'Vernacular names',

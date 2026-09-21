@@ -142,8 +142,12 @@ export interface ClbComparisonTypeMaterial {
 }
 
 export interface ClbComparisonNameRelation {
+  // "relatedUsageId|type" -- what the copy action sends
+  id: string | null;
   type: string | null;
+  // "scientificName authorship" for display; relatedScientificName is what gets compared
   relatedName: string | null;
+  relatedScientificName: string | null;
 }
 
 export interface ClbComparison {
@@ -175,6 +179,7 @@ export interface ClbCopyPayload {
   synonymIds?: string[];
   vernacularIds?: string[];
   typeMaterialIds?: string[];
+  nameRelationIds?: string[];
   publishedIn?: boolean;
 }
 
@@ -182,6 +187,53 @@ export interface ClbCopyResult {
   summary: ClbImportSummary;
   // the reference created for the CLB published-in citation, when requested
   publishedInReferenceId: number | null;
+}
+
+// --- "wire into tree": the CLB higher classification resolved against our tree -------------------
+
+export interface ClbClassificationStep {
+  clbId: string | null;
+  rank: string;
+  name: string;
+  authorship: string | null;
+  // our existing ACCEPTED usage with the same name + rank; null = not in the project (can be created)
+  matchId: number | null;
+  // the match sits directly under the previous resolved ancestor (our tree agrees with CLB here)
+  inPlace: boolean;
+  ambiguous: boolean;
+}
+
+export interface ClbClassificationPreview {
+  steps: ClbClassificationStep[];
+  currentParentId: number | null;
+  currentParentName: string | null;
+}
+
+export interface ClbClassificationResult {
+  parentId: number | null;
+  created: number;
+  moved: boolean;
+}
+
+export function previewClbClassification(
+  pid: number,
+  usageId: number,
+  datasetKey: string,
+  taxonId: string,
+): Promise<ClbClassificationPreview> {
+  const q = new URLSearchParams({ datasetKey, taxonId });
+  return api<ClbClassificationPreview>(`/api/projects/${pid}/usages/${usageId}/clb-classification?${q}`);
+}
+
+export function applyClbClassification(
+  pid: number,
+  usageId: number,
+  payload: { datasetKey: string; taxonId: string; createClbIds: string[] },
+): Promise<ClbClassificationResult> {
+  return api<ClbClassificationResult>(`/api/projects/${pid}/usages/${usageId}/clb-classification`, {
+    method: 'POST',
+    json: payload,
+  });
 }
 
 // POST .../clb-copy -- the Compare-with-CLB "«" actions: copy chosen CLB records onto the focal usage.

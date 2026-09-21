@@ -90,3 +90,31 @@ test('« copies a differing value, a single missing record, or all missing recor
   expect(within(vnRow).queryByRole('button')).not.toBeInTheDocument();
   expect(vernaculars).not.toHaveBeenCalled();
 });
+
+test('name relations match on type + scientific name (authorship ignored); CLB-only ones get «', async () => {
+  setup();
+  const nameRelations = vi.fn();
+  const classification = vi.fn();
+  renderWithProviders(
+    <ClbComparisonView
+      ours={{ ...ours, nameRelations: [{ type: 'basionym', relatedName: 'Felis leo' }] }}
+      clb={{
+        ...clb,
+        classification: [{ rank: 'genus', name: 'Panthera' }],
+        nameRelations: [
+          { id: 'B|basionym', type: 'basionym', relatedName: 'Felis leo Linnaeus, 1758', relatedScientificName: 'Felis leo' },
+          { id: 'X|spelling correction', type: 'spelling correction', relatedName: 'Panthera leoo', relatedScientificName: 'Panthera leoo' },
+        ],
+      }}
+      copy={{ nameRelations, classification }}
+    />,
+  );
+  const relRow = screen.getByText('Name relations').closest('tr') as HTMLElement;
+  const buttons = within(relRow).getAllByRole('button', { name: 'Copy to ours' });
+  expect(buttons).toHaveLength(1); // the basionym is already ours
+  await userEvent.click(buttons[0]);
+  expect(nameRelations).toHaveBeenCalledWith(['X|spelling correction']);
+
+  await userEvent.click(screen.getByRole('button', { name: 'Wire into tree' }));
+  expect(classification).toHaveBeenCalled();
+});

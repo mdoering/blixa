@@ -576,7 +576,7 @@ class ClbImportServiceIT extends AbstractPostgresIT {
     when(clb.usageInfo(ds, "CP")).thenReturn(src);
 
     var result = service.copyFromClb(userId, pid, focalId, new org.catalogueoflife.editor.clb.dto.ClbCopyRequest(
-        ds, "CP", List.of("S2"), List.of("12"), List.of("T1"), Boolean.TRUE));
+        ds, "CP", List.of("S2"), List.of("12"), List.of("T1"), Boolean.TRUE, null));
 
     assertThat(result.summary().synonyms()).isEqualTo(1);
     NameUsage copied = findByName(pid, "Copyus secundus");
@@ -602,8 +602,83 @@ class ClbImportServiceIT extends AbstractPostgresIT {
     int pid = createProject(userId, "clb-copy-none-project");
     int focalId = createFocalUsage(pid, userId);
     org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.copyFromClb(userId, pid, focalId,
-            new org.catalogueoflife.editor.clb.dto.ClbCopyRequest("3LXR", "CP", List.of(), null, null, null)))
+            new org.catalogueoflife.editor.clb.dto.ClbCopyRequest("3LXR", "CP", List.of(), null, null, null, null)))
         .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
         .hasMessageContaining("nothing selected");
+  }
+
+  // A CLB taxon whose name has a basionym relation to its own homotypic synonym, and a
+  // "spelling correction" relation to a name that is neither a synonym nor in our project.
+  private static UsageInfo relInfo() {
+    Taxon t = new Taxon(name("RL-N", "Panthera leo", "(Linnaeus, 1758)", Rank.SPECIES));
+    t.setId("RL");
+    t.setStatus(TaxonomicStatus.ACCEPTED);
+    UsageInfo info = new UsageInfo(t);
+    Synonym bas = new Synonym(name("BAS-N", "Felis leo", "Linnaeus, 1758", Rank.SPECIES));
+    bas.setId("BAS");
+    info.setSynonyms(new Synonymy());
+    info.getSynonyms().getHomotypic().add(bas);
+    life.catalogue.api.model.NameUsageRelation r1 = new life.catalogue.api.model.NameUsageRelation();
+    r1.setUsageId("RL");
+    r1.setNameId("RL-N");
+    r1.setRelatedUsageId("BAS");
+    r1.setRelatedNameId("BAS-N");
+    r1.setType(life.catalogue.api.vocab.NomRelType.BASIONYM);
+    life.catalogue.api.model.NameUsageRelation r2 = new life.catalogue.api.model.NameUsageRelation();
+    r2.setUsageId("RL");
+    r2.setNameId("RL-N");
+    r2.setRelatedUsageId("ELSE");
+    r2.setRelatedNameId("ELSE-N");
+    r2.setType(life.catalogue.api.vocab.NomRelType.SPELLING_CORRECTION);
+    info.setNameRelations(List.of(r1, r2));
+    info.getNames().put("BAS-N", name("BAS-N", "Felis leo", "Linnaeus, 1758", Rank.SPECIES));
+    info.getNames().put("ELSE-N", name("ELSE-N", "Panthera leoo", null, Rank.SPECIES));
+    return info;
+  }
+
+  @Test
+  void copyNameRelationBringsItsSynonymAlongWhenNotInProject() {
+    int userId = createUser("clb-rel-1");
+    int pid = createProject(userId, "clb-rel-1-project");
+    int focalId = createFocalUsage(pid, userId);
+    when(clb.usageInfo("3LXR", "RL")).thenReturn(relInfo());
+
+    var result = service.copyFromClb(userId, pid, focalId, new org.catalogueoflife.editor.clb.dto.ClbCopyRequest(
+        "3LXR", "RL", null, null, null, null, List.of("BAS|basionym", "ELSE|spelling correction")));
+
+    NameUsage bas = findByName(pid, "Felis leo");
+    assertThat(synonymAccepted.findAcceptedFor(pid, bas.getId())).containsExactly(focalId);
+    assertThat(nameRelationMapper.findByUsage(pid, focalId))
+        .extracting(r -> r.type() + "->" + r.relatedUsageId())
+        .containsExactly("basionym->" + bas.getId());
+    // the relation to a name that is neither in the project nor a CLB synonym is reported, not made
+    assertThat(result.summary().issues()).extracting(ClbImportSummary.ClbImportIssue::message)
+        .containsExactly("related usage not found");
+  }
+
+  @Test
+  void copyNameRelationLinksAnExistingUsageOfTheProject() {
+    int userId = createUser("clb-rel-2");
+    int pid = createProject(userId, "clb-rel-2-project");
+    int focalId = createFocalUsage(pid, userId);
+    NameUsage existing = new NameUsage();
+    existing.setProjectId(pid);
+    existing.setId(idSeq.allocate(pid, NAME_USAGE_ENTITY));
+    existing.setStatus(Status.SYNONYM);
+    existing.setScientificName("Felis leo");
+    existing.setAuthorship("L.");
+    existing.setRank("species");
+    existing.setModifiedBy(userId);
+    usages.insert(existing);
+    when(clb.usageInfo("3LXR", "RL")).thenReturn(relInfo());
+
+    service.copyFromClb(userId, pid, focalId, new org.catalogueoflife.editor.clb.dto.ClbCopyRequest(
+        "3LXR", "RL", null, null, null, null, List.of("BAS|basionym")));
+
+    // linked to the existing usage -- no second "Felis leo" created
+    assertThat(usages.findByScientificName(pid, "Felis leo")).hasSize(1);
+    assertThat(nameRelationMapper.findByUsage(pid, focalId))
+        .extracting(r -> r.relatedUsageId())
+        .containsExactly(existing.getId());
   }
 }

@@ -118,8 +118,9 @@ public class ClbCompareService {
         Name related = info.getNames() == null || rel.getRelatedNameId() == null
             ? null : info.getNames().get(rel.getRelatedNameId());
         String relatedLabel = related == null ? rel.getRelatedNameId() : label(related);
-        relations.add(new ClbNameRelation(
-            rel.getType() == null ? null : lower(rel.getType().name()).replace('_', ' '), relatedLabel));
+        String type = rel.getType() == null ? null : lower(rel.getType().name()).replace('_', ' ');
+        relations.add(new ClbNameRelation(rel.getRelatedUsageId() + "|" + type, type, relatedLabel,
+            related == null ? null : related.getScientificName()));
       }
     }
 
