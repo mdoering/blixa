@@ -99,11 +99,13 @@ class ClbImportClientIT {
   }
 
   @Test
-  void searchUsagesParsesNestedNameFields() {
-    server.expect(requestTo(BASE + "/dataset/3LXR/nameusage?q=Panthera&limit=20&rank=genus"))
+  void searchUsagesPrefixSearchParsesNestedUsage() {
+    server.expect(requestTo(BASE
+            + "/dataset/3LXR/nameusage/search?q=Panthera&content=SCIENTIFIC_NAME&type=PREFIX&limit=20&rank=genus"))
         .andRespond(withSuccess("""
             {"offset":0,"limit":20,"total":1,"result":[
-              {"id":"6DBT","status":"accepted","name":{"scientificName":"Panthera","rank":"genus"}}
+              {"id":"6DBT","usage":{"id":"6DBT","status":"accepted",
+                "name":{"scientificName":"Panthera","rank":"genus"}}}
             ]}
             """, MediaType.APPLICATION_JSON));
 

@@ -123,22 +123,28 @@ public class ClbImportClient {
   }
 
   /**
-   * GET /dataset/{datasetKey}/nameusage?q={q}[&rank={rank}]&limit=20. A hit's scientificName/rank
-   * live under the nested {@code .name} object, not the top-level usage (verified against a live
-   * CLB response), unlike {@code .status}, which is top-level.
+   * GET /dataset/{datasetKey}/nameusage/search?q={q}&content=SCIENTIFIC_NAME&type=PREFIX[&rank=]
+   * &limit=20 -- a prefix search, so a partial or not-exactly-matching name still finds candidates
+   * (the plain {@code /nameusage?q=} list is an exact-name match and silently returned nothing).
+   * Each search hit wraps the usage under {@code .usage}; scientificName/rank sit on its nested
+   * {@code .name}, status on the usage itself.
    */
   public List<ClbUsageHit> searchUsages(String datasetKey, String q, String rank) {
-    var uri = UriComponentsBuilder.fromPath("/dataset/{ds}/nameusage")
+    var uri = UriComponentsBuilder.fromPath("/dataset/{ds}/nameusage/search")
         .queryParam("q", q)
+        .queryParam("content", "SCIENTIFIC_NAME")
+        .queryParam("type", "PREFIX")
         .queryParam("limit", 20);
     if (rank != null && !rank.isBlank()) {
       uri.queryParam("rank", rank);
     }
     JsonNode page = getPage(uri, datasetKey);
     List<ClbUsageHit> out = new ArrayList<>();
-    for (JsonNode n : page.path("result")) {
-      JsonNode name = n.path("name");
-      out.add(new ClbUsageHit(text(n, "id"), text(name, "scientificName"), text(name, "rank"), text(n, "status")));
+    for (JsonNode hit : page.path("result")) {
+      JsonNode usage = hit.has("usage") ? hit.path("usage") : hit;
+      JsonNode name = usage.path("name");
+      out.add(new ClbUsageHit(text(usage, "id"), text(name, "scientificName"), text(name, "rank"),
+          text(usage, "status")));
     }
     return out;
   }

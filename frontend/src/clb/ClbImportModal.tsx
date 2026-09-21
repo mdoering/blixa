@@ -31,6 +31,7 @@ import {
   type ClbImportSummary,
   type ClbUsageHit,
 } from '../api/clb';
+import DatasetLabel from './DatasetLabel';
 
 export interface ClbImportFocalUsage {
   id: number;
@@ -255,13 +256,7 @@ export default function ClbImportModal({ projectId, focalUsage, opened, onClose 
                     </Text>
                     {resolved.rank ? ` (${resolved.rank})` : ''}
                     {' — '}
-                    <Text span inherit c="dimmed" title={resolved.datasetTitle ?? undefined}>
-                      {resolved.datasetTitle
-                        ? resolved.datasetTitle.length > 60
-                          ? `${resolved.datasetTitle.slice(0, 57)}…`
-                          : resolved.datasetTitle
-                        : `dataset ${resolved.datasetKey}`}
-                    </Text>
+                    <DatasetLabel datasetKey={resolved.datasetKey} c="dimmed" maxChars={60} />
                   </Text>
                 )}
               </Stack>

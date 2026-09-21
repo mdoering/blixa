@@ -72,6 +72,31 @@ export function getClbDatasetLabels(keys: string[]): Promise<Record<string, stri
   return api<Record<string, string>>(`/api/clb/dataset-labels?${search.toString()}`);
 }
 
+// One key's label, batched: every lookup requested in the same tick (e.g. a list of hits, each
+// rendering a DatasetLabel) goes out as a single /dataset-labels call. Resolves to the key itself
+// when the dataset can't be resolved.
+let pendingLabels = new Map<string, { resolve: (l: string) => void; reject: (e: unknown) => void }[]>();
+let labelFlush: ReturnType<typeof setTimeout> | null = null;
+
+export function getClbDatasetLabel(key: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const waiters = pendingLabels.get(key) ?? [];
+    waiters.push({ resolve, reject });
+    pendingLabels.set(key, waiters);
+    if (labelFlush == null) {
+      labelFlush = setTimeout(() => {
+        const batch = pendingLabels;
+        pendingLabels = new Map();
+        labelFlush = null;
+        getClbDatasetLabels([...batch.keys()]).then(
+          (labels) => batch.forEach((ws, k) => ws.forEach((w) => w.resolve(labels[k] ?? k))),
+          (err) => batch.forEach((ws) => ws.forEach((w) => w.reject(err))),
+        );
+      }, 0);
+    }
+  });
+}
+
 export function searchClbUsages(datasetKey: string, q: string, rank?: string): Promise<ClbUsageHit[]> {
   const search = new URLSearchParams();
   if (q) search.set('q', q);

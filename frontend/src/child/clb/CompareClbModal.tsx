@@ -10,7 +10,7 @@ import {
   Text,
   TextInput,
 } from '@mantine/core';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import { getSynonyms, getUsage } from '../../api/usages';
@@ -22,6 +22,7 @@ import {
   searchClbDatasets,
   searchClbUsages,
 } from '../../api/clb';
+import DatasetLabel from '../../clb/DatasetLabel';
 import ClbComparisonView, { type OursSide } from './ClbComparisonView';
 
 interface Props {
@@ -31,7 +32,7 @@ interface Props {
   onClose: () => void;
 }
 
-function HitRow({ label, sub, onClick }: { label: string; sub?: string; onClick: () => void }) {
+function HitRow({ label, sub, onClick }: { label: string; sub?: ReactNode; onClick: () => void }) {
   return (
     <Paper withBorder p="xs" radius="sm" onClick={onClick} style={{ cursor: 'pointer' }}>
       <Text size="sm">{label}</Text>
@@ -166,7 +167,7 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
                           setDatasetLabel(f.title ?? f.key);
                         }}
                       >
-                        {f.title ?? f.key}
+                        {f.title ?? <DatasetLabel datasetKey={f.key} size="xs" />}
                       </Button>
                     ))}
                   </Group>
@@ -182,7 +183,7 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
                     <HitRow
                       key={d.key}
                       label={d.title ?? d.key}
-                      sub={d.alias ?? d.key}
+                      sub={d.alias ?? undefined}
                       onClick={() => {
                         setDatasetKey(d.key);
                         setDatasetLabel(d.title ?? d.key);
@@ -209,13 +210,38 @@ export default function CompareClbModal({ pid, usageId, opened, onClose }: Props
                   value={nameQ}
                   onChange={(e) => setNameQ(e.currentTarget.value)}
                 />
+                {(() => {
+                  const hits = mode === 'all' ? allHits : inDatasetHits;
+                  if (!debouncedName.trim()) return null;
+                  if (hits.isFetching) return <Loader size="sm" />;
+                  if (hits.isError)
+                    return (
+                      <Text size="sm" c="red">
+                        ChecklistBank search failed
+                      </Text>
+                    );
+                  return (hits.data ?? []).length === 0 ? (
+                    <Text size="sm" c="dimmed">
+                      No matching names{mode === 'dataset' ? ' in this dataset' : ''} — try another spelling.
+                    </Text>
+                  ) : (
+                    <Text size="xs" c="dimmed">
+                      Click a name to compare it.
+                    </Text>
+                  );
+                })()}
                 <Stack gap="xs">
                   {mode === 'all' &&
                     (allHits.data ?? []).map((h) => (
                       <HitRow
                         key={`${h.datasetKey}-${h.id}`}
                         label={`${h.scientificName ?? ''} ${h.authorship ?? ''}`}
-                        sub={`${h.rank ?? ''} · ${h.status ?? ''} · ${h.datasetTitle ?? `dataset ${h.datasetKey}`}`}
+                        sub={
+                          <>
+                            {`${h.rank ?? ''} · ${h.status ?? ''} · `}
+                            <DatasetLabel datasetKey={h.datasetKey} size="xs" c="dimmed" />
+                          </>
+                        }
                         onClick={() => setTarget({ datasetKey: h.datasetKey, taxonId: h.id })}
                       />
                     ))}
