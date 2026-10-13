@@ -3,10 +3,13 @@ package org.catalogueoflife.editor.parse;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.gbif.nameparser.api.Authorship;
 import org.gbif.nameparser.api.NamePart;
+import org.gbif.nameparser.api.NomCode;
 import org.gbif.nameparser.api.ParsedName;
+import org.gbif.nameparser.util.NameFormatter;
 
 /**
  * Maps a GBIF name-parser {@link ParsedName} onto the atomized nomenclatural fields of a {@link
@@ -16,6 +19,12 @@ import org.gbif.nameparser.api.ParsedName;
  * {@link ParsedName#getBasionymAuthorship()} are mapped. The per-epithet {@code
  * getGenericAuthorship()} / {@code getSpecificAuthorship()} are deliberately ignored — they
  * attach authors to a non-terminal epithet and are not part of a proper name for our purposes.
+ *
+ * <p>The author and year columns have no room for an {@link Authorship#isAnonymous() anonymous}
+ * work or a {@link Authorship#isBracketedYear() bracketed year}, so -- like CLB's ColDP {@code
+ * AuthorAtoms} (CatalogueOfLife/backend#1611) -- both travel inside the values: an anonymous work
+ * as the code specific "anon."/"Anon." or its attributed authors each in square brackets, a
+ * bracketed year as "[1916]".
  */
 public final class ParsedNameMapping {
 
@@ -39,19 +48,35 @@ public final class ParsedNameMapping {
 
     Authorship combination = pn.getCombinationAuthorship();
     if (combination != null) {
-      u.setCombinationAuthorship(join(combination.getAuthors()));
+      u.setCombinationAuthorship(join(authors(combination, pn.getCode())));
       u.setCombinationExAuthorship(join(combination.getExAuthors()));
-      u.setCombinationAuthorshipYear(combination.getYear());
+      u.setCombinationAuthorshipYear(year(combination));
+      u.setSanctioningAuthor(combination.getSanctioningAuthor());
     }
 
+    // A sanctioned basionym's own sanctioning author has no column and is not kept.
     Authorship basionym = pn.getBasionymAuthorship();
     if (basionym != null) {
-      u.setBasionymAuthorship(join(basionym.getAuthors()));
+      u.setBasionymAuthorship(join(authors(basionym, pn.getCode())));
       u.setBasionymExAuthorship(join(basionym.getExAuthors()));
-      u.setBasionymAuthorshipYear(basionym.getYear());
+      u.setBasionymAuthorshipYear(year(basionym));
     }
+  }
 
-    u.setSanctioningAuthor(pn.getSanctioningAuthor());
+  /** The authors of {@code a}, marking an anonymous work as described in the class javadoc. */
+  private static List<String> authors(Authorship a, @Nullable NomCode code) {
+    if (!a.isAnonymous()) {
+      return a.getAuthors();
+    }
+    if (a.hasAuthors()) {
+      return a.getAuthors().stream().map(x -> "[" + x + "]").toList();
+    }
+    return List.of(NameFormatter.anonymousAuthor(code));
+  }
+
+  /** The year of {@code a}, in square brackets if it is a bracketed year. */
+  private static String year(Authorship a) {
+    return a.isBracketedYear() && a.getYear() != null ? "[" + a.getYear() + "]" : a.getYear();
   }
 
   /** Pipe-joins an author list into the single authoritative string column, or null if empty. */

@@ -6,13 +6,14 @@ import org.catalogueoflife.editor.name.NameUsage;
 import org.gbif.nameparser.api.NameParser;
 import org.gbif.nameparser.api.NomCode;
 import org.gbif.nameparser.api.ParseResult;
+import org.gbif.nameparser.api.ParsedName;
 import org.gbif.nameparser.api.Rank;
 import org.gbif.nameparser.rust.NameParserRust;
 import org.gbif.nameparser.util.NameFormatter;
 import org.springframework.stereotype.Service;
 
 /**
- * Wraps the GBIF name-parser 5.0.0 {@link NameParser} to atomize a {@link NameUsage}'s scientific
+ * Wraps the GBIF name-parser 5.x {@link NameParser} to atomize a {@link NameUsage}'s scientific
  * name + authorship, and to render formatted display names, per design-spec Appendix A.
  *
  * <p>At 5.0.0 the reference Java parser was dropped; the sole implementation is {@link
@@ -85,15 +86,22 @@ public class NameParserService {
 
   /**
    * Renders a formatted display name for {@code u} via {@link NameFormatter}'s {@code
-   * canonicalComplete}/{@code canonicalCompleteHtml}. Falls back to the raw {@code
-   * scientificName} (plus authorship, if present) when the name cannot be parsed.
+   * canonicalComplete}/{@code canonicalCompleteHtml}, for a {@code Parsed} and a semi-structured
+   * {@code Informal} name alike. Falls back to the raw {@code scientificName} (plus authorship, if
+   * present) when the name is {@code Unparsable}.
    */
   public String formatName(NameUsage u, @Nullable NomCode nomCode, boolean html) {
     Rank rank = parseRank(u.getRank());
     ParseResult result = parser.parse(u.getScientificName(), u.getAuthorship(), rank, nomCode);
-    return result.parsed()
-        .map(pn -> html ? NameFormatter.canonicalCompleteHtml(pn) : NameFormatter.canonicalComplete(pn))
-        .orElseGet(() -> rawName(u));
+    ParsedName pn = switch (result) {
+      case ParseResult.Parsed p -> p.name();
+      case ParseResult.Informal i -> i.toParsedName();
+      case ParseResult.Unparsable _ -> null;
+    };
+    if (pn == null) {
+      return rawName(u);
+    }
+    return html ? NameFormatter.canonicalCompleteHtml(pn) : NameFormatter.canonicalComplete(pn);
   }
 
   /** The raw {@code scientificName}, with authorship appended when present -- the unparsable fallback. */

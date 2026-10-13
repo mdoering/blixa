@@ -18,7 +18,8 @@
   <properties>
     <java.version>25</java.version>
     <mybatis-starter.version>4.0.1</mybatis-starter.version>
-    <name-parser-rust.version>0.1.0</name-parser-rust.version>
+    <name-parser.version>5.4.0-SNAPSHOT</name-parser.version>
+    <name-parser-rust.version>0.3.1-SNAPSHOT</name-parser-rust.version>
   </properties>
 
   <dependencies>
@@ -112,14 +113,16 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- GBIF name parser 5.0.0: the API module (NameParser interface, ParseResult, enums like
+    <!-- GBIF name parser 5.x: the API module (NameParser interface, ParseResult, enums like
          Rank/NomCode/NameType) is separate from the implementation. The reference Java impl
          (NameParserImpl) was dropped at 5.0.0; the sole implementation is now a Rust core reached
-         over the JDK Foreign Function and Memory API (java.lang.foreign), which requires JDK 25. -->
+         over the JDK Foreign Function and Memory API (java.lang.foreign), which requires JDK 25.
+         Both track the latest snapshots, as the CLB backend does; the rust binding pins the api
+         version it implements, so bump the two together. -->
     <dependency>
       <groupId>org.gbif</groupId>
       <artifactId>name-parser-api</artifactId>
-      <version>5.0.0</version>
+      <version>${name-parser.version}</version>
     </dependency>
     <dependency>
       <groupId>org.gbif.nameparser</groupId>

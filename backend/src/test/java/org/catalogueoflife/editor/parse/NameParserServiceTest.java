@@ -57,6 +57,49 @@ class NameParserServiceTest {
   }
 
   @Test
+  void parseIntoSanctioningAuthor() {
+    // Since name-parser 5.2 the sanctioning author sits on each Authorship, not the ParsedName.
+    NameUsage u = new NameUsage();
+    u.setScientificName("Boletus edulis");
+    u.setAuthorship("Bull. : Fr.");
+    u.setRank("species");
+
+    service.parseInto(u, NomCode.BOTANICAL);
+
+    assertEquals("Bull.", u.getCombinationAuthorship());
+    assertEquals("Fr.", u.getSanctioningAuthor());
+    assertEquals("COMPLETE", u.getParseState());
+  }
+
+  @Test
+  void parseIntoAnonymousAuthorship() {
+    // An anonymous work has no authors; the atomized column keeps it as the code specific "anon.".
+    NameUsage u = new NameUsage();
+    u.setScientificName("Rosa canina");
+    u.setAuthorship("anon.");
+    u.setRank("species");
+
+    service.parseInto(u, NomCode.BOTANICAL);
+
+    assertEquals("anon.", u.getCombinationAuthorship());
+    assertNull(u.getBasionymAuthorship());
+  }
+
+  @Test
+  void parseIntoBracketedYear() {
+    // A year known only from evidence outside the work keeps its square brackets (ICZN Rec. 22A.2.3).
+    NameUsage u = new NameUsage();
+    u.setScientificName("Puma concolor");
+    u.setAuthorship("Linnaeus, [1771]");
+    u.setRank("species");
+
+    service.parseInto(u, NomCode.ZOOLOGICAL);
+
+    assertEquals("Linnaeus", u.getCombinationAuthorship());
+    assertEquals("[1771]", u.getCombinationAuthorshipYear());
+  }
+
+  @Test
   void parseIntoUnparsableNameNeverThrows() {
     // A BOLD BIN identifier - not a scientific name at all - is unparsable. Under name-parser 5.0.0
     // it is recognised specifically as an IDENTIFIER (4.2.0 classified it as the catch-all OTHER).
@@ -118,6 +161,19 @@ class NameParserServiceTest {
     String html = service.formatName(u, NomCode.BOTANICAL, true);
 
     assertEquals("<i>Abies</i> <i>alba</i> Mill.", html);
+  }
+
+  @Test
+  void formatNameRendersInformalName() {
+    // A semi-structured Informal name has no atomized ParsedName, but still renders via
+    // Informal.toParsedName() instead of falling back to the raw input.
+    NameUsage u = new NameUsage();
+    u.setScientificName("Abies  sp.   BOLD:AAA0001");
+    u.setRank("species");
+
+    String canonical = service.formatName(u, NomCode.BOTANICAL, false);
+
+    assertEquals("Abies sp. BOLD:AAA0001", canonical);
   }
 
   @Test
