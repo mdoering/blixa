@@ -126,7 +126,7 @@ public class DwcaToColdp {
     put(row, ColdpTerm.authorship, core.value(DwcTerm.scientificNameAuthorship));
     put(row, ColdpTerm.rank, core.value(DwcTerm.taxonRank));
     put(row, ColdpTerm.nameStatus, core.value(DwcTerm.nomenclaturalStatus));
-    put(row, ColdpTerm.publishedInYear, core.value(DwcTerm.namePublishedInYear));
+    put(row, ColdpTerm.namePublishedInYear, core.value(DwcTerm.namePublishedInYear));
     put(row, ColdpTerm.remarks, core.value(DwcTerm.taxonRemarks));
 
     String coldpStatus = normalizeStatus(core.value(DwcTerm.taxonomicStatus));

@@ -106,6 +106,15 @@ class DwcaImportIT extends AbstractPostgresIT {
     assertThat(syns.size()).isEqualTo(1);
     assertThat(syns.get(0).get("scientificName").asString()).isEqualTo("Felis leo");
 
+    // namePublishedInYear lands in the usage's published-in year
+    for (var e : Map.of("Panthera", 1816, "Felis leo", 1758).entrySet()) {
+      int id = e.getKey().equals("Felis leo")
+          ? syns.get(0).get("id").asInt() : byName.get(e.getKey()).get("id").asInt();
+      mvc.perform(get("/api/projects/" + pid + "/usages/" + id))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.publishedInYear").value(e.getValue()));
+    }
+
     // flat fallback: Aus bus hangs under a synthesized genus Aus, itself under Felidae, up to Animalia
     assertThat(byName).containsKeys("Aus bus", "Aus", "Felidae", "Animalia");
     assertThat(byName.get("Aus").get("rank").asString()).isEqualTo("genus");
@@ -157,13 +166,14 @@ class DwcaImportIT extends AbstractPostgresIT {
         + "</archive>\n";
 
     // taxa.txt: taxonID, scientificName, taxonRank, taxonomicStatus, parentNameUsageID,
-    //           acceptedNameUsageID, kingdom, phylum, class, order, family, genus
+    //           acceptedNameUsageID, kingdom, phylum, class, order, family, genus,
+    //           namePublishedInYear
     String taxa = "taxonID\tscientificName\ttaxonRank\ttaxonomicStatus\tparentNameUsageID\t"
-        + "acceptedNameUsageID\tkingdom\tphylum\tclass\torder\tfamily\tgenus\n"
-        + "1\tPanthera\tgenus\taccepted\t\t\t\t\t\t\t\t\n"
-        + "2\tPanthera leo\tspecies\taccepted\t1\t\t\t\t\t\t\t\n"
-        + "3\tFelis leo\tspecies\tsynonym\t\t2\t\t\t\t\t\t\n"
-        + "4\tAus bus\tspecies\taccepted\t\t\tAnimalia\tChordata\tMammalia\tCarnivora\tFelidae\tAus\n";
+        + "acceptedNameUsageID\tkingdom\tphylum\tclass\torder\tfamily\tgenus\tnamePublishedInYear\n"
+        + "1\tPanthera\tgenus\taccepted\t\t\t\t\t\t\t\t\t1816\n"
+        + "2\tPanthera leo\tspecies\taccepted\t1\t\t\t\t\t\t\t\t\n"
+        + "3\tFelis leo\tspecies\tsynonym\t\t2\t\t\t\t\t\t\t1758\n"
+        + "4\tAus bus\tspecies\taccepted\t\t\tAnimalia\tChordata\tMammalia\tCarnivora\tFelidae\tAus\t\n";
     String vernacular = "taxonID\tvernacularName\tlanguage\n2\tLion\ten\n";
     String distribution = "taxonID\tlocality\testablishmentMeans\n2\tAfrica\tnative\n";
     String speciesprofile = "taxonID\tisMarine\tisTerrestrial\tisExtinct\n"
@@ -185,7 +195,8 @@ class DwcaImportIT extends AbstractPostgresIT {
     sb.append("    <files><location>taxa.txt</location></files>\n");
     sb.append("    <id index=\"0\"/>\n");
     String[] terms = {"taxonID", "scientificName", "taxonRank", "taxonomicStatus", "parentNameUsageID",
-        "acceptedNameUsageID", "kingdom", "phylum", "class", "order", "family", "genus"};
+        "acceptedNameUsageID", "kingdom", "phylum", "class", "order", "family", "genus",
+        "namePublishedInYear"};
     for (int i = 0; i < terms.length; i++) {
       sb.append("    <field index=\"" + i + "\" term=\"" + DWC + terms[i] + "\"/>\n");
     }

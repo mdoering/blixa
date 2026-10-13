@@ -199,6 +199,7 @@ core**. Other core types are rejected.
 | `parentNameUsageID` | Parent of an accepted name |
 | `acceptedNameUsageID` | Accepted name of a synonym or misapplied name |
 | `nomenclaturalStatus` | Nomenclatural status (ColDP vocabulary values only) |
+| `namePublishedInYear` | Published in year |
 | `taxonRemarks` | Remarks |
 | `kingdom`, `phylum`, `class`, `order`, `family`, `subfamily`, `genus`, `subgenus` | Only for flat archives (see below) |
 
