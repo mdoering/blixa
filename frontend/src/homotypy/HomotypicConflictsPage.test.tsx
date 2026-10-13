@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils';
 import { server, http, HttpResponse } from '../test/server';
 import { Routes, Route } from 'react-router-dom';
+import { QueryClient } from '@tanstack/react-query';
 import HomotypicConflictsPage from './HomotypicConflictsPage';
 
 const CONFLICTS = [
@@ -42,12 +43,12 @@ const SYNONYM_TARGET_CONFLICTS = [
   },
 ];
 
-function renderPage() {
+function renderPage(queryClient?: QueryClient) {
   return render(
     <Routes>
       <Route path="/projects/:projectId/homotypic-conflicts/:rootId" element={<HomotypicConflictsPage />} />
     </Routes>,
-    { route: '/projects/7/homotypic-conflicts/100' },
+    { route: '/projects/7/homotypic-conflicts/100', queryClient },
   );
 }
 
@@ -87,6 +88,27 @@ describe('HomotypicConflictsPage', () => {
         relations: [{ usageId: 2, relatedUsageId: 1, type: 'basionym' }],
       }),
     );
+  });
+
+  it('consolidates: refreshes the tree, not only the survivor\'s synonymy', async () => {
+    server.use(
+      http.post('/api/projects/7/usages/1/homotypic/consolidate', () =>
+        HttpResponse.json({ homotypic: [], heterotypicGroups: [], misapplied: [] }),
+      ),
+    );
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidated: unknown[] = [];
+    const orig = qc.invalidateQueries.bind(qc);
+    qc.invalidateQueries = ((filters?: { queryKey?: unknown[] }) => {
+      invalidated.push(filters?.queryKey);
+      return orig(filters);
+    }) as typeof qc.invalidateQueries;
+    renderPage(qc);
+    await screen.findAllByText(/Poa annua/);
+    await userEvent.click(screen.getByRole('button', { name: /consolidate/i }));
+    await waitFor(() => expect(invalidated).toContainEqual(['treeChildren', 7]));
+    expect(invalidated).toContainEqual(['treeRoots', 7]);
+    expect(invalidated).toContainEqual(['synonymy', 7]);
   });
 
   it('consolidates: a synonym-target accepted (e.g. Festuca foo) is never demoted, its synonym member is re-pointed', async () => {

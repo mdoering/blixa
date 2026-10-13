@@ -51,8 +51,12 @@ function ConflictCard({
       return consolidateHomotypic(pid, survivor, { losers, repoint, relations });
     },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['tree', pid] });
-      await qc.invalidateQueries({ queryKey: ['synonymy', pid, survivor] });
+      // the losers were demoted and synonyms re-pointed: refresh what Demote refreshes (the tree
+      // queries are treeRoots/treeChildren/treePath) plus every synonymy, not just the survivor's
+      await Promise.all(
+        ['treeRoots', 'treeChildren', 'treePath', 'usageSearch', 'usage', 'usageSynonyms',
+          'usageAccepted', 'synonymy'].map((key) => qc.invalidateQueries({ queryKey: [key, pid] })),
+      );
       notifications.show({ message: 'Consolidated' });
       onDone();
     },
