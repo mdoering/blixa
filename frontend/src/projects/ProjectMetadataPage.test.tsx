@@ -750,6 +750,38 @@ test('owner can toggle public and publish a release', async () => {
   expect(screen.getByText('1.0')).toBeInTheDocument();
 });
 
+test('deleting a release asks for confirmation first', async () => {
+  let deleted = false;
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json({ ...project, license: 'CC0-1.0' })),
+    http.get('/api/projects/3/releases', () =>
+      HttpResponse.json(
+        deleted
+          ? []
+          : [{ id: 1, projectId: 3, version: '1.0', notes: null, status: 'READY', nameUsageCount: 3,
+              metrics: {}, fileName: 'x.zip', fileSize: 10, error: null, createdAt: '2026-07-12T00:00:00Z' }],
+      ),
+    ),
+    http.delete('/api/projects/3/releases/1', () => {
+      deleted = true;
+      return new HttpResponse(null, { status: 204 });
+    }),
+    noLatestMatchRun,
+    noLatestExportRun,
+  );
+  renderPage();
+  await openTab('Releases');
+  await userEvent.click(await screen.findByRole('button', { name: 'Delete release 1.0' }));
+
+  // nothing is deleted until the dialog is confirmed
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog).toHaveTextContent('Permanently delete release 1.0');
+  expect(deleted).toBe(false);
+  await userEvent.click(screen.getByRole('button', { name: 'Delete release' }));
+  await waitFor(() => expect(deleted).toBe(true));
+  await waitFor(() => expect(screen.queryByText('READY')).not.toBeInTheDocument());
+});
+
 test('a license-less project disables the Public toggle and Publish release button with a hint', async () => {
   server.use(
     http.get('/api/projects/3', () => HttpResponse.json({ ...project, license: null })),

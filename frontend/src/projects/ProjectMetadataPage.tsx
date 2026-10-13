@@ -330,6 +330,20 @@ export default function ProjectMetadataPage() {
     onError: (e) => notifications.show({ color: 'red', message: messageFor(e, 'Delete failed') }),
   });
 
+  const confirmDeleteRelease = (r: { id: number; version: string }) =>
+    modals.openConfirmModal({
+      title: 'Delete release',
+      children: (
+        <Text size="sm">
+          Permanently delete release <b>{r.version}</b> and its archive? Anyone using its download
+          link will no longer get the file. This cannot be undone.
+        </Text>
+      ),
+      labels: { confirm: 'Delete release', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => deleteReleaseMut.mutate(r.id),
+    });
+
   const confirmDelete = () =>
     modals.openConfirmModal({
       title: 'Delete project',
@@ -454,7 +468,7 @@ export default function ProjectMetadataPage() {
                           color="red"
                           aria-label={`Delete release ${r.version}`}
                           loading={deleteReleaseMut.isPending}
-                          onClick={() => deleteReleaseMut.mutate(r.id)}
+                          onClick={() => confirmDeleteRelease(r)}
                         >
                           <IconTrash size={16} />
                         </ActionIcon>

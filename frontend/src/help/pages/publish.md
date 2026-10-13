@@ -117,8 +117,9 @@ keeps its releases internal until you make it public.
 
 ### Delete a release
 
-Owners can delete a release with the bin icon at the end of its row. The release is removed
-immediately, with no confirmation, and its download disappears from the public page.
+Owners can delete a release with the bin icon at the end of its row, then **Delete release** to
+confirm. The release and its archive are removed for good, and its download disappears from the
+public page.
 
 ## Export ColDP
 
