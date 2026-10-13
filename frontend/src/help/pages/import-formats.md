@@ -171,7 +171,7 @@ Blixa reads six keys and ignores the rest:
 | Key | Project field |
 |---|---|
 | `title` | Title (unless you enter one in the modal) |
-| `alias` | Alias |
+| `alias` | Alias, unless it breaks the [alias rules](/help/publish) or another project already has it; then the project gets no alias |
 | `description` | Description |
 | `license` | License |
 | `geographicScope` | Geographic scope |

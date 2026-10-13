@@ -74,6 +74,11 @@ public interface ProjectMapper {
   boolean ownerHasTitle(@Param("userId") int userId, @Param("title") String title,
       @Param("excludeId") int excludeId);
 
+  // Aliases are unique across all projects, case-insensitively (index project_alias_lower_uq):
+  // /p/{alias} is one global namespace. excludeId is the project being edited, 0 on create.
+  @Select("SELECT EXISTS (SELECT 1 FROM project WHERE lower(alias) = lower(#{alias}) AND id <> #{excludeId})")
+  boolean aliasTaken(@Param("alias") String alias, @Param("excludeId") int excludeId);
+
   @Delete("DELETE FROM project WHERE id = #{id}")
   void delete(int id);
 

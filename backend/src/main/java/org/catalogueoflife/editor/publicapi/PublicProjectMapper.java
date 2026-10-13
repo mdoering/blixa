@@ -22,7 +22,7 @@ public interface PublicProjectMapper {
   @org.apache.ibatis.annotations.ResultMap("pubProject")
   Project findPublicById(@Param("id") int id);
 
-  @Select("SELECT * FROM project WHERE alias = #{alias} AND is_public = true ORDER BY id LIMIT 1")
+  @Select("SELECT * FROM project WHERE lower(alias) = lower(#{alias}) AND is_public = true")
   @org.apache.ibatis.annotations.ResultMap("pubProject")
   Project findPublicByAlias(@Param("alias") String alias);
 }

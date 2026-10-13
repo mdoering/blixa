@@ -47,7 +47,7 @@ export function getPublicProjects(): Promise<PublicProjectSummary[]> {
 }
 
 export function getPublicProject(idOrAlias: string): Promise<PublicProjectInfo> {
-  return api<PublicProjectInfo>(`/api/public/projects/${idOrAlias}`);
+  return api<PublicProjectInfo>(`/api/public/projects/${encodeURIComponent(idOrAlias)}`);
 }
 
 // Releases already carry a server-computed `downloadUrl`, but this mirrors that route so callers

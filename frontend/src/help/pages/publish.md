@@ -18,7 +18,10 @@ public page.
 1. Go to **Project** → **Metadata**.
 2. Fill in:
    - **Title**: the checklist's name (required).
-   - **Alias**: a short name. It also gives the public page a readable address, e.g. `/p/felidae`.
+   - **Alias**: a short name. It also gives the public page a readable address, e.g. `/p/felidae`,
+     and names your export files. Use up to 64 letters, digits, `.`, `_` or `-`, starting with a
+     letter or digit, and not just digits. Each alias can belong to one project only, ignoring
+     upper and lower case.
    - **License**: **CC0-1.0** or **CC-BY-4.0**. A license is required to make the project public
      and to publish releases.
    - **Description**: what the checklist covers and how it was made.

@@ -2,6 +2,7 @@ package org.catalogueoflife.editor.project;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 import life.catalogue.api.vocab.License;
 import life.catalogue.common.csl.CslFormatter;
 import org.catalogueoflife.editor.name.Reference;
@@ -47,7 +48,7 @@ public class ProjectService {
   public Project create(int userId, CreateProjectRequest req) {
     Project p = new Project();
     p.setTitle(requireUniqueTitle(userId, req.title(), 0));
-    p.setAlias(req.alias());
+    p.setAlias(requireValidAlias(req.alias(), 0));
     p.setNomCode(parseNomCode(req.nomCode()));
     projects.insert(p);
     members.upsert(new ProjectMember(p.getId(), userId, Role.OWNER.dbValue()));
@@ -65,6 +66,50 @@ public class ProjectService {
           "you already have a project titled \"" + title + "\"");
     }
     return title;
+  }
+
+  // An alias is the readable part of a public address (/p/{alias}, /api/public/projects/{alias}) and
+  // of export file names, so it is restricted to characters that never need escaping in a URL path
+  // or a file name. It must not be all digits either: a numeric /p/{x} is read as a project id.
+  private static final Pattern ALIAS = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
+
+  /** Why alias can't be used as given (null when it can), ignoring whether another project has it. */
+  public static String aliasProblem(String alias) {
+    if (!ALIAS.matcher(alias).matches()) {
+      return "an alias is 1-64 letters, digits, '.', '_' or '-', starting with a letter or digit";
+    }
+    if (alias.chars().allMatch(Character::isDigit)) {
+      return "an alias needs at least one letter (a number is read as a project id)";
+    }
+    return null;
+  }
+
+  // Returns the trimmed alias to store (null for none); 400 if it breaks the rules above, 409 if
+  // another project already has it (case-insensitively). excludeId is the project being edited.
+  private String requireValidAlias(String rawAlias, int excludeId) {
+    String alias = rawAlias == null || rawAlias.isBlank() ? null : rawAlias.trim();
+    if (alias == null) return null;
+    String problem = aliasProblem(alias);
+    if (problem != null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, problem);
+    }
+    if (projects.aliasTaken(alias, excludeId)) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT,
+          "the alias \"" + alias + "\" is already used by another project");
+    }
+    return alias;
+  }
+
+  /**
+   * For imports: the archive's alias if it follows the rules and no other project has it, else
+   * null -- an alias from someone else's metadata.yaml must not fail the whole import.
+   */
+  public String usableAlias(String rawAlias, int excludeId) {
+    String alias = rawAlias == null || rawAlias.isBlank() ? null : rawAlias.trim();
+    if (alias == null || aliasProblem(alias) != null || projects.aliasTaken(alias, excludeId)) {
+      return null;
+    }
+    return alias;
   }
 
   public List<Project> listForUser(int userId) {
@@ -121,7 +166,7 @@ public class ProjectService {
     Project p = projects.findById(projectId);
     String oldCslStyle = p.getCslStyle();
     p.setTitle(requireUniqueTitle(userId, req.title(), projectId));
-    p.setAlias(req.alias());
+    p.setAlias(requireValidAlias(req.alias(), projectId));
     p.setDescription(req.description());
     p.setNomCode(nomCode);
     p.setLicense(license);

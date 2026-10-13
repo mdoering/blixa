@@ -82,6 +82,19 @@ function formatFileSize(bytes: number): string {
   return `${(kb / 1024).toFixed(1)} MB`;
 }
 
+// Mirrors the backend's ProjectService.aliasProblem: the alias is part of the public address
+// (/p/<alias>) and of export file names, so only characters that never need escaping, and never
+// just digits (a number is read as a project id). Uniqueness is checked by the server (409).
+export function aliasError(alias: string | undefined): string | null {
+  const a = (alias ?? '').trim();
+  if (!a) return null;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(a)) {
+    return "Use up to 64 letters, digits, '.', '_' or '-', starting with a letter or digit";
+  }
+  if (/^\d+$/.test(a)) return 'Needs at least one letter: a number is read as a project id';
+  return null;
+}
+
 export default function ProjectMetadataPage() {
   const { projectId } = useParams();
   const id = Number(projectId);
@@ -104,6 +117,7 @@ export default function ProjectMetadataPage() {
     },
     validate: {
       title: (v) => (v ? null : 'Required'),
+      alias: aliasError,
     },
   });
 
@@ -393,7 +407,11 @@ export default function ProjectMetadataPage() {
           <Stack gap="md">
             <TextInput label="Title" {...form.getInputProps('title')} />
             <SimpleGrid cols={2}>
-              <TextInput label="Alias" {...form.getInputProps('alias')} />
+              <TextInput
+                label="Alias"
+                placeholder="e.g. felidae, for the public address /p/felidae"
+                {...form.getInputProps('alias')}
+              />
               <Select
                 label="License"
                 clearable

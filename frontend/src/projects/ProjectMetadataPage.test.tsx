@@ -65,6 +65,34 @@ test('prefills the form and saves updated metadata', async () => {
   await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument());
 });
 
+test('an alias that would break the public address is rejected before saving', async () => {
+  const put = vi.fn();
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json(project)),
+    http.put('/api/projects/3/metadata', async ({ request }) => {
+      put(await request.json());
+      return HttpResponse.json(project);
+    }),
+    noLatestMatchRun,
+    noLatestExportRun,
+  );
+  renderPage();
+  const alias = await screen.findByLabelText('Alias');
+  await userEvent.type(alias, 'big cats');
+  await userEvent.click(screen.getAllByRole('button', { name: /save/i })[0]);
+  expect(await screen.findByText(/letters, digits/)).toBeInTheDocument();
+  await userEvent.clear(alias);
+  await userEvent.type(alias, '2024');
+  await userEvent.click(screen.getAllByRole('button', { name: /save/i })[0]);
+  expect(await screen.findByText(/at least one letter/)).toBeInTheDocument();
+  expect(put).not.toHaveBeenCalled();
+
+  await userEvent.clear(alias);
+  await userEvent.type(alias, 'big-cats');
+  await userEvent.click(screen.getAllByRole('button', { name: /save/i })[0]);
+  await waitFor(() => expect(put).toHaveBeenCalledWith(expect.objectContaining({ alias: 'big-cats' })));
+});
+
 test('a second Save button below Settings submits the same metadata form', async () => {
   let puts = 0;
   server.use(

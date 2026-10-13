@@ -360,7 +360,8 @@ public class ImportRunService {
 
     Project p = projectService.create(userId, new CreateProjectRequest(title, null, nomCodeName));
     projectService.updateMetadata(userId, p.getId(), new UpdateProjectMetadataRequest(
-        title, md.alias(), md.description(), nomCodeName, md.license(),
+        title, projectService.usableAlias(md.alias(), p.getId()), md.description(), nomCodeName,
+        md.license(),
         md.geographicScope(), md.taxonomicScope(), null, null, null, null));
     runs.setProject(runId, p.getId());
 

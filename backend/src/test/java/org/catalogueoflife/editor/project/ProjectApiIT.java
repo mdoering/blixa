@@ -1,5 +1,6 @@
 package org.catalogueoflife.editor.project;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -30,6 +31,7 @@ class ProjectApiIT extends AbstractPostgresIT {
   @Autowired AppUserService users;
   @Autowired ProjectMemberMapper members;
   @Autowired ObjectMapper json;
+  @Autowired ProjectService projectService;
 
   private void ensureUser(String username) {
     AppUser existing = users.requireByUsernameOrNull(username);
@@ -349,5 +351,59 @@ class ProjectApiIT extends AbstractPostgresIT {
             .content("{\"title\":\"  Padded Title  \"}"))
        .andExpect(status().isCreated())
        .andExpect(jsonPath("$.title").value("Padded Title"));
+  }
+
+  private long createProject(String title) throws Exception {
+    String body = mvc.perform(post("/api/projects").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"" + title + "\"}"))
+        .andExpect(status().isCreated())
+        .andReturn().getResponse().getContentAsString();
+    return json.readTree(body).get("id").asLong();
+  }
+
+  private org.springframework.test.web.servlet.ResultActions saveAlias(long pid, String alias)
+      throws Exception {
+    return mvc.perform(put("/api/projects/" + pid + "/metadata").with(csrf())
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"title\":\"Alias test " + pid + "\",\"alias\":\"" + alias + "\"}"));
+  }
+
+  @Test
+  @WithMockUser(username = "aliasOwner")
+  void aliasMustBeUrlSafeNotNumericAndUnique() throws Exception {
+    ensureUser("aliasOwner");
+    long a = createProject("Alias A");
+    long b = createProject("Alias B");
+
+    saveAlias(a, "  felidae-2.0_x  ").andExpect(status().isOk())
+        .andExpect(jsonPath("$.alias").value("felidae-2.0_x"));
+    // characters that would need escaping in /p/{alias} or a file name
+    for (String bad : new String[] {"big cats", "a/b", "50%", "x?y", "-lead", "kätzchen"}) {
+      saveAlias(b, bad).andExpect(status().isBadRequest());
+    }
+    // a number would be read as a project id
+    saveAlias(b, "2024").andExpect(status().isBadRequest());
+    // taken by project a, case-insensitively
+    saveAlias(b, "FELIDAE-2.0_x").andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("already used")));
+    // blank clears it
+    saveAlias(b, "  ").andExpect(status().isOk()).andExpect(jsonPath("$.alias").value(nullValue()));
+    // a project keeps its own alias on re-save
+    saveAlias(a, "felidae-2.0_x").andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser(username = "aliasImporter")
+  void importedAliasIsDroppedWhenUnusable() throws Exception {
+    ensureUser("aliasImporter");
+    long a = createProject("Alias holder");
+    saveAlias(a, "taken-alias").andExpect(status().isOk());
+
+    assertThat(projectService.usableAlias(" fresh-alias ", 0)).isEqualTo("fresh-alias");
+    assertThat(projectService.usableAlias("Taken-Alias", 0)).isNull();
+    assertThat(projectService.usableAlias("taken-alias", (int) a)).isEqualTo("taken-alias");
+    assertThat(projectService.usableAlias("Big Cats", 0)).isNull();
+    assertThat(projectService.usableAlias("42", 0)).isNull();
+    assertThat(projectService.usableAlias(null, 0)).isNull();
   }
 }

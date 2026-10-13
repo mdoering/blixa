@@ -16,7 +16,7 @@ export interface JoinRequestBody {
 
 // Unauthenticated: a visitor on a public project page requests to join by submitting their ORCID.
 export function requestJoin(idOrAlias: string, body: JoinRequestBody): Promise<void> {
-  return api<void>(`/api/public/projects/${idOrAlias}/join`, { method: 'POST', json: body });
+  return api<void>(`/api/public/projects/${encodeURIComponent(idOrAlias)}/join`, { method: 'POST', json: body });
 }
 
 export function listJoinRequests(pid: number): Promise<JoinRequest[]> {
