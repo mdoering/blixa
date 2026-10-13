@@ -157,6 +157,32 @@ class ImportApiIT extends AbstractPostgresIT {
     assertThat(latest.get("status").asString()).isEqualTo("DONE");
   }
 
+  // A title sent with the upload overrides the archive's own metadata.yaml title (everything else
+  // still comes from the archive) -- lets the same archive be imported twice by one user.
+  @Test
+  @WithMockUser(username = "importTitleOverride")
+  void uploadTitleOverridesTheArchiveTitle(@TempDir Path tmp) throws Exception {
+    ensureUser("importTitleOverride");
+
+    Path dir = tmp.resolve("archive");
+    Files.createDirectories(dir);
+    byte[] zipBytes = buildArchive(dir,
+        new ColdpMetadataDto("Archive Title", null, "kept description", "CC0-1.0", null, null),
+        "zoological");
+    MockMultipartFile file = new MockMultipartFile("file", "titled.zip", "application/zip", zipBytes);
+
+    String startBody = mvc.perform(multipart("/api/projects/import").file(file)
+            .param("title", "  My Copy  ").with(csrf()))
+        .andExpect(status().isAccepted())
+        .andReturn().getResponse().getContentAsString();
+    JsonNode done = pollUntilTerminal(json.readTree(startBody).get("id").asLong());
+    assertThat(done.get("status").asString()).isEqualTo("DONE");
+
+    Project p = projects.findById((int) done.get("projectId").asLong());
+    assertThat(p.getTitle()).isEqualTo("My Copy");
+    assertThat(p.getDescription()).isEqualTo("kept description");
+  }
+
   // Only metadata.yaml, no data file of any kind -- ColdpReader.from(dir) itself (CsvReader's
   // schema discovery, the CLB library code, unmodified) throws a SourceInvalidException("No data
   // files found in ...") before loadTransactional's own NameUsage/Name+Taxon check ever runs. Either
