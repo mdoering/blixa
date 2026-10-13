@@ -6,6 +6,7 @@ import { ApiError, messageFor } from '../api/client';
 import { getAccepted, getUsage, promoteUsage } from '../api/usages';
 import ClassificationTree from './ClassificationTree';
 import type { MoveTarget } from './MoveNameModal';
+import { WithHelp } from '../components/HelpLink';
 
 export interface PromoteModalProps {
   pid: number;
@@ -86,9 +87,11 @@ export default function PromoteModal({ pid, usage, opened, onClose }: PromoteMod
       opened={opened}
       onClose={onClose}
       title={
-        <Text fw={600}>
-          Promote <Text span fs="italic" inherit>{usage.scientificName ?? '—'}</Text> to accepted
-        </Text>
+        <WithHelp page="synonyms" section="promote-a-synonym" label="Help: promoting a synonym">
+          <Text fw={600}>
+            Promote <Text span fs="italic" inherit>{usage.scientificName ?? '—'}</Text> to accepted
+          </Text>
+        </WithHelp>
       }
     >
       <Stack gap="md">

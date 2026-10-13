@@ -10,6 +10,7 @@ import {
   previewUsageMerge,
   type MergeCandidate,
 } from '../api/merge';
+import { WithHelp } from '../components/HelpLink';
 
 export interface MergeRecordsModalProps {
   entity: 'usage' | 'reference';
@@ -111,7 +112,12 @@ export default function MergeRecordsModal({
   const survivor = candidates?.find((c) => c.id === survivorId);
 
   return (
-    <Modal opened={opened} onClose={onClose} size="lg" title={<Text fw={600}>Merge {ids.length} records</Text>}>
+    <Modal opened={opened} onClose={onClose} size="lg" title={
+        <WithHelp page="merge" section="merge-selected-names" label="Help: merging records">
+          <Text fw={600}>Merge {ids.length} records</Text>
+        </WithHelp>
+      }
+    >
       <Stack gap="md">
         {isLoading || !candidates ? (
           <Text c="dimmed">Loading…</Text>

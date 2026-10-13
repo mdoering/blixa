@@ -12,6 +12,7 @@ import { useNameActions } from '../names/useNameActions';
 import ClassificationTree from './ClassificationTree';
 import TaxonDetail from './TaxonDetail';
 import { useSelectedUsage } from './useSelectedUsage';
+import HelpLink from '../components/HelpLink';
 
 export default function TreePage() {
   const { projectId } = useParams();
@@ -72,7 +73,10 @@ export default function TreePage() {
   return (
     <Box>
       <Group justify="space-between" mb="md">
-        <Text fw={600}>Classification tree</Text>
+        <Group gap={4} wrap="nowrap">
+          <Text fw={600}>Classification tree</Text>
+          <HelpLink page="build-the-tree" label="Help: the classification tree" />
+        </Group>
         <Group gap="md">
           <Switch
             size="sm"

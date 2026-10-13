@@ -210,6 +210,10 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 
 ## Deployment / docs
 
+- **User documentation** *(implemented; spec `docs/superpowers/specs/2026-10-13-user-documentation-design.md`)*:
+  in-app `/help` (markdown, Diátaxis structure), contextual `?` links, a curated Felidae playground
+  dataset + "Try it with demo data", and Playwright-generated screenshots.
+
 - Drop the Postgres-only docker compose; document configuring the pg dbname/user/password + Flyway init (confirm whether the backend auto-migrates on boot).
 - Rename the "full" docker compose to just `docker-compose.yml`.
 

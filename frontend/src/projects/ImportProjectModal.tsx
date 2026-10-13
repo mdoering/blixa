@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom';
 import { getIdScopes } from '../api/coldp';
 import { getImportRun, startImport } from '../api/import';
 import { messageFor } from '../api/client';
+import { WithHelp } from '../components/HelpLink';
 
 export interface ImportProjectModalProps {
   opened: boolean;
@@ -96,7 +97,12 @@ export default function ImportProjectModal({ opened, onClose }: ImportProjectMod
   const canSubmit = file != null && !scopeMissing && !running;
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Import ColDP">
+    <Modal opened={opened} onClose={onClose} title={
+        <WithHelp page="start-a-checklist" section="import-a-file" label="Help: importing">
+          Import ColDP
+        </WithHelp>
+      }
+    >
       <Stack gap="md">
         <FileInput
           label="ColDP, DwC-A, or text-tree file"
@@ -108,7 +114,7 @@ export default function ImportProjectModal({ opened, onClose }: ImportProjectMod
         />
         <TextInput
           label="Title"
-          description="Used as the project title for text-tree and DwC-A imports (ColDP carries its own)."
+          description="Optional. Defaults to the title in a ColDP metadata.yaml, otherwise the file name."
           value={title}
           onChange={(e) => setTitle(e.currentTarget.value)}
         />

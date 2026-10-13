@@ -7,6 +7,7 @@ import { getChildren } from '../api/tree';
 import { demoteUsage, getUsage } from '../api/usages';
 import ClassificationTree from './ClassificationTree';
 import type { MoveTarget } from './MoveNameModal';
+import { WithHelp } from '../components/HelpLink';
 
 export interface DemoteModalProps {
   pid: number;
@@ -92,9 +93,11 @@ export default function DemoteModal({ pid, usage, initialStatus, opened, onClose
       opened={opened}
       onClose={onClose}
       title={
-        <Text fw={600}>
-          Demote <Text span fs="italic" inherit>{usage.scientificName ?? '—'}</Text> to a synonym
-        </Text>
+        <WithHelp page="synonyms" section="demote-a-name" label="Help: demoting a name">
+          <Text fw={600}>
+            Demote <Text span fs="italic" inherit>{usage.scientificName ?? '—'}</Text> to a synonym
+          </Text>
+        </WithHelp>
       }
     >
       <Stack gap="md">

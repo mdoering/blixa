@@ -42,6 +42,7 @@ import ImportReferencesModal from './ImportReferencesModal';
 import ReconcileJournalsModal from './ReconcileJournalsModal';
 import ReferenceForm from './ReferenceForm';
 import { parseYearFilter } from './parseYearFilter';
+import HelpLink from '../components/HelpLink';
 
 const PAGE = 25;
 
@@ -158,9 +159,12 @@ export default function ReferencesPage() {
   return (
     <Stack>
       <Group justify="space-between">
-        <Title order={3} m={0}>
-          References{total !== undefined ? ` (${total})` : ''}
-        </Title>
+        <Group gap={4} wrap="nowrap">
+          <Title order={3} m={0}>
+            References{total !== undefined ? ` (${total})` : ''}
+          </Title>
+          <HelpLink page="references" label="Help: references" />
+        </Group>
         <Group gap="xs">
           {(refs?.length ?? 0) > 0 && (
             <Button

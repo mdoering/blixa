@@ -24,6 +24,7 @@ import CreateNameModal from './CreateNameModal';
 import NameActionMenu from './NameActionMenu';
 import { useNameActions } from './useNameActions';
 import { STATUS_META, statusMeta } from './statusMeta';
+import HelpLink from '../components/HelpLink';
 
 // Same common ranks as CreateNameModal's RANK_OPTIONS (lower-case wire form).
 const RANK_OPTIONS = [
@@ -330,7 +331,10 @@ export default function NameSearchPage() {
   return (
     <Box>
       <Group justify="space-between" mb="md">
-        <Title order={3} m={0}>Names</Title>
+        <Group gap={4} wrap="nowrap">
+          <Title order={3} m={0}>Names</Title>
+          <HelpLink page="edit-names" section="find-names-on-the-names-page" label="Help: the Names page" />
+        </Group>
         <Group gap="xs">
           {(data?.total ?? 0) > 0 && (
             <Button

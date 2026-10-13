@@ -7,6 +7,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { listChanges } from '../api/changes';
 import { listDiscussions } from '../api/discussions';
 import type { Change } from '../api/types';
+import HelpLink from '../components/HelpLink';
 
 dayjs.extend(relativeTime);
 
@@ -102,9 +103,12 @@ export default function HistoryPage() {
   return (
     <Stack>
       <Group justify="space-between">
-        <Title order={3} m={0}>
-          History
-        </Title>
+        <Group gap={4} wrap="nowrap">
+          <Title order={3} m={0}>
+            History
+          </Title>
+          <HelpLink page="collaborate" section="history" label="Help: history" />
+        </Group>
         <Select
           placeholder="All objectives"
           clearable

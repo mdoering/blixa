@@ -19,6 +19,7 @@ import { notifications } from '@mantine/notifications';
 import { messageFor } from '../api/client';
 import { getProject } from '../api/projects';
 import { issueSummary, listIssues, reviewIssue, revalidate } from '../api/issues';
+import HelpLink from '../components/HelpLink';
 
 const PAGE = 25;
 const SEVERITY_COLOR: Record<string, string> = { error: 'red', warning: 'yellow', info: 'blue' };
@@ -82,9 +83,12 @@ export default function IssuesPage() {
   return (
     <Stack>
       <Group justify="space-between">
-        <Title order={3} m={0}>
-          Issues
-        </Title>
+        <Group gap={4} wrap="nowrap">
+          <Title order={3} m={0}>
+            Issues
+          </Title>
+          <HelpLink page="validation" section="the-issues-page" label="Help: validation issues" />
+        </Group>
         {canEdit && (
           <Button
             leftSection={<IconRefresh size={14} />}

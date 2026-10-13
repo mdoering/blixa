@@ -10,6 +10,7 @@ import { listDiscussions, type Discussion, type DiscussionStatus } from '../api/
 import UserAvatar from '../components/UserAvatar';
 import DiscussionForm from './DiscussionForm';
 import DiscussionSettingsModal from './DiscussionSettingsModal';
+import HelpLink from '../components/HelpLink';
 
 const PAGE = 25;
 const STATUS_COLOR: Record<DiscussionStatus, string> = {
@@ -67,9 +68,12 @@ export default function DiscussionsPage() {
   return (
     <Box>
       <Group justify="space-between" mb="md">
-        <Title order={3} m={0}>
-          Discussions
-        </Title>
+        <Group gap={4} wrap="nowrap">
+          <Title order={3} m={0}>
+            Discussions
+          </Title>
+          <HelpLink page="collaborate" section="discussions" label="Help: discussions" />
+        </Group>
         <Group gap="xs">
           {isEditor && (
             <ActionIcon

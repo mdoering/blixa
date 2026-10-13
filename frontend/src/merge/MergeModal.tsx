@@ -28,6 +28,7 @@ import {
 import { listProjects } from '../api/projects';
 import { messageFor } from '../api/client';
 import MergeMappingTables from './MergeMappingTables';
+import { WithHelp } from '../components/HelpLink';
 
 export interface MergeModalProps {
   opened: boolean;
@@ -188,7 +189,13 @@ export default function MergeModal({ opened, onClose, targetId }: MergeModalProp
     : 0;
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Merge project" size="lg">
+    <Modal opened={opened} onClose={onClose} title={
+        <WithHelp page="merge" section="merge-another-project" label="Help: merging projects">
+          Merge project
+        </WithHelp>
+      }
+      size="lg"
+    >
       <Stack gap="md">
         {runId == null && (
           <Stack gap="xs">

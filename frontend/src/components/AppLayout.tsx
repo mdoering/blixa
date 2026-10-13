@@ -14,6 +14,7 @@ import BlixaLogo from './BlixaLogo';
 import ColorSchemeToggle from './ColorSchemeToggle';
 import ActiveObjectiveSelector from './ActiveObjectiveSelector';
 import UserAvatar from './UserAvatar';
+import HelpLink from './HelpLink';
 
 export default function AppLayout() {
   const { data: me } = useMe();
@@ -74,6 +75,7 @@ export default function AppLayout() {
           <CurrentProjectName projectId={projectId} />
           <Group ml="auto" gap="sm" wrap="nowrap">
             {projectId != null && <ActiveObjectiveSelector pid={projectId} />}
+            <HelpLink />
             <ColorSchemeToggle />
             <Menu position="bottom-end" withinPortal>
               <Menu.Target>

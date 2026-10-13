@@ -1,0 +1,527 @@
+col:ID	col:parentID	col:basionymID	col:status	col:scientificName	col:authorship	col:rank	col:code	col:nameReferenceID	col:namePublishedInPage	col:namePublishedInYear	col:extinct	col:link	col:remarks
+N			accepted	Animalia		kingdom	zoological						
+CH2	N		accepted	Chordata		phylum	zoological						
+6224G	CH2		accepted	Mammalia	Linnaeus, 1758	class	zoological						
+VS	6224G		accepted	Carnivora	Bowdich, 1821	order	zoological						
+623RM	VS		accepted	Felidae	Fischer de Waldheim, 1817	family	zoological	0b0391b7-efd7-45a0-abfd-fca98da49741		1817		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180580	
+LPDQM	623RM		accepted	Asilifelis	Werdelin, 2011	genus	zoological	e4fe877a-0e8c-4b82-92ef-1502d37c1d98		2011		https://www.irmng.org/aphia.php?p=taxdetails&id=1479978	
+JKL	623RM		accepted	Felinae	Fischer de Waldheim, 1817	subfamily	zoological			1817		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552363	
+J3J	JKL		synonym	Acinonychinae	Pocock, 1917	subfamily	zoological			1917		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552362	
+628LP	623RM		accepted	Pantherinae	Pocock, 1917	subfamily	zoological			1917		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552364	
+MYJ	JKL		accepted	Acinonyx	Brookes, 1828	genus	zoological	bb6564c5-4b11-49bc-88c1-59efcc75cb00		1828		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183812	
+LQLTM	MYJ		synonym	Abacinonyx	Kretzoi, 1929	genus	zoological	d09659dd-a74b-42e0-8e61-f817b4eea162		1929		https://www.irmng.org/aphia.php?p=taxdetails&id=11923391	
+M4LVN	MYJ		synonym	Acinomyx	de Beaumont, 1964	genus	zoological			1964		https://www.irmng.org/aphia.php?p=taxdetails&id=1452554	
+MZJJK	MYJ		synonym	Cinaylurus	Lund, 1839	genus	zoological	81f0c089-8b0b-494e-b5db-7c86ef7a2392		1839		https://www.irmng.org/aphia.php?p=taxdetails&id=1121644	
+N4T9N	MYJ		synonym	Cynaelurus	Agassiz, 1846	genus	zoological	d205fa53-4fa3-4da0-b46e-d37e161237f1		1846		https://www.irmng.org/aphia.php?p=taxdetails&id=1316243	
+N4TBL	MYJ		synonym	Cynailurus	Wagler, 1830	genus	zoological	a7e6c1fa-042f-4660-998d-43061de32f24		1830		https://www.irmng.org/aphia.php?p=taxdetails&id=1123695	
+N5G67	MYJ		synonym	Cynofelis	Lesson, 1842	genus	zoological	bc6ac5d0-748f-41ca-ae9a-9b0b14bc6977		1842		https://www.irmng.org/aphia.php?p=taxdetails&id=1414363	
+NXDP4	MYJ		synonym	Guepar	Boitard, 1841	genus	zoological	c1b04b6d-4829-4c8c-ac13-555739329b20		1841		https://www.irmng.org/aphia.php?p=taxdetails&id=1150270	
+NXDP7	MYJ		synonym	Gueparda	Gray, 1842	genus	zoological	3260c0a6-cabe-4a2e-98ce-6316841baa2e		1842		https://www.irmng.org/aphia.php?p=taxdetails&id=1448387	
+NXDPG	MYJ		synonym	Guepardus	Duvernoy, 1834	genus	zoological	9a830c51-ba1e-4c13-9bf3-d531d3b26ea5		1834		https://www.irmng.org/aphia.php?p=taxdetails&id=1232507	
+M4LWG	MYJ		synonym	Miracinonyx	Adams, 1979	genus	zoological	4f7778a1-658f-4791-a6fb-086956d277f3		1979		https://www.irmng.org/aphia.php?p=taxdetails&id=1208841	
+RH28K	MYJ		synonym	Paracinonyx	Kretzoi, 1929	genus	zoological	d09659dd-a74b-42e0-8e61-f817b4eea162		1929		https://www.irmng.org/aphia.php?p=taxdetails&id=1452555	
+3H8V	JKL		accepted	Caracal	Gray, 1843	genus	zoological	77b7d43b-ee43-4127-a54b-11644d5e4965		1843		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552459	
+MBV9T	3H8V		synonym	Caracala	Gray, 1842	genus	zoological	8c4189fb-5db2-47b4-9c07-1f9cfccfe16e		1842		https://www.irmng.org/aphia.php?p=taxdetails&id=1415359	
+MPKMR	3H8V		synonym	Chrysailurus	Severtzov, 1858	genus	zoological	0f6d6fc0-940e-4eb8-9a09-81403e0fb24c		1858		https://www.irmng.org/aphia.php?p=taxdetails&id=1162582	
+6WGT	3H8V		synonym	Profelis	Severtzov, 1858	genus	zoological			1858		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621781	
+TVJ65	3H8V		synonym	Urolynchus	Severtzov, 1858	genus	zoological	81452bf3-11f5-4acf-bceb-123bc48f409b		1858		https://www.irmng.org/aphia.php?p=taxdetails&id=1182292	
+3JKK	JKL		accepted	Catopuma	Severtzov, 1858	genus	zoological	0dbb3233-db50-4781-a015-79c948723e46		1858		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621778	
+MKKGL	3JKK		synonym	Badiofelis	Pocock, 1932	genus	zoological	de0a3f2b-4fd9-409b-bd72-232d45f57252		1932		https://www.irmng.org/aphia.php?p=taxdetails&id=1206478	
+4JQ8	JKL		accepted	Felis	Linnaeus, 1758	genus	zoological	5fbdfbf5-5938-4b3e-ac55-8c5bfe6c5992		1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180586	
+LVBBV	4JQ8		synonym	Avitofelis	Kretzoi, 1930	genus	zoological	d09659dd-a74b-42e0-8e61-f817b4eea162		1930		https://www.irmng.org/aphia.php?p=taxdetails&id=1452254	
+M8ZRQ	4JQ8		synonym	Catolynx	Severtzov, 1858	genus	zoological	0f6d6fc0-940e-4eb8-9a09-81403e0fb24c		1858		https://www.irmng.org/aphia.php?p=taxdetails&id=1122626	
+M9RM4	4JQ8		synonym	Catus	Frisch, 1775	genus	zoological			1775		https://www.irmng.org/aphia.php?p=taxdetails&id=1452255	
+MS8LB	4JQ8		synonym	Chaus	Gray, 1843	genus	zoological	b2e21d5a-066b-47ac-8eb5-bbb32bd87a76		1843		https://www.irmng.org/aphia.php?p=taxdetails&id=1397542	
+NZZTT	4JQ8		synonym	Eremaelurus	Ognev, 1927	genus	zoological	5b039fa2-cb12-49fe-87b0-37974b09ff16		1927		https://www.irmng.org/aphia.php?p=taxdetails&id=1226112	
+NT68N	4JQ8		synonym	Felia	Gray, 1869	genus	zoological	3e568a37-8ad9-40a7-a9f1-2e812cf4f4c2		1869		https://www.irmng.org/aphia.php?p=taxdetails&id=1285127	
+NTFSD	4JQ8		synonym	Felix	Voigt, 1818	genus	zoological	4ac66dac-1d5f-4fa4-b11b-8c06a5f4306b		1818		https://www.irmng.org/aphia.php?p=taxdetails&id=1331757	
+P6RW4	4JQ8		synonym	Folis	Tschershi, 1892	genus	zoological	98ba31b2-4ae6-44dc-84ad-68a479c2e7bc		1892		https://www.irmng.org/aphia.php?p=taxdetails&id=1323069	
+QK6QH	4JQ8		synonym	Mamfelisus	Herrera, 1899	genus	zoological			1899		https://www.irmng.org/aphia.php?p=taxdetails&id=1452256	
+QJZB7	4JQ8		synonym	Microfelis	Roberts, 1926	genus	zoological	f9b90e1f-6ee5-4494-a830-5e0faa36c926		1926		https://www.irmng.org/aphia.php?p=taxdetails&id=1386705	
+QX7G4	4JQ8		synonym	Octalobus	Elliot, 1883	genus	zoological	1911f59f-ee82-48fa-9be3-fdb1ec354558		1883		https://www.irmng.org/aphia.php?p=taxdetails&id=1208922	
+QXKKS	4JQ8		synonym	Octolobus		genus	zoological					https://www.irmng.org/aphia.php?p=taxdetails&id=1286774	
+R3D5V	4JQ8		synonym	Otailurus	Severtzov, 1858	genus	zoological	0f6d6fc0-940e-4eb8-9a09-81403e0fb24c		1858		https://www.irmng.org/aphia.php?p=taxdetails&id=1328396	
+R4ZCV	4JQ8		synonym	Otocalobus	Pocock, 1917	genus	zoological	c4b57f51-aa36-499c-a8cc-5efb0c452d7c		1917		https://www.irmng.org/aphia.php?p=taxdetails&id=1157373	
+S235Z	4JQ8		synonym	Poliailurus	Lönnberg, 1925	genus	zoological	05626713-22b3-430b-bd7c-55de7e5011cd		1925		https://www.irmng.org/aphia.php?p=taxdetails&id=1191388	
+TM9G8	4JQ8		synonym	Trichaelurus	Satunin, 1905	genus	zoological	caf45a90-eeda-4dd3-bbf1-5b9032c169b1		1905		https://www.irmng.org/aphia.php?p=taxdetails&id=1227372	
+4VWN	JKL		accepted	Herpailurus	Severtzov, 1858	genus	zoological	f764051d-66d6-43fb-acab-678a9140a0ba		1858		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552373	
+5CC6	JKL		accepted	Leopardus	Gray, 1842	genus	zoological	62a08868-67a8-4e3d-9b02-c8498aa01b9f		1842		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552371	
+MQ696	5CC6		synonym	Colocolo	Pocock, 1941	genus	zoological	ec601406-2c89-4ed7-aae7-288d9f24274c		1941		https://www.irmng.org/aphia.php?p=taxdetails&id=1161851	
+N7CGP	5CC6		synonym	Dendrailurus	Severtzov, 1858	genus	zoological	401dcdf1-bd05-4099-b18b-84fe55f2a164		1858		https://www.irmng.org/aphia.php?p=taxdetails&id=1121691	
+PZ2NN	5CC6		synonym	Lynchaelurus	Elliot, 1904	genus	zoological	2d6cda09-fc26-40e3-9cd0-899f58e90084		1904		https://www.irmng.org/aphia.php?p=taxdetails&id=1127342	
+NTCBF	5CC6		synonym	Lynchailurus	Severtzov, 1858	genus	zoological	401dcdf1-bd05-4099-b18b-84fe55f2a164		1858		https://www.irmng.org/aphia.php?p=taxdetails&id=1207390	
+Q6LBQ	5CC6		synonym	Margay	Gray, 1867	genus	zoological	5220cf71-4f92-4ee0-99e5-9d6ae064e4e2		1867		https://www.irmng.org/aphia.php?p=taxdetails&id=1329538	
+QLPFF	5CC6		synonym	Montifelis	Schwangart, 1941	genus	zoological	55381bcf-ce5e-415b-804a-c2d0a119ed8d		1941		https://www.irmng.org/aphia.php?p=taxdetails&id=1178328	
+QRYY8	5CC6		synonym	Mungofelis	Antonius, 1933	genus	zoological	f7dfb222-885f-428c-910e-4ec2728c8040		1933		https://www.irmng.org/aphia.php?p=taxdetails&id=1132829	
+QYRSY	5CC6		synonym	Noctifelis	Severtzov, 1858	genus	zoological	785286b6-2e3d-4d11-a063-30d9c0e4d295		1858		https://www.irmng.org/aphia.php?p=taxdetails&id=1165244	
+687N	5CC6		synonym	Oncifelis	Severtzov, 1858	genus	zoological	0f6d6fc0-940e-4eb8-9a09-81403e0fb24c		1858		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552454	
+RFWFS	5CC6		synonym	Oncilla	Allen, 1919	genus	zoological	c21683fe-0e11-429c-91ba-8a6f6fa174fb		1919		https://www.irmng.org/aphia.php?p=taxdetails&id=1421970	
+NTCBX	5CC6		synonym	Oncoides	Sewertzov, 1858	genus	zoological	0f6d6fc0-940e-4eb8-9a09-81403e0fb24c		1858		https://www.irmng.org/aphia.php?p=taxdetails&id=1398051	
+69H5	5CC6		synonym	Oreailurus	Cabrera, 1940	genus	zoological	487f75f1-9a85-4239-92ed-4e2883e423cd		1940		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621779	
+RL87M	5CC6		synonym	Pajeros	Gray, 1867	genus	zoological	5220cf71-4f92-4ee0-99e5-9d6ae064e4e2		1867		https://www.irmng.org/aphia.php?p=taxdetails&id=1128802	
+Q5F46	5CC6		synonym	Pardalina	Gray, 1867	genus	zoological	5220cf71-4f92-4ee0-99e5-9d6ae064e4e2		1867		https://www.irmng.org/aphia.php?p=taxdetails&id=1317094	
+RZ2YK	5CC6		synonym	Pardalis	Gray, 1867	genus	zoological	5220cf71-4f92-4ee0-99e5-9d6ae064e4e2		1867		https://www.irmng.org/aphia.php?p=taxdetails&id=1299121	
+RZLYF	5CC6		synonym	Pseudolynx	Schwangart, 1941	genus	zoological	55381bcf-ce5e-415b-804a-c2d0a119ed8d		1941		https://www.irmng.org/aphia.php?p=taxdetails&id=1359960	
+SSQVG	5CC6		synonym	Severtzowius	Kretzoi & Kretzoi, 2000	genus	zoological	0254022c-4d10-4522-a8cb-441b78daa979		2000		https://www.irmng.org/aphia.php?p=taxdetails&id=1229597	
+62WXN	JKL		accepted	Leptailurus	Severtzov, 1858	genus	zoological	62ef2d61-df27-4304-9082-9b68b79cbc3f		1858		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552456	
+NTZDK	62WXN		synonym	Galeopardus	Heuglin, 1866	genus	zoological	f8daf303-1f85-4a77-84c7-57470a633f35		1866		https://www.irmng.org/aphia.php?p=taxdetails&id=1221276	
+SPVVW	62WXN		synonym	Septailurus	Sewertzow, 1858	genus	zoological	2e29890e-9876-4c66-b797-2fc71bef8959		1858		https://www.irmng.org/aphia.php?p=taxdetails&id=1244538	
+SRVJG	62WXN		synonym	Serval	Gray, 1867	genus	zoological	5220cf71-4f92-4ee0-99e5-9d6ae064e4e2		1867		https://www.irmng.org/aphia.php?p=taxdetails&id=1163739	
+SRVJK	62WXN		synonym	Servalina	Grevé, 1894	genus	zoological	36b4ca54-d280-4aa0-8b7a-39d49dd3d45c		1894		https://www.irmng.org/aphia.php?p=taxdetails&id=1406164	
+5HR8	JKL		accepted	Lynx	Kerr, 1792	genus	zoological	afee6db8-44b2-435e-a552-cb2d8225eb05		1792		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180581	
+MGPWK	5HR8		synonym	Cervaria	Gray, 1867	genus	zoological	5220cf71-4f92-4ee0-99e5-9d6ae064e4e2		1867		https://www.irmng.org/aphia.php?p=taxdetails&id=1337200	
+NZVCM	5HR8		synonym	Eucervaria	Palmer, 1903	genus	zoological	941a8d56-151b-4ee5-9623-9c2f063017bb		1903		https://www.irmng.org/aphia.php?p=taxdetails&id=1125824	
+QDJYX	5HR8		synonym	Linx	Kaup, 1829	genus	zoological	754c93ae-73bb-46d5-a502-c7b5df7f2637		1829		https://www.irmng.org/aphia.php?p=taxdetails&id=1190910	
+PYZSS	5HR8		synonym	Lynceus	Gray, 1821	genus	zoological	d2938413-4bf9-4a67-a52b-548c550d1bdf		1821		https://www.irmng.org/aphia.php?p=taxdetails&id=1325330	
+PZ3M4	5HR8		synonym	Lynchus	Jardine, 1834	genus	zoological	ce49d4da-6cd1-4c07-8e76-82410df4bfe4		1834		https://www.irmng.org/aphia.php?p=taxdetails&id=1421175	
+PZ4CG	5HR8		synonym	Lyncus	Gray, 1825	genus	zoological	8d723c97-5b03-48d0-abd3-09faa83e637a		1825		https://www.irmng.org/aphia.php?p=taxdetails&id=1446278	
+RZ4MT	5HR8		synonym	Pardina	Kaup, 1829	genus	zoological	881cc794-bd7d-4df2-b6fa-0e3a6feb45ed		1829		https://www.irmng.org/aphia.php?p=taxdetails&id=1407603	
+5ZG5	628LP		accepted	Neofelis	Gray, 1867	genus	zoological	0710e513-46cc-4ca6-bab2-154a0f24c8e0		1867		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183808	
+63HYL	JKL		accepted	Otocolobus	Brandt, 1842	genus	zoological			1842		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552455	
+6DBT	628LP		accepted	Panthera	Oken, 1816	genus	zoological	9a3119ac-0045-4481-859a-be7b8e737870		1816		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180592	
+PY63G	6DBT		synonym	Jaguarius	Sebertzov, 1858	genus	zoological	0f6d6fc0-940e-4eb8-9a09-81403e0fb24c		1858		https://www.irmng.org/aphia.php?p=taxdetails&id=1242194	
+PY63K	6DBT		synonym	Jaguirius	Elliot, 1904	genus	zoological	2d6cda09-fc26-40e3-9cd0-899f58e90084		1904		https://www.irmng.org/aphia.php?p=taxdetails&id=1179248	
+Q3FP3	6DBT		synonym	Leo	Oken, 1816	genus	zoological	53245565-37a1-4064-9383-d2eeb4a632b5		1816		https://www.irmng.org/aphia.php?p=taxdetails&id=1336155	
+Q3MVP	6DBT		synonym	Leonina	Grevé, 1894	genus	zoological	36b4ca54-d280-4aa0-8b7a-39d49dd3d45c		1894		https://www.irmng.org/aphia.php?p=taxdetails&id=1367303	
+Q3MVQ	6DBT		synonym	Leoninae	Wagner, 1841	genus	zoological			1841		https://www.irmng.org/aphia.php?p=taxdetails&id=1452298	
+RZD4W	6DBT		synonym	Pardotigris	Kretzoi, 1929	genus	zoological	fda0fb17-64b3-4cdb-a75c-91dc7b2ed6ec		1929		https://www.irmng.org/aphia.php?p=taxdetails&id=1191708	
+RZD8W	6DBT		synonym	Pardus	Fitzinger, 1868	genus	zoological			1868		https://www.irmng.org/aphia.php?p=taxdetails&id=1452486	
+T66KT	6DBT		synonym	Tigrina	Grevé, 1894	genus	zoological	36b4ca54-d280-4aa0-8b7a-39d49dd3d45c		1894		https://www.irmng.org/aphia.php?p=taxdetails&id=1413289	
+T66L8	6DBT		synonym	Tigrinae	Wagner, 1841	genus	zoological			1841		https://www.irmng.org/aphia.php?p=taxdetails&id=1452299	
+N8S3R	6DBT		synonym	Tigris	Oken, 1816	genus	zoological	53245565-37a1-4064-9383-d2eeb4a632b5		1816		https://www.irmng.org/aphia.php?p=taxdetails&id=1043353	
+84TD	6DBT		synonym	Uncia	Gray, 1854	genus	zoological			1854		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183810	
+6HK4	JKL		accepted	Pardofelis	Severtzov, 1858	genus	zoological	24be7780-92f0-46af-8850-0e08400addce		1858		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621780	
+6VR3	JKL		accepted	Prionailurus	Severtzov, 1858	genus	zoological	24be7780-92f0-46af-8850-0e08400addce		1858		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552453	
+L6TP3	6VR3		synonym	Aellurina	Trouessart, 1885	genus	zoological	c2d81c11-2fae-4e14-9011-bf5e7372e03d		1885		https://www.irmng.org/aphia.php?p=taxdetails&id=1410295	
+L6V6G	6VR3		synonym	Aelurina	Gill, 1872	genus	zoological	c7169300-7403-4410-bb71-035573d8179b		1872		https://www.irmng.org/aphia.php?p=taxdetails&id=1387779	
+L6RGK	6VR3		synonym	Ailurin	Gervais, 1855	genus	zoological	b6756057-dc74-4c4f-ac95-9a657cd9b7b2		1855		https://www.irmng.org/aphia.php?p=taxdetails&id=1104265	
+L6RGL	6VR3		synonym	Ailurina	Trouessart, 1885	genus	zoological	67ec20e5-51ce-459c-92da-6cd3bed73eeb		1885		https://www.irmng.org/aphia.php?p=taxdetails&id=1433466	
+L6RGT	6VR3		synonym	Ailurinus	Gervais, 1870	genus	zoological	3b157cb1-fa25-4b41-a796-476d83deac15		1870		https://www.irmng.org/aphia.php?p=taxdetails&id=1292021	
+L6RKJ	6VR3		synonym	Ailurogale	Fitzinger, 1869	genus	zoological	af13c058-10b2-4a47-8ee1-4696bc942f9e		1869		https://www.irmng.org/aphia.php?p=taxdetails&id=1208517	
+L6RMF	6VR3		synonym	Ailurun	Gyldenstolpe, 1919	genus	zoological	a82e9d83-4317-4a04-818a-0d6d60070023		1919		https://www.irmng.org/aphia.php?p=taxdetails&id=1104606	
+PV6QN	6VR3		synonym	Ictailurus	Sevwertzov, 1858	genus	zoological	33d7682a-0d5e-4112-bd53-27ce08709dd9		1858		https://www.irmng.org/aphia.php?p=taxdetails&id=1204488	
+5M85	6VR3		synonym	Mayailurus	Imaizumi, 1967	genus	zoological	4487c58c-d6f5-4215-a0dc-13ab728d379a		1967		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726248	
+RLPN5	6VR3		synonym	Plethaelurus	Cope, 1882	genus	zoological	960db6b8-a287-45d0-8a45-252b75907232		1882		https://www.irmng.org/aphia.php?p=taxdetails&id=1217205	
+VS2B9	6VR3		synonym	Prionofelis	Kretzoi, 1929	genus	zoological	d09659dd-a74b-42e0-8e61-f817b4eea162		1929		https://www.irmng.org/aphia.php?p=taxdetails&id=1452294	
+TVFDC	6VR3		synonym	Viverriceps	Gray, 1867	genus	zoological	5220cf71-4f92-4ee0-99e5-9d6ae064e4e2		1867		https://www.irmng.org/aphia.php?p=taxdetails&id=1160253	
+TWMD8	6VR3		synonym	Zibethailurus	Severtzov, 1858	genus	zoological	33d7682a-0d5e-4112-bd53-27ce08709dd9		1858		https://www.irmng.org/aphia.php?p=taxdetails&id=1245360	
+75F9	JKL		accepted	Puma	Jardine, 1834	genus	zoological	bd7cc262-05fd-46b6-8f31-8e4880fb152c		1834		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552375	
+9BTZ	MYJ	CFSCQ	accepted	Acinonyx jubatus	(Schreber, 1775)	species	zoological	52cfbac9-113a-4a26-8106-315e1d7d0ae8		1775		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183813	
+CFSCQ	9BTZ		synonym	Felis jubata	Schreber, 1775	species	zoological			1775		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229686	
+NTD2T	9BTZ		synonym	Felis fearonii	Smith, 1834	species	zoological	98cfc74a-d0ec-45c9-9616-6ac6fd56e5e5		1834		http://zoobank.org/05ed71f1-93c3-48d1-b5b2-8a983a86454f	
+CFJ2J	3H8V	CFSC9	accepted	Caracal aurata	(Temminck, 1827)	species	zoological			1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229766	
+CFSC9	CFJ2J		synonym	Felis aurata	Temminck, 1827	species	zoological			1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229682	
+6W9YF	CFJ2J		synonym	Profelis aurata	(Temminck, 1827)	species	zoological			1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621874	
+QZRR	3H8V	3DXV2	accepted	Caracal caracal	(Schreber, 1776)	species	zoological	83abf6c9-6694-4192-b995-9eda11dd913a		1776		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552775	
+3DXV2	QZRR		synonym	Felis caracal	Schreber, 1776	species	zoological			1776		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=622016	
+3WSJT	QZRR		synonym	Lynx caracal	(Schreber, 1776)	species	zoological			1776		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183788	
+69FCB	3JKK	CFSCB	accepted	Catopuma badia	(Gray, 1874)	species	zoological	3e0e8164-1eaa-4df2-9651-950d0b5f73e9		1874		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621866	
+CFSCB	69FCB		synonym	Felis badia	Gray, 1874	species	zoological			1874		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229680	
+RZ53X	69FCB		synonym	Pardofelis badia	(Gray, 1874)	species	zoological			1874		https://www.iucnredlist.org/species/4037/112910221	
+RVXB	3JKK	CFSDJ	accepted	Catopuma temminckii	(Vigors & Horsfield, 1827)	species	zoological	03819b4d-a901-49b6-bffc-66b084ac4a1d		1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621867	
+CFSDJ	RVXB		synonym	Felis temminckii	Vigors & Horsfield, 1827	species	zoological			1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229681	
+RZ54Q	RVXB		synonym	Pardofelis temminckii	(Vigors & Horsfield, 1827) Johnson et al., 2006	species	zoological			2006			
+V7XQY	RVXB		synonym	Profelis temminckii	(Vigors & Horsfield, 1827) Pocock, 1932	species	zoological			1932			
+VRFPS	RVXB		synonym	Felis melli	Matschie, 1922 (in Mell, 1922)	species	zoological			1922			
+V7XR4	RVXB		synonym	Felis nigrescens	Gray, 1863	species	zoological			1863			
+V7XR3	RVXB		synonym	Felis semenovi	Satunin, 1905	species	zoological			1905			
+V7XR6	RVXB		synonym	Felis trislis	Milne-Edwards, 1872	species	zoological			1872			
+6HR5M	4JQ8		accepted	Felis bieti	A. Milne-Edwards, 1892	species	zoological	25609e7b-bbcd-4fc3-8ead-3610333f7c64		1892		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183789	
+NTDQZ	6HR5M		synonym	Felis pallida	Buchner, 1892	species	zoological			1892			
+S2363	6HR5M		synonym	Poliailurus pallida	(Buchner, 1892)	species	zoological			1892		https://www.iucnredlist.org/species/8539/213200674	
+3DXV3	4JQ8		accepted	Felis catus	Linnaeus, 1758	species	zoological	5fbdfbf5-5938-4b3e-ac55-8c5bfe6c5992		1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183798	
+DJ4DR	3DXV3		synonym	Felis domesticus		species	zoological						
+D5H7S	3DXV3		synonym	Felis maniculata		species	zoological					https://www.marinespecies.org/aphia.php?p=taxdetails&id=1465494	
+3DXV4	4JQ8		accepted	Felis chaus	Schreber, 1777	species	zoological	673ead2f-e6d8-4b4b-8583-36373d275af2		1777		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183802	
+3DXVF	4JQ8		accepted	Felis lybica	Forster, 1780	species	zoological	2ccf35e8-b8ff-4567-a250-0e4c4ac6a2f2		1780		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183799	
+V7XQT	3DXVF		synonym	Felis chutuchta	Birula, 1917	species	zoological			1917			
+NTD5T	3DXVF		synonym	Felis haussa	Thomas & Hinton, 1921	species	zoological	b6288930-6c90-4013-88a7-97c532fd4b21		1921		http://zoobank.org/42d54276-9fdf-4041-8b37-cc7f1e77609d	
+V26Z3	3DXVF		synonym	Felis reyi	Lavauden, 1929	species	zoological			1929		https://taxref.mnhn.fr/taxref-web/taxa/1044513	
+PZB35	3DXVF		synonym	Lynx sardiniae	Mola, 1908	species	zoological			1908			
+3DXVH	4JQ8		accepted	Felis margarita	Loche, 1858	species	zoological	c5c9d587-188d-4ab1-bca7-11aad7b59f6c		1858		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183801	
+3DXVM	4JQ8		accepted	Felis nigripes	Burchell, 1824	species	zoological	942fdfb9-bbbb-4dd8-8a60-a1ef2d3b8a0f		1824		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183800	
+3DXW2	4JQ8		accepted	Felis silvestris	Schreber, 1777	species	zoological	8ece03de-a439-435b-a6ef-454cb464d05e		1777		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180589	
+NTD2Z	3DXW2		synonym	Felis ferus	Erxleben, 1777	species	zoological	350e3140-5bfa-4692-8640-e0a633c016fa	518	1777		https://treatment.plazi.org/id/03A01B3B5C2EFFE860E4FB1BFB87F961	
+NTD4Y	3DXW2		synonym	Felis grampia	Miller, 1907	species	zoological	e31b2bc9-acb7-485f-829b-b5b0f6dfeaad		1907		http://zoobank.org/8186f92b-d196-484a-80e9-a4be6b9a1c2e	
+NTDNB	3DXW2		synonym	Felis obscura	Desmarest, 1821	species	zoological	a15a6393-7370-4b22-8f4c-8eb3c4624e82	230	1821		https://treatment.plazi.org/id/03A01B3B5C2EFFE960CCF8F9FE5FFD19	
+CFYBG	4VWN	CFSDS	accepted	Herpailurus yagouaroundi	(É. Geoffroy Saint-Hilaire, 1803)	species	zoological	6a307aa7-67cd-4e7d-886d-1399f13386bf		1803		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229748	
+CFSDS	CFYBG		synonym	Felis yagouaroundi	É. Geoffroy Saint-Hilaire, 1803	species	zoological	93618a2e-d508-4142-968f-e29a3dce8452		1803		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229784	
+4QHKJ	CFYBG		synonym	Puma yagouaroundi	(É. Geoffroy Saint-Hilaire, 1803)	species	zoological			1803		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726257	
+V34HQ	CFYBG		synonym	Felis ameghinoi	Holmberg, 1898	species	zoological			1898		https://treatment.plazi.org/id/BF0387D8FFE0D34BC2873BAAFBDFFC33	
+6HR5P	CFYBG		synonym	Felis apache	Mearns, 1901	species	zoological			1901		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203601	
+6HQTN	CFYBG		synonym	Felis cacomitli	Berlandier, 1859	species	zoological			1859		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203600	
+NTCZC	CFYBG		synonym	Felis darwini	Martin, 1837	species	zoological			1837		https://treatment.plazi.org/id/BF0387D8FFE0D34BC2873BAAFBDFFC33	
+TZ8J5	CFYBG		synonym	Felis eyra	Fischer, 1814	species	zoological			1814		https://treatment.plazi.org/id/BF0387D8FFE0D34BC2873BAAFBDFFC33	
+3DXV7	CFYBG		synonym	Felis fossata	Mearns, 1901	species	zoological			1901		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203604	
+NTD8J	CFYBG		synonym	Felis jaguarondi	Fischer, 1814	species	zoological			1814		https://treatment.plazi.org/id/BF0387D8FFE0D34BC2873BAAFBDFFC33	
+3DXVS	CFYBG		synonym	Felis panamensis	J. A. Allen, 1904	species	zoological			1904		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203606	
+NTFD3	CFYBG		synonym	Felis unicolor	Trail, 1819	species	zoological			1819		https://treatment.plazi.org/id/BF0387D8FFE0D34BC2873BAAFBDFFC33	
+NTFFT	CFYBG		synonym	Felis yagouaroundi	Desmarest, 1816	species	zoological			1816		https://taxref.mnhn.fr/taxref-web/taxa/443820	
+3DXW5	CFYBG		synonym	Felis yaguarondi	Lacépède, 1809	species	zoological			1809		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180591	
+NTFGR	CFYBG		synonym	Felis yaguaroundi	Lacépède, 1809	species	zoological			1809		https://taxref.mnhn.fr/taxref-web/taxa/655383	
+3L2VM	CFYBG		synonym	Herpailurus yaguarondi	(Lacépède, 1809)	species	zoological			1809		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552471	
+3T785	5CC6	CFSCC	accepted	Leopardus braccatus	(Cope, 1889)	species	zoological	7cb12d0d-12fb-4a1e-b22d-c2af20e6fefa		1889		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726250	
+CFSCC	3T785		synonym	Felis braccata	Cope, 1889	species	zoological	2043280e-678c-459c-8efd-f6c8a14a26fa	144	1889		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229731	
+3T786	5CC6	CFSCF	accepted	Leopardus colocola	(Molina, 1782)	species	zoological			1782		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229764	
+CFSCF	3T786		synonym	Felis colocola	Molina, 1782	species	zoological			1782		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229765	
+CFSCG	3T786		synonym	Felis colocolo	Molina, 1782	species	zoological	687204bf-4e4b-443e-a443-640a96fa505f	295	1782		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229683	
+CFYC6	3T786		synonym	Leopardus colocolo	(Molina, 1782)	species	zoological			1782		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726251	
+PZ2P4	3T786		synonym	Lynchailurus colocolo	(Molina, 1782)	species	zoological			1782		https://www.iucnredlist.org/species/15309/97204446	
+49H2D	3T786		synonym	Oncifelis colocolo	(Molina, 1782)	species	zoological			1782		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552769	
+CFYC9	5CC6		provisionally accepted	Leopardus garleppi	(Matschie, 1912)	species	zoological			1912		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229732	
+3T787	5CC6	3DXV8	accepted	Leopardus geoffroyi	(d'Orbigny & Gervais, 1844)	species	zoological	061603a8-ea50-4d9f-ba96-5001701a197e		1844		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726252	
+3DXV8	3T787		synonym	Felis geoffroyi	d'Orbigny & Gervais, 1844	species	zoological			1844		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183797	
+74N3Z	3T787		synonym	Oncifelis geoffroyi	(d'Orbigny & Gervais, 1844)	species	zoological			1844		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552764	
+NTDKJ	3T787		synonym	Felis melas	Bertoni, 1914	species	zoological			1914		https://treatment.plazi.org/id/03C0C957A929BC14D4EC4302FC15FB4A	
+NTDV3	3T787		synonym	Felis pardoides	Gray, 1867	species	zoological			1867		https://treatment.plazi.org/id/03C0C957A929BC14D4EC4302FC15FB4A	
+NTDZZ	3T787		synonym	Felis salinarum	Thomas, 1903	species	zoological	5ddd110f-5a32-42bd-a806-d357725e2ce4		1903		http://zoobank.org/86ce69e5-dc4f-4fe8-81ff-d5dfd40c5812	
+3T789	5CC6	CFSCL	accepted	Leopardus guigna	(Molina, 1782)	species	zoological	06615c7f-f393-4f99-bfac-d1d326152b15		1782		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726253	
+CFSCL	3T789		synonym	Felis guigna	Molina, 1782	species	zoological	687204bf-4e4b-443e-a443-640a96fa505f	295	1782		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229685	
+49H2F	3T789		synonym	Oncifelis guigna	(Molina, 1782)	species	zoological			1782		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621870	
+6P8KN	5CC6	CFSCM	accepted	Leopardus guttulus	(Hensel, 1872)	species	zoological			1872		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933421	
+CFSCM	6P8KN		synonym	Felis guttula	Hensel, 1872	species	zoological			1872		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229793	
+3T78B	5CC6	3DXVD	accepted	Leopardus jacobitus	(Cornalia, 1865)	species	zoological	cb111e27-56a3-4589-bd30-42e0a6f63c9f		1865		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726254	
+3DXVD	3T78B		synonym	Felis jacobita	Cornalia, 1865	species	zoological			1865		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=622012	
+6SSZD	3T78B		synonym	Oreailurus jacobita	(Cornalia, 1865)	species	zoological			1865		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621871	
+CFYCB	5CC6		provisionally accepted	Leopardus munoai	(Ximénez, 1961)	species	zoological			1961		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229733	
+CGLN3	5CC6		provisionally accepted	Leopardus narinensis	Ruiz-García, 2018	species	zoological			2018		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229734	
+3T78C	5CC6	3DXVR	accepted	Leopardus pajeros	(Desmarest, 1816)	species	zoological	912ebaf7-1d1a-40fa-b422-dd52e3988dfb		1816		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726255	
+3DXVR	3T78C		synonym	Felis pajeros	Desmarest, 1816	species	zoological			1816		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183796	
+PZ2PJ	3T78C		synonym	Lynchailurus pajeros	(Desmarest)	species	zoological					https://treatment.plazi.org/id/03FAB267FFA4FFD9FF36FE7BDA81DC04	
+3T78D	5CC6	3DXVT	accepted	Leopardus pardalis	(Linnaeus, 1758)	species	zoological	ee457116-ec2b-4c4d-8566-3209d6750fab		1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552470	
+3DXVT	3T78D		synonym	Felis pardalis	Linnaeus, 1758	species	zoological	d91e94cb-581e-44c7-be63-2d8209c94fd2	42	1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180588	
+6P8MM	5CC6	CFSDL	accepted	Leopardus tigrinus	(Schreber, 1775)	species	zoological	889498dc-0993-4a7a-a3d8-5196cf7dad39		1775		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621868	
+CFSDL	6P8MM		synonym	Felis tigrinus	Schreber, 1775	species	zoological			1775		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229684	
+3T78F	5CC6	3DXW4	accepted	Leopardus wiedii	(Schinz, 1821)	species	zoological	bd8fde2b-320a-48ea-aa07-a7eeb31d9dbd		1821		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552469	
+3DXW4	3T78F		synonym	Felis wiedii	Schinz, 1821	species	zoological			1821		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180590	
+VPMHR	3T78F		synonym	Felis elegans	Lesson, 1830	species	zoological			1830		https://treatment.plazi.org/id/2E4C87FBFFC03060FF0E0B6CFB34917C	
+VPMHQ	3T78F		synonym	Felis macroura	Wied, 1826	species	zoological			1826		https://treatment.plazi.org/id/2E4C87FBFFC03060FF0E0B6CFB34917C	
+3THH7	4JQ8	3DXVZ	accepted	Leptailurus serval	(Schreber, 1776)	species	zoological	08128d1f-a12e-436f-9bf6-5268f9769438		1776		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552766	Playground flaw F5: filed under Felis.
+MBV9P	3THH7		synonym	Caracal serval	(von Schreber, 1776)	species	zoological			1776		https://www.iucnredlist.org/species/11638/156536762	
+3DXVZ	3THH7		synonym	Felis serval	Schreber, 1776	species	zoological			1776		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183792	
+NTCHW	3THH7		synonym	Felis brachyura	Wagner, 1841	species	zoological	e9ed9c87-3c94-4228-bc52-14a6d12401aa		1841		http://zoobank.org/a1f11d63-3f62-423b-b3a4-4ec6f08a3fe3	
+NTCJY	3THH7		synonym	Felis capensis	Forster, 1781	species	zoological	897fe927-a63e-46e5-94eb-276439182d4c	4	1781		https://treatment.plazi.org/id/03A01B3B5C2FFFE96235FD1DFE5FFB3C	
+NTFC4	3THH7		synonym	Felis togoensis	Matschie, 1893	species	zoological	9ffe7282-3043-470d-98d1-c39e3e6b5de4		1893		http://zoobank.org/c39807d5-6669-4287-96f7-2e293826ca6f	
+3WSJS	5HR8		accepted	Lynx canadensis	Kerr, 1792	species	zoological	2b3e45ab-5c19-40c8-827e-727a53806429		1792		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180585	
+NTCJM	3WSJS		synonym	Felis canadensis	Kerr, 1792	species	zoological	3b2488d8-f1b5-47e2-ae52-5198718c55fb		1792		https://treatment.plazi.org/id/BD6D8798DF64FFBF19601D7278DB442E	
+NTCHB	3WSJS		synonym	Felis borealis	Temminck, 1824	species	zoological			1824		https://treatment.plazi.org/id/BD6D8798DF64FFBF19601D7278DB442E	
+6QR9T	5HR8	CFSC8	accepted	Lynx lynx	(Linnaeus, 1758)	species	zoological	d5af4ddc-d11c-44da-9c73-f0d194a6cb6c		1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180584	
+CFSC8	6QR9T		synonym	Felis lynx	Linnaeus, 1758	species	zoological	020cba23-bb1b-4d86-a1c1-75eeaf276a29	43	1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229736	
+NTFSR	6QR9T		synonym	Felix lynx	Linnaeus, 1758	species	zoological			1758		https://www.iucnredlist.org/species/12519/121707666	
+NTCHC	6QR9T		synonym	Felis borealis	Thunberg, 1798	species	zoological			1798			
+NTCNH	6QR9T		synonym	Felis cervaria	Temminck, 1824	species	zoological	ac0d8b9c-6d9f-489c-a468-73e062fc30fe	106	1824			
+NTD8X	6QR9T		synonym	Felis kattlo	Schrank, 1798	species	zoological			1798			
+V7XR9	6QR9T		synonym	Felis lupulinus	Thunberg, 1825	species	zoological			1825			
+NTDDP	6QR9T		synonym	Felis lyncula	Nilsson, 1820	species	zoological			1820			
+NTFDK	6QR9T		synonym	Felis virgate	Nilsson, 1829	species	zoological			1829			
+NTCBS	6QR9T		synonym	Felis vulgaris	Kerr, 1792	species	zoological	d1c6e95a-4764-497b-8da8-79ec481ca361		1792		http://zoobank.org/1349eb81-6690-49d5-bbf0-856b571a63a5	
+NTFDN	6QR9T		synonym	Felis vulpinus	Thunberg, 1825	species	zoological			1825			
+PS8W9	6QR9T		synonym	Lissodelphis borealis	: Kishida & Mori, 1931	species	zoological	6dfe2379-0b32-4195-8b12-40151d575d3f	379	1931		https://treatment.plazi.org/id/03A0BE3B6458FFEBFF4FF972FE7A56BA	
+PZ9Q7	6QR9T		synonym	Lynx cervaria	Fitzinger, 1870	species	zoological			1870			
+V2WFP	6QR9T		synonym	Lynx stroganovi	Heptner, 1969	species	zoological	cb7c8462-5aee-46c8-b2a5-4a804916c2d9		1969		http://zoobank.org/00dfeca8-1043-44c0-8a07-453c90a9fa1f	
+V7XRB	6QR9T		synonym	Lynx vulgaris	Kerr, 1792	species	zoological			1792			
+3WSJV	5HR8	6HQTT	accepted	Lynx pardinus		species	zoological	78d08151-9a5f-4056-87eb-4a0b92e2fdd5		1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621869	
+6HQTT	3WSJV		synonym	Felis pardina	Temminck, 1827	species	zoological			1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=622015	
+3WSJW	5HR8	3DXVY	accepted	Lynx rufus	(Schreber, 1777)	species	zoological	a972b85a-c282-4b06-b178-a3c43a9e0e61		1777		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180582	
+3DXVY	3WSJW		synonym	Felis rufus	Schreber, 1777	species	zoological	ca35ff8c-31ca-4905-a394-0ead9840f337	pl. 109. B [1777]; see also text 3 (24): 412 [1777]	1777		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203547	
+46H7Y	5ZG5	CFSCH	accepted	Neofelis diardi	(G. Cuvier, 1823)	species	zoological			1823		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933419	
+CFSCH	46H7Y		synonym	Felis diardi	G. Cuvier, 1823	species	zoological			1823		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229675	
+46H7Z	5ZG5	CFSD4	accepted	Neofelis nebulosa	(Griffith, 1821)	species	zoological	ba90a7d2-9384-4a1d-9a13-c6bd9e416de9		1821		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183809	
+CFSD4	46H7Z		synonym	Felis nebulosa	Griffith, 1821	species	zoological			1821		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229674	
+NTDKH	46H7Z		synonym	Felis melli	Matschie, 1922	species	zoological			1922			
+Q3Z28	46H7Z		synonym	Leopardus brachyurus	Swinhoe, 1862	species	zoological			1862			
+4B7BN	63HYL	3DXVG	accepted	Otocolobus manul	(Pallas, 1776)	species	zoological			1776		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552765	
+3DXVG	4B7BN		synonym	Felis manul	Pallas, 1776	species	zoological			1776		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183791	
+4CGXP	6DBT	CFSCR	accepted	Panthera leo	(Linnaeus, 1758)	species	zoological	20529c6b-2415-4317-b736-8d37b25a7d38		1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183803	
+CFSCR	4CGXP		synonym	Felis leo	Linnaeus, 1758	species	zoological	d91e94cb-581e-44c7-be63-2d8209c94fd2	41	1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229678	
+4CGXQ	6DBT	3DXVP	accepted	Panthera onca	(Linnaeus, 1758)	species	zoological	ee457116-ec2b-4c4d-8566-3209d6750fab		1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180593	
+3DXVP	4CGXQ		synonym	Felis onca	Linnaeus, 1758	species	zoological	d91e94cb-581e-44c7-be63-2d8209c94fd2	42	1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203607	
+NTCNG	4CGXQ		synonym	Felis centralis	Mearns, 1901	species	zoological	a5a3bd42-ae87-4866-af84-c181c8fa74ae		1901		http://zoobank.org/fa88e1ae-1a9c-4818-862c-274f10e87dfd	
+VPN3F	4CGXQ		synonym	Felis jaguapara	Liais, 1872	species	zoological			1872		https://treatment.plazi.org/id/038B87F3FFB3FFF21582821AFBE6CFB1	
+VPN3D	4CGXQ		synonym	Felis jaguarete	Liais, 1872	species	zoological			1872		https://treatment.plazi.org/id/038B87F3FFB3FFF21582821AFBE6CFB1	
+VPN3G	4CGXQ		synonym	Felis jaguatyrica	Liais, 1872	species	zoological			1872		https://treatment.plazi.org/id/038B87F3FFB3FFF21582821AFBE6CFB1	
+VPN3J	4CGXQ		synonym	Felis notialis	Hollister, 1914	species	zoological			1914		https://treatment.plazi.org/id/038B87F3FFB3FFF21582821AFBE6CFB1	
+VPN3H	4CGXQ		synonym	Felis paraguensis	Hollister, 1914	species	zoological			1914		https://treatment.plazi.org/id/038B87F3FFB3FFF21582821AFBE6CFB1	
+VPN3C	4CGXQ		synonym	Felis ramsayi	Miller, 1930	species	zoological			1930		https://treatment.plazi.org/id/038B87F3FFB3FFF21582821AFBE6CFB1	
+Q3Z77	4CGXQ		synonym	Leopardus hernandesii	Gray, 1857	species	zoological	57f1f393-a0c2-43bd-b6dd-a6bc3793cb1d		1857		http://zoobank.org/39cf0c53-5c7a-42a3-9172-dc0e2593e2bf	
+4CGXR	6DBT	CFSDC	accepted	Panthera pardus	(Linnaeus, 1758)	species	zoological	20529c6b-2415-4317-b736-8d37b25a7d38		1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183804	
+CFSDC	4CGXR		synonym	Felis pardus	Linnaeus, 1758	species	zoological	020cba23-bb1b-4d86-a1c1-75eeaf276a29	41	1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229677	
+NTD33	4CGXR		synonym	Felis fontanierii	Milne-Edwards, 1867	species	zoological			1867			
+V7XRR	4CGXR		synonym	Felis grayi	Trouessart, 1904	species	zoological			1904			
+CFSCS	4CGXR		synonym	Felis leopardus	Schreber, 1775	species	zoological			1775		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229768	
+CFSD8	4CGXR		synonym	Felis panthera	Schreber, 1775	species	zoological			1775		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229767	
+NTFDD	4CGXR		synonym	Felis villosa	Bonhote, 1903	species	zoological	24985ca0-bb84-4471-b1c2-edb4da44b47c	475	1903			
+Q3Z29	4CGXR		synonym	Leopardus chinensis	Gray, 1867	species	zoological			1867			
+V7XRX	4CGXR		synonym	Leopardus japanensis	Lydekker, 1896	species	zoological			1896			
+V7XRY	4CGXR		synonym	Leopardus pardus	Gray, 1867	species	zoological			1867			
+Q3ZDG	4CGXR		synonym	Leopardus perniger	Gray, 1863	species	zoological			1863			
+R9GBR	4CGXR		synonym	Panthera hanensis	Matschie, 1907	species	zoological			1907			
+V7XRL	4CGXR		synonym	Panthera orientalis	Fitzinger, 1868	species	zoological			1868			
+4CGXS	6DBT	CFSDM	accepted	Panthera tigris	(Linnaeus, 1758)	species	zoological	20529c6b-2415-4317-b736-8d37b25a7d38		1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183805	
+CFSDM	4CGXS		synonym	Felis tigris	Linnaeus, 1758	species	zoological	020cba23-bb1b-4d86-a1c1-75eeaf276a29	41	1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229737	
+T673R	4CGXS		synonym	Tigris mikodoi	Satunin, 1915	species	zoological	677f2e0f-71d3-47c6-8670-86db4b588581	16	1915		https://treatment.plazi.org/id/03A0BE3B645BFFEEFF4FFCB6FA5D51FA	
+V7XS2	4CGXS		synonym	Tigris regalis	Gray, 1867	species	zoological			1867			
+T673Z	4CGXS		synonym	Tigris striatus	Severtzov, 1858	species	zoological			1858			
+V7XRZ	4CGXS		synonym	Tigris styani	Pocock, 1929	species	zoological			1929			
+4CGXT	6DBT	CFSDP	accepted	Panthera uncia	(Schreber, 1775)	species	zoological			1775		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933420	
+CFSDP	4CGXT		synonym	Felis uncia	Schreber, 1775	species	zoological			1775		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229676	
+TRCMQ	4CGXT		synonym	Uncia uncia	(Schreber, 1775)	species	zoological			1775		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183811	
+NTD7F	4CGXT		synonym	Felis irbis	Ehrenberg, 1830	species	zoological			1830			
+NTFD2	4CGXT		synonym	Felis uncioides	Horsfield, 1855	species	zoological			1855			
+7DHJ4	4CGXT		synonym	Uncia uncia	Pocock, 1916	species	zoological			1916			
+4DJJ2	6HK4	CFSCZ	accepted	Pardofelis marmorata	(Martin, 1837)	species	zoological	4d3d2be9-22bb-403a-9c24-48815c36520f		1837		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621872	
+CFSCZ	4DJJ2		synonym	Felis marmorata	Martin, 1837	species	zoological			1837		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229679	
+4MF7C	6VR3	6HQTM	accepted	Prionailurus bengalensis	(Kerr, 1792)	species	zoological	ee21c381-25d1-4532-b64f-3f44683d310c		1792		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552763	
+6HQTM	4MF7C		synonym	Felis bengalensis	Kerr, 1792	species	zoological	2a8ed389-733c-4a7f-a6b6-0d9a1bb34b15	151	1792		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183793	
+V7XRC	4MF7C		synonym	Felis anastasiae	Satunin, 1905	species	zoological			1905			
+V7XRG	4MF7C		synonym	Felis decolorata	Milne-Edwards, 1872	species	zoological			1872			
+NTD79	4MF7C		synonym	Felis ingrami	Bonhote, 1903	species	zoological			1903			
+V7XRK	4MF7C		synonym	Felis manchurica	Mori, 1922	species	zoological			1922			
+NTDKV	4MF7C		synonym	Felis microtis	Milne-Edwards, 1872	species	zoological	66162f93-69c9-4e2a-a2ab-63c8ef5d50b1	221	1872			
+V7XRD	4MF7C		synonym	Felis ricketti	Bonhote, 1903	species	zoological			1903			
+V7XRH	4MF7C		synonym	Felis sinensis	Sthih, 1930	species	zoological			1930			
+QW3XZ	4MF7C		synonym	Mustela manchurica	Mori, 1922	species	zoological	bf76aeb4-4c78-435e-b95d-431f3138ba34	609	1922		https://treatment.plazi.org/id/03A0BE3B645EFFEBFF4FFC88FCCD52E4	
+CG8CW	6VR3	CFSCP	accepted	Prionailurus javanensis	(Desmarest, 1816)	species	zoological			1816		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229747	
+CFSCP	CG8CW		synonym	Felis javanensis	Desmarest, 1816	species	zoological			1816		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229776	
+6W932	6VR3	CFSDD	accepted	Prionailurus planiceps	(Vigors & Horsfield, 1827)	species	zoological	90d99122-cde9-4076-82e3-29231ed9653c		1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=621873	
+CFSDD	6W932		synonym	Felis planiceps	Vigors & Horsfield, 1827	species	zoological			1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229688	
+4MF7F	6VR3	3DXVX	accepted	Prionailurus rubiginosus	(I. Geoffroy Saint-Hilaire, 1831)	species	zoological	450941fa-cf3f-4dde-b7a6-e918943ab460		1831		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552774	
+3DXVX	4MF7F		synonym	Felis rubiginosa	I. Geoffroy Saint-Hilaire, 1831	species	zoological			1831		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183794	
+CFSDF	4MF7F		synonym	Felis rubiginosus	I. Geoffroy Saint-Hilaire, 1831	species	zoological			1831		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229687	
+TVFDM	4MF7F		synonym	Viverriceps rubiginosa	Gray, 1867	species	zoological			1867		https://treatment.plazi.org/id/03E7879DFFB9B117BEA89C45FB43FC58	
+4MF7G	6VR3	3DXW3	accepted	Prionailurus viverrinus	(Bennett, 1833)	species	zoological	791df0b3-72ef-448a-b916-28203c21516f		1833		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552770	
+3DXW3	4MF7G		synonym	Felis viverrina	Bennett, 1833	species	zoological			1833		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183795	
+CFSDR	4MF7G		synonym	Felis viverrinus	Bennett, 1833	species	zoological			1833		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229689	
+4QHKG	75F9	3DXV5	accepted	Puma concolor	(Linnaeus, 1771)	species	zoological	fc643127-34cc-44e7-ab3f-d514768c12b7		1771		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552479	
+3DXV5	4JQ8		accepted	Felis concolor	Linnaeus, 1771	species	zoological			1771		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180587	Playground flaw F4: homotypic with Puma concolor.
+NTCDD	4QHKG		synonym	Felis arundivaza	Hollister, 1911	species	zoological			1911		https://treatment.plazi.org/id/03B86D2DFFA0FF816B704556A776FEC1	
+NTCJF	4QHKG		synonym	Felis californica	Linnaeus, 1758	species	zoological			1758		https://treatment.plazi.org/id/03B86D2DFFA0FF816B704556A776FEC1	
+7J78D	9BTZ		accepted	Acinonyx jubatus hecki	Hilzheimer, 1913	subspecies	zoological			1913		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726289	
+5FDDF	9BTZ		accepted	Acinonyx jubatus jubatus		subspecies	zoological	52cfbac9-113a-4a26-8106-315e1d7d0ae8		1775		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726288	
+5FDDG	5FDDF		synonym	Acinonyx jubatus raineyi	Heller, 1913	subspecies	zoological			1913		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726290	
+5FDDJ	5FDDF		synonym	Acinonyx jubatus velox	Heller, 1913	subspecies	zoological			1913		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726292	
+5FDDH	9BTZ		accepted	Acinonyx jubatus soemmeringii	(Fitzinger, 1855)	subspecies	zoological			1855		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726291	
+5FDDK	9BTZ		accepted	Acinonyx jubatus venaticus	(Griffith, 1821)	subspecies	zoological			1821		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726293	
+CFJ2K	CFJ2J		accepted	Caracal aurata aurata		subspecies	zoological			1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229917	
+5KNTZ	CFJ2K		synonym	Profelis aurata aurata		subspecies	zoological			1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726429	
+CFJ2L	CFJ2J	7KP4Y	accepted	Caracal aurata celidogaster	(Temminck, 1827)	subspecies	zoological			1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229918	
+7KP4Y	CFJ2L		synonym	Profelis aurata celidogaster	Temminck, 1827	subspecies	zoological			1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933443	
+5G7J2	QZRR		accepted	Caracal caracal caracal		subspecies	zoological	83abf6c9-6694-4192-b995-9eda11dd913a		1776		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726294	
+5G7J3	5G7J2		synonym	Caracal caracal damarensis	(Roberts, 1926)	subspecies	zoological			1926		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726296	
+5G7J4	5G7J2		synonym	Caracal caracal limpopoensis	(Roberts, 1926)	subspecies	zoological			1926		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726297	
+5G7J5	5G7J2		synonym	Caracal caracal lucani	(Rochebrune, 1885)	subspecies	zoological			1885		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726298	
+5G7J8	5G7J2		synonym	Caracal caracal poecilotis	Thomas & Hinton, 1921	subspecies	zoological			1921		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726300	
+5G7J7	QZRR	CGLN6	accepted	Caracal caracal nubica	(J. B. Fischer, 1829)	subspecies	zoological			1829		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726299	
+CGLN6	5G7J7		synonym	Felis caracal nubicus	J. B. Fischer, 1829	subspecies	zoological			1829		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229933	
+5G7HZ	5G7J7		synonym	Caracal caracal algira	(Wagner, 1841)	subspecies	zoological			1841		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726295	
+5G7J9	QZRR	CGLPD	accepted	Caracal caracal schmitzi	(Matschie, 1912)	subspecies	zoological			1912		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726301	
+CGLPD	5G7J9		synonym	Felis caracal schmitzi	Matschie, 1912	subspecies	zoological			1912		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229928	
+5G7J6	5G7J9		synonym	Caracal caracal michaelis	Heptner, 1945	subspecies	zoological			1945		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933423	
+CFKQ3	RVXB		accepted	Catopuma temminckii moormensis	(Hodgson, 1831)	subspecies	zoological			1831		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229908	
+5G9SF	CFKQ3		synonym	Catopuma temminckii dominicanorum	(Sclater, 1898)	subspecies	zoological			1898		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726303	
+5G9SH	CFKQ3		synonym	Catopuma temminckii tristis	(A. Milne-Edwards, 1872)	subspecies	zoological			1872		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726304	
+5G9SG	RVXB		accepted	Catopuma temminckii temminckii		subspecies	zoological	03819b4d-a901-49b6-bffc-66b084ac4a1d		1827		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726302	
+5HBYP	3DXV4		accepted	Felis chaus affinis	Gray, 1830	subspecies	zoological			1830		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726306	
+5HBYT	5HBYP		synonym	Felis chaus kelaarti	Pocock, 1939	subspecies	zoological			1939		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726309	
+7JTBX	5HBYP		synonym	Felis chaus kutas	Pearson, 1832	subspecies	zoological			1832		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726310	
+5HBYY	5HBYP		synonym	Felis chaus prateri	Pocock, 1939	subspecies	zoological			1939		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726314	
+CGLQX	5HBYP		synonym	Felis chaus valbalala	Deraniyagala, 1955	subspecies	zoological			1955		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229874	
+5HBYQ	3DXV4		accepted	Felis chaus chaus		subspecies	zoological	673ead2f-e6d8-4b4b-8583-36373d275af2		1777		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726305	
+5HBYS	5HBYQ		synonym	Felis chaus furax	de Winton, 1898	subspecies	zoological			1898		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726308	
+5HBYV	5HBYQ		synonym	Felis chaus maimanah	Zukowsky, 1915	subspecies	zoological			1915		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726311	
+5HBYW	5HBYQ		synonym	Felis chaus nilotica	de Winton, 1898	subspecies	zoological			1898		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726312	
+5HBYX	5HBYQ		synonym	Felis chaus oxiana	Heptner, 1969	subspecies	zoological			1969		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726313	
+5HBYR	3DXV4		accepted	Felis chaus fulvidina	Thomas, 1929	subspecies	zoological			1929		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726307	
+CFSCV	3DXVF		accepted	Felis lybica cafra	Desmarest, 1822	subspecies	zoological			1822		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229877	
+5HC2L	CFSCV		synonym	Felis silvestris cafra	Desmarest, 1822	subspecies	zoological			1822		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726326	
+CFSCW	3DXVF		accepted	Felis lybica lybica		subspecies	zoological			1780		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229875	
+5HC2Y	CFSCW		synonym	Felis silvestris lybica	Forster, 1780	subspecies	zoological			1780		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726338	
+CFSCX	3DXVF		accepted	Felis lybica ornata	Gray, 1832	subspecies	zoological			1832		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229876	
+5HC34	CFSCX		synonym	Felis silvestris ornata	Gray, 1832	subspecies	zoological			1832		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726342	
+5HC23	3DXVH		accepted	Felis margarita margarita		subspecies	zoological	c5c9d587-188d-4ab1-bca7-11aad7b59f6c		1858		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726318	
+5HBZZ	5HC23		synonym	Felis margarita airensis	Pocock, 1951	subspecies	zoological			1951		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726319	
+5HC24	5HC23		synonym	Felis margarita meinertzhageni	Pocock, 1938	subspecies	zoological			1938		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726321	
+5HC26	3DXVH		accepted	Felis margarita thinobia	(Ognev, 1927)	subspecies	zoological			1927		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726322	
+5HC22	5HC26		synonym	Felis margarita harrisoni	Hemmer, Grubb & Groves, 1976	subspecies	zoological			1976		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726320	
+5HC25	5HC26		synonym	Felis margarita scheffeli	Hemmer, 1974	subspecies	zoological			1974		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=622050	
+5HC2M	3DXW2		accepted	Felis silvestris caucasica	Satunin, 1905	subspecies	zoological			1905		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726327	
+5HC37	3DXW2		accepted	Felis silvestris silvestris		subspecies	zoological	8ece03de-a439-435b-a6ef-454cb464d05e		1777		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726325	
+7K8NP	3T789		accepted	Leopardus guigna guigna		subspecies	zoological	06615c7f-f393-4f99-bfac-d1d326152b15		1782		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726357	
+7JWNQ	3T789		accepted	Leopardus guigna tigrillo	(Schinz, 1844)	subspecies	zoological			1844		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726358	
+7K8QW	3T78D		accepted	Leopardus pardalis mitis	(F. Cuvier, 1820)	subspecies	zoological			1820		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726366	
+5HC2F	7K8QW		synonym	Felis pardalis mearnsi	J. A. Allen, 1904	subspecies	zoological			1904		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203582	
+5HC2G	7K8QW		synonym	Felis pardalis minimus	Wilson, 1860	subspecies	zoological			1860		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203584	
+7JWQW	7K8QW		synonym	Leopardus pardalis aequatorialis	(Mearns, 1903)	subspecies	zoological			1903		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726364	
+7JX2W	7K8QW		synonym	Leopardus pardalis mearnsi	(J. A. Allen, 1904)	subspecies	zoological			1904		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552794	
+7JX38	7K8QW		synonym	Leopardus pardalis melanurus	(Ball, 1844)	subspecies	zoological			1844		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726365	
+7K938	7K8QW		synonym	Leopardus pardalis pseudopardalis	(Boitard, 1842)	subspecies	zoological			1842		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726367	
+7JWQX	7K8QW		synonym	Leopardus pardalis pusaeus	(Thomas, 1914)	subspecies	zoological			1914		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726368	
+7JX2X	7K8QW		synonym	Leopardus pardalis steinbachi	Pocock, 1941	subspecies	zoological	91f2d983-7b38-49f9-a037-e3634fe1d99a		1941		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726369	
+7K92W	3T78D		accepted	Leopardus pardalis pardalis		subspecies	zoological	ee457116-ec2b-4c4d-8566-3209d6750fab		1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=622051	
+7JTC8	7K92W		synonym	Felis pardalis albescens	Pucheran, 1855	subspecies	zoological			1855		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203579	
+5HC2H	7K92W		synonym	Felis pardalis nelsoni	Goldman, 1925	subspecies	zoological			1925		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203585	
+5HC2J	7K92W		synonym	Felis pardalis sonoriensis	Goldman, 1925	subspecies	zoological			1925		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203586	
+7JWR8	7K92W		synonym	Leopardus pardalis albescens	(Pucheran, 1855)	subspecies	zoological			1855		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552793	
+7K8R8	7K92W		synonym	Leopardus pardalis nelsoni	(Goldman, 1925)	subspecies	zoological			1925		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552795	
+7JWR9	7K92W		synonym	Leopardus pardalis sonoriensis	(Goldman, 1925)	subspecies	zoological			1925		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552796	
+7K8QX	6P8MM	CFSDB	accepted	Leopardus tigrinus oncilla	(Thomas, 1903)	subspecies	zoological			1903		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726372	
+CFSDB	7K8QX		synonym	Felis pardinoides oncilla	Thomas, 1903	subspecies	zoological			1903		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229925	
+7K8R9	6P8MM		accepted	Leopardus tigrinus pardinoides	(Gray, 1867)	subspecies	zoological			1867		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726373	
+7K92X	6P8MM		accepted	Leopardus tigrinus tigrinus		subspecies	zoological	889498dc-0993-4a7a-a3d8-5196cf7dad39		1775		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726370	
+7K8R6	3T78F		accepted	Leopardus wiedii glauculus	(Thomas, 1903)	subspecies	zoological			1903		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726376	
+5HC3C	7K8R6		synonym	Felis wiedii glaucula	Thomas, 1903	subspecies	zoological			1903		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203589	
+7K936	7K8R6		synonym	Leopardus wiedii glaucula	(Thomas, 1903)	subspecies	zoological			1903		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552809	
+5HBZP	7K8R6		synonym	Felis glaucula oaxacensis	Nelson & Goldman, 1931	subspecies	zoological	fee190d9-2e3a-43bc-97dc-f9d2b8296ac8		1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203593	
+5HBZQ	7K8R6		synonym	Felis glaucula yucatanica	Nelson & Goldman, 1931	subspecies	zoological	fee190d9-2e3a-43bc-97dc-f9d2b8296ac8		1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203599	
+5HC3B	7K8R6		synonym	Felis wiedii cooperi	Goldman, 1943	subspecies	zoological			1943		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203588	
+5HC3D	7K8R6		synonym	Felis wiedii nicaraguae	(J. A. Allen, 1919)	subspecies	zoological			1919		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203591	
+7JSTC	7K8R6		synonym	Felis wiedii oaxacensis	Nelson & Goldman, 1931	subspecies	zoological			1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203548	
+5HC3F	7K8R6		synonym	Felis wiedii pirrensis	Goldman, 1914	subspecies	zoological			1914		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203594	
+5HC3G	7K8R6		synonym	Felis wiedii salvinia	(Pocock, 1941)	subspecies	zoological			1941		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203596	
+5HC3J	7K8R6		synonym	Felis wiedii yucatanica	Nelson & Goldman, 1931	subspecies	zoological			1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203598	
+7JX36	7K8R6		synonym	Leopardus wiedii cooperi	(Goldman, 1943)	subspecies	zoological			1943		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552806	
+7JWQV	7K8R6		synonym	Leopardus wiedii nicaraguae	(J. A. Allen, 1919)	subspecies	zoological			1919		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552797	
+7JWR7	7K8R6		synonym	Leopardus wiedii oaxacensis	(Nelson & Goldman, 1931)	subspecies	zoological			1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=622091	
+7JX2V	7K8R6		synonym	Leopardus wiedii pirrensis	(Goldman, 1914)	subspecies	zoological			1914		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552798	
+7K8QV	7K8R6		synonym	Leopardus wiedii salvinia	Pocock, 1941	subspecies	zoological	91f2d983-7b38-49f9-a037-e3634fe1d99a		1941		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203597	
+7JX37	7K8R6		synonym	Leopardus wiedii salvinius	Pocock, 1941	subspecies	zoological			1941		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726377	
+7K937	7K8R6		synonym	Leopardus wiedii yucatanica	(Nelson & Goldman, 1931)	subspecies	zoological			1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552800	
+7JWQY	7K8R6		synonym	Leopardus wiedii yucatanicus	(Nelson & Goldman, 1931)	subspecies	zoological			1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726379	
+5JJKL	7K8R6		synonym	Margay glaucula nicaraguae	J. A. Allen, 1919	subspecies	zoological			1919		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203592	
+7K8R7	3T78F	CGLLM	accepted	Leopardus wiedii vigens	(Thomas, 1904)	subspecies	zoological			1904		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726378	
+CGLLM	7K8R7		synonym	Felis wiedii vigens	Thomas, 1904	subspecies	zoological			1904		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229935	
+7K92V	3T78F		accepted	Leopardus wiedii wiedii		subspecies	zoological	bd8fde2b-320a-48ea-aa07-a7eeb31d9dbd		1821		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552799	
+5HC3H	7K92V		synonym	Felis wiedii wiedii		subspecies	zoological			1821		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203587	
+7K939	7K92V		synonym	Leopardus wiedii amazonicus	(Cabrera, 1917)	subspecies	zoological			1917		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726374	
+7JWR6	7K92V		synonym	Leopardus wiedii boliviae	Pocock, 1941	subspecies	zoological	91f2d983-7b38-49f9-a037-e3634fe1d99a		1941		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726375	
+7JYLL	3THH7		accepted	Leptailurus serval constantinus	(Forster, 1780)	subspecies	zoological			1780		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726382	
+7JYLM	7JYLL		synonym	Leptailurus serval constantina	(Forster, 1780)	subspecies	zoological			1780		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=622034	
+7JYLX	3THH7	CFSDG	accepted	Leptailurus serval lipostictus	(Pocock, 1907)	subspecies	zoological			1907		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726389	
+CFSDG	7JYLX		synonym	Felis servalina liposticta	Pocock, 1907	subspecies	zoological			1907		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229926	
+7JYLZ	3THH7		accepted	Leptailurus serval serval		subspecies	zoological	08128d1f-a12e-436f-9bf6-5268f9769438		1776		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=622056	
+CFZH9	6QR9T		accepted	Lynx lynx balcanicus	(Bures, 1941)	subspecies	zoological			1941		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229909	
+CFZHB	6QR9T		accepted	Lynx lynx carpathicus	Kratochvil & Stollman, 1963	subspecies	zoological			1963		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229828	
+CFZHC	6QR9T		accepted	Lynx lynx dinniki	Satunin, 1915	subspecies	zoological			1915		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229829	
+5JGKN	6QR9T		accepted	Lynx lynx isabellinus	(Blyth, 1847)	subspecies	zoological			1847		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726401	
+5JGKQ	6QR9T		accepted	Lynx lynx lynx		subspecies	zoological	d5af4ddc-d11c-44da-9c73-f0d194a6cb6c		1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726400	
+NTDF5	5JGKQ		synonym	Felis lynx lynx		subspecies	zoological			1758		https://taxref.mnhn.fr/taxref-web/taxa/60616	
+CFZHD	6QR9T		accepted	Lynx lynx wrangeli	Ognev, 1928	subspecies	zoological			1928		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229831	
+5JGKW	3WSJW		accepted	Lynx rufus fasciatus	Rafinesque, 1817	subspecies	zoological			1817		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726407	
+5JGKT	5JGKW		synonym	Lynx rufus baileyi	Merriam, 1890	subspecies	zoological			1890		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726405	
+7JZZK	5JGKW		synonym	Lynx rufus californicus	Mearns, 1897	subspecies	zoological			1897		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726406	
+5JGL2	5JGKW		synonym	Lynx rufus pallescens	Merriam, 1899	subspecies	zoological			1899		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726411	
+5JGL3	5JGKW		synonym	Lynx rufus peninsularis	Thomas, 1898	subspecies	zoological			1898		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726412	
+5JGL6	5JGKW		synonym	Lynx rufus texensis	J. A. Allen, 1895	subspecies	zoological			1895		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726414	
+5JGL4	3WSJW		accepted	Lynx rufus rufus		subspecies	zoological	a972b85a-c282-4b06-b178-a3c43a9e0e61		1777		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=180583	
+5HC2K	5JGL4		synonym	Felis rufus rufus		subspecies	zoological			1777		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203549	
+5JGKX	5JGL4		synonym	Lynx rufus floridanus	Rafinesque, 1817	subspecies	zoological			1817		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726408	
+5JGKY	5JGL4		synonym	Lynx rufus gigas	Bangs, 1897	subspecies	zoological			1897		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726409	
+5JGL5	5JGL4		synonym	Lynx rufus superiorensis	Peterson & Downing, 1952	subspecies	zoological			1952		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726413	
+CG53F	46H7Y		accepted	Neofelis diardi borneensis	Wilting, Christiansen, Kitchener, Kemp, Ambu & Fickel, 2010	subspecies	zoological	89dbfbe8-0ccd-4cfb-9214-bc08a4b0d6b6		2010		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229800	
+CG53G	46H7Y		accepted	Neofelis diardi diardi		subspecies	zoological			1823		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229799	
+CG5GC	4B7BN		accepted	Otocolobus manul manul		subspecies	zoological			1776		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229833	
+5HBZW	CG5GC		synonym	Felis manul ferruginea	(Ognev, 1928)	subspecies	zoological			1928		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726316	
+5HBZX	CG5GC		synonym	Felis manul manul		subspecies	zoological			1776		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726315	
+CG5GB	CG5GC		synonym	Otocolobus manul ferrugineus	Ognev, 1928	subspecies	zoological			1928		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229834	
+CG5GD	4B7BN	5HBZY	accepted	Otocolobus manul nigripectus	(Hodgson, 1842)	subspecies	zoological			1842		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229835	
+5HBZY	CG5GD		synonym	Felis manul nigripecta	Hodgson, 1842	subspecies	zoological			1842		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726317	
+5K5LR	4CGXR		accepted	Panthera pardus delacouri	Pocock, 1930	subspecies	zoological			1930		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726465	
+5K5LS	4CGXR		accepted	Panthera pardus fusca	(Meyer, 1794)	subspecies	zoological			1794		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726466	
+7KH89	4CGXR		accepted	Panthera pardus kotiya	Deraniyagala, 1956	subspecies	zoological			1956		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726468	
+5K5LV	4CGXR		accepted	Panthera pardus melas	(G. Cuvier, 1809)	subspecies	zoological	6bc00f7d-f405-46fe-a088-29435755c6d5		1809		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726469	
+5K5LW	4CGXR		accepted	Panthera pardus nimr	(Hemprich & Ehrenberg, 1833)	subspecies	zoological			1833		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726470	
+5K5LX	4CGXR		accepted	Panthera pardus orientаlis	(Schlegel, 1857)	subspecies	zoological			1857		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726471	Playground flaw F6: Cyrillic look-alike letter in the epithet.
+5K5LT	5K5LX		synonym	Panthera pardus japonensis	(Gray, 1862)	subspecies	zoological			1862		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726467	
+5K5LY	4CGXR		accepted	Panthera pardus pardus		subspecies	zoological	20529c6b-2415-4317-b736-8d37b25a7d38		1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726464	
+CG7RN	4CGXR		accepted	Panthera pardus tulliana	Valenciennes, 1856	subspecies	zoological			1856		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229817	
+CGLPN	CG7RN		synonym	Panthera pardus ciscaucasicus	Satunin, 1914	subspecies	zoological			1914		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229805	
+5K5LZ	CG7RN		synonym	Panthera pardus saxicolor	Pocock, 1927	subspecies	zoological			1927		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933431	
+5K5M9	4CGXS		accepted	Panthera tigris tigris		subspecies	zoological	20529c6b-2415-4317-b736-8d37b25a7d38		1758		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183806	
+5K5M2	5K5M9		synonym	Panthera tigris altaica	Temminck, 1844	subspecies	zoological			1844		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726472	
+5K5M3	5K5M9		synonym	Panthera tigris amoyensis	(Hilzheimer, 1905)	subspecies	zoological			1905		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726473	
+5K5M5	5K5M9		synonym	Panthera tigris corbetti	Mazak, 1968	subspecies	zoological			1968		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726475	
+5K5M6	5K5M9		synonym	Panthera tigris longipilis	(Fitzinger, 1868)	subspecies	zoological			1868		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=183807	
+7KGHW	5K5M9		synonym	Panthera tigris virgata	(Illiger, 1815)	subspecies	zoological			1815		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726478	
+CG7NX	4DJJ2		accepted	Pardofelis marmorata longicaudata	(Blainville, 1843)	subspecies	zoological			1843		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229907	
+CG7NW	CG7NX		synonym	Pardofelis marmorata charltoni	(Gray, 1846)	subspecies	zoological			1846		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229819	
+5K7H6	CG7NX		synonym	Pardofelis marmorata charltonii	(Gray, 1846)	subspecies	zoological			1846		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726416	
+5K7H7	4DJJ2		accepted	Pardofelis marmorata marmorata		subspecies	zoological	4d3d2be9-22bb-403a-9c24-48815c36520f		1837		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726415	
+5KND2	4MF7C		accepted	Prionailurus bengalensis bengalensis		subspecies	zoological	ee21c381-25d1-4532-b64f-3f44683d310c		1792		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=622028	
+5KNCZ	5KND2		synonym	Prionailurus bengalensis alleni	Sody, 1949	subspecies	zoological	156c54b4-063a-4bc9-8141-e42c8a2a31bb	181	1949		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726417	
+5KND4	5KND2		synonym	Prionailurus bengalensis chinensis	(Gray, 1837)	subspecies	zoological			1837		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726419	
+5KND7	5KND2		synonym	Prionailurus bengalensis horsfieldii	(Gray, 1842)	subspecies	zoological			1842		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726422	
+5KNDC	5KND2		synonym	Prionailurus bengalensis trevelyani	Pocock, 1939	subspecies	zoological			1939		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726426	
+5KND5	4MF7C		accepted	Prionailurus bengalensis euptilurus	(Elliot, 1871)	subspecies	zoological			1871		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726420	
+5KND8	5KND5		synonym	Prionailurus bengalensis iriomotensis	(Imaizumi, 1967)	subspecies	zoological			1967		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=622029	
+CG8CX	CG8CW		accepted	Prionailurus javanensis javanensis		subspecies	zoological			1816		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229878	
+CG8CY	CG8CW		accepted	Prionailurus javanensis sumatranus	(Horsfield, 1821)	subspecies	zoological			1821		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229879	
+5KNDB	CG8CY		synonym	Prionailurus bengalensis sumatranus	(Horsfield, 1821)	subspecies	zoological			1821		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726425	
+5KND3	CG8CY		synonym	Prionailurus bengalensis borneoensis	Brongersma, 1936	subspecies	zoological	bfe29f85-1175-402f-85fb-3068c8a41c6e		1936		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726418	
+5KND6	CG8CY		synonym	Prionailurus bengalensis heaneyi	Groves, 1997	subspecies	zoological			1997		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726421	
+7KP4H	CG8CY		synonym	Prionailurus bengalensis rabori	Groves, 1997	subspecies	zoological			1997		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726424	
+5KNDD	4MF7F		accepted	Prionailurus rubiginosus koladivius	Deraniyagala, 1956	subspecies	zoological			1956		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933445	
+7KP4N	4MF7F		accepted	Prionailurus rubiginosus phillipsi	Pocock, 1939	subspecies	zoological			1939		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726428	
+5KNDF	4MF7F		accepted	Prionailurus rubiginosus rubiginosus		subspecies	zoological	450941fa-cf3f-4dde-b7a6-e918943ab460		1831		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726427	
+CG8CZ	4MF7G		accepted	Prionailurus viverrinus rhizophoreus	Sody, 1936	subspecies	zoological			1936		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933444	
+5KNDG	CG8CZ		synonym	Prionailurus viverrinus rizophoreus	Sody, 1936	subspecies	zoological			1936		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229837	
+CG8D2	4MF7G		accepted	Prionailurus viverrinus viverrinus		subspecies	zoological			1833		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=1229836	
+5KSLR	4QHKG		accepted	Puma concolor concolor		subspecies	zoological	fc643127-34cc-44e7-ab3f-d514768c12b7		1771		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552780	
+5HBZ2	5KSLR		synonym	Felis concolor anthonyi	Nelson & Goldman, 1931	subspecies	zoological	a1c5bab4-a057-49dc-b6d5-52a848068349		1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933455	
+5HBZ6	5KSLR		synonym	Felis concolor capricornensis	Goldman, 1946	subspecies	zoological	3f88fb89-8445-4790-b780-12a942ddded3		1946		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933450	
+5HBZ7	5KSLR		synonym	Felis concolor concolor		subspecies	zoological			1771		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=202391	
+5HBZC	5KSLR		synonym	Felis concolor greeni	Nelson & Goldman, 1931	subspecies	zoological	a1c5bab4-a057-49dc-b6d5-52a848068349		1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933456	
+5KSLF	5KSLR		synonym	Puma concolor acrocodia	(Goldman, 1943)	subspecies	zoological			1943		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933432	
+5KSLG	5KSLR		synonym	Puma concolor anthonyi	(Nelson & Goldman, 1931)	subspecies	zoological			1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726431	
+5KSLH	5KSLR		synonym	Puma concolor araucanus	(Osgood, 1943)	subspecies	zoological			1943		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933436	
+5KSLK	5KSLR		synonym	Puma concolor bangsi	(Merriam, 1901)	subspecies	zoological			1901		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933442	
+5KSLL	5KSLR		synonym	Puma concolor borbensis	(Nelson & Goldman, 1933)	subspecies	zoological			1933		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933433	
+5KSLN	5KSLR		synonym	Puma concolor cabrerae	Pocock, 1940	subspecies	zoological	9a6196d3-0edd-476c-ae14-b2b3dc8cf09a	312	1940		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726432	
+5KSLQ	5KSLR		synonym	Puma concolor capricornensis	(Goldman, 1946)	subspecies	zoological			1946		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933434	
+5KSLW	5KSLR		synonym	Puma concolor greeni	(Nelson & Goldman, 1931)	subspecies	zoological			1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933435	
+5KSLZ	5KSLR		synonym	Puma concolor incarum	(Nelson & Goldman, 1929)	subspecies	zoological			1929		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933441	
+5KSM6	5KSLR		synonym	Puma concolor osgoodi	(Nelson & Goldman, 1929)	subspecies	zoological			1929		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933440	
+5KSM7	5KSLR		synonym	Puma concolor patagonica	(Merriam, 1901)	subspecies	zoological			1901		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933437	
+5KSM8	5KSLR		synonym	Puma concolor pearsoni	(Thomas, 1901)	subspecies	zoological			1901		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933438	
+5KSM9	5KSLR		synonym	Puma concolor puma	(Molina, 1782)	subspecies	zoological			1782		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=726433	
+5KSMB	5KSLR		synonym	Puma concolor soderstromii	(Lönnberg, 1913)	subspecies	zoological			1913		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933439	
+5KSLV	4QHKG	7JTC9	accepted	Puma concolor couguar	(Kerr, 1792)	subspecies	zoological			1792		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=622093	
+7JTC9	5KSLV		synonym	Felis concolor cougar	Kerr, 1792	subspecies	zoological			1792		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933422	
+5HBZB	5KSLV		synonym	Felis concolor couguar	Kerr, 1792	subspecies	zoological			1792		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=202392	
+7KQ7W	5KSLV		synonym	Puma concolor cougar	(Kerr, 1792)	subspecies	zoological			1792		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552783	
+5HBYL	5KSLV		synonym	Felis aztecus browni	Merriam, 1903	subspecies	zoological			1903		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203555	
+5HBYM	5KSLV		synonym	Felis bangsi costaricensis	Merriam, 1901	subspecies	zoological			1901		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203559	
+5HBZ3	5KSLV		synonym	Felis concolor azteca	Merriam, 1901	subspecies	zoological			1901		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203552	
+5HBZ4	5KSLV		synonym	Felis concolor browni	Merriam, 1903	subspecies	zoological			1903		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203554	
+5HBZ5	5KSLV		synonym	Felis concolor californica	May, 1896	subspecies	zoological			1896		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203556	
+5HBZ8	5KSLV		synonym	Felis concolor coryi	Bangs, 1899	subspecies	zoological			1899		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=202393	
+5HBZ9	5KSLV		synonym	Felis concolor costaricensis	Merriam, 1901	subspecies	zoological			1901		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203558	
+5HBZD	5KSLV		synonym	Felis concolor hippolestes	Merriam, 1897	subspecies	zoological			1897		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203560	
+7K5BX	5KSLV		synonym	Felis concolor improcera	Phillips, 1912	subspecies	zoological			1912		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203562	
+5HBZF	5KSLV		synonym	Felis concolor kaibabensis	Nelson & Goldman, 1931	subspecies	zoological	a1c5bab4-a057-49dc-b6d5-52a848068349		1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203564	
+5HBZG	5KSLV		synonym	Felis concolor mayensis	Nelson & Goldman, 1929	subspecies	zoological			1929		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203565	
+5HBZH	5KSLV		synonym	Felis concolor missoulensis	Goldman, 1943	subspecies	zoological			1943		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203566	
+5HBZJ	5KSLV		synonym	Felis concolor olympus	Merriam, 1897	subspecies	zoological			1897		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=933449	
+5HBZK	5KSLV		synonym	Felis concolor oregonensis	Rafinesque, 1832	subspecies	zoological			1832		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203567	
+5HBZL	5KSLV		synonym	Felis concolor schorgeri	Jackson, 1955	subspecies	zoological			1955		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203570	
+5HBZM	5KSLV		synonym	Felis concolor stanleyana	Goldman, 1938	subspecies	zoological			1938		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203571	
+5HBZN	5KSLV		synonym	Felis concolor vancouverensis	Nelson & Goldman, 1932	subspecies	zoological			1932		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203572	
+5HBZR	5KSLV		synonym	Felis hippolestes aztecus	Merriam, 1901	subspecies	zoological			1901		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=622089	
+5HBZS	5KSLV		synonym	Felis hippolestes olympus	Merriam, 1897	subspecies	zoological			1897		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=203569	
+5KSLJ	5KSLV		synonym	Puma concolor azteca	(Merriam, 1901)	subspecies	zoological			1901		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552777	
+5KSLM	5KSLV		synonym	Puma concolor browni	(Merriam, 1903)	subspecies	zoological			1903		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552778	
+5KSLP	5KSLV		synonym	Puma concolor californica	(May, 1896)	subspecies	zoological			1896		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552779	
+5KSLS	5KSLV		synonym	Puma concolor coryi	(Bangs, 1899)	subspecies	zoological			1899		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552781	
+5KSLT	5KSLV		synonym	Puma concolor costaricensis	(Merriam, 1901)	subspecies	zoological			1901		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552782	
+5KSLX	5KSLV		synonym	Puma concolor hippolestes	(Merriam, 1897)	subspecies	zoological			1897		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552784	
+5KSLY	5KSLV		synonym	Puma concolor improcera	(Phillips, 1912)	subspecies	zoological			1912		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552785	
+5KSM2	5KSLV		synonym	Puma concolor kaibabensis	(Nelson & Goldman, 1931)	subspecies	zoological			1931		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552786	
+5KSM3	5KSLV		synonym	Puma concolor mayensis	(Nelson & Goldman, 1929)	subspecies	zoological			1929		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552787	
+5KSM4	5KSLV		synonym	Puma concolor missoulensis	(Goldman, 1943)	subspecies	zoological			1943		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552788	
+5KSM5	5KSLV		synonym	Puma concolor oregonensis	(Rafinesque, 1832)	subspecies	zoological			1832		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552789	
+7KQ88	5KSLV		synonym	Puma concolor schorgeri	(Jackson, 1955)	subspecies	zoological			1955		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552790	
+5KSMC	5KSLV		synonym	Puma concolor stanleyana	(Goldman, 1938)	subspecies	zoological			1938		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552791	
+5KSMD	5KSLV		synonym	Puma concolor vancouverensis	(Nelson & Goldman, 1932)	subspecies	zoological			1932		https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value=552792	
+PG1	6DBT		accepted	Panthera tigirs	(Linnaeus, 1758)	species	zoological						Playground flaw F2: misspelling of Panthera tigris.
+PG2	5HR8		accepted	Lynx rufus	(Schreber, 1777)	species	zoological						Playground flaw F3: duplicate of Lynx rufus.
+PG5	CFSCR		synonym	Leo leo	(Linnaeus, 1758)	species	zoological						Playground flaw F7: points at a synonym.
+PG6	4JQ8		provisionally accepted	Felis sp. "Bornean form"		species	zoological						Playground flaw F8: informal placeholder name.

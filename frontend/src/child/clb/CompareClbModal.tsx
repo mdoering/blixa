@@ -33,6 +33,7 @@ import {
 import DatasetLabel from '../../clb/DatasetLabel';
 import ClbClassificationPanel from './ClbClassificationPanel';
 import ClbComparisonView, { type CopyField, type CopyHandlers, type OursSide } from './ClbComparisonView';
+import { WithHelp } from '../../components/HelpLink';
 
 const vernacularApi = childApi<{ name: string | null; language: string | null }>('vernaculars');
 
@@ -264,7 +265,13 @@ export default function CompareClbModal({ pid, usageId, opened, onClose, onCopyF
   };
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Compare with ChecklistBank" size="xl">
+    <Modal opened={opened} onClose={onClose} title={
+        <WithHelp page="checklistbank" section="compare-a-taxon-with-clb" label="Help: comparing with CLB">
+          Compare with ChecklistBank
+        </WithHelp>
+      }
+      size="xl"
+    >
       <Stack>
         {!target && (
           <>

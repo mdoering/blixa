@@ -17,5 +17,5 @@ test('lists the user projects with their role', async () => {
 
 test('shows empty state when there are no projects', async () => {
   renderWithProviders(<ProjectListPage />); // default handler returns []
-  await waitFor(() => expect(screen.getByText('No projects yet')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/No projects yet/)).toBeInTheDocument());
 });

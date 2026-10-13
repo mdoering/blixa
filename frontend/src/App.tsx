@@ -22,6 +22,7 @@ import DiscussionDetailPage from './discussions/DiscussionDetailPage';
 import CurrentWorkPage from './lock/CurrentWorkPage';
 import AdminUsersPage from './admin/AdminUsersPage';
 import HomotypicConflictsPage from './homotypy/HomotypicConflictsPage';
+import HelpPage from './help/HelpPage';
 
 export default function App() {
   return (
@@ -36,6 +37,8 @@ export default function App() {
         <Route index element={<LandingPage />} />
         <Route path="p/:idOrAlias" element={<PublicProjectPage />} />
         <Route path="p/:pid/discussions/:id" element={<PublicDiscussionPage />} />
+        <Route path="help" element={<HelpPage />} />
+        <Route path="help/:page" element={<HelpPage />} />
       </Route>
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>

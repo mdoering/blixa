@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { listLocks, releaseLock } from '../api/locks';
 import type { Lock } from '../api/types';
+import HelpLink from '../components/HelpLink';
 
 dayjs.extend(relativeTime);
 
@@ -32,9 +33,12 @@ export default function CurrentWorkPage() {
 
   return (
     <Stack>
-      <Title order={3} m={0}>
-        Current work
-      </Title>
+      <Group gap={4} wrap="nowrap">
+        <Title order={3} m={0}>
+          Current work
+        </Title>
+        <HelpLink page="collaborate" section="the-activity-page" label="Help: current work" />
+      </Group>
 
       {rows.length === 0 ? (
         <Text c="dimmed" size="sm">

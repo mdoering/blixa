@@ -32,6 +32,7 @@ import {
   type ClbUsageHit,
 } from '../api/clb';
 import DatasetLabel from './DatasetLabel';
+import { WithHelp } from '../components/HelpLink';
 
 export interface ClbImportFocalUsage {
   id: number;
@@ -208,9 +209,11 @@ export default function ClbImportModal({ projectId, focalUsage, opened, onClose 
       onClose={handleClose}
       size="lg"
       title={
-        <Text fw={600}>
-          Import from ChecklistBank into <Text span fs="italic" inherit>{focalName}</Text>
-        </Text>
+        <WithHelp page="checklistbank" section="import-from-checklistbank" label="Help: importing from CLB">
+          <Text fw={600}>
+            Import from ChecklistBank into <Text span fs="italic" inherit>{focalName}</Text>
+          </Text>
+        </WithHelp>
       }
     >
       <Stack gap="md">

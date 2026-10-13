@@ -9,6 +9,7 @@ import {
   getHomotypicConflicts,
   type ConflictCluster,
 } from '../api/usages';
+import HelpLink from '../components/HelpLink';
 
 function clusterKey(c: ConflictCluster) {
   return c.accepted.map((a) => a.id).sort((x, y) => x - y).join('-');
@@ -125,7 +126,10 @@ export default function HomotypicConflictsPage() {
 
   return (
     <Stack>
-      <Title order={3}>Homotypic conflicts</Title>
+      <Group gap={4} wrap="nowrap">
+        <Title order={3}>Homotypic conflicts</Title>
+        <HelpLink page="synonyms" section="homotypic-conflicts" label="Help: homotypic conflicts" />
+      </Group>
       {clusters.length === 0 ? (
         <Text c="dimmed">No homotypic conflicts found in this subtree.</Text>
       ) : (

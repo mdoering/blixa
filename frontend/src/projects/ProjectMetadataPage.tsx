@@ -4,6 +4,7 @@ import {
   Anchor,
   Autocomplete,
   Badge,
+  Box,
   Button,
   Divider,
   Group,
@@ -40,6 +41,7 @@ import type { UpdateMetadataPayload } from '../api/types';
 import MergeModal from '../merge/MergeModal';
 import PropertyKeysModal from './PropertyKeysModal';
 import { NOM_CODES } from './CreateProjectModal';
+import HelpLink from '../components/HelpLink';
 
 // The CLB dataset key COL's own checklist is published under -- "col" conventionally aliases
 // this dataset, so picking that scope defaults its Dataset key field to save a lookup (see the
@@ -350,6 +352,9 @@ export default function ProjectMetadataPage() {
           <Tabs.Tab value="settings">Settings</Tabs.Tab>
           <Tabs.Tab value="releases">Releases</Tabs.Tab>
           <Tabs.Tab value="tools">Tools</Tabs.Tab>
+          <Box ml="auto">
+            <HelpLink page="publish" label="Help: project settings & publishing" />
+          </Box>
         </Tabs.List>
 
         {/* Metadata: the core bibliographic form + Save. The Settings tab's fields (GBIF map toggle,

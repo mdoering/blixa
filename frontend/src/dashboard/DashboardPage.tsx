@@ -26,6 +26,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getDashboard, markDashboardSeen } from '../api/dashboard';
+import HelpLink from '../components/HelpLink';
 
 // One inbox row: an icon, a label (optionally a link), grouped under "Needs attention".
 function InboxRow({
@@ -80,7 +81,10 @@ export default function DashboardPage() {
   return (
     <Container size="lg" py="md">
       <Stack gap="lg">
-        <Title order={2}>Dashboard</Title>
+        <Group gap={4} wrap="nowrap">
+          <Title order={2}>Dashboard</Title>
+          <HelpLink page="collaborate" section="your-dashboard" label="Help: the dashboard" />
+        </Group>
 
         <Paper withBorder p="md" radius="md">
           <Stack gap="sm">

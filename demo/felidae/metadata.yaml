@@ -1,0 +1,12 @@
+title: Blixa playground – Felidae
+description: >-
+  A practice dataset for the Blixa checklist editor: the extant cats (Felidae) taken from the
+  Catalogue of Life, with a handful of deliberate errors added for the Blixa tutorial (see the
+  Remarks of names with IDs starting PG). Not for scientific use.
+license: CC-BY-4.0
+taxonomicScope: Felidae (extant)
+geographicScope: Global
+source:
+  - title: Catalogue of Life
+    citation: Bánki, O. et al. Catalogue of Life (ChecklistBank dataset 3LXR), retrieved 2026-10-13.
+    url: https://www.checklistbank.org/dataset/3LXR

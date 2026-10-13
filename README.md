@@ -115,6 +115,30 @@ cd frontend && npm test
 
 The backend test suite spins up its own throwaway PostgreSQL via Testcontainers — it does **not** use the `docker compose` database above.
 
+## User documentation
+
+The end-user help lives in the app at **`/help`** — markdown pages in
+[`frontend/src/help/pages/`](frontend/src/help/pages/), ordered by
+[`frontend/src/help/toc.ts`](frontend/src/help/toc.ts), with screenshots in
+`frontend/public/help/img/`. `npm test` checks that every toc entry has a page and that all help
+links, anchors and images resolve.
+
+**Playground dataset.** [`demo/`](demo/) holds a curated Felidae ColDP with deliberate errors used
+by the tutorial; see [`demo/README.md`](demo/README.md). `demo/build.sh` zips it into
+`frontend/public/help/demo/`, where the docs and the **Try it with demo data** button pick it up.
+
+**Regenerating help screenshots.** With the local stack running (backend on the `dev` profile so
+admin/admin works, and `npm run dev`), run once `npx playwright install chromium`, then:
+
+```bash
+cd frontend && npm run screenshots              # all shots
+SHOTS=issues,tree-overview npm run screenshots  # just some
+```
+
+The script (`frontend/scripts/screenshots.ts`) imports the playground as
+"Blixa playground – Felidae" on first run and reuses it afterwards — delete that project for a clean
+slate. Set `BLIXA_URL` if the app isn't on `http://localhost:5173`.
+
 ---
 
 ## Reset the database
@@ -260,4 +284,4 @@ GBIF also mirrors journald to the partial public log viewer at <https://logs.gbi
 
 - **JDK 25 is required to build.** If `mvn` picks up Java 21 you'll get compile errors — run `sdk env` in `backend/` or set `JAVA_HOME` explicitly.
 - The **`dev` profile is for local development only** (it seeds `admin`/`admin`) — never enable it in production.
-- Design docs and implementation plans live under [`docs/superpowers/`](docs/superpowers/); the roadmap/backlog is in [`features.md`](features.md).
+- Design docs and implementation plans live under [`docs/superpowers/`](docs/superpowers/); the roadmap/backlog is in [`backlog.md`](backlog.md).

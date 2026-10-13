@@ -6,6 +6,8 @@ import { Link } from 'react-router-dom';
 import { listProjects } from '../api/projects';
 import CreateProjectModal from './CreateProjectModal';
 import ImportProjectModal from './ImportProjectModal';
+import TryDemoButton from './TryDemoButton';
+import HelpLink from '../components/HelpLink';
 
 export default function ProjectListPage() {
   const [creating, setCreating] = useState(false);
@@ -15,10 +17,14 @@ export default function ProjectListPage() {
   return (
     <div>
       <Group justify="space-between" mb="md">
-        <Title order={3} m={0}>
-          My projects
-        </Title>
+        <Group gap={4} wrap="nowrap">
+          <Title order={3} m={0}>
+            My projects
+          </Title>
+          <HelpLink page="start-a-checklist" label="Help: start a checklist" />
+        </Group>
         <Group gap="xs">
+          <TryDemoButton existingTitles={(data ?? []).map((p) => p.title)} />
           <Button
             variant="default"
             leftSection={<IconFileImport size={14} />}
@@ -32,7 +38,13 @@ export default function ProjectListPage() {
       {isLoading ? (
         <Loader />
       ) : (data ?? []).length === 0 ? (
-        <Text c="dimmed">No projects yet</Text>
+        <Text c="dimmed">
+          No projects yet. New to Blixa? Try it with demo data and follow the{' '}
+          <Anchor href="/help/tutorial" target="_blank">
+            tutorial
+          </Anchor>
+          .
+        </Text>
       ) : (
         <Stack gap="xs">
           {(data ?? []).map((p) => (

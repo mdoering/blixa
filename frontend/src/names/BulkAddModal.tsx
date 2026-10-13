@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { messageFor } from '../api/client';
 import { insertBulk, previewBulk, type BulkPreview, type BulkPreviewNode } from '../api/bulk';
+import { WithHelp } from '../components/HelpLink';
 
 export interface BulkAddTarget {
   id: number;
@@ -87,10 +88,12 @@ export default function BulkAddModal({ pid, target, opened, onClose, onDone, fix
 
   return (
     <Modal opened={opened} onClose={onClose} size="lg" title={
-      <Text fw={600}>
-        {fixedMode === 'synonyms' ? 'Add synonyms of ' : 'Bulk add under '}
-        <Text span fs="italic" inherit>{target.scientificName ?? '—'}</Text>
-      </Text>
+      <WithHelp page="build-the-tree" section="bulk-add-names" label="Help: bulk add & TextTree">
+        <Text fw={600}>
+          {fixedMode === 'synonyms' ? 'Add synonyms of ' : 'Bulk add under '}
+          <Text span fs="italic" inherit>{target.scientificName ?? '—'}</Text>
+        </Text>
+      </WithHelp>
     }>
       <Stack gap="md">
         {!fixedMode && (
