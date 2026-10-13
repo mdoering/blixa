@@ -143,10 +143,6 @@ Next, add a recent paper on tiger subspecies and attach it to the tiger.
 5. In **Add existing reference**, start typing `Planning tiger`, pick the reference and click
    **Add**. It is now listed as a reference of *Panthera tigris*.
 
-> **Note:** the **Add existing reference** list currently offers only a project's first 200
-> references. The playground has more than that, so the reference you just created may not be
-> offered yet. If so, skip steps 4–5 — the reference itself has been saved.
-
 To record where a name was originally published, use **Published in reference** on the
 **Details** tab instead. See [References](/help/references).
 

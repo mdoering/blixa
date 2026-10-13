@@ -3,9 +3,9 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { IconExternalLink, IconPlus, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { ApiError, messageFor } from '../api/client';
-import { listReferences } from '../api/references';
+import { getReference } from '../api/references';
 import { addWebReference, setUsageReferences } from '../api/usages';
 import type { Reference } from '../api/types';
 import EntitySelect from './EntitySelect';
@@ -22,9 +22,8 @@ export interface ReferencesTabProps {
   canEdit: boolean;
 }
 
-// Resolves the usage's reference_id[] against the project's references (GET /references) so each
-// row can show a real citation/title rather than a bare id -- a project reference list beyond the
-// picker's page size falls back to '#<id>', matching EntitySelect's own "current" fallback.
+// Fetches each of the usage's reference_id[] (GET /references/{id}) so each row can show a real
+// citation/title rather than a bare id, however many references the project has.
 export default function ReferencesTab({
   pid,
   usageId,
@@ -36,11 +35,13 @@ export default function ReferencesTab({
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [url, setUrl] = useState('');
 
-  const { data } = useQuery({
-    queryKey: ['references', pid],
-    queryFn: () => listReferences(pid, { limit: 200, offset: 0 }),
+  const linked = useQueries({
+    queries: referenceIds.map((id) => ({
+      queryKey: ['references', pid, 'byId', id],
+      queryFn: () => getReference(pid, id),
+    })),
   });
-  const byId = new Map((data ?? []).map((r) => [r.id, r]));
+  const byId = new Map(linked.flatMap((q) => (q.data ? [[q.data.id, q.data] as const] : [])));
 
   // Invalidates the loaded usage (so referenceIds/version flow back down as fresh props),
   // the project's reference list (so a just-created web reference resolves to its title/badge

@@ -103,7 +103,8 @@ public interface NameUsageMapper {
   List<NameUsage> findAllByProject(@Param("projectId") int projectId);
 
   // Unified list/search: q/rank/status are each optional (null -> unfiltered), ANDed together.
-  // q is the existing pg_trgm fuzzy filter (scientific_name % q); rank/status are exact matches
+  // q is the pg_trgm fuzzy filter (scientific_name % q) or a name prefix (SearchTerms.prefixLike,
+  // ranked first) -- trigram similarity alone misses short input like "Pan"; rank/status are exact matches
   // against their STORED string form (rank: the name-parser Rank's lower-cased name(); status:
   // the Status enum's name()) -- NameUsageService normalizes caller-supplied filter values into
   // that form before calling this. Order is by similarity when q is present (best match first),
@@ -116,11 +117,13 @@ public interface NameUsageMapper {
       FROM name_usage nu
       LEFT JOIN taxon_info ti ON ti.project_id = nu.project_id AND ti.usage_id = nu.id
       WHERE nu.project_id = #{projectId}
-      <if test="q != null">AND nu.scientific_name % #{q}</if>
+      <bind name="qLike" value="@org.catalogueoflife.editor.name.SearchTerms@prefixLike(q)"/>
+      <if test="q != null">AND (nu.scientific_name % #{q} OR nu.scientific_name ILIKE #{qLike})</if>
       <if test="rank != null">AND nu.rank = #{rank}</if>
       <if test="status != null">AND nu.status = #{status}</if>
       <choose>
-        <when test="q != null">ORDER BY similarity(nu.scientific_name, #{q}) DESC</when>
+        <when test="q != null">ORDER BY nu.scientific_name ILIKE #{qLike} DESC,
+        similarity(nu.scientific_name, #{q}) DESC, nu.scientific_name</when>
         <otherwise>ORDER BY nu.scientific_name</otherwise>
       </choose>
       LIMIT #{limit} OFFSET #{offset}
@@ -137,7 +140,8 @@ public interface NameUsageMapper {
       <script>
       SELECT COUNT(*) FROM name_usage
       WHERE project_id = #{projectId}
-      <if test="q != null">AND scientific_name % #{q}</if>
+      <bind name="qLike" value="@org.catalogueoflife.editor.name.SearchTerms@prefixLike(q)"/>
+      <if test="q != null">AND (scientific_name % #{q} OR scientific_name ILIKE #{qLike})</if>
       <if test="rank != null">AND rank = #{rank}</if>
       <if test="status != null">AND status = #{status}</if>
       </script>
@@ -151,7 +155,8 @@ public interface NameUsageMapper {
       <script>
       SELECT id FROM name_usage
       WHERE project_id = #{projectId}
-      <if test="q != null">AND scientific_name % #{q}</if>
+      <bind name="qLike" value="@org.catalogueoflife.editor.name.SearchTerms@prefixLike(q)"/>
+      <if test="q != null">AND (scientific_name % #{q} OR scientific_name ILIKE #{qLike})</if>
       <if test="rank != null">AND rank = #{rank}</if>
       <if test="status != null">AND status = #{status}</if>
       ORDER BY id

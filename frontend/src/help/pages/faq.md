@@ -87,9 +87,9 @@ Filter the Issues page by **severity** to focus on errors and warnings first. Se
 
 ## Search doesn't find a name
 
-- The **Names** search is fuzzy and compares your text with the whole **scientific name**. A short
-  fragment of a long name may not be similar enough to match, so type more of it: genus and
-  epithet. Authorship isn't searched.
+- The **Names** search finds names that start with your text, or are spelled similarly to it as a
+  whole. A fragment from the middle of a long name (an epithet alone) may not be similar enough
+  to match, so type the name from its start: genus and epithet. Authorship isn't searched.
 - **Look-alike characters** break matching. A name typed or pasted with, for example, a Cyrillic
   `а` instead of a Latin `a` looks right but is a different string. In the playground,
   *Panthera pardus orientаlis* is such a name. Blixa flags these as

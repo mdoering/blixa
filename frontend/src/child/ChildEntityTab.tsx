@@ -41,7 +41,7 @@ export interface FieldDef<T = unknown> {
   label: string;
   type?: FieldType;
   options?: Option[]; // select
-  load?: () => Promise<Option[]>; // entity
+  load?: (q: string) => Promise<Option[]>; // entity (q: the typed search) / autocomplete (q ignored)
   entityQueryKey?: unknown[]; // entity
   current?: (row: T) => Option | null; // entity: label for the selected value when editing
   span?: number; // 1..12, default 6

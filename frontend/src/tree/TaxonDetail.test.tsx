@@ -185,11 +185,11 @@ test('editing authorship and saving PUTs the update with the loaded version', as
 
 test('the published-in reference picker and remarks field render, seeded from the usage', async () => {
   mockCommon(baseUsage({ publishedInReferenceId: 7, remarks: 'Needs review' }));
+  // the picker lists none of the project's references; the selected one is fetched by id
   server.use(
-    http.get('/api/projects/4/references', () =>
-      HttpResponse.json([
-        { id: 7, citation: 'Mill. 1768', title: 'Abies alba desc', version: 0 },
-      ]),
+    http.get('/api/projects/4/references', () => HttpResponse.json([])),
+    http.get('/api/projects/4/references/7', () =>
+      HttpResponse.json({ id: 7, citation: 'Mill. 1768', title: 'Abies alba desc', version: 0 }),
     ),
   );
   renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
@@ -197,13 +197,13 @@ test('the published-in reference picker and remarks field render, seeded from th
   await waitFor(() =>
     expect(screen.getByLabelText('Scientific name')).toHaveValue('Panthera leo'),
   );
-  // The reference select resolves the loaded reference's title as its label, not a bare '#7'.
+  // The reference select resolves the reference's citation as its label, not a bare '#7'.
   // getByRole('textbox', ...), not getByLabelText: Mantine's Select combobox keeps its (hidden)
   // options listbox in the DOM with the same aria-labelledby as the input, so getByLabelText
   // matches both and errors on ambiguity.
   await waitFor(() =>
     expect(screen.getByRole('textbox', { name: 'Published in reference' })).toHaveValue(
-      'Abies alba desc',
+      'Mill. 1768',
     ),
   );
   expect(screen.getByLabelText('Remarks')).toHaveValue('Needs review');
@@ -457,13 +457,14 @@ test('the Types tab lists a holotype with its institution and occurrenceID', asy
 
 test('the References tab lists the usage\'s references, a citation and a webpage title with a web badge/link', async () => {
   mockCommon(baseUsage({ referenceId: [7, 9] }));
+  const refs: Record<string, object> = {
+    7: { id: 7, citation: 'Mill. 1768, Gardeners Dictionary', title: null, type: null, link: null, version: 0 },
+    9: { id: 9, citation: null, title: 'Example Page', type: 'webpage', link: 'https://example.org/page', version: 0 },
+  };
+  // linked references are fetched one by one, not looked up in the (paged) project list
   server.use(
-    http.get('/api/projects/4/references', () =>
-      HttpResponse.json([
-        { id: 7, citation: 'Mill. 1768, Gardeners Dictionary', title: null, type: null, link: null, version: 0 },
-        { id: 9, citation: null, title: 'Example Page', type: 'webpage', link: 'https://example.org/page', version: 0 },
-      ]),
-    ),
+    http.get('/api/projects/4/references', () => HttpResponse.json([])),
+    http.get('/api/projects/4/references/:id', ({ params }) => HttpResponse.json(refs[params.id as string])),
   );
   renderWithProviders(<TaxonDetail pid={4} usageId={10} />);
 
@@ -485,13 +486,20 @@ test('the References tab lists the usage\'s references, a citation and a webpage
 
 test('adding an existing reference on the References tab PUTs the updated id list', async () => {
   mockCommon(baseUsage({ referenceId: [7], version: 3 }));
+  const mill = { id: 7, citation: 'Mill. 1768', title: null, type: null, link: null, version: 0 };
+  const searches: (string | null)[] = [];
+  // the picker searches the server: reference 11 only comes back for a matching q
   server.use(
-    http.get('/api/projects/4/references', () =>
-      HttpResponse.json([
-        { id: 7, citation: 'Mill. 1768', title: null, type: null, link: null, version: 0 },
-        { id: 11, citation: null, title: 'New Reference', type: null, link: null, version: 0 },
-      ]),
-    ),
+    http.get('/api/projects/4/references', ({ request }) => {
+      const q = new URL(request.url).searchParams.get('q');
+      searches.push(q);
+      return HttpResponse.json(
+        q === 'New'
+          ? [{ id: 11, citation: null, title: 'New Reference', type: null, link: null, version: 0 }]
+          : [],
+      );
+    }),
+    http.get('/api/projects/4/references/7', () => HttpResponse.json(mill)),
   );
   let putBody: Record<string, unknown> | undefined;
   server.use(
@@ -507,8 +515,9 @@ test('adding an existing reference on the References tab PUTs the updated id lis
   await waitFor(() => expect(screen.getAllByText('Mill. 1768').length).toBeGreaterThanOrEqual(1));
 
   const picker = await screen.findByRole('textbox', { name: 'Add existing reference' });
-  await userEvent.click(picker);
+  await userEvent.type(picker, 'New');
   await userEvent.click(await screen.findByText('New Reference'));
+  expect(searches).toContain('New');
   // Two "Add" buttons on this tab (existing-reference / web-URL) -- the first is this one's.
   await userEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]);
 

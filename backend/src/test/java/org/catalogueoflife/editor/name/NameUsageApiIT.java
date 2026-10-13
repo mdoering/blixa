@@ -378,6 +378,15 @@ class NameUsageApiIT extends AbstractPostgresIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].scientificName").value("Abies"));
 
+    // a short prefix (too short for trigram similarity) still finds names starting with it,
+    // and LIKE wildcards in q are literal.
+    mvc.perform(get("/api/projects/" + pid + "/usages").param("q", "Pic"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].scientificName").value("Piceabies alba"));
+    mvc.perform(get("/api/projects/" + pid + "/usages").param("q", "%"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(0));
+
     // q + rank + status combined with AND: rank=species/status=accepted alone are exact filters
     // that already narrow to exactly {Abies alba, Abies alpina} regardless of q, so adding
     // q="Abies" (which both fuzzy-match comfortably) must still total exactly 2 -- proving the

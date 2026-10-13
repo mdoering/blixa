@@ -174,6 +174,19 @@ class ReferenceApiIT extends AbstractPostgresIT {
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.length()").value(1))
        .andExpect(jsonPath("$[0].citation").value("Jones 1943, More Fauna"));
+
+    // Partly typed words match as word prefixes (what a reference picker sends while typing).
+    mvc.perform(get(base).param("q", "Darw Orig"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.length()").value(1))
+       .andExpect(jsonPath("$[0].citation").value("Darwin 1859, On the Origin of Species"));
+    mvc.perform(get(base + "/count").param("q", "Faun"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.count").value(2));
+    // tsquery syntax in the input is ignored, not a 500.
+    mvc.perform(get(base).param("q", "Gard:* & !(|"))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.length()").value(1));
   }
 
   @Test

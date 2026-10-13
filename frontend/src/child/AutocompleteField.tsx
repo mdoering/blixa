@@ -7,7 +7,7 @@ export interface AutocompleteFieldProps {
   onChange: (value: string) => void;
   // Loads the suggestion set (e.g. the project's property keys). Free-text: typing a value not in
   // the list is allowed, so new keys can still be introduced -- this only offers existing ones.
-  load: () => Promise<Option[]>;
+  load: (q: string) => Promise<Option[]>;
   queryKey: unknown[];
   label?: string;
   placeholder?: string;
@@ -24,7 +24,7 @@ export default function AutocompleteField({
   label,
   placeholder,
 }: AutocompleteFieldProps) {
-  const { data } = useQuery({ queryKey, queryFn: load });
+  const { data } = useQuery({ queryKey, queryFn: () => load('') });
   const options = (data ?? []).map((o) => o.value);
   return (
     <Autocomplete

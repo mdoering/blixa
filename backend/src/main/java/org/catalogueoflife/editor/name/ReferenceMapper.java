@@ -67,7 +67,8 @@ public interface ReferenceMapper {
   // Paged reference listing with optional full-text citation search and an optional year range.
   // Backs both the bare list (all filters null -> every reference, id order) and the search box.
   //  * q: native pg full-text over the citation (websearch_to_tsquery, 'simple' config) -- matches
-  //    whole words anywhere in the citation, ranked by ts_rank. Replaces the old trigram `%`, which
+  //    whole words anywhere in the citation, ranked by ts_rank -- or every word of q as a word
+  //    prefix (SearchTerms.prefixTsQuery), so a picker finds "Johnson" while typing "Johns". Replaces the old trigram `%`, which
   //    returned nothing for ordinary queries (a short term's similarity to a long citation is below
   //    the pg_trgm threshold). See V26__reference_citation_fts.sql.
   //  * yearFrom/yearTo: inclusive bounds on the 4-digit year parsed out of the free-text `issued`
@@ -77,8 +78,12 @@ public interface ReferenceMapper {
       <script>
       SELECT * FROM reference
       WHERE project_id = #{projectId}
+      <bind name="qPrefix" value="@org.catalogueoflife.editor.name.SearchTerms@prefixTsQuery(q)"/>
       <if test="q != null and q != ''">
-        AND to_tsvector('simple', coalesce(citation, '')) @@ websearch_to_tsquery('simple', #{q})
+        AND (to_tsvector('simple', coalesce(citation, '')) @@ websearch_to_tsquery('simple', #{q})
+        <if test="qPrefix != null">
+          OR to_tsvector('simple', coalesce(citation, '')) @@ to_tsquery('simple', #{qPrefix})
+        </if>)
       </if>
       <if test="yearFrom != null">
         AND substring(issued from '\\d{4}')::int &gt;= #{yearFrom}
@@ -89,7 +94,12 @@ public interface ReferenceMapper {
       <choose>
         <when test="q != null and q != ''">
           ORDER BY ts_rank(to_tsvector('simple', coalesce(citation, '')),
-                           websearch_to_tsquery('simple', #{q})) DESC, id
+                           websearch_to_tsquery('simple', #{q})) DESC,
+          <if test="qPrefix != null">
+                   ts_rank(to_tsvector('simple', coalesce(citation, '')),
+                           to_tsquery('simple', #{qPrefix})) DESC,
+          </if>
+                   id
         </when>
         <otherwise>
           ORDER BY id
@@ -109,8 +119,12 @@ public interface ReferenceMapper {
       <script>
       SELECT count(*) FROM reference
       WHERE project_id = #{projectId}
+      <bind name="qPrefix" value="@org.catalogueoflife.editor.name.SearchTerms@prefixTsQuery(q)"/>
       <if test="q != null and q != ''">
-        AND to_tsvector('simple', coalesce(citation, '')) @@ websearch_to_tsquery('simple', #{q})
+        AND (to_tsvector('simple', coalesce(citation, '')) @@ websearch_to_tsquery('simple', #{q})
+        <if test="qPrefix != null">
+          OR to_tsvector('simple', coalesce(citation, '')) @@ to_tsquery('simple', #{qPrefix})
+        </if>)
       </if>
       <if test="yearFrom != null">
         AND substring(issued from '\\d{4}')::int &gt;= #{yearFrom}

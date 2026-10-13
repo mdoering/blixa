@@ -79,8 +79,9 @@ export default function DeleteNameModal({ pid, usage, opened, deleting, onClose,
                 onChange={setReparentTo}
                 queryKey={['usagesPicker', pid]}
                 placeholder="Search for a new parent…"
-                load={() =>
-                  searchUsages(pid, { limit: 500, offset: 0 }).then((page) =>
+                // the new parent must be an accepted taxon
+                load={(q) =>
+                  searchUsages(pid, { q: q || undefined, status: 'ACCEPTED', limit: 50, offset: 0 }).then((page) =>
                     page.items
                       .filter((u) => u.id !== usage.id)
                       .map((u) => ({ value: String(u.id), label: u.scientificName ?? `#${u.id}` })),

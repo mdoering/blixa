@@ -10,6 +10,7 @@ import {
   type NameRelation,
 } from '../api/nameRelations';
 import { listReferences } from '../api/references';
+import type { Reference } from '../api/types';
 import { searchUsages } from '../api/usages';
 import ChildEntityTab, { type ColumnDef, type FieldDef } from './ChildEntityTab';
 import type { Option } from './EntitySelect';
@@ -28,20 +29,26 @@ const NOM_REL_TYPES = [
   'type',
 ].map((v) => ({ value: v, label: v }));
 
-export function usageOptions(pid: number, excludeId?: number): () => Promise<Option[]> {
-  return () =>
-    searchUsages(pid, { limit: 200, offset: 0 }).then((page) =>
+// Picker loaders: the first 50 server-side matches for what the user typed (EntitySelect).
+export function usageOptions(pid: number, excludeId?: number): (q: string) => Promise<Option[]> {
+  return (q) =>
+    searchUsages(pid, { q: q || undefined, limit: 50, offset: 0 }).then((page) =>
       page.items
         .filter((u) => u.id !== excludeId)
         .map((u) => ({ value: String(u.id), label: u.scientificName ?? `#${u.id}` })),
     );
 }
 
-export function referenceOptions(pid: number): () => Promise<Option[]> {
-  return () =>
-    listReferences(pid, { limit: 200, offset: 0 }).then((refs) =>
-      refs.map((r) => ({ value: String(r.id), label: r.title ?? r.citation ?? `#${r.id}` })),
+export function referenceOptions(pid: number): (q: string) => Promise<Option[]> {
+  return (q) =>
+    listReferences(pid, { q: q || undefined, limit: 50, offset: 0 }).then((refs) =>
+      refs.map(referenceOption),
     );
+}
+
+// The citation identifies a reference better than its title (author + year).
+export function referenceOption(r: Reference): Option {
+  return { value: String(r.id), label: r.citation ?? r.title ?? `#${r.id}` };
 }
 
 // A usage's name, as a link that opens it in the detail panel when the host supports navigation.

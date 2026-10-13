@@ -14,8 +14,8 @@ references needs the **owner** or **editor** role.
 Use this to find a reference or check whether it is already in the project.
 
 1. Open **References** in the sidebar. The title shows how many references the project has.
-2. Type into **Search citations…**. The search covers the citation text and is forgiving about
-   small spelling differences.
+2. Type into **Search citations…**. The search covers the citation text and finds whole words or
+   the beginnings of words, so `Johns 2006` finds *Johnson et al. 2006*.
 3. To filter by year, type into the year box: `1941` for one year, `1941-1944` for a range,
    `1941-` for that year and later, or `-1944` for that year and earlier.
 4. Use **Previous** and **Next** to page through the results.

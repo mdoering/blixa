@@ -43,7 +43,7 @@ import InfoLabel from '../components/InfoLabel';
 import ClassificationBar from './ClassificationBar';
 import NameHeader from './NameHeader';
 import EntitySelect from '../child/EntitySelect';
-import NameRelationsTab, { referenceOptions } from '../child/NameRelationsTab';
+import NameRelationsTab, { referenceOption, referenceOptions } from '../child/NameRelationsTab';
 import { colIdFrom, scopedId, withScopedId } from '../child/map/mapUrls';
 import ReferencesTab from '../child/ReferencesTab';
 import TypeMaterialTab from '../child/TypeMaterialTab';
@@ -227,7 +227,8 @@ export default function TaxonDetail({ pid, usageId, onNavigate }: TaxonDetailPro
     staleTime: 5 * 60 * 1000,
   });
 
-  // BHL page finder: the focal name's nomenclatural reference must already have a linked BHL item.
+  // The picked nomenclatural reference: the picker's label, and the BHL page finder (which needs the
+  // reference to already have a linked BHL item).
   const nomRefId =
     typeof form.values.publishedInReferenceId === 'number'
       ? form.values.publishedInReferenceId
@@ -235,7 +236,7 @@ export default function TaxonDetail({ pid, usageId, onNavigate }: TaxonDetailPro
   const { data: nomRef } = useQuery({
     queryKey: ['reference', pid, nomRefId],
     queryFn: () => getReference(pid, nomRefId as number),
-    enabled: nomRefId != null && canEdit,
+    enabled: nomRefId != null,
   });
   const [bhlPageOpen, setBhlPageOpen] = useState(false);
 
@@ -646,12 +647,11 @@ export default function TaxonDetail({ pid, usageId, onNavigate }: TaxonDetailPro
                   load={referenceOptions(pid)}
                   queryKey={['refOptions', pid]}
                   current={
-                    usage.publishedInReferenceId
-                      ? {
-                          value: String(usage.publishedInReferenceId),
-                          label: `#${usage.publishedInReferenceId}`,
-                        }
-                      : null
+                    nomRef && nomRef.id === nomRefId
+                      ? referenceOption(nomRef)
+                      : nomRefId != null
+                        ? { value: String(nomRefId), label: `#${nomRefId}` }
+                        : null
                   }
                 />
                 <SimpleGrid cols={3}>

@@ -233,8 +233,8 @@ Use this to search all names in the project, including synonyms, which the tree 
 ![The Names page searching for Lynx](/help/img/names-search.png)
 
 1. Open **Names** in the sidebar.
-2. Type into **Search scientific name…**. The search is forgiving, so small spelling differences
-   still find the name.
+2. Type into **Search scientific name…**. Names starting with your text come first, followed by
+   similar spellings, so small spelling differences still find the name.
 3. Narrow the results with the **Rank** and **Status** filters.
 4. Click a row to open the name on the right. Right-click a row, or click its **⋮**, for the same
    [actions menu](/help/build-the-tree#the-row-actions-menu) as in the tree.
