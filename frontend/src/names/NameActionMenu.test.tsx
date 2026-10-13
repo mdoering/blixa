@@ -48,6 +48,29 @@ test('the change-status submenu greys out the usage\'s current status', async ()
   expect(screen.getByText('Unassessed').closest('button')).toBeEnabled();
 });
 
+test('unassessed <-> synonym/misapplied are disabled with a hint (only Demote/Promote cross over)', async () => {
+  const { unmount } = renderWithProviders(
+    <NameActionMenu pid={3} usage={{ ...usage, status: 'UNASSESSED' }} canEdit onSelect={() => {}} />,
+  );
+  await userEvent.click(screen.getByLabelText('Actions'));
+  await userEvent.click(await screen.findByText('Change status'));
+  expect((await screen.findByText('Synonym')).closest('button')).toBeDisabled();
+  expect(screen.getByText('Misapplied').closest('button')).toBeDisabled();
+  expect(screen.getByText('Accepted').closest('button')).toBeEnabled();
+  expect(screen.getAllByText('Accept it first, then demote it')).toHaveLength(2);
+  unmount();
+
+  renderWithProviders(
+    <NameActionMenu pid={3} usage={{ ...usage, status: 'SYNONYM' }} canEdit onSelect={() => {}} />,
+  );
+  await userEvent.click(screen.getByLabelText('Actions'));
+  await userEvent.click(await screen.findByText('Change status'));
+  expect((await screen.findByText('Unassessed')).closest('button')).toBeDisabled();
+  expect(screen.getByText('Promote it first')).toBeInTheDocument();
+  expect(screen.getByText('Misapplied').closest('button')).toBeEnabled();
+  expect(screen.getByText('Accepted').closest('button')).toBeEnabled();
+});
+
 test('add-child/add-synonym are hidden for a non-accepted usage (backend 400s both)', async () => {
   renderWithProviders(
     <NameActionMenu pid={3} usage={synonymUsage} canEdit onSelect={() => {}} />,

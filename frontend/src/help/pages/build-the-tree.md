@@ -46,7 +46,7 @@ What the menu offers depends on the name's status:
 | **Bulk add…** | accepted | [Paste many names at once](#bulk-add-names) |
 | **Find homotypic conflicts** | accepted | [Scan the subtree for homotypic conflicts](/help/synonyms#homotypic-conflicts) |
 | **Add accepted name…** | synonym, misapplied | [Make it pro parte](/help/synonyms#pro-parte-synonyms) |
-| **Change status** | all | Switch status. Accepted to synonym opens [Demote](/help/synonyms#demote-a-name), synonym to accepted opens [Promote](/help/synonyms#promote-a-synonym) |
+| **Change status** | all | Switch status. Accepted to synonym opens [Demote](/help/synonyms#demote-a-name), synonym to accepted opens [Promote](/help/synonyms#promote-a-synonym). An unassessed name must be accepted before it can be demoted, and a synonym promoted before it can be made unassessed |
 | **Accept subtree…** | accepted, unassessed | [Accept every unassessed name below](#accept-unassessed-names) |
 | **Delete** | all | [Delete the name](#delete-a-name) |
 

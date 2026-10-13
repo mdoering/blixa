@@ -29,6 +29,16 @@ const STATUS_OPTIONS = [
   { value: 'UNASSESSED', label: 'Unassessed' },
 ];
 
+// Unassessed <-> synonym/misapplied would move a name between the tree and a synonymy in one
+// step, which only Demote (from accepted) and Promote (to accepted) do -- the server rejects it.
+// Returns the hint shown on the disabled option, or null when the change is allowed.
+export function blockedStatusHint(from: string | null | undefined, to: string): string | null {
+  const synonymLike = (s: string | null | undefined) => s === 'SYNONYM' || s === 'MISAPPLIED';
+  if (from === 'UNASSESSED' && synonymLike(to)) return 'Accept it first, then demote it';
+  if (synonymLike(from) && to === 'UNASSESSED') return 'Promote it first';
+  return null;
+}
+
 // The minimal shape needed for the actions below -- both TreeNode and NameUsage satisfy this.
 export interface NameActionMenuUsage {
   id: number;
@@ -191,15 +201,23 @@ export default function NameActionMenu({
               </Menu.Item>
             </Menu.Target>
             <Menu.Dropdown>
-              {STATUS_OPTIONS.map((s) => (
-                <Menu.Item
-                  key={s.value}
-                  disabled={usage.status === s.value}
-                  onClick={() => onStatusClick(s.value)}
-                >
-                  {s.label}
-                </Menu.Item>
-              ))}
+              {STATUS_OPTIONS.map((s) => {
+                const hint = blockedStatusHint(usage.status, s.value);
+                return (
+                  <Menu.Item
+                    key={s.value}
+                    disabled={usage.status === s.value || hint != null}
+                    onClick={() => onStatusClick(s.value)}
+                  >
+                    {s.label}
+                    {hint && (
+                      <Text size="xs" c="dimmed">
+                        {hint}
+                      </Text>
+                    )}
+                  </Menu.Item>
+                );
+              })}
             </Menu.Dropdown>
           </Menu>
           {isTaxon && (
