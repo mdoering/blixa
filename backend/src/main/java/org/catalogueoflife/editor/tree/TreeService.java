@@ -1,13 +1,16 @@
 package org.catalogueoflife.editor.tree;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.catalogueoflife.editor.audit.AuditService;
 import org.catalogueoflife.editor.audit.Operation;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.Pagination;
+import org.catalogueoflife.editor.name.homotypy.SynonymyMapper;
 import org.catalogueoflife.editor.name.Status;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
@@ -31,9 +34,11 @@ public class TreeService {
   private final AuditService audit;
   private final ObjectMapper objectMapper;
   private final ApplicationEventPublisher events;
+  private final SynonymyMapper synonymy;
 
   public TreeService(TreeMapper tree, NameUsageMapper usages, ProjectService projects, AuditService audit,
-      ObjectMapper objectMapper, ApplicationEventPublisher events) {
+      ObjectMapper objectMapper, ApplicationEventPublisher events, SynonymyMapper synonymy) {
+    this.synonymy = synonymy;
     this.tree = tree;
     this.usages = usages;
     this.projects = projects;
@@ -57,22 +62,26 @@ public class TreeService {
   }
 
   // Builds the accepted subtree rooted at rootId (root included) as a TextTree node tree, each
-  // accepted taxon's synonyms nested beneath it (heterotypic `=` for now; homotypic `≡` refinement
-  // is a follow-up). Any project member may read; 404 if rootId is not an accepted taxon here. The
-  // controller streams the returned root via SubtreeTxtree (see TreeController#subtreeTxtree).
+  // accepted taxon's synonyms nested beneath it: `≡` for those homotypic with it (its homotypic
+  // name-relation closure, as on the Synonyms tab), `=` for the rest; extinct taxa get `†`. Any
+  // project member may read; 404 if rootId is not an accepted taxon here. The controller streams
+  // the returned root via SubtreeTxtree (see TreeController#subtreeTxtree).
   public SimpleTreeNode buildSubtree(int actorId, int projectId, int rootId) {
     projects.requireRole(actorId, projectId);
     List<SubtreeRow> rows = tree.subtreeUsages(projectId, rootId);
     Map<Integer, SimpleTreeNode> byId = new LinkedHashMap<>();
     SimpleTreeNode root = null;
     for (SubtreeRow r : rows) {
-      SimpleTreeNode node = new SimpleTreeNode(
-          r.id(), label(r.scientificName(), r.authorship()), r.rank(), false, false, false, false);
+      SimpleTreeNode node = new SimpleTreeNode(r.id(), label(r.scientificName(), r.authorship()),
+          r.rank(), Boolean.TRUE.equals(r.extinct()), false, false, false);
       byId.put(r.id(), node);
-      for (NameUsage syn : usages.findSynonymsOfAccepted(projectId, r.id())) {
+      List<NameUsage> syns = usages.findSynonymsOfAccepted(projectId, r.id());
+      Set<Integer> homotypic = syns.isEmpty()
+          ? Set.of() : new HashSet<>(synonymy.homotypicClosure(projectId, r.id()));
+      for (NameUsage syn : syns) {
         node.synonyms.add(new SimpleTreeNode(syn.getId(),
             label(syn.getScientificName(), syn.getAuthorship()), syn.getRank(),
-            false, false, false, false));
+            false, false, homotypic.contains(syn.getId()), false));
       }
       if (r.id() == rootId) {
         root = node;

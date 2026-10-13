@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.catalogueoflife.editor.child.NameRelationService;
+import org.catalogueoflife.editor.child.dto.NameRelationRequest;
 import org.catalogueoflife.editor.merge.NameMatcher;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
@@ -43,16 +45,18 @@ public class BulkInsertService {
   private final ProjectMapper projectMapper;
   private final NameParserService parser;
   private final TreeMapper tree;
+  private final NameRelationService relations;
 
   public BulkInsertService(NameUsageService usageService, NameUsageMapper usages,
       ProjectService projects, ProjectMapper projectMapper, NameParserService parser,
-      TreeMapper tree) {
+      TreeMapper tree, NameRelationService relations) {
     this.usageService = usageService;
     this.usages = usages;
     this.projects = projects;
     this.projectMapper = projectMapper;
     this.parser = parser;
     this.tree = tree;
+    this.relations = relations;
   }
 
   public BulkPreviewResponse preview(int userId, int projectId, BulkInsertRequest req) {
@@ -152,6 +156,10 @@ public class BulkInsertService {
       for (SimpleTreeNode s : n.synonyms) {
         int synId = createUsage(userId, projectId, s, "SYNONYM", null, nomCode);
         usageService.linkSynonym(userId, projectId, synId, id);
+        if (s.homotypic) { // "≡": homotypic with its accepted name
+          relations.create(userId, projectId, synId,
+              new NameRelationRequest(id, "homotypic", null, null, null, null));
+        }
         counts[0]++;
         counts[1]++;
       }
@@ -161,12 +169,14 @@ public class BulkInsertService {
 
   // Builds a CreateNameUsageRequest and delegates to NameUsageService.create. Rank is pre-resolved
   // to a non-blank value (create requires @NotBlank rank): the [rank] suffix if present, else the
-  // parser-inferred rank, else "unranked".
+  // parser-inferred rank, else "unranked". A TextTree line carries the authorship after the name;
+  // it is split off into the authorship field.
   private int createUsage(int userId, int projectId, SimpleTreeNode node, String status,
       Integer parentId, NomCode nomCode) {
     String rank = effectiveRank(node, nomCode);
+    NameParserService.NameAndAuthorship na = parser.splitAuthorship(node.name, node.rank, nomCode);
     CreateNameUsageRequest r = new CreateNameUsageRequest(
-        node.name, null, rank, status, parentId,
+        na.name(), na.authorship(), rank, status, parentId,
         null, null, null, null, null, null, null,
         null, // genderAgreement
         node.extinct ? Boolean.TRUE : null,
@@ -244,8 +254,10 @@ public class BulkInsertService {
   NameUsage toUsage(int projectId, int userId, SimpleTreeNode node, Status status,
       Integer parentId, NomCode nomCode) {
     NameUsage u = new NameUsage();
+    NameParserService.NameAndAuthorship na = parser.splitAuthorship(node.name, node.rank, nomCode);
     u.setProjectId(projectId);
-    u.setScientificName(node.name);
+    u.setScientificName(na.name());
+    u.setAuthorship(na.authorship());
     u.setRank(node.rank);
     u.setStatus(status);
     u.setParentId(parentId);

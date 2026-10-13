@@ -185,4 +185,25 @@ class NameParserServiceTest {
 
     assertEquals("BOLD:AAA0001", fallback);
   }
+
+  @Test
+  void splitAuthorshipTakesTheTrailingAuthorshipVerbatim() {
+    assertEquals(new NameParserService.NameAndAuthorship("Panthera leo", "(Linnaeus, 1758)"),
+        service.splitAuthorship("Panthera leo (Linnaeus, 1758)", null, NomCode.ZOOLOGICAL));
+    assertEquals(new NameParserService.NameAndAuthorship("Abies alba", "Mill."),
+        service.splitAuthorship("Abies alba Mill.", "species", NomCode.BOTANICAL));
+    assertEquals(
+        new NameParserService.NameAndAuthorship("Abies alba subsp. nebrodensis", "(Mattei) Mattei"),
+        service.splitAuthorship("Abies alba subsp. nebrodensis (Mattei) Mattei", null, null));
+    assertEquals(new NameParserService.NameAndAuthorship("Felidae", "Fischer de Waldheim, 1817"),
+        service.splitAuthorship("Felidae Fischer de Waldheim, 1817", "family", NomCode.ZOOLOGICAL));
+  }
+
+  @Test
+  void splitAuthorshipLeavesNamesWithoutAuthorshipWhole() {
+    assertEquals(new NameParserService.NameAndAuthorship("Panthera leo", null),
+        service.splitAuthorship("Panthera leo", null, null));
+    assertEquals(new NameParserService.NameAndAuthorship("Felis sp. \"Bornean form\"", null),
+        service.splitAuthorship("Felis sp. \"Bornean form\"", null, null));
+  }
 }

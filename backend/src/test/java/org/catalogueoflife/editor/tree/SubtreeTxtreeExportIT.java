@@ -49,9 +49,15 @@ class SubtreeTxtreeExportIT extends AbstractPostgresIT {
 
   private long createUsage(long pid, String name, String authorship, String rank, String stat,
       Long parentId) throws Exception {
+    return createUsage(pid, name, authorship, rank, stat, parentId, false);
+  }
+
+  private long createUsage(long pid, String name, String authorship, String rank, String stat,
+      Long parentId, boolean extinct) throws Exception {
     String content = "{\"scientificName\":\"" + name + "\",\"authorship\":\"" + authorship
         + "\",\"rank\":\"" + rank + "\",\"status\":\"" + stat + "\""
-        + (parentId != null ? ",\"parentId\":" + parentId : "") + "}";
+        + (parentId != null ? ",\"parentId\":" + parentId : "")
+        + (extinct ? ",\"extinct\":true" : "") + "}";
     String body = mvc.perform(post("/api/projects/" + pid + "/usages").with(csrf())
             .contentType(MediaType.APPLICATION_JSON).content(content))
         .andExpect(status().isCreated())
@@ -98,5 +104,60 @@ class SubtreeTxtreeExportIT extends AbstractPostgresIT {
     mvc.perform(get("/api/projects/" + pid + "/tree/" + genus + "/subtree.txtree")
             .with(user("txStranger")))
         .andExpect(status().is4xxClientError());
+  }
+
+  // Download subtree -> Bulk add brings back the authorship (in its own field), the extinct flag
+  // ("†") and which synonyms are homotypic ("≡").
+  @Test
+  @WithMockUser(username = "txRound")
+  void roundTripsAuthorshipExtinctAndHomotypicSynonyms() throws Exception {
+    ensureUser("txRound");
+    long pid = createProject("txtreeround");
+    long genus = createUsage(pid, "Aus", "", "genus", "accepted", null);
+    long species = createUsage(pid, "Aus bus", "(L.) Mill.", "species", "accepted", genus, true);
+    long basionym = createUsage(pid, "Bus bus", "L.", "species", "synonym", null);
+    long hetero = createUsage(pid, "Aus vetus", "Mill.", "species", "synonym", null);
+    for (long syn : new long[] {basionym, hetero}) {
+      mvc.perform(put("/api/projects/" + pid + "/usages/" + syn + "/synonym-of/" + species).with(csrf()))
+          .andExpect(status().isNoContent());
+    }
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + species + "/relations").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"relatedUsageId\":" + basionym + ",\"type\":\"basionym\"}"))
+        .andExpect(status().is2xxSuccessful());
+
+    String txt = mvc.perform(get("/api/projects/" + pid + "/tree/" + genus + "/subtree.txtree"))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    SimpleTreeNode sp = Tree.simple(new ByteArrayInputStream(txt.getBytes(StandardCharsets.UTF_8)))
+        .getRoot().get(0).children.get(0);
+    assertThat(sp.extinct).isTrue();
+    assertThat(sp.synonyms).anyMatch(s -> s.name.equals("Bus bus L.") && s.homotypic);
+    assertThat(sp.synonyms).anyMatch(s -> s.name.equals("Aus vetus Mill.") && !s.homotypic);
+
+    // re-import the download under a new root
+    long root = createUsage(pid, "Copy", "", "genus", "accepted", null);
+    mvc.perform(post("/api/projects/" + pid + "/usages/bulk").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(java.util.Map.of(
+                "targetId", root, "mode", "children", "text", txt))))
+        .andExpect(status().isOk());
+    long copyGenus = json.readTree(mvc.perform(get("/api/projects/" + pid + "/tree/children/" + root))
+        .andReturn().getResponse().getContentAsString()).get(0).get("id").asLong();
+    long copy = json.readTree(mvc.perform(get("/api/projects/" + pid + "/tree/children/" + copyGenus))
+        .andReturn().getResponse().getContentAsString()).get(0).get("id").asLong();
+    String usage = mvc.perform(get("/api/projects/" + pid + "/usages/" + copy))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    assertThat(json.readTree(usage).get("scientificName").asString()).isEqualTo("Aus bus");
+    assertThat(json.readTree(usage).get("authorship").asString()).isEqualTo("(L.) Mill.");
+    assertThat(json.readTree(usage).get("extinct").asBoolean()).isTrue();
+    String synonymy = mvc.perform(get("/api/projects/" + pid + "/usages/" + copy + "/synonymy"))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    assertThat(json.readTree(synonymy).get("homotypic")).hasSize(1);
+    assertThat(json.readTree(synonymy).get("homotypic").get(0).get("scientificName").asString())
+        .isEqualTo("Bus bus");
+    assertThat(json.readTree(synonymy).get("heterotypicGroups")).hasSize(1);
   }
 }

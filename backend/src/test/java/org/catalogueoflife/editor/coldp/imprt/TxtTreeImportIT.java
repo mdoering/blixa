@@ -70,7 +70,8 @@ class TxtTreeImportIT extends AbstractPostgresIT {
   @WithMockUser(username = "ttImp")
   void importsTextTreeAsStagingProject() throws Exception {
     ensureUser("ttImp");
-    String tree = "Panthera [genus]\n  Panthera leo [species]\n    =Felis leo\n";
+    String tree = "Panthera [genus]\n  Panthera leo (Linnaeus, 1758) [species]\n"
+        + "    ≡Felis leo Linnaeus, 1758\n";
     MockMultipartFile file = new MockMultipartFile("file", "cats.txtree",
         "text/plain", tree.getBytes(StandardCharsets.UTF_8));
 
@@ -107,6 +108,8 @@ class TxtTreeImportIT extends AbstractPostgresIT {
       } else if ("Panthera leo".equals(name)) {
         leoId = item.get("id").asInt();
         assertThat(item.get("status").asString()).isEqualTo("ACCEPTED");
+        // the authorship written after the name lands in its own field
+        assertThat(item.get("authorship").asString()).isEqualTo("(Linnaeus, 1758)");
       }
     }
     assertThat(pantheraId).as("Panthera root usage").isNotNull();
@@ -127,5 +130,11 @@ class TxtTreeImportIT extends AbstractPostgresIT {
     JsonNode synonyms = json.readTree(synonymsBody);
     assertThat(synonyms.size()).isEqualTo(1);
     assertThat(synonyms.get(0).get("scientificName").asString()).isEqualTo("Felis leo");
+
+    // "≡" made it homotypic with the accepted name
+    mvc.perform(get("/api/projects/" + projectId + "/usages/" + leoId + "/synonymy"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.homotypic[0].scientificName").value("Felis leo"))
+        .andExpect(jsonPath("$.homotypic[0].authorship").value("Linnaeus, 1758"));
   }
 }

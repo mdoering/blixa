@@ -113,9 +113,11 @@ public interface TreeMapper {
         FROM name_usage n JOIN sub ON n.project_id = sub.project_id AND n.parent_id = sub.id
         WHERE n.status = 'ACCEPTED' AND sub.depth < 10000
       )
-      SELECT id, parent_id AS parentId, scientific_name AS scientificName, authorship, rank
+      SELECT sub.id, sub.parent_id AS parentId, sub.scientific_name AS scientificName,
+             sub.authorship, sub.rank, ti.extinct
       FROM sub
-      ORDER BY depth, ordinal NULLS LAST, scientific_name
+      LEFT JOIN taxon_info ti ON ti.project_id = sub.project_id AND ti.usage_id = sub.id
+      ORDER BY sub.depth, sub.ordinal NULLS LAST, sub.scientific_name
       """)
   List<SubtreeRow> subtreeUsages(@Param("projectId") int projectId, @Param("rootId") int rootId);
 

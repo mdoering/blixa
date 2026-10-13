@@ -36,10 +36,10 @@ has one subspecies.
 ## Lines and names
 
 - Put **one name per line**. Save files as UTF-8.
-- You can write the **authorship** after the name, as in the examples on this page. Blixa parses
-  the authors and year, but it stores the whole text in the **Scientific name** field and leaves
-  **Authorship** empty. If you need the authorship in its own field, move it there afterwards (see
-  [The Details tab](/help/edit-names#the-details-tab)), or leave authorship out of the TextTree.
+- You can write the **authorship** after the name, as in the examples on this page. Blixa splits
+  it off into the **Authorship** field, so `Panthera leo (Linnaeus, 1758)` becomes the name
+  *Panthera leo* with the authorship *(Linnaeus, 1758)*. A name Blixa can't parse is kept whole as
+  the **Scientific name**.
 - **Empty lines** are skipped. A line that contains **only spaces** is rejected as an error, so
   delete such lines.
 - A name must be at least two characters long.
@@ -74,9 +74,10 @@ indented properly on line 4. Use 2 spaces only* or *Use 2 spaces for children*.
 
 - Put `=` before a synonym and indent it one level under its accepted name. The space after `=`
   is optional.
-- `≡` (homotypic synonym) and the older `*` also mark a synonym. Blixa reads `≡` as an ordinary
-  synonym and doesn't record that it is homotypic. To record homotypy, use **Group synonyms**
-  afterwards (see [Group synonyms](/help/synonyms#group-synonyms)).
+- Put `≡` before a **homotypic** synonym (one based on the same type as its accepted name, such as
+  its basionym). Blixa records a *homotypic* name relation between the two, so the synonym is listed
+  in the accepted name's homotypic group (see [Group synonyms](/help/synonyms#group-synonyms)).
+  The older `*` marks an ordinary synonym, like `=`.
 - A synonym can't have children or synonyms of its own. Blixa **ignores anything indented under
   a synonym**.
 - A `=` line at the top level isn't treated as a synonym: it is added as an accepted name.
@@ -117,8 +118,9 @@ Any project member can download, including viewers. The file is named
 
 - the selected taxon and all **accepted** taxa below it, each with its authorship and `[rank]`.
   Unassessed names are left out.
-- the synonyms **and misapplied names** of each accepted taxon, written as `=` lines before its
-  children. Blixa doesn't write `≡`, `†` or any other marker yet.
+- the synonyms **and misapplied names** of each accepted taxon, written before its children:
+  `≡` for synonyms in the accepted name's homotypic group, `=` for all others.
+- `†` before extinct taxa.
 - the children of each taxon, in tree order.
 
 You can paste the file straight into **Bulk add…** or import it with **Import ColDP**.

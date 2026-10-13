@@ -62,6 +62,38 @@ public class NameParserService {
     }
   }
 
+  /** A scientific name and its authorship, split from one string such as a TextTree line. */
+  public record NameAndAuthorship(String name, @Nullable String authorship) {}
+
+  /**
+   * Splits a name written together with its authorship ("Panthera leo (Linnaeus, 1758)") into the
+   * bare name and the authorship, both taken verbatim from the input. The name is the shortest
+   * leading run of words that parses to the same name without any authorship; the rest is the
+   * authorship. A name without an authorship, or one the parser can't atomize, comes back whole
+   * with a null authorship.
+   */
+  public NameAndAuthorship splitAuthorship(String fullName, @Nullable String rank,
+      @Nullable NomCode nomCode) {
+    String full = fullName == null ? "" : fullName.strip();
+    Rank r = parseRank(rank);
+    var whole = parser.parse(full, null, r, nomCode).parsed();
+    if (whole.isEmpty() || !whole.get().hasAuthorship()) {
+      return new NameAndAuthorship(fullName, null);
+    }
+    String canonical = whole.get().canonicalNameWithoutAuthorship();
+    String[] words = full.split("\\s+");
+    for (int k = 1; k < words.length; k++) {
+      String head = String.join(" ", java.util.Arrays.copyOfRange(words, 0, k));
+      var p = parser.parse(head, null, r, nomCode).parsed();
+      if (p.isPresent() && !p.get().hasAuthorship()
+          && canonical.equals(p.get().canonicalNameWithoutAuthorship())) {
+        return new NameAndAuthorship(head,
+            String.join(" ", java.util.Arrays.copyOfRange(words, k, words.length)));
+      }
+    }
+    return new NameAndAuthorship(fullName, null);
+  }
+
   /**
    * Nulls out all atomized name-part and authorship fields derived from a previous parse.
    * {@code scientificName}, {@code authorship} and {@code rank} are the authoritative inputs and

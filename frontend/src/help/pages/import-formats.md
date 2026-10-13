@@ -240,8 +240,9 @@ path are created only once.
 A TextTree file (`.txtree`, `.tree`, `.txt` or `.tsv`) is an indented list of names. The full
 syntax is described in [TextTree syntax](/help/texttree). On import:
 
-- Every name is added as **Accepted** (or as a synonym if marked with `=`). Lines marked `†` are
-  flagged as extinct.
+- Every name is added as **Accepted** (or as a synonym if marked with `=` or `≡`). An authorship
+  after the name goes into the **Authorship** field, `≡` synonyms are recorded as homotypic with
+  their accepted name, and lines marked `†` are flagged as extinct.
 - The project has no metadata and no nomenclatural code. Set them on the **Project** page
   afterwards.
 - **Preserve source identifiers** isn't available.
