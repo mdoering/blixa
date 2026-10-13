@@ -1,8 +1,10 @@
 package org.catalogueoflife.editor.clb;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.web.util.UriUtils;
 
 // Parses a pasted ChecklistBank/portal URL into (datasetKey, taxonId) so the "paste a URL" import
 // entry point (Task 2/3) doesn't need the user to hunt down the raw dataset key and id themselves.
@@ -43,12 +45,22 @@ public final class ClbTaxonUrl {
     }
     Matcher m = CLB_DATASET_USAGE.matcher(s);
     if (m.matches()) {
-      return Optional.of(new ClbRef(m.group(1), m.group(2)));
+      return Optional.of(new ClbRef(m.group(1), decode(m.group(2))));
     }
     m = COL_PORTAL_TAXON.matcher(s);
     if (m.matches()) {
-      return Optional.of(new ClbRef(COL_PORTAL_DATASET, m.group(1)));
+      return Optional.of(new ClbRef(COL_PORTAL_DATASET, decode(m.group(1))));
     }
     return Optional.empty();
+  }
+
+  // Ids that are themselves URLs (iNaturalist's "https://www.inaturalist.org/taxa/42007") appear
+  // percent-encoded in the path; a malformed escape is kept as typed.
+  private static String decode(String segment) {
+    try {
+      return UriUtils.decode(segment, StandardCharsets.UTF_8);
+    } catch (IllegalArgumentException e) {
+      return segment;
+    }
   }
 }

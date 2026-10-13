@@ -93,7 +93,7 @@ class ClbImportControllerIT extends AbstractPostgresIT {
     when(clb.usageInfo(eq("3LXR"), eq("6W3C4"))).thenReturn(new UsageInfo(t));
     when(clb.datasetTitle(eq("3LXR"))).thenReturn("Catalogue of Life");
 
-    mvc.perform(get("/api/clb/3LXR/resolve/6W3C4"))
+    mvc.perform(get("/api/clb/3LXR/resolve").param("id", "6W3C4"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.datasetKey").value("3LXR"))
         .andExpect(jsonPath("$.taxonId").value("6W3C4"))
@@ -108,7 +108,7 @@ class ClbImportControllerIT extends AbstractPostgresIT {
     when(clb.usageInfo(eq("3LXR"), eq("bogus")))
         .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "CLB taxon not found"));
 
-    mvc.perform(get("/api/clb/3LXR/resolve/bogus"))
+    mvc.perform(get("/api/clb/3LXR/resolve").param("id", "bogus"))
         .andExpect(status().isNotFound());
   }
 

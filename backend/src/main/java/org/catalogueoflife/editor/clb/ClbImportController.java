@@ -140,8 +140,11 @@ public class ClbImportController {
   }
 
   // The CLB side of a focal-taxon comparison: name/authorship/rank/status + classification + synonyms.
-  @GetMapping("/api/clb/{datasetKey}/compare/{taxonId}")
-  public ClbComparison compare(@PathVariable String datasetKey, @PathVariable String taxonId) {
+  // The taxon id is a query parameter, not a path segment: some datasets use URLs as ids (iNaturalist's
+  // "https://www.inaturalist.org/taxa/42007"), and an encoded slash in the path is rejected by Apache
+  // and Tomcat before it ever reaches us.
+  @GetMapping("/api/clb/{datasetKey}/compare")
+  public ClbComparison compare(@PathVariable String datasetKey, @RequestParam("id") String taxonId) {
     currentUser.require();
     return compareService.compare(datasetKey, taxonId);
   }
@@ -149,9 +152,9 @@ public class ClbImportController {
   // Resolves a pasted URL's (datasetKey, taxonId) (see ClbTaxonUrl.parse, run client-side first for
   // instant feedback) to a light {@link ClbResolvedTaxon} just so the modal can show what it's about
   // to import -- 404 (from ClbImportClient.usageInfo, "no such taxon in that dataset") propagates
-  // straight through unchanged.
-  @GetMapping("/api/clb/{datasetKey}/resolve/{taxonId}")
-  public ClbResolvedTaxon resolve(@PathVariable String datasetKey, @PathVariable String taxonId) {
+  // straight through unchanged. The taxon id is a query parameter for the same reason as in compare.
+  @GetMapping("/api/clb/{datasetKey}/resolve")
+  public ClbResolvedTaxon resolve(@PathVariable String datasetKey, @RequestParam("id") String taxonId) {
     currentUser.require();
     UsageInfo info = client.usageInfo(datasetKey, taxonId);
     NameUsageBase usage = info.getUsage();

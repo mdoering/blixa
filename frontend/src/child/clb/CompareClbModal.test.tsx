@@ -63,7 +63,7 @@ test('picks a global CLB hit and shows the side-by-side comparison', async () =>
         },
       ]),
     ),
-    http.get('/api/clb/3LXR/compare/6W3C4', () => HttpResponse.json(clbComparison)),
+    http.get('/api/clb/3LXR/compare', () => HttpResponse.json(clbComparison)),
     http.get('/api/clb/dataset-labels', () => HttpResponse.json({ '3LXR': 'COL' })),
   );
 
@@ -77,6 +77,31 @@ test('picks a global CLB hit and shows the side-by-side comparison', async () =>
   expect(screen.getByText('(Linnaeus, 1758)')).toBeInTheDocument();
   // classification from both sides
   expect(screen.getAllByText(/Felidae/).length).toBeGreaterThan(0);
+});
+
+test('a taxon id that is a URL (iNaturalist) is sent as the id query parameter, not a path segment', async () => {
+  const inatId = 'https://www.inaturalist.org/taxa/42007';
+  let sent: string | null = null;
+  server.use(
+    http.get('/api/projects/3', () => HttpResponse.json({ id: 3, role: 'editor', favoriteClbDatasets: [] })),
+    http.get('/api/projects/3/usages/5', () => HttpResponse.json(usage)),
+    http.get('/api/projects/3/tree/path/5', () => HttpResponse.json([])),
+    http.get('/api/projects/3/usages/5/synonyms', () => HttpResponse.json([])),
+    http.get('/api/clb/usages', () =>
+      HttpResponse.json([
+        { datasetKey: '139831', datasetTitle: 'iNaturalist', id: inatId, scientificName: 'Panthera leo', authorship: '(Linnaeus, 1758)', rank: 'species', status: 'accepted' },
+      ]),
+    ),
+    http.get('/api/clb/dataset-labels', () => HttpResponse.json({ '139831': 'iNat' })),
+    http.get('/api/clb/139831/compare', ({ request }) => {
+      sent = new URL(request.url).searchParams.get('id');
+      return HttpResponse.json({ ...clbComparison, datasetKey: '139831', taxonId: inatId });
+    }),
+  );
+  renderWithProviders(<CompareClbModal pid={3} usageId={5} opened onClose={() => {}} />);
+  await userEvent.click(await screen.findByText(/Panthera leo \(Linnaeus, 1758\)/));
+  expect(await screen.findByText('Mill.')).toBeInTheDocument();
+  expect(sent).toBe(inatId);
 });
 
 test('global hits show each dataset by its alias (one batched label lookup), never the raw key', async () => {
@@ -130,7 +155,7 @@ test('by dataset: pick a dataset, then click a name hit to compare; no hits show
           : [],
       );
     }),
-    http.get('/api/clb/3LXR/compare/6W3C4', () => HttpResponse.json(clbComparison)),
+    http.get('/api/clb/3LXR/compare', () => HttpResponse.json(clbComparison)),
     http.get('/api/clb/dataset-labels', () => HttpResponse.json({ '3LXR': 'COL' })),
   );
   renderWithProviders(<CompareClbModal pid={3} usageId={5} opened onClose={() => {}} />);
@@ -164,7 +189,7 @@ test('a failing comparison shows the error instead of an empty pane', async () =
       ]),
     ),
     http.get('/api/clb/dataset-labels', () => HttpResponse.json({ '9': 'X' })),
-    http.get('/api/clb/9/compare/t1', () =>
+    http.get('/api/clb/9/compare', () =>
       HttpResponse.json({ error: 'This ChecklistBank dataset is private' }, { status: 403 }),
     ),
   );
@@ -185,7 +210,7 @@ test('comparing a CLB synonym shows its accepted name', async () => {
       ]),
     ),
     http.get('/api/clb/dataset-labels', () => HttpResponse.json({ '3LXR': 'COL' })),
-    http.get('/api/clb/3LXR/compare/CFSCR', () =>
+    http.get('/api/clb/3LXR/compare', () =>
       HttpResponse.json({
         ...clbComparison,
         taxonId: 'CFSCR',
@@ -233,7 +258,7 @@ test('copying a CLB synonym posts it to clb-copy; copying a value hands it to th
       ]),
     ),
     http.get('/api/clb/dataset-labels', () => HttpResponse.json({ '3LXR': 'COL' })),
-    http.get('/api/clb/3LXR/compare/6W3C4', () =>
+    http.get('/api/clb/3LXR/compare', () =>
       HttpResponse.json({
         ...clbComparison,
         synonyms: [{ scientificName: 'Felis leo', authorship: 'L.', status: 'SYNONYM', id: 'S1' }],

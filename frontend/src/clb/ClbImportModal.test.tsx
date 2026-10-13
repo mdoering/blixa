@@ -15,7 +15,7 @@ function renderModal() {
 
 test('pasting a valid CLB taxon URL resolves and shows the taxon name', async () => {
   server.use(
-    http.get('/api/clb/3LXR/resolve/6W3C4', () =>
+    http.get('/api/clb/3LXR/resolve', () =>
       HttpResponse.json({
         datasetKey: '3LXR',
         taxonId: '6W3C4',
@@ -117,7 +117,7 @@ test('search path: picking a dataset, then a taxon (with a rank filter), posts t
 test('UPDATE_FOCAL reveals the entity-type checkboxes, all checked by default; unchecking one ' +
   'is reflected in the posted entityTypes', async () => {
   server.use(
-    http.get('/api/clb/3LXR/resolve/6W3C4', () =>
+    http.get('/api/clb/3LXR/resolve', () =>
       HttpResponse.json({
         datasetKey: '3LXR',
         taxonId: '6W3C4',
@@ -184,7 +184,7 @@ test('UPDATE_FOCAL reveals the entity-type checkboxes, all checked by default; u
 test('a successful import posts {datasetKey, sourceTaxonId, mode} (no entityTypes for TAXON_SUBTREE) ' +
   'and renders the summary', async () => {
   server.use(
-    http.get('/api/clb/3LXR/resolve/6W3C4', () =>
+    http.get('/api/clb/3LXR/resolve', () =>
       HttpResponse.json({
         datasetKey: '3LXR',
         taxonId: '6W3C4',
@@ -233,7 +233,7 @@ test('a successful import posts {datasetKey, sourceTaxonId, mode} (no entityType
 
 test('a failed import shows the error message', async () => {
   server.use(
-    http.get('/api/clb/3LXR/resolve/6W3C4', () =>
+    http.get('/api/clb/3LXR/resolve', () =>
       HttpResponse.json({
         datasetKey: '3LXR',
         taxonId: '6W3C4',

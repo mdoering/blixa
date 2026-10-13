@@ -85,4 +85,17 @@ class ClbTaxonUrlTest {
   void nullIsEmpty() {
     assertThat(ClbTaxonUrl.parse(null)).isEmpty();
   }
+
+  @Test
+  void percentEncodedUrlIdIsDecoded() {
+    assertThat(ClbTaxonUrl.parse(
+        "https://www.checklistbank.org/dataset/139831/taxon/https%3A%2F%2Fwww.inaturalist.org%2Ftaxa%2F42007"))
+        .contains(new ClbRef("139831", "https://www.inaturalist.org/taxa/42007"));
+  }
+
+  @Test
+  void malformedEscapeIsKeptAsTyped() {
+    assertThat(ClbTaxonUrl.parse("https://www.checklistbank.org/dataset/3LXR/taxon/6D%ZZ"))
+        .contains(new ClbRef("3LXR", "6D%ZZ"));
+  }
 }

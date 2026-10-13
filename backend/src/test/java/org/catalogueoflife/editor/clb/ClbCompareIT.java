@@ -70,7 +70,7 @@ class ClbCompareIT extends AbstractPostgresIT {
     when(clb.usageInfo(eq("3LXR"), eq("6W3C4"))).thenReturn(info);
     when(clb.datasetTitle(eq("3LXR"))).thenReturn("Catalogue of Life");
 
-    mvc.perform(get("/api/clb/3LXR/compare/6W3C4"))
+    mvc.perform(get("/api/clb/3LXR/compare").param("id", "6W3C4"))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.datasetKey").value("3LXR"))
        .andExpect(jsonPath("$.datasetTitle").value("Catalogue of Life"))
@@ -125,7 +125,28 @@ class ClbCompareIT extends AbstractPostgresIT {
         .thenThrow(new org.springframework.web.server.ResponseStatusException(
             org.springframework.http.HttpStatus.FORBIDDEN, "This ChecklistBank dataset is private"));
 
-    mvc.perform(get("/api/clb/310869/compare/4457929")).andExpect(status().isForbidden());
+    mvc.perform(get("/api/clb/310869/compare").param("id", "4457929")).andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(username = "cmpUser4b")
+  void compareATaxonWhoseIdIsAUrl() throws Exception {
+    ensureUser("cmpUser4b");
+    String inatId = "https://www.inaturalist.org/taxa/42007";
+    Name n = new Name();
+    n.setScientificName("Puma concolor");
+    n.setRank(Rank.SPECIES);
+    Taxon t = new Taxon(n);
+    t.setId(inatId);
+    t.setStatus(TaxonomicStatus.ACCEPTED);
+    when(clb.usageInfo(eq("139831"), eq(inatId))).thenReturn(new UsageInfo(t));
+    when(clb.datasetTitle(eq("139831"))).thenReturn("iNaturalist");
+
+    mvc.perform(get("/api/clb/139831/compare").param("id", inatId))
+       .andExpect(status().isOk())
+       .andExpect(jsonPath("$.taxonId").value(inatId))
+       .andExpect(jsonPath("$.link").value(
+           "https://www.checklistbank.org/dataset/139831/taxon/https:%2F%2Fwww.inaturalist.org%2Ftaxa%2F42007"));
   }
 
   @Test
@@ -149,7 +170,7 @@ class ClbCompareIT extends AbstractPostgresIT {
     when(clb.usageInfo(eq("3LXR"), eq("CFSCR"))).thenReturn(new UsageInfo(syn));
     when(clb.datasetTitle(eq("3LXR"))).thenReturn("Catalogue of Life");
 
-    mvc.perform(get("/api/clb/3LXR/compare/CFSCR"))
+    mvc.perform(get("/api/clb/3LXR/compare").param("id", "CFSCR"))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.scientificName").value("Felis leo"))
        .andExpect(jsonPath("$.status").value("SYNONYM"))
@@ -200,7 +221,7 @@ class ClbCompareIT extends AbstractPostgresIT {
     when(clb.usageInfo(eq("3LXR"), eq("6DBT"))).thenReturn(info);
     when(clb.datasetTitle(eq("3LXR"))).thenReturn("Catalogue of Life");
 
-    mvc.perform(get("/api/clb/3LXR/compare/6DBT"))
+    mvc.perform(get("/api/clb/3LXR/compare").param("id", "6DBT"))
        .andExpect(status().isOk())
        .andExpect(jsonPath("$.etymology").value("from Greek panther"))
        .andExpect(jsonPath("$.gender").value("feminine"))

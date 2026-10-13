@@ -29,10 +29,20 @@ export function parseClbUrl(url: string): ClbRef | null {
   const s = url.trim();
   if (!s) return null;
   let m = CLB_DATASET_USAGE.exec(s);
-  if (m) return { datasetKey: m[1], taxonId: m[2] };
+  if (m) return { datasetKey: m[1], taxonId: decodeSegment(m[2]) };
   m = COL_PORTAL_TAXON.exec(s);
-  if (m) return { datasetKey: COL_PORTAL_DATASET, taxonId: m[1] };
+  if (m) return { datasetKey: COL_PORTAL_DATASET, taxonId: decodeSegment(m[1]) };
   return null;
+}
+
+// Ids that are themselves URLs (iNaturalist's "https://www.inaturalist.org/taxa/42007") appear
+// percent-encoded in the path; a malformed escape is kept as typed.
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
 }
 
 // --- suggest proxy (mirrors ClbImportClient's own hit shapes) --------------------------------
@@ -106,7 +116,7 @@ export function searchClbUsages(datasetKey: string, q: string, rank?: string): P
 
 export function resolveClbTaxon(datasetKey: string, taxonId: string): Promise<ClbResolvedTaxon> {
   return api<ClbResolvedTaxon>(
-    `/api/clb/${encodeURIComponent(datasetKey)}/resolve/${encodeURIComponent(taxonId)}`,
+    `/api/clb/${encodeURIComponent(datasetKey)}/resolve?id=${encodeURIComponent(taxonId)}`,
   );
 }
 
@@ -262,9 +272,11 @@ export function searchClbAllDatasets(q: string, rank?: string): Promise<ClbGloba
   return api<ClbGlobalUsageHit[]>(`/api/clb/usages?${search.toString()}`);
 }
 
+// The taxon id goes in the query, not the path: ids can be URLs, and Apache/Tomcat reject an encoded
+// slash in the path.
 export function compareClbTaxon(datasetKey: string, taxonId: string): Promise<ClbComparison> {
   return api<ClbComparison>(
-    `/api/clb/${encodeURIComponent(datasetKey)}/compare/${encodeURIComponent(taxonId)}`,
+    `/api/clb/${encodeURIComponent(datasetKey)}/compare?id=${encodeURIComponent(taxonId)}`,
   );
 }
 

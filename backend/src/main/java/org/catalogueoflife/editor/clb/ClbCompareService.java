@@ -1,5 +1,6 @@
 package org.catalogueoflife.editor.clb;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -23,6 +24,7 @@ import org.catalogueoflife.editor.clb.dto.ClbTypeMaterial;
 import org.catalogueoflife.editor.clb.dto.ClbSynonym;
 import org.catalogueoflife.editor.clb.dto.ClbVernacular;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriUtils;
 
 // Builds the CLB side of a focal-taxon comparison from a fetched UsageInfo (name/authorship/rank/
 // status + higher classification + flattened synonyms), and proxies the all-datasets name search.
@@ -72,7 +74,8 @@ public class ClbCompareService {
       acceptedName = label(s.getAccepted().getName());
     }
     String link = "https://www.checklistbank.org/dataset/" + datasetKey
-        + (u instanceof Synonym ? "/nameusage/" : "/taxon/") + u.getId();
+        + (u instanceof Synonym ? "/nameusage/" : "/taxon/")
+        + UriUtils.encodePathSegment(u.getId(), StandardCharsets.UTF_8);
 
     List<ClbRankName> classification = new ArrayList<>();
     if (info.getClassification() != null) {
