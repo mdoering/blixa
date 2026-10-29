@@ -19,6 +19,7 @@ import life.catalogue.api.model.Synonym;
 import life.catalogue.api.model.Synonymy;
 import life.catalogue.api.model.Taxon;
 import life.catalogue.api.model.TaxonProperty;
+import life.catalogue.api.model.TypeDesignation;
 import life.catalogue.api.model.TypeMaterial;
 import life.catalogue.api.model.UsageInfo;
 import life.catalogue.api.model.VernacularName;
@@ -256,9 +257,8 @@ class ClbUsageMapperTest {
   @Test
   void mapsTypeMaterialIncludingUnparseableCoordinates() {
     TypeMaterial tm = new TypeMaterial();
-    tm.setNameId("N1");
+    tm.addName("N1", TypeStatus.HOLOTYPE);
     tm.setCitation("citation text");
-    tm.setStatus(TypeStatus.HOLOTYPE);
     tm.setInstitutionCode("NHM");
     tm.setCatalogNumber("12345");
     tm.setCountry(Country.GERMANY);
@@ -272,7 +272,7 @@ class ClbUsageMapperTest {
     tm.setLatitude("52.5");
     tm.setLongitude("not-a-number");
 
-    var mapped = ClbUsageMapper.toTypeMaterialRequest(tm);
+    var mapped = ClbUsageMapper.toTypeMaterialRequest(TypeDesignation.of("N1", tm));
     assertThat(mapped.request().citation()).isEqualTo("citation text");
     assertThat(mapped.request().status()).isEqualTo("holotype");
     assertThat(mapped.request().institutionCode()).isEqualTo("NHM");
@@ -399,9 +399,9 @@ class ClbUsageMapperTest {
     info.setProperties(List.of(tp));
 
     TypeMaterial tm = new TypeMaterial();
-    tm.setNameId("N1");
+    tm.addName("N1", null);
     tm.setCitation("type citation");
-    info.setTypeMaterial(Map.of("N1", List.of(tm)));
+    info.setTypeMaterial(Map.of("N1", List.of(TypeDesignation.of("N1", tm))));
 
     NameUsageRelation rel = new NameUsageRelation();
     rel.setType(NomRelType.BASIONYM);

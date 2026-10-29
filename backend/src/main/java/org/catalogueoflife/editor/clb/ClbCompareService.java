@@ -12,6 +12,7 @@ import life.catalogue.api.model.Synonym;
 import life.catalogue.api.model.Synonymy;
 import life.catalogue.api.model.NameUsageRelation;
 import life.catalogue.api.model.Reference;
+import life.catalogue.api.model.TypeDesignation;
 import life.catalogue.api.model.TypeMaterial;
 import life.catalogue.api.model.UsageInfo;
 import life.catalogue.api.model.VernacularName;
@@ -104,11 +105,12 @@ public class ClbCompareService {
 
     String nameId = n == null ? null : n.getId();
     List<ClbTypeMaterial> types = new ArrayList<>();
-    List<TypeMaterial> tms = nameId == null || info.getTypeMaterial() == null
+    List<TypeDesignation> tds = nameId == null || info.getTypeMaterial() == null
         ? null : info.getTypeMaterial().get(nameId);
-    if (tms != null) {
-      for (TypeMaterial tm : tms) {
-        types.add(new ClbTypeMaterial(tm.getId(), lower(tm.getStatus() == null ? null : tm.getStatus().name()),
+    if (tds != null) {
+      for (TypeDesignation td : tds) {
+        TypeMaterial tm = td.getTypeMaterial();
+        types.add(new ClbTypeMaterial(tm.getId(), lower(td.getStatus() == null ? null : td.getStatus().name()),
             tm.getCitation(), tm.getCatalogNumber(), tm.getInstitutionCode(), tm.getLocality()));
       }
     }

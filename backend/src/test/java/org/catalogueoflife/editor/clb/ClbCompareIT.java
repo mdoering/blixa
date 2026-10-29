@@ -201,7 +201,8 @@ class ClbCompareIT extends AbstractPostgresIT {
     life.catalogue.api.model.TypeMaterial tm = new life.catalogue.api.model.TypeMaterial();
     tm.setId("TM1");
     tm.setCitation("type species: Felis pardus");
-    info.getTypeMaterial().put("N1", new java.util.ArrayList<>(List.of(tm)));
+    info.getTypeMaterial().put("N1", new java.util.ArrayList<>(List.of(
+        new life.catalogue.api.model.TypeDesignation("N1", null, tm))));
     life.catalogue.api.model.VernacularName vn = new life.catalogue.api.model.VernacularName();
     vn.setId(7);
     vn.setName("Big cats");

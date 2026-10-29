@@ -59,6 +59,12 @@ class ClbImportClientIT {
     assertThat(info.getSynonyms().getHomotypic().get(0).getName().getScientificName()).isEqualTo("Felis leo");
     assertThat(info.getDistributions()).hasSize(1);
     assertThat(info.getVernacularNames()).hasSize(1);
+    // Type material comes as name scoped designations, the status of the specimen for that name.
+    var td = info.getTypeMaterial("N1").get(0);
+    assertThat(td.getStatus().name()).isEqualTo("NEOTYPE");
+    assertThat(td.getTypeMaterial().getId()).isEqualTo("TM1");
+    assertThat(td.getTypeMaterial().getInstitutionCode()).isEqualTo("NHMUK");
+    assertThat(ClbUsageMapper.toTypeMaterialRequest(td).request().status()).isEqualTo("neotype");
     server.verify();
   }
 
@@ -221,8 +227,8 @@ class ClbImportClientIT {
 
   // A trimmed, hand-built (but realistically-shaped -- cross-checked against a live
   // GET .../dataset/3LXR/taxon/4CGXP/info response) UsageInfo JSON: an accepted Panthera leo taxon
-  // with one homotypic synonym, one distribution, one vernacular name, a publishedIn reference and a
-  // second taxonomic reference.
+  // with one homotypic synonym, one distribution, one vernacular name, one type designation, a
+  // publishedIn reference and a second taxonomic reference.
   private static final String CANNED_INFO_JSON = """
       {
         "usage": {
@@ -253,6 +259,14 @@ class ClbImportClientIT {
         "vernacularNames": [
           {"name": "Lion", "language": "eng"}
         ],
+        "typeMaterial": {
+          "N1": [
+            {"nameId": "N1", "status": "neotype", "typeMaterial": {
+              "id": "TM1", "citation": "Neotype NHMUK 1234", "institutionCode": "NHMUK",
+              "names": [{"nameId": "N1", "status": "neotype"}, {"nameId": "N2", "status": "holotype"}]
+            }}
+          ]
+        },
         "references": {
           "ref-1": {"id": "ref-1", "citation": "Syst. Nat., 10th ed. vol.1 p.41"},
           "ref-2": {"id": "ref-2", "citation": "Some other reference"}

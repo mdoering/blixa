@@ -568,7 +568,9 @@ class ClbImportServiceIT extends AbstractPostgresIT {
     life.catalogue.api.model.TypeMaterial tm2 = new life.catalogue.api.model.TypeMaterial();
     tm2.setId("T2");
     tm2.setCitation("paratype two");
-    src.getTypeMaterial().put("CP-N", new java.util.ArrayList<>(List.of(tm1, tm2)));
+    src.getTypeMaterial().put("CP-N", new java.util.ArrayList<>(List.of(
+        new life.catalogue.api.model.TypeDesignation("CP-N", null, tm1),
+        new life.catalogue.api.model.TypeDesignation("CP-N", null, tm2))));
     life.catalogue.api.model.Reference pub = new life.catalogue.api.model.Reference();
     pub.setId("PUB");
     pub.setCitation("Syst. Nat. 1758");

@@ -18,6 +18,7 @@ import life.catalogue.api.model.Synonym;
 import life.catalogue.api.model.Synonymy;
 import life.catalogue.api.model.Taxon;
 import life.catalogue.api.model.TaxonProperty;
+import life.catalogue.api.model.TypeDesignation;
 import life.catalogue.api.model.TypeMaterial;
 import life.catalogue.api.model.UsageInfo;
 import life.catalogue.api.model.VernacularName;
@@ -261,10 +262,13 @@ public final class ClbUsageMapper {
   // clbId: the CLB type material's own id, so a single record can be picked (Compare-with-CLB copy).
   public record MappedTypeMaterial(TypeMaterialRequest request, String clbReferenceId, String clbId) {}
 
-  public static MappedTypeMaterial toTypeMaterialRequest(TypeMaterial tm) {
+  // A CLB specimen can typify several names, each with its own status: the designation carries the
+  // status for the one name it was listed under, the specimen fields come from its TypeMaterial.
+  public static MappedTypeMaterial toTypeMaterialRequest(TypeDesignation td) {
+    TypeMaterial tm = td.getTypeMaterial();
     TypeMaterialRequest r = new TypeMaterialRequest(
         tm.getCitation(),
-        lower(tm.getStatus()),
+        lower(td.getStatus()),
         tm.getInstitutionCode(),
         tm.getCatalogNumber(),
         null, // occurrenceId: CLB TypeMaterial carries no such field either -- see ChildColdpWriter.typeMaterialRow
@@ -284,7 +288,7 @@ public final class ClbUsageMapper {
 
   /** {@code UsageInfo.getTypeMaterial()} is already keyed by CLB nameID; this just maps each value list. */
   public static Map<String, List<MappedTypeMaterial>> toTypeMaterial(UsageInfo info) {
-    Map<String, List<TypeMaterial>> byName = info.getTypeMaterial();
+    Map<String, List<TypeDesignation>> byName = info.getTypeMaterial();
     if (byName == null || byName.isEmpty()) {
       return Map.of();
     }
