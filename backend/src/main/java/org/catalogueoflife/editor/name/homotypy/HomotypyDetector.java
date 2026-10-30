@@ -76,6 +76,8 @@ public class HomotypyDetector {
     Map<String, List<Name>> buckets = new LinkedHashMap<>();
     for (NameUsage u : candidates) {
       Name n = ClbNames.toName(u, code);
+      // the sorter drops names without atomized authorship anyway, logging a WARN for each
+      if (!n.hasAuthorship()) continue;
       String epithet = epithetKey(n);
       if (epithet == null) continue;
       usages.put(u.getId(), u);
