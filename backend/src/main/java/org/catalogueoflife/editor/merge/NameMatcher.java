@@ -4,7 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import life.catalogue.api.model.Name;
 import life.catalogue.common.tax.AuthorshipNormalizer;
 import life.catalogue.matching.Equality;
 import life.catalogue.matching.authorship.AuthorComparator;
@@ -14,6 +17,7 @@ import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.nomenclature.ClbNames;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.dto.ScoredId;
+import org.gbif.nameparser.api.Authorship;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -26,8 +30,9 @@ import org.springframework.stereotype.Service;
 //      reconstructed from the atomized name-part fields NameParserService.parseInto populates
 //      (falling back to the raw scientificName for names that failed to parse). Target usages are
 //      grouped by canonicalKey once per match() call; a source usage's candidates are whatever
-//      target usages share its key. Author compatibility (authorCompatible) then decides the
-//      category among those candidates -- see match()'s javadoc for the exact partition.
+//      target usages share its key. Author compatibility (authorCompatible: CLB's AuthorComparator
+//      per authorship part, stricter on years) then decides the category among those candidates --
+//      see match()'s javadoc for the exact partition.
 //   2. Trigram fuzzy fallback: only when NO target usage shares the source's canonicalKey at all
 //      (an empty candidate set) -- NameUsageMapper.findFuzzyCandidate's pg_trgm `%`/similarity()
 //      query against target.scientificName, rank-qualified (same rank as the source, like the
@@ -40,6 +45,7 @@ import org.springframework.stereotype.Service;
 public class NameMatcher {
 
   private static final AuthorComparator AUTHORS = new AuthorComparator(AuthorshipNormalizer.INSTANCE);
+  private static final Pattern YEAR = Pattern.compile("(\\d{4})");
 
   private final NameUsageMapper usages;
   private final double threshold;
@@ -135,11 +141,22 @@ public class NameMatcher {
   private static String norm(String x){ return x==null? "" : x.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+"," "); }
 
   /**
-   * Blank raw authorship on either side is compatible. Names carrying atomized authorship (parsed)
-   * are judged with CLB's {@link AuthorComparator}, so "L." and "Linnaeus" are the same author;
-   * names without any atomized authorship fall back to comparing the normalized raw strings.
-   * Only EQUAL counts as compatible, not "not DIFFERENT": a false match merges silently, while a
-   * false homonym flag is reviewed by an editor.
+   * Blank raw authorship on either side is compatible. Names without any atomized authorship fall
+   * back to comparing the normalized raw strings. Parsed names are compared part by part with CLB's
+   * {@link AuthorComparator}, so "L." and "Linnaeus" are the same author:
+   *
+   * <ul>
+   *   <li>the combination authorship when both sides have one, and the basionym authorship when both
+   *       sides have one, must each be EQUAL -- "(Smith) Jones" is not "(Brown) Jones";
+   *   <li>a part only one side has is not compared: "Mill." and "(L.) Mill." stay compatible, as
+   *       incomplete data;
+   *   <li>if the sides share no part, e.g. "Smith, 1900" and "(Smith, 1900)", the one part each has
+   *       is compared with the other's.
+   * </ul>
+   *
+   * Merging is stricter than CLB: only EQUAL counts, not "not DIFFERENT", and a compared part whose
+   * years are both given but differ is incompatible, even within the comparator's year tolerance. A
+   * false match merges silently, while a false homonym flag is reviewed by an editor.
    */
   static boolean authorCompatible(NameUsage a, NameUsage b) {
     if (isBlank(a.getAuthorship()) || isBlank(b.getAuthorship())) {
@@ -148,7 +165,33 @@ public class NameMatcher {
     if (!atomized(a) || !atomized(b)) {
       return normAuthor(a.getAuthorship()).equals(normAuthor(b.getAuthorship()));
     }
-    return AUTHORS.compare(ClbNames.toName(a, null), ClbNames.toName(b, null)) == Equality.EQUAL;
+    Name na = ClbNames.toName(a, null);
+    Name nb = ClbNames.toName(b, null);
+    Authorship ca = na.getCombinationAuthorship(), cb = nb.getCombinationAuthorship();
+    Authorship ba = na.getBasionymAuthorship(), bb = nb.getBasionymAuthorship();
+    boolean bothCombination = present(ca) && present(cb);
+    boolean bothBasionym = present(ba) && present(bb);
+    if (!bothCombination && !bothBasionym) {
+      return samePart(present(ca) ? ca : ba, present(cb) ? cb : bb);
+    }
+    return (!bothCombination || samePart(ca, cb)) && (!bothBasionym || samePart(ba, bb));
+  }
+
+  private static boolean samePart(Authorship x, Authorship y) {
+    Integer yx = year(x), yy = year(y);
+    if (yx != null && yy != null && !yx.equals(yy)) {
+      return false;
+    }
+    return AUTHORS.compare(x, y) == Equality.EQUAL;
+  }
+
+  private static boolean present(Authorship a) {
+    return a != null && a.exists();
+  }
+
+  private static Integer year(Authorship a) {
+    Matcher m = a.getYear() == null ? null : YEAR.matcher(a.getYear());
+    return m != null && m.find() ? Integer.valueOf(m.group(1)) : null;
   }
 
   private static boolean atomized(NameUsage u) {

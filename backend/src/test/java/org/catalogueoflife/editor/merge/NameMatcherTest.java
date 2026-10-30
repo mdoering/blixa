@@ -169,18 +169,53 @@ class NameMatcherTest {
 
   @Test
   void basionymAuthorshipIsComparedWhenCombinationAuthorshipIsAbsent() {
-    // AuthorComparator: an EQUAL combination authorship decides alone; basionym only counts otherwise
+    // no combination authorship on either side: the basionym authorship alone decides
     assertTrue(NameMatcher.authorCompatible(parsed(null, "L.", null), parsed(null, "Linnaeus", null)));
     assertFalse(NameMatcher.authorCompatible(parsed(null, "L.", null), parsed(null, "Smith", null)));
   }
 
   @Test
   void bracketShapeMismatchIsIncompatible() {
-    // combination-only "Smith, 1900" vs basionym-only "(Linnaeus, 1758)": comparator says UNKNOWN
+    // combination-only "Smith, 1900" vs basionym-only "(Linnaeus, 1758)": no shared part, so the
+    // one part of each side is compared with the other's
     NameUsage a = parsed("Smith", null, "1900");
     NameUsage b = parsed(null, "Linnaeus", null);
     b.setBasionymAuthorshipYear("1758");
     assertFalse(NameMatcher.authorCompatible(a, b));
+  }
+
+  @Test
+  void sharedPartsMustAllBeEqual() {
+    // a recombination by the same author of two different basionyms is a different name
+    assertFalse(NameMatcher.authorCompatible(parsed("Jones", "Smith", null), parsed("Jones", "Brown", null)));
+    assertTrue(NameMatcher.authorCompatible(parsed("Mill.", "L.", null), parsed("Mill.", "Linnaeus", null)));
+  }
+
+  @Test
+  void partOnOneSideOnlyIsNotCompared() {
+    // "Mill." vs "(L.) Mill.": incomplete data, not a conflict
+    assertTrue(NameMatcher.authorCompatible(parsed("Mill.", null, null), parsed("Mill.", "L.", null)));
+    assertTrue(NameMatcher.authorCompatible(parsed("Mill.", "L.", null), parsed("Mill.", null, null)));
+  }
+
+  @Test
+  void differentYearsAreIncompatibleEvenWithinTheComparatorsTolerance() {
+    // AuthorComparator accepts up to 11 years apart; merging does not
+    assertFalse(NameMatcher.authorCompatible(parsed("Smith", null, "1850"), parsed("Smith", null, "1860")));
+    assertTrue(NameMatcher.authorCompatible(parsed("Smith", null, "1850"), parsed("Smith", null, "1850")));
+    NameUsage a = parsed("Jones", "Smith", null);
+    NameUsage b = parsed("Jones", "Smith", null);
+    a.setBasionymAuthorshipYear("1850");
+    b.setBasionymAuthorshipYear("1851");
+    assertFalse(NameMatcher.authorCompatible(a, b));
+  }
+
+  @Test
+  void bracketsOnOneSideOnlyCompareAcross() {
+    // "Smith, 1900" vs "(Smith, 1900)": the same author and year, only the brackets differ
+    NameUsage b = parsed(null, "Smith", null);
+    b.setBasionymAuthorshipYear("1900");
+    assertTrue(NameMatcher.authorCompatible(parsed("Smith", null, "1900"), b));
   }
 
   @Test

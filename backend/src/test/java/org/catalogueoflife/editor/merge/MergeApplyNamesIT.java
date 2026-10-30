@@ -176,8 +176,9 @@ class MergeApplyNamesIT extends AbstractPostgresIT {
     Reference targetRef = newReference(targetId, userId,
         "Doe, J. 2020. A DOI title. Journal, 1, 2-3.", "10.1234/abcd");
 
-    // Source: genus + species that both MATCH the target's (same canonical key + compatible author
-    // -- see NameMatcher.authorCompatible), a brand-new accepted species under the matched genus, a
+    // Source: genus + species that both MATCH the target's (same canonical key; the genus has no
+    // authorship and the species the same parsed "(Linnaeus, 1758)", which NameMatcher.authorCompatible
+    // calls compatible part by part), a brand-new accepted species under the matched genus, a
     // brand-new accepted subspecies under THAT new species (two-level new chain), and a brand-new
     // synonym pointing at the matched species. Plus one matched (DOI) and one new reference.
     NameUsage srcGenus = newUsage(sourceId, userId, "Panthera", null, "genus", Status.ACCEPTED, null, null);

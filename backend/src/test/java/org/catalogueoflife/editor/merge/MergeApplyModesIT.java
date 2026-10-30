@@ -44,10 +44,11 @@ import tools.jackson.databind.ObjectMapper;
 //    override remark", ONE Distribution child area="Africa") + the same "Felis leo" (linked via
 //    synonym_accepted to the source leo) + a brand-new accepted "Panthera onca".
 //
-// NameMatcher.authorCompatible only ever calls two DIFFERING non-blank author strings compatible
-// when at least one side is blank (mismatched non-blank authors -> POSSIBLE_HOMONYM, never
-// MATCHED, by design -- see NameMatcher's own javadoc) -- so a MATCHED usage with a genuinely
-// differing, curator-visible authorship-reconciliation outcome needs the TARGET side blank. That is
+// NameMatcher.authorCompatible calls a blank authorship on either side compatible, while two
+// non-blank authorships must name the same authors (and years, where both give one) part by part
+// -- a different author is POSSIBLE_HOMONYM, never MATCHED, by design (see NameMatcher's
+// own javadoc). So a MATCHED usage with a genuinely differing, curator-visible
+// authorship-reconciliation outcome needs the TARGET side blank. That is
 // exactly `authorship` here: blank on the target, non-blank on the source, so BOTH OVERWRITE and
 // FILL_GAPS end up filling it to the source's value (a "blank target field filled from source"
 // demonstration for FILL_GAPS, and incidentally also satisfies OVERWRITE's "authorship is now the
