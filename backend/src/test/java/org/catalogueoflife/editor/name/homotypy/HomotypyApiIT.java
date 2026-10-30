@@ -31,6 +31,7 @@ class HomotypyApiIT extends AbstractPostgresIT {
   @Autowired AppUserService users;
   @Autowired ProjectMemberMapper members;
   @Autowired ObjectMapper json;
+  @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
 
   private void ensureUser(String username) {
     if (users.requireByUsernameOrNull(username) == null) users.createLocal(username, "pw", username);
@@ -168,5 +169,23 @@ class HomotypyApiIT extends AbstractPostgresIT {
             .with(user("nonMemberHomo")).with(csrf())
             .contentType(MediaType.APPLICATION_JSON).content(body))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void synonymyGroupsAnUppercaseImportedBasionym() throws Exception {
+    ensureUser("homoOwner");
+    long pid = createProject("homoupper");
+    long acceptedId = createUsage(pid, "Poa annua", "L.", "species", "accepted");
+    long synId = createUsage(pid, "Ochlopoa annua", "(L.) H.Scholz", "species", "synonym");
+    link(pid, synId, acceptedId);
+    // raw ColDP spelling as written by the importer
+    jdbc.update("INSERT INTO name_relation (project_id, id, usage_id, related_usage_id, type) "
+        + "VALUES (?, (SELECT coalesce(max(id),0)+1 FROM name_relation WHERE project_id = ?), ?, ?, 'BASIONYM')",
+        (int) pid, (int) pid, (int) synId, (int) acceptedId);
+    mvc.perform(get("/api/projects/" + pid + "/usages/" + acceptedId + "/synonymy").with(user("homoOwner")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.homotypic.length()").value(1))
+        .andExpect(jsonPath("$.homotypic[0].id").value((int) synId))
+        .andExpect(jsonPath("$.heterotypicGroups.length()").value(0));
   }
 }

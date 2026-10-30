@@ -4,10 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import life.catalogue.api.vocab.NomRelType;
 import life.catalogue.common.tax.AuthorshipNormalizer;
 import life.catalogue.common.tax.SciNameNormalizer;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.Status;
+import org.catalogueoflife.editor.nomenclature.RelTypes;
 import org.catalogueoflife.editor.name.homotypy.dto.HomotypyProposal;
 import org.catalogueoflife.editor.name.homotypy.dto.ProposedGroup;
 import org.catalogueoflife.editor.name.homotypy.dto.ProposedRelation;
@@ -91,7 +93,8 @@ public class HomotypyDetector {
   }
 
   private static ProposedRelation rel(int usageId, int relatedId, String type, Set<String> existing) {
-    boolean exists = existing.contains(usageId + ":" + relatedId + ":" + HomotypicRelations.normalize(type));
+    NomRelType t = RelTypes.parse(type);
+    boolean exists = t != null && existing.contains(usageId + ":" + relatedId + ":" + RelTypes.label(t));
     return new ProposedRelation(usageId, relatedId, type, exists);
   }
 

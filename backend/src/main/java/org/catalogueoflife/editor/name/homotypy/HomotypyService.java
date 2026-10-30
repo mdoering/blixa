@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import life.catalogue.api.vocab.NomRelType;
 import org.catalogueoflife.editor.child.NameRelationMapper;
 import org.catalogueoflife.editor.child.dto.NameRelationRequest;
 import org.catalogueoflife.editor.child.dto.NameRelationResponse;
@@ -17,6 +18,7 @@ import org.catalogueoflife.editor.name.homotypy.dto.ApplyHomotypicRequest;
 import org.catalogueoflife.editor.name.homotypy.dto.HomotypyProposal;
 import org.catalogueoflife.editor.name.homotypy.dto.SynonymEntry;
 import org.catalogueoflife.editor.name.homotypy.dto.Synonymy;
+import org.catalogueoflife.editor.nomenclature.RelTypes;
 import org.catalogueoflife.editor.parse.NameParserService;
 import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectService;
@@ -87,7 +89,7 @@ public class HomotypyService {
       if (s.getStatus() == Status.MISAPPLIED) misapplied.add(entry(s, project)); else nonMisapplied.add(s);
     }
 
-    Set<Integer> acceptedClosure = new HashSet<>(synonymyMapper.homotypicClosure(projectId, acceptedId));
+    Set<Integer> acceptedClosure = new HashSet<>(synonymyMapper.homotypicClosure(projectId, acceptedId, RelTypes.HOMOTYPIC_LABELS));
     List<SynonymEntry> homotypic = new ArrayList<>();
     List<NameUsage> remaining = new ArrayList<>();
     for (NameUsage s : nonMisapplied) {
@@ -101,7 +103,7 @@ public class HomotypyService {
       if (placed.contains(s.getId())) continue;
       Set<Integer> group = new LinkedHashSet<>();
       group.add(s.getId());
-      group.addAll(synonymyMapper.homotypicClosure(projectId, s.getId()));
+      group.addAll(synonymyMapper.homotypicClosure(projectId, s.getId(), RelTypes.HOMOTYPIC_LABELS));
       List<SynonymEntry> members = new ArrayList<>();
       for (NameUsage r : remaining) {
         if (group.contains(r.getId()) && placed.add(r.getId())) members.add(entry(r, project));
@@ -141,7 +143,10 @@ public class HomotypyService {
     for (Integer id : ids) {
       for (NameRelationResponse r : nameRelations.findByUsage(projectId, id)) {
         if (r.relatedUsageId() != null) {
-          keys.add(r.usageId() + ":" + r.relatedUsageId() + ":" + HomotypicRelations.normalize(r.type()));
+          NomRelType t = RelTypes.parse(r.type());
+          if (t != null) {
+            keys.add(r.usageId() + ":" + r.relatedUsageId() + ":" + RelTypes.label(t));
+          }
         }
       }
     }

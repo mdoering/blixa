@@ -12,18 +12,22 @@ public interface SynonymyMapper {
   // homotypic type (walked in BOTH directions, type normalized case/_/-). Depth-guarded; excludes
   // the seed usage itself. Blixa datasets are small so depth 100 is ample.
   @Select("""
+      <script>
       WITH RECURSIVE closure(uid, depth) AS (
         SELECT #{usageId}, 0
         UNION
         SELECT CASE WHEN nr.usage_id = c.uid THEN nr.related_usage_id ELSE nr.usage_id END, c.depth + 1
         FROM closure c
         JOIN name_relation nr ON nr.project_id = #{projectId}
-          AND lower(regexp_replace(nr.type, '[_-]', ' ', 'g'))
-              IN ('basionym','homotypic','spelling correction','based on','replacement name','superfluous')
+          AND lower(regexp_replace(btrim(nr.type), '[_-]', ' ', 'g')) IN
+            <foreach item="t" collection="types" open="(" separator="," close=")">#{t}</foreach>
           AND (nr.usage_id = c.uid OR nr.related_usage_id = c.uid)
-        WHERE c.depth < 100
+        WHERE c.depth &lt; 100
       )
-      SELECT DISTINCT uid FROM closure WHERE uid IS NOT NULL AND uid <> #{usageId}
+      SELECT DISTINCT uid FROM closure WHERE uid IS NOT NULL AND uid &lt;&gt; #{usageId}
+      </script>
       """)
-  List<Integer> homotypicClosure(@Param("projectId") int projectId, @Param("usageId") int usageId);
+  // `types` are the normalized homotypic labels (RelTypes.HOMOTYPIC_LABELS); must be non-empty.
+  List<Integer> homotypicClosure(@Param("projectId") int projectId, @Param("usageId") int usageId,
+      @Param("types") List<String> types);
 }

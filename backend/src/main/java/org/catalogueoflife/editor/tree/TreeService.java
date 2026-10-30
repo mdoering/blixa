@@ -11,6 +11,7 @@ import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.Pagination;
 import org.catalogueoflife.editor.name.homotypy.SynonymyMapper;
+import org.catalogueoflife.editor.nomenclature.RelTypes;
 import org.catalogueoflife.editor.name.Status;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
@@ -77,7 +78,7 @@ public class TreeService {
       byId.put(r.id(), node);
       List<NameUsage> syns = usages.findSynonymsOfAccepted(projectId, r.id());
       Set<Integer> homotypic = syns.isEmpty()
-          ? Set.of() : new HashSet<>(synonymy.homotypicClosure(projectId, r.id()));
+          ? Set.of() : new HashSet<>(synonymy.homotypicClosure(projectId, r.id(), RelTypes.HOMOTYPIC_LABELS));
       for (NameUsage syn : syns) {
         node.synonyms.add(new SimpleTreeNode(syn.getId(),
             label(syn.getScientificName(), syn.getAuthorship()), syn.getRank(),
