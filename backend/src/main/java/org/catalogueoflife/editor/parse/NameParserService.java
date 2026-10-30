@@ -22,11 +22,10 @@ import org.springframework.stereotype.Service;
  * lifetime of this service.
  *
  * <p>Also at 5.0.0, {@link NameParser#parse} no longer throws {@code UnparsableNameException};
- * it returns a sealed {@link ParseResult} that is one of {@code Parsed} (a full {@link
- * org.gbif.nameparser.api.ParsedName}), {@code Informal} (a semi-structured name with no atomized
- * {@code ParsedName}), or {@code Unparsable} (not a name at all -- virus, formula, placeholder,
- * identifier, ...). Only {@code Parsed} carries atomized fields; the other two are treated here as
- * un-atomizable.
+ * it returns a sealed {@link ParseResult} that is either {@code Parsed} (a full {@link
+ * org.gbif.nameparser.api.ParsedName}) or {@code Unparsable} (not a name at all -- virus, formula,
+ * placeholder, identifier, ...). Since 6.0 there is no separate {@code Informal} variant. Only
+ * {@code Parsed} carries atomized fields; {@code Unparsable} is treated here as un-atomizable.
  */
 @Service
 public class NameParserService {
@@ -39,8 +38,8 @@ public class NameParserService {
    * nameType} and {@code parseState} on {@code u} in place.
    *
    * <p>Never throws: when the parser yields no atomized {@link org.gbif.nameparser.api.ParsedName}
-   * -- an {@code Unparsable} name (virus names, BOLD BINs, hybrid formulas, placeholders, ...) or a
-   * semi-structured {@code Informal} name -- {@code u.parseState} is set to {@code "UNPARSABLE"} and
+   * -- an {@code Unparsable} name (virus names, BOLD BINs, hybrid formulas, placeholders, ...) --
+   * {@code u.parseState} is set to {@code "UNPARSABLE"} and
    * {@code u.nameType} to the result's {@link org.gbif.nameparser.api.NameType}; the caller always
    * gets back a usable, if unparsed, {@link NameUsage}.
    *
@@ -118,18 +117,13 @@ public class NameParserService {
 
   /**
    * Renders a formatted display name for {@code u} via {@link NameFormatter}'s {@code
-   * canonicalComplete}/{@code canonicalCompleteHtml}, for a {@code Parsed} and a semi-structured
-   * {@code Informal} name alike. Falls back to the raw {@code scientificName} (plus authorship, if
+   * canonicalComplete}/{@code canonicalCompleteHtml}. Falls back to the raw {@code scientificName} (plus authorship, if
    * present) when the name is {@code Unparsable}.
    */
   public String formatName(NameUsage u, @Nullable NomCode nomCode, boolean html) {
     Rank rank = parseRank(u.getRank());
     ParseResult result = parser.parse(u.getScientificName(), u.getAuthorship(), rank, nomCode);
-    ParsedName pn = switch (result) {
-      case ParseResult.Parsed p -> p.name();
-      case ParseResult.Informal i -> i.toParsedName();
-      case ParseResult.Unparsable _ -> null;
-    };
+    ParsedName pn = result.parsed().orElse(null);
     if (pn == null) {
       return rawName(u);
     }

@@ -165,8 +165,8 @@ class NameParserServiceTest {
 
   @Test
   void formatNameRendersInformalName() {
-    // A semi-structured Informal name has no atomized ParsedName, but still renders via
-    // Informal.toParsedName() instead of falling back to the raw input.
+    // A semi-structured informal name (sp. + BOLD id) still renders from its parsed form
+    // instead of falling back to the raw input.
     NameUsage u = new NameUsage();
     u.setScientificName("Abies  sp.   BOLD:AAA0001");
     u.setRank("species");
