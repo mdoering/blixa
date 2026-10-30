@@ -105,6 +105,12 @@ class NameRelationCleanupApiIT extends AbstractPostgresIT {
     return createUsage(pid, name, authorship, "species", "accepted", familyId);
   }
 
+  private long synonym(long pid, String name, String authorship, long acceptedId) throws Exception {
+    long id = createUsage(pid, name, authorship, "species", "synonym", null);
+    link(pid, id, acceptedId);
+    return id;
+  }
+
   private long family(long pid, String name) throws Exception {
     return createUsage(pid, name, "", "family", "accepted", null);
   }
@@ -531,6 +537,53 @@ class NameRelationCleanupApiIT extends AbstractPostgresIT {
     verify(relationMapper, times(1)).findByProject((int) pid);
     verify(relationMapper, never()).findByUsage(eq((int) pid), anyInt());
     verify(relationMapper, never()).findByRelated(eq((int) pid), anyInt());
+  }
+
+  // Part 1 (the homotypic grouping) never creates what Part 2 (this cleanup) flags: everything the
+  // detector proposes is applied the way the grouping dialog does by default, and the scan of the
+  // subtree then lists no pair. The seed has a stored basionym the detector must reuse and a stored
+  // later homonym between two names of one authorship group, which it must not relate homotypically.
+  @Test
+  void appliedHomotypyProposalsAreNeverFlagged() throws Exception {
+    long pid = createProject();
+    long fam = family(pid, "Felidae");
+    long leo = species(pid, "Panthera leo", "(Linnaeus, 1758)", fam);
+    long felisLeo = synonym(pid, "Felis leo", "Linnaeus, 1758", leo);
+    long leoLeo = synonym(pid, "Leo leo", "(Linnaeus, 1758)", leo);
+    long leoNobilis = synonym(pid, "Leo nobilis", "(Smith, 1900)", leo);
+    long felisNobilis = synonym(pid, "Felis nobilis", "(Smith, 1900)", leo);
+    synonym(pid, "Uncia nobilis", "(Smith, 1900)", leo);
+    synonym(pid, "Felis nubica", "Blainville, 1843", leo);
+    relate(pid, leoLeo, felisLeo, "basionym");
+    relate(pid, felisNobilis, leoNobilis, "later homonym");
+    long stored = relationCount(pid);
+
+    String detect = mvc.perform(get("/api/projects/" + pid + "/usages/" + leo + "/homotypic/detect")
+            .with(user(OWNER)))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+    var proposed = json.createArrayNode();
+    for (JsonNode g : json.readTree(detect).get("groups")) {
+      for (JsonNode r : g.get("relations")) {
+        if (!r.get("alreadyExists").asBoolean()) {
+          proposed.addObject().put("usageId", r.get("usageId").asLong())
+              .put("relatedUsageId", r.get("relatedUsageId").asLong()).put("type", r.get("type").asString());
+        }
+      }
+    }
+    var body = json.createObjectNode();
+    body.set("relations", proposed);
+    mvc.perform(post("/api/projects/" + pid + "/usages/" + leo + "/homotypic/apply").with(csrf())
+            .with(user(OWNER)).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body)))
+        .andExpect(status().isOk());
+    // the basionym of the accepted name and a homotypic link among the "nobilis" names were created
+    assertThat(proposed.size()).isGreaterThanOrEqualTo(2);
+    assertThat(relationCount(pid)).isEqualTo(stored + proposed.size());
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM name_relation WHERE project_id = ? AND usage_id = ?"
+        + " AND related_usage_id = ? AND type = 'basionym'", Long.class, pid, leo, felisLeo)).isEqualTo(1);
+
+    assertThat(list(scan(pid, leo))).isEmpty();
+    assertThat(list(scan(pid, null))).isEmpty();
   }
 
   // ---- apply ----
