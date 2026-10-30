@@ -178,6 +178,7 @@ class NameRelationCleanupApiIT extends AbstractPostgresIT {
       idle = busy ? 0 : idle + 1;
       Thread.sleep(100);
     }
+    assertThat(idle).as("validation pool still busy after 60s").isGreaterThanOrEqualTo(5);
   }
 
   // ---- tests ----
@@ -308,6 +309,60 @@ class NameRelationCleanupApiIT extends AbstractPostgresIT {
     assertThat(dup2.get("duplicate").asBoolean()).isTrue();
     assertThat(dup2.get("preselected").asBoolean()).isFalse();
     assertThat(issues(dup2)).containsExactly("DUPLICATE");
+  }
+
+  // The judge removes the basionym (neither name cites a basionym authorship) and attaches its
+  // verdict to the first row it sees, the bare one. The service keeps the referenced row instead:
+  // the verdict must follow to it, and the bare twin is removed and preselected too.
+  @Test
+  void removedRelationWithContentCarryingDuplicate() throws Exception {
+    long pid = createProject();
+    long fam = family(pid, "Aidae");
+    long bus = species(pid, "Aus bus", "Smith, 1900", fam);
+    long buss = species(pid, "Aus buss", "Smith, 1900", fam);
+    long bare = relate(pid, buss, bus, "basionym");
+    long referenced = relate(pid, buss, bus, "basionym", 7, null, null);
+    long spelling = relate(pid, buss, bus, "spelling correction");
+
+    JsonNode p = pair(scan(pid, null), bus, buss);
+    assertThat(p.get("relations").size()).isEqualTo(3);
+    JsonNode kept = relation(p, referenced);
+    assertThat(kept.get("duplicate").asBoolean()).isFalse();
+    assertThat(kept.get("remove").asBoolean()).isTrue();
+    assertThat(kept.get("preselected").asBoolean()).isTrue();
+    assertThat(issues(kept)).containsExactly("NAME_RELATION_CONFLICT");
+    JsonNode twin = relation(p, bare);
+    assertThat(twin.get("duplicate").asBoolean()).isTrue();
+    assertThat(twin.get("remove").asBoolean()).isTrue();
+    assertThat(twin.get("preselected").asBoolean()).isTrue();
+    assertThat(issues(twin)).containsExactly("NAME_RELATION_CONFLICT", "DUPLICATE");
+    JsonNode s = relation(p, spelling);
+    assertThat(s.get("remove").asBoolean()).isFalse();
+    assertThat(s.get("preselected").asBoolean()).isFalse();
+    assertThat(issues(s)).isEmpty();
+
+    // Both basionym rows carry different remarks: the duplicate holds content the kept row lacks,
+    // yet it is preselected, as the relation itself is removed. The kept row needs more filled
+    // fields than the first-seen bare-remarks row, so the swap is exercised here too.
+    long pid2 = createProject();
+    long fam2 = family(pid2, "Aidae");
+    long bus2 = species(pid2, "Aus bus", "Smith, 1900", fam2);
+    long buss2 = species(pid2, "Aus buss", "Smith, 1900", fam2);
+    long first = relate(pid2, buss2, bus2, "basionym", null, null, "from WoRMS");
+    long richer = relate(pid2, buss2, bus2, "basionym", null, "p. 3", "see Smith 1900");
+    relate(pid2, buss2, bus2, "spelling correction");
+
+    JsonNode p2 = pair(scan(pid2, null), bus2, buss2);
+    JsonNode kept2 = relation(p2, richer);
+    assertThat(kept2.get("duplicate").asBoolean()).isFalse();
+    assertThat(kept2.get("remove").asBoolean()).isTrue();
+    assertThat(kept2.get("preselected").asBoolean()).isTrue();
+    assertThat(issues(kept2)).containsExactly("NAME_RELATION_CONFLICT");
+    JsonNode twin2 = relation(p2, first);
+    assertThat(twin2.get("duplicate").asBoolean()).isTrue();
+    assertThat(twin2.get("remove").asBoolean()).isTrue();
+    assertThat(twin2.get("preselected").asBoolean()).isTrue();
+    assertThat(issues(twin2)).containsExactly("NAME_RELATION_CONFLICT", "DUPLICATE");
   }
 
   @Test
