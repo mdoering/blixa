@@ -1,10 +1,14 @@
 package org.catalogueoflife.editor.name.homotypy;
 
 import java.util.List;
+import java.util.Map;
 import org.catalogueoflife.editor.auth.CurrentUser;
+import org.catalogueoflife.editor.name.homotypy.dto.CleanupRequest;
 import org.catalogueoflife.editor.name.homotypy.dto.RelationConflictPair;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,5 +31,10 @@ public class NameRelationCleanupController {
   public List<RelationConflictPair> conflicts(@PathVariable int pid,
       @RequestParam(required = false) Integer rootId) {
     return service.scan(currentUser.require().getId(), pid, rootId);
+  }
+
+  @PostMapping("/cleanup")
+  public Map<String, Integer> cleanup(@PathVariable int pid, @RequestBody CleanupRequest req) {
+    return Map.of("deleted", service.apply(currentUser.require().getId(), pid, req));
   }
 }

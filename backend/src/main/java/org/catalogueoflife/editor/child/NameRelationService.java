@@ -13,6 +13,7 @@ import org.catalogueoflife.editor.validation.ValidationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -90,8 +91,26 @@ public class NameRelationService {
     requireEditor(userId, projectId);
     NameRelationResponse before = requireInProject(projectId, id);
     mapper.delete(projectId, id);
-    audit.record(projectId, userId, ENTITY, id, Operation.DELETE, before, null);
-    events.publishEvent(ValidationEvent.forUsage(projectId, usageId));
+    recordDelete(userId, projectId, before);
+  }
+
+  /**
+   * Deletes the relation only if it still has the given version; returns false when it is missing
+   * or was changed. Audits like {@link #delete}. Must run inside the caller's transaction, which
+   * should be rolled back on false when deleting several relations all-or-nothing.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean deleteWithAudit(int userId, int projectId, NameRelationResponse before) {
+    if (mapper.deleteVersioned(projectId, before.id(), before.version()) == 0) {
+      return false;
+    }
+    recordDelete(userId, projectId, before);
+    return true;
+  }
+
+  private void recordDelete(int userId, int projectId, NameRelationResponse before) {
+    audit.record(projectId, userId, ENTITY, before.id(), Operation.DELETE, before, null);
+    events.publishEvent(ValidationEvent.forUsage(projectId, before.usageId()));
   }
 
   private void requireUsage(int projectId, int usageId) {

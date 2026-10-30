@@ -526,4 +526,146 @@ class NameRelationCleanupApiIT extends AbstractPostgresIT {
     verify(relationMapper, never()).findByUsage(eq((int) pid), anyInt());
     verify(relationMapper, never()).findByRelated(eq((int) pid), anyInt());
   }
+
+  // ---- apply ----
+
+  private String refs(long[]... idVersion) {
+    var arr = json.createArrayNode();
+    for (long[] r : idVersion) arr.addObject().put("id", r[0]).put("version", r[1]);
+    var body = json.createObjectNode();
+    body.set("relations", arr);
+    return json.writeValueAsString(body);
+  }
+
+  private org.springframework.test.web.servlet.ResultActions cleanup(long pid, String body, String username)
+      throws Exception {
+    return mvc.perform(post("/api/projects/" + pid + "/name-relations/cleanup").with(csrf())
+        .with(user(username)).contentType(MediaType.APPLICATION_JSON).content(body));
+  }
+
+  private long relationCount(long pid) {
+    return jdbc.queryForObject("SELECT count(*) FROM name_relation WHERE project_id = ?", Long.class, pid);
+  }
+
+  private long deleteAudits(long pid) {
+    return jdbc.queryForObject("SELECT count(*) FROM change WHERE project_id = ? AND entity_type = 'name_relation'"
+        + " AND operation = 'DELETE'", Long.class, pid);
+  }
+
+  private long[] idVersion(JsonNode pairs, long id1, long id2, long relationId) {
+    JsonNode r = relation(pair(pairs, id1, id2), relationId);
+    return new long[] {relationId, r.get("version").asLong()};
+  }
+
+  // basionym + spelling correction + a third, flag-only-free relation pair: returns pid, usages, ids
+  @Test
+  void applyDeletesExactlyTheSentRelations() throws Exception {
+    long pid = createProject();
+    long fam = family(pid, "Aidae");
+    long bus = species(pid, "Aus bus", "Smith, 1900", fam);
+    long buss = species(pid, "Aus buss", "Smith, 1900", fam);
+    long basionym = relate(pid, buss, bus, "basionym");
+    long spelling = relate(pid, buss, bus, "spelling correction");
+    long other = relate(pid, bus, fam, "homotypic");
+    awaitValidation();
+    JsonNode pairs = scan(pid, null);
+
+    cleanup(pid, refs(idVersion(pairs, bus, buss, basionym), idVersion(pairs, bus, buss, spelling)), OWNER)
+        .andExpect(status().isOk())
+        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.deleted").value(2));
+
+    assertThat(relationCount(pid)).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT id FROM name_relation WHERE project_id = ?", Long.class, pid))
+        .isEqualTo(other);
+    assertThat(deleteAudits(pid)).isEqualTo(2);
+    // before image
+    String diff = jdbc.queryForObject("SELECT diff::text FROM change WHERE project_id = ? AND entity_id = ?"
+        + " AND operation = 'DELETE'", String.class, pid, basionym);
+    assertThat(diff).contains("basionym");
+    awaitValidation();
+  }
+
+  @Test
+  void staleVersionFailsWholeRequest() throws Exception {
+    long pid = createProject();
+    long fam = family(pid, "Aidae");
+    long bus = species(pid, "Aus bus", "Smith, 1900", fam);
+    long buss = species(pid, "Aus buss", "Smith, 1900", fam);
+    long basionym = relate(pid, buss, bus, "basionym");
+    long spelling = relate(pid, buss, bus, "spelling correction");
+    JsonNode pairs = scan(pid, null);
+    long[] a = idVersion(pairs, bus, buss, basionym);
+    long[] b = idVersion(pairs, bus, buss, spelling);
+    // an editor changes the second relation after the scan
+    mvc.perform(put("/api/projects/" + pid + "/usages/" + buss + "/relations/" + spelling).with(csrf())
+            .with(user(OWNER)).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"relatedUsageId\":" + bus + ",\"type\":\"spelling correction\",\"remarks\":\"x\",\"version\":" + b[1] + "}"))
+        .andExpect(status().isOk());
+    long auditsBefore = deleteAudits(pid);
+
+    cleanup(pid, refs(a, b), OWNER).andExpect(status().isConflict());
+
+    assertThat(relationCount(pid)).isEqualTo(2);
+    assertThat(deleteAudits(pid)).isEqualTo(auditsBefore).isZero();
+  }
+
+  @Test
+  void missingRelationFailsWholeRequest() throws Exception {
+    long pid = createProject();
+    long fam = family(pid, "Aidae");
+    long bus = species(pid, "Aus bus", "Smith, 1900", fam);
+    long buss = species(pid, "Aus buss", "Smith, 1900", fam);
+    long basionym = relate(pid, buss, bus, "basionym");
+    long spelling = relate(pid, buss, bus, "spelling correction");
+    JsonNode pairs = scan(pid, null);
+    long[] a = idVersion(pairs, bus, buss, basionym);
+    long[] b = idVersion(pairs, bus, buss, spelling);
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .delete("/api/projects/" + pid + "/usages/" + buss + "/relations/" + spelling)
+            .with(csrf()).with(user(OWNER)))
+        .andExpect(status().isNoContent());
+    long auditsBefore = deleteAudits(pid);
+
+    cleanup(pid, refs(a, b), OWNER).andExpect(status().isConflict());
+
+    assertThat(relationCount(pid)).isEqualTo(1);
+    assertThat(deleteAudits(pid)).isEqualTo(auditsBefore);
+  }
+
+  @Test
+  void viewerCannotApply() throws Exception {
+    long pid = createProject();
+    addMember(pid, "relViewer", Role.VIEWER);
+    long fam = family(pid, "Aidae");
+    long a = species(pid, "Aus mus", "Smith, 1900", fam);
+    long b = species(pid, "Bus mus", "(Smith, 1900)", fam);
+    long r1 = relate(pid, b, a, "basionym");
+    relate(pid, b, a, "basionym");
+    long[] ref = idVersion(scan(pid, null), a, b, r1);
+
+    cleanup(pid, refs(ref), "relViewer").andExpect(status().isForbidden());
+    assertThat(relationCount(pid)).isEqualTo(2);
+  }
+
+  @Test
+  void emptyRequestIs400AndDuplicateIdsDeleteOnce() throws Exception {
+    long pid = createProject();
+    long fam = family(pid, "Aidae");
+    long a = species(pid, "Aus mus", "Smith, 1900", fam);
+    long b = species(pid, "Bus mus", "(Smith, 1900)", fam);
+    long r1 = relate(pid, b, a, "basionym");
+    relate(pid, b, a, "basionym");
+    long[] ref = idVersion(scan(pid, null), a, b, r1);
+
+    cleanup(pid, "{\"relations\":[]}", OWNER).andExpect(status().isBadRequest());
+    cleanup(pid, "{}", OWNER).andExpect(status().isBadRequest());
+    cleanup(pid, refs(new long[] {ref[0], ref[1]}, new long[] {ref[0], ref[1] + 1}), OWNER)
+        .andExpect(status().isBadRequest());
+    assertThat(relationCount(pid)).isEqualTo(2);
+
+    cleanup(pid, refs(ref, ref), OWNER)
+        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.deleted").value(1));
+    assertThat(relationCount(pid)).isEqualTo(1);
+    assertThat(deleteAudits(pid)).isEqualTo(1);
+  }
 }

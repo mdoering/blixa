@@ -17,11 +17,14 @@ import life.catalogue.basgroup.NameRelationJudge.Judged;
 import life.catalogue.basgroup.NameRelationJudge.PairResult;
 import life.catalogue.basgroup.NameRelationRules.Rel;
 import org.catalogueoflife.editor.child.NameRelationMapper;
+import org.catalogueoflife.editor.child.NameRelationService;
 import org.catalogueoflife.editor.child.dto.NameRelationResponse;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.SynAccLink;
 import org.catalogueoflife.editor.name.SynonymAcceptedMapper;
+import org.catalogueoflife.editor.name.homotypy.dto.CleanupRequest;
+import org.catalogueoflife.editor.name.homotypy.dto.CleanupRequest.RelationRef;
 import org.catalogueoflife.editor.name.homotypy.dto.JudgedRelation;
 import org.catalogueoflife.editor.name.homotypy.dto.PairName;
 import org.catalogueoflife.editor.name.homotypy.dto.RelationConflictPair;
@@ -30,15 +33,17 @@ import org.catalogueoflife.editor.nomenclature.RelTypes;
 import org.catalogueoflife.editor.parse.NameParserService;
 import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectService;
+import org.catalogueoflife.editor.project.Role;
 import org.gbif.nameparser.api.NomCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
  * The name relation cleanup of CatalogueOfLife/data#1815: judges the stored relations pair by pair of
  * names with CLB's {@link NameRelationJudge} and lists the pairs with conflicting, redundant or
- * duplicate relations for an editor to review. The scan only reads; nothing is deleted here.
+ * duplicate relations for an editor to review. The scan only reads; apply deletes the relations an editor ticked.
  */
 @Service
 public class NameRelationCleanupService {
@@ -53,14 +58,61 @@ public class NameRelationCleanupService {
   private final NameRelationMapper nameRelations;
   private final ProjectService projects;
   private final NameParserService parser;
+  private final NameRelationService relationService;
 
   public NameRelationCleanupService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted,
-      NameRelationMapper nameRelations, ProjectService projects, NameParserService parser) {
+      NameRelationMapper nameRelations, ProjectService projects, NameParserService parser,
+      NameRelationService relationService) {
+    this.relationService = relationService;
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
     this.nameRelations = nameRelations;
     this.projects = projects;
     this.parser = parser;
+  }
+
+  /**
+   * Deletes exactly the listed relations, each only if it still has the version the scan showed.
+   * All or nothing: a missing or changed relation throws 409, which rolls the transaction back, so
+   * no relation, audit row or (after-commit) validation event survives. Repeated identical refs are
+   * deleted once; the same id with two different versions is a 400. An empty list is a 400.
+   * Like {@code NameRelationService.delete} this does not look at soft locks.
+   *
+   * @return the number of relations deleted
+   */
+  @Transactional
+  public int apply(int userId, int projectId, CleanupRequest req) {
+    String role = projects.requireRole(userId, projectId);
+    if (!role.equals(Role.OWNER.dbValue()) && !role.equals(Role.EDITOR.dbValue())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "owner or editor required");
+    }
+    if (req == null || req.relations() == null || req.relations().isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "no relations given");
+    }
+    Map<Integer, Integer> wanted = new LinkedHashMap<>();
+    for (RelationRef ref : req.relations()) {
+      if (ref == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "null relation reference");
+      }
+      Integer prev = wanted.put(ref.id(), ref.version());
+      if (prev != null && prev != ref.version()) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "relation " + ref.id() + " given with two versions");
+      }
+    }
+    int deleted = 0;
+    for (Map.Entry<Integer, Integer> e : wanted.entrySet()) {
+      NameRelationResponse before = nameRelations.findById(projectId, e.getKey());
+      // the version of the row read must be the one the editor saw; deleteWithAudit then re-checks
+      // it atomically in the DELETE itself
+      if (before == null || (before.version() == null ? 0 : before.version()) != e.getValue()
+          || !relationService.deleteWithAudit(userId, projectId, before)) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT,
+            "conflict: relation " + e.getKey() + " is missing or was changed");
+      }
+      deleted++;
+    }
+    return deleted;
   }
 
   /**

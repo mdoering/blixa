@@ -67,4 +67,9 @@ public interface NameRelationMapper {
 
   @Delete("DELETE FROM name_relation WHERE project_id = #{projectId} AND id = #{id}")
   int delete(@Param("projectId") int projectId, @Param("id") int id);
+
+  // The version column is NOT NULL DEFAULT 0, so no null handling is needed to match a scanned version.
+  @Delete("DELETE FROM name_relation WHERE project_id = #{projectId} AND id = #{id} AND version = #{version}")
+  int deleteVersioned(@Param("projectId") int projectId, @Param("id") int id,
+      @Param("version") int version);
 }
