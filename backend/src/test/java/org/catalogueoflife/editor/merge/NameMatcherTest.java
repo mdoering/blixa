@@ -104,28 +104,91 @@ class NameMatcherTest {
 
   // -- authorCompatible -----------------------------------------------------------------------
 
+  private static NameUsage parsed(String combination, String basionym, String year) {
+    NameUsage u = new NameUsage();
+    u.setGenus("Panthera");
+    u.setSpecificEpithet("leo");
+    u.setRank("species");
+    u.setCombinationAuthorship(combination);
+    u.setBasionymAuthorship(basionym);
+    u.setCombinationAuthorshipYear(year);
+    u.setAuthorship(String.join(" ", java.util.stream.Stream.of(basionym, combination).filter(x -> x != null).toList()));
+    return u;
+  }
+
+  private static NameUsage raw(String authorship) {
+    NameUsage u = new NameUsage();
+    u.setScientificName("Panthera leo");
+    u.setAuthorship(authorship);
+    return u;
+  }
+
   @Test
   void equalAuthorsAreCompatible() {
-    assertTrue(NameMatcher.authorCompatible("Mill.", "Mill."));
+    assertTrue(NameMatcher.authorCompatible(parsed("Mill.", null, null), parsed("Mill.", null, null)));
   }
 
   @Test
-  void blankOnEitherSideIsCompatible() {
-    assertTrue(NameMatcher.authorCompatible("", "Mill."));
-    assertTrue(NameMatcher.authorCompatible(null, "Mill."));
-    assertTrue(NameMatcher.authorCompatible("Mill.", null));
-    assertTrue(NameMatcher.authorCompatible(null, null));
+  void abbreviatedAndFullAuthorAreCompatible() {
+    // CHANGED vs the old string heuristic ("L." vs "Linnaeus" was incompatible)
+    assertTrue(NameMatcher.authorCompatible(parsed("L.", null, null), parsed("Linnaeus", null, null)));
   }
 
   @Test
-  void differentAuthorStringsAreNotCompatible() {
-    // The brief's motivating case: "L." vs "(Linnaeus, 1758)" must NOT be treated as compatible --
-    // this is what routes a same-canonical-key candidate to POSSIBLE_HOMONYM rather than MATCHED.
-    assertFalse(NameMatcher.authorCompatible("L.", "(Linnaeus, 1758)"));
+  void differentAuthorsAreIncompatible() {
+    assertFalse(NameMatcher.authorCompatible(parsed("Mill.", null, null), parsed("L.", null, null)));
   }
 
   @Test
-  void authorCompatibleIsCaseSpaceAndPunctuationInsensitive() {
-    assertTrue(NameMatcher.authorCompatible("(Linnaeus, 1758)", "linnaeus 1758"));
+  void blankRawAuthorshipIsCompatible() {
+    NameUsage withAuthor = parsed("Mill.", null, null);
+    assertTrue(NameMatcher.authorCompatible(withAuthor, parsed(null, null, null)));
+    assertTrue(NameMatcher.authorCompatible(parsed(null, null, null), withAuthor));
+    assertTrue(NameMatcher.authorCompatible(raw(""), raw("Mill.")));
+    assertTrue(NameMatcher.authorCompatible(raw(null), raw("Mill.")));
+    assertTrue(NameMatcher.authorCompatible(raw("Mill."), raw(null)));
+    assertTrue(NameMatcher.authorCompatible(raw(null), raw(null)));
+  }
+
+  @Test
+  void unparsedNamesFallBackToRawStrings() {
+    assertFalse(NameMatcher.authorCompatible(raw("Someone"), raw("Other")));
+    assertTrue(NameMatcher.authorCompatible(raw("Someone"), raw("someone")));
+  }
+
+  @Test
+  void differentRawStringsAreNotCompatibleWithoutAtomizedAuthors() {
+    // unchanged: "L." vs "(Linnaeus, 1758)" cannot be judged from raw strings alone
+    assertFalse(NameMatcher.authorCompatible(raw("L."), raw("(Linnaeus, 1758)")));
+  }
+
+  @Test
+  void rawFallbackIsCaseSpaceAndPunctuationInsensitive() {
+    assertTrue(NameMatcher.authorCompatible(raw("(Linnaeus, 1758)"), raw("linnaeus 1758")));
+  }
+
+  @Test
+  void basionymAuthorshipIsComparedWhenCombinationAuthorshipIsAbsent() {
+    // AuthorComparator: an EQUAL combination authorship decides alone; basionym only counts otherwise
+    assertTrue(NameMatcher.authorCompatible(parsed(null, "L.", null), parsed(null, "Linnaeus", null)));
+    assertFalse(NameMatcher.authorCompatible(parsed(null, "L.", null), parsed(null, "Smith", null)));
+  }
+
+  @Test
+  void bracketShapeMismatchIsIncompatible() {
+    // combination-only "Smith, 1900" vs basionym-only "(Linnaeus, 1758)": comparator says UNKNOWN
+    NameUsage a = parsed("Smith", null, "1900");
+    NameUsage b = parsed(null, "Linnaeus", null);
+    b.setBasionymAuthorshipYear("1758");
+    assertFalse(NameMatcher.authorCompatible(a, b));
+  }
+
+  @Test
+  void yearOnOneSideOnly() {
+    NameUsage a = parsed("L.", null, null);
+    NameUsage b = parsed("L.", null, "1758");
+    // AuthorComparator returns EQUAL when only one side has a year, so partial info stays MATCHED
+    assertTrue(NameMatcher.authorCompatible(a, b));
+    assertTrue(NameMatcher.authorCompatible(b, a));
   }
 }

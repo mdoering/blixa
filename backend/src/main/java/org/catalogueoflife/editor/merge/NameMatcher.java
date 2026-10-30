@@ -5,9 +5,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
+import life.catalogue.common.tax.AuthorshipNormalizer;
+import life.catalogue.matching.Equality;
+import life.catalogue.matching.authorship.AuthorComparator;
 import org.catalogueoflife.editor.merge.dto.Candidate;
 import org.catalogueoflife.editor.merge.dto.Category;
 import org.catalogueoflife.editor.name.NameUsage;
+import org.catalogueoflife.editor.nomenclature.ClbNames;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.dto.ScoredId;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +38,8 @@ import org.springframework.stereotype.Service;
 // costly to a curator than a few extra records surfaced for manual review.
 @Service
 public class NameMatcher {
+
+  private static final AuthorComparator AUTHORS = new AuthorComparator(AuthorshipNormalizer.INSTANCE);
 
   private final NameUsageMapper usages;
   private final double threshold;
@@ -93,7 +99,7 @@ public class NameMatcher {
       // Grouping preserves target insertion order (findAllByProject is ORDER BY id), so "first"
       // below is deterministically the lowest-id same-key target.
       List<NameUsage> compatible = candidates.stream()
-          .filter(c -> authorCompatible(src.getAuthorship(), c.getAuthorship()))
+          .filter(c -> authorCompatible(src, c))
           .collect(Collectors.toList());
       if (compatible.size() == 1) {
         return new Candidate(sourceId, Category.MATCHED, String.valueOf(compatible.get(0).getId()), 1.0);
@@ -128,12 +134,26 @@ public class NameMatcher {
   private static String s(String x){ return x==null? "" : x.trim(); }
   private static String norm(String x){ return x==null? "" : x.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+"," "); }
 
-  // heuristic: strip case + all non-alphanumerics; blank on either side = compatible. Conservative:
-  // mismatched author strings (e.g. "L." vs "(Linnaeus, 1758)") are NOT compatible -> POSSIBLE_HOMONYM
-  // (surfaced for review), never silently merged. Upgradeable to a GBIF AuthorComparator later.
-  static boolean authorCompatible(String a, String b) {
-    String na = normAuthor(a), nb = normAuthor(b);
-    return na.isEmpty() || nb.isEmpty() || na.equals(nb);
+  /**
+   * Blank raw authorship on either side is compatible. Names carrying atomized authorship (parsed)
+   * are judged with CLB's {@link AuthorComparator}, so "L." and "Linnaeus" are the same author;
+   * names without any atomized authorship fall back to comparing the normalized raw strings.
+   * Only EQUAL counts as compatible, not "not DIFFERENT": a false match merges silently, while a
+   * false homonym flag is reviewed by an editor.
+   */
+  static boolean authorCompatible(NameUsage a, NameUsage b) {
+    if (isBlank(a.getAuthorship()) || isBlank(b.getAuthorship())) {
+      return true;
+    }
+    if (!atomized(a) || !atomized(b)) {
+      return normAuthor(a.getAuthorship()).equals(normAuthor(b.getAuthorship()));
+    }
+    return AUTHORS.compare(ClbNames.toName(a, null), ClbNames.toName(b, null)) == Equality.EQUAL;
   }
+
+  private static boolean atomized(NameUsage u) {
+    return !isBlank(u.getCombinationAuthorship()) || !isBlank(u.getBasionymAuthorship());
+  }
+  private static boolean isBlank(String x) { return x == null || x.isBlank(); }
   private static String normAuthor(String a){ return a==null? "" : a.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]",""); }
 }
