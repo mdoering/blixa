@@ -140,7 +140,7 @@ public class NameParserService {
   }
 
   /** Tolerant string -> Rank, falling back to {@link Rank#UNRANKED} rather than throwing. */
-  private static Rank parseRank(@Nullable String rank) {
+  public static Rank parseRank(@Nullable String rank) {
     if (rank == null || rank.isBlank()) {
       return Rank.UNRANKED;
     }
