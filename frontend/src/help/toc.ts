@@ -29,6 +29,7 @@ export const HELP_TOC: HelpSection[] = [
       { slug: 'build-the-tree', title: 'Build the classification' },
       { slug: 'edit-names', title: 'Edit names & taxon data' },
       { slug: 'synonyms', title: 'Synonyms & homotypy' },
+      { slug: 'relation-cleanup', title: 'Clean name relations' },
       { slug: 'references', title: 'References' },
       { slug: 'checklistbank', title: 'Use ChecklistBank & COL' },
       { slug: 'validation', title: 'Validation issues' },

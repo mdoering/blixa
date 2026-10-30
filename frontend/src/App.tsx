@@ -22,6 +22,7 @@ import DiscussionDetailPage from './discussions/DiscussionDetailPage';
 import CurrentWorkPage from './lock/CurrentWorkPage';
 import AdminUsersPage from './admin/AdminUsersPage';
 import HomotypicConflictsPage from './homotypy/HomotypicConflictsPage';
+import RelationConflictsPage from './homotypy/RelationConflictsPage';
 import HelpPage from './help/HelpPage';
 
 export default function App() {
@@ -54,6 +55,8 @@ export default function App() {
             <Route path="discussions" element={<DiscussionsPage />} />
             <Route path="discussions/:id" element={<DiscussionDetailPage />} />
             <Route path="homotypic-conflicts/:rootId" element={<HomotypicConflictsPage />} />
+            <Route path="relation-conflicts" element={<RelationConflictsPage />} />
+            <Route path="relation-conflicts/:rootId" element={<RelationConflictsPage />} />
             <Route path="history" element={<HistoryPage />} />
             <Route path="activity" element={<CurrentWorkPage />} />
             <Route path="metadata" element={<ProjectMetadataPage />} />

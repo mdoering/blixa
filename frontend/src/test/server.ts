@@ -88,6 +88,9 @@ export const server = setupServer(
   http.get('/api/projects/:pid/usages/:id/counts', () =>
     HttpResponse.json({ synonyms: 0, nameRelations: 0, typeMaterial: 0, vernaculars: 0,
       distributions: 0, media: 0, estimates: 0, properties: 0, issues: 0, discussions: 0 })),
+  // Default: no conflicting name relations (Clean name relations page).
+  http.get('/api/projects/:pid/name-relations/conflicts', () => HttpResponse.json([])),
+  http.post('/api/projects/:pid/name-relations/cleanup', () => HttpResponse.json({ deleted: 0 })),
   // Default empty pending-invitations list, so any owner-role render of MembersPage doesn't need
   // this mocked per-test unless it asserts the list.
   http.get('/api/projects/:pid/invitations', () => HttpResponse.json([])),

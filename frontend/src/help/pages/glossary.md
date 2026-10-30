@@ -28,7 +28,8 @@ has no authorship of its own: it takes the species' author. Blixa flags one with
 The original name on which later combinations are based. *Felis leo* Linnaeus, 1758 is the
 basionym of *Panthera leo* (Linnaeus, 1758). Blixa stores it as a *basionym* relation on the
 **Relations** tab, and uses it to group homotypic synonyms. See
-[Group synonyms](/help/synonyms#group-synonyms).
+[Group synonyms](/help/synonyms#group-synonyms). Contradicting or duplicate relations can be
+reviewed under [Clean name relations](/help/relation-cleanup).
 
 ## ChecklistBank
 

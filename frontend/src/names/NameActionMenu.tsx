@@ -174,6 +174,12 @@ export default function NameActionMenu({
               >
                 Find homotypic conflicts
               </Menu.Item>
+              <Menu.Item
+                leftSection={<IconGitMerge size={14} />}
+                onClick={() => navigate(`/projects/${pid}/relation-conflicts/${usage.id}`)}
+              >
+                Clean name relations
+              </Menu.Item>
             </>
           )}
           {(usage.status === 'SYNONYM' || usage.status === 'MISAPPLIED') && (

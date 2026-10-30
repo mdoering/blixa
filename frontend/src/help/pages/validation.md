@@ -29,6 +29,9 @@ Checking one name at a time can miss knock-on effects on its neighbours. For exa
 species can create or clear a `duplicate_name` on *another* name, and changing a genus's year
 affects its species. Revalidating a group or the whole project settles these.
 
+Contradicting or duplicate name relations are reviewed separately under
+[Clean name relations](/help/relation-cleanup).
+
 ## Revalidate
 
 Use this when the issue counts look out of date, for example after many edits or a big

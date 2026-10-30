@@ -787,6 +787,23 @@ export default function ProjectMetadataPage() {
           <Stack gap="xs">
             <Group justify="space-between">
               <Title order={5} m={0}>
+                Clean name relations
+              </Title>
+              <Button variant="default" component={Link} to={`/projects/${id}/relation-conflicts`}>
+                Clean name relations
+              </Button>
+            </Group>
+            <Text size="sm" c="dimmed">
+              Review name pairs whose relations contradict, repeat or duplicate each other. Nothing is
+              deleted unless you tick it.
+            </Text>
+          </Stack>
+        )}
+
+        {canEdit && (
+          <Stack gap="xs">
+            <Group justify="space-between">
+              <Title order={5} m={0}>
                 Link genera
               </Title>
               <Button
