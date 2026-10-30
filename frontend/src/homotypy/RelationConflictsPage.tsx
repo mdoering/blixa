@@ -107,8 +107,9 @@ export default function RelationConflictsPage() {
     onSuccess: async (r) => {
       setConfirming(false);
       notifications.show({ message: `Deleted ${r.deleted} name relations` });
+      // keys match by prefix: ['name relation', pid] covers every usage's relations tab
       await Promise.all(
-        ['usageRelations', 'usage', 'synonymy', 'issues'].map((key) =>
+        ['name relation', 'name relation reverse', 'usage', 'synonymy', 'issues'].map((key) =>
           qc.invalidateQueries({ queryKey: [key, pid] })),
       );
       await refresh();

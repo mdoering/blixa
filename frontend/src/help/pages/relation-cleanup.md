@@ -19,16 +19,26 @@ without a flagged problem are shown greyed out and without a checkbox, for conte
 
 ## The four findings
 
-- **Contradicts another relation of these names**: for example one relation says the first name is
-  the basionym of the second while another says the opposite. The relation Blixa suggests removing is
-  ticked.
-- **Repeats what another relation says**: the same fact recorded again, for example the relation
-  given in both directions. The suggested duplicate is ticked.
-- **The names differ in more than their spelling**: a *spelling correction* between names that are not
-  plausibly spelling variants. This is only flagged, not ticked. Often the relation type is wrong.
-- **Exact duplicate**: the same type between the same two names recorded more than once. Blixa keeps
-  the row with the most reference, page and remarks. A duplicate is ticked only if it carries nothing
-  the kept row lacks; otherwise it is listed but left unticked.
+The relations Blixa suggests removing come ticked. Some findings are only flagged and come
+unticked: nothing tells which relation is wrong, so the decision is yours.
+
+- **Contradicts another relation of these names**: the relations of the pair cannot all be right.
+  Where the names tell which one is wrong, that relation is ticked. For example a basionym or
+  homotypic relation next to a *later homonym*, or a basionym given in both directions where only
+  one of the names cites the other's authors in brackets. Where the names do not tell, the relations
+  are only flagged and none is ticked. For example a basionym given in both directions between two
+  names that cite no authors in brackets and have the same or no year, or a basionym next to a type
+  relation where both or neither fit the names.
+- **Repeats what another relation says**: a *homotypic* relation next to a more specific one, such as
+  a basionym, or a homotypic relation recorded again, for example in the other direction. The
+  repetition is ticked.
+- **The names differ in more than their spelling**: a *spelling correction* between names that are
+  not plausibly spelling variants. It is ticked. Often only the relation type is wrong: untick it and
+  correct the type in the **Relations** tab instead.
+- **Exact duplicate**: the same type between the same two names, in the same direction, recorded
+  more than once. Blixa keeps the row with the most reference, page and remarks. If the relation
+  itself is ticked for removal, all its duplicates are ticked too. If the relation stays, a duplicate
+  is ticked only if it carries nothing the kept row lacks; otherwise it is listed but left unticked.
 
 ## Delete
 
