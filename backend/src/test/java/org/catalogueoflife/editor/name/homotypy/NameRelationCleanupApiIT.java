@@ -557,32 +557,73 @@ class NameRelationCleanupApiIT extends AbstractPostgresIT {
     return new long[] {relationId, r.get("version").asLong()};
   }
 
-  // basionym + spelling correction + a third, flag-only-free relation pair: returns pid, usages, ids
+  // Two pairs, scanned first; the request is built from the scan result:
+  //  pair A: two basionym rows with different remarks -> the second is a content-carrying duplicate
+  //          (duplicate=true, preselected=false); no flag-only verdict fixture exists, so this stands
+  //          in for "listed but unticked" (the editor may still tick it);
+  //  pair B: basionym removed by the judge (referenced row kept, remove=true) with a bare twin
+  //          (remove=true, preselected=true) that is deliberately NOT sent.
   @Test
   void applyDeletesExactlyTheSentRelations() throws Exception {
     long pid = createProject();
     long fam = family(pid, "Aidae");
+    long orig = species(pid, "Aus eus", "Smith, 1900", fam);
+    long comb = species(pid, "Bus eus", "(Smith, 1900)", fam);
+    long one = relate(pid, comb, orig, "basionym", null, null, "from WoRMS");
+    long two = relate(pid, comb, orig, "basionym", null, null, "see Smith 1900, p. 3");
     long bus = species(pid, "Aus bus", "Smith, 1900", fam);
     long buss = species(pid, "Aus buss", "Smith, 1900", fam);
-    long basionym = relate(pid, buss, bus, "basionym");
+    long bare = relate(pid, buss, bus, "basionym");
+    long referenced = relate(pid, buss, bus, "basionym", 7, null, null);
     long spelling = relate(pid, buss, bus, "spelling correction");
-    long other = relate(pid, bus, fam, "homotypic");
     awaitValidation();
-    JsonNode pairs = scan(pid, null);
 
-    cleanup(pid, refs(idVersion(pairs, bus, buss, basionym), idVersion(pairs, bus, buss, spelling)), OWNER)
+    JsonNode pairs = scan(pid, null);
+    JsonNode dup = relation(pair(pairs, orig, comb), two);
+    assertThat(dup.get("duplicate").asBoolean()).isTrue();
+    assertThat(dup.get("preselected").asBoolean()).isFalse();
+    JsonNode removed = relation(pair(pairs, bus, buss), referenced);
+    assertThat(removed.get("remove").asBoolean()).isTrue();
+    JsonNode twin = relation(pair(pairs, bus, buss), bare);
+    assertThat(twin.get("remove").asBoolean()).isTrue();
+    assertThat(twin.get("preselected").asBoolean()).isTrue();
+
+    cleanup(pid, refs(idVersion(pairs, orig, comb, two), idVersion(pairs, bus, buss, referenced)), OWNER)
         .andExpect(status().isOk())
         .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.deleted").value(2));
 
-    assertThat(relationCount(pid)).isEqualTo(1);
-    assertThat(jdbc.queryForObject("SELECT id FROM name_relation WHERE project_id = ?", Long.class, pid))
-        .isEqualTo(other);
+    // the preselected twin, the kept duplicate row and the spelling row were not sent: they survive
+    List<Long> survivors = jdbc.queryForList("SELECT id FROM name_relation WHERE project_id = ? ORDER BY id",
+        Long.class, pid);
+    assertThat(survivors).containsExactlyInAnyOrder(one, bare, spelling);
     assertThat(deleteAudits(pid)).isEqualTo(2);
-    // before image
-    String diff = jdbc.queryForObject("SELECT diff::text FROM change WHERE project_id = ? AND entity_id = ?"
-        + " AND operation = 'DELETE'", String.class, pid, basionym);
-    assertThat(diff).contains("basionym");
+    assertBeforeImage(pid, two, comb, orig);
+    assertBeforeImage(pid, referenced, buss, bus);
     awaitValidation();
+  }
+
+  private void assertBeforeImage(long pid, long relationId, long usageId, long relatedId) throws Exception {
+    String diff = jdbc.queryForObject("SELECT diff::text FROM change WHERE project_id = ? AND entity_type ="
+        + " 'name_relation' AND entity_id = ? AND operation = 'DELETE'", String.class, pid, relationId);
+    JsonNode before = json.readTree(diff).get("before");
+    assertThat(before.get("id").asLong()).isEqualTo(relationId);
+    assertThat(before.get("usageId").asLong()).isEqualTo(usageId);
+    assertThat(before.get("relatedUsageId").asLong()).isEqualTo(relatedId);
+  }
+
+  @Test
+  void missingVersionIsRejected() throws Exception {
+    long pid = createProject();
+    long fam = family(pid, "Aidae");
+    long a = species(pid, "Aus mus", "Smith, 1900", fam);
+    long b = species(pid, "Bus mus", "(Smith, 1900)", fam);
+    long r1 = relate(pid, b, a, "basionym");
+    relate(pid, b, a, "basionym");
+
+    cleanup(pid, "{\"relations\":[{\"id\":" + r1 + "}]}", OWNER).andExpect(status().isBadRequest());
+    cleanup(pid, "{\"relations\":[{\"version\":0}]}", OWNER).andExpect(status().isBadRequest());
+    assertThat(relationCount(pid)).isEqualTo(2);
+    assertThat(deleteAudits(pid)).isZero();
   }
 
   @Test

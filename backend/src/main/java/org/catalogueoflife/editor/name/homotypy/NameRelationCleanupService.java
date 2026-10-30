@@ -91,11 +91,12 @@ public class NameRelationCleanupService {
     }
     Map<Integer, Integer> wanted = new LinkedHashMap<>();
     for (RelationRef ref : req.relations()) {
-      if (ref == null) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "null relation reference");
+      if (ref == null || ref.id() == null || ref.version() == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "each relation needs an id and a version");
       }
       Integer prev = wanted.put(ref.id(), ref.version());
-      if (prev != null && prev != ref.version()) {
+      if (prev != null && !prev.equals(ref.version())) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
             "relation " + ref.id() + " given with two versions");
       }
