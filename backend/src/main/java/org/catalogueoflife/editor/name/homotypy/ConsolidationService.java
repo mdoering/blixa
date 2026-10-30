@@ -7,6 +7,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.catalogueoflife.editor.child.NameRelationMapper;
+import org.catalogueoflife.editor.child.dto.NameRelationResponse;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.NameUsageMapper;
 import org.catalogueoflife.editor.name.Status;
@@ -28,6 +30,7 @@ public class ConsolidationService {
 
   private final NameUsageMapper usages;
   private final SynonymAcceptedMapper synonymAccepted;
+  private final NameRelationMapper nameRelations;
   private final HomotypyDetector detector;
   private final ProjectService projects;
   private final NameParserService parser;
@@ -35,10 +38,11 @@ public class ConsolidationService {
   private final HomotypyService homotypy;
 
   public ConsolidationService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted,
-      HomotypyDetector detector, ProjectService projects, NameParserService parser,
+      NameRelationMapper nameRelations, HomotypyDetector detector, ProjectService projects, NameParserService parser,
       org.catalogueoflife.editor.name.NameUsageService nameUsages, HomotypyService homotypy) {
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
+    this.nameRelations = nameRelations;
     this.detector = detector;
     this.projects = projects;
     this.parser = parser;
@@ -98,7 +102,17 @@ public class ConsolidationService {
     Map<Integer, NameUsage> candidateById = new HashMap<>();
     candidates.forEach(u -> candidateById.put(u.getId(), u));
 
-    List<ProposedGroup> groups = detector.group(candidates, Set.of()).groups();
+    // The stored relations touching a candidate, loaded once for the project: the grouping's data
+    // evidence (homotypic links, later homonyms, known misspellings) and what marks a proposal as existing.
+    List<NameRelationResponse> candidateRelations = new ArrayList<>();
+    for (NameRelationResponse r : nameRelations.findByProject(projectId)) {
+      if (candidateById.containsKey(r.usageId())
+          || r.relatedUsageId() != null && candidateById.containsKey(r.relatedUsageId())) {
+        candidateRelations.add(r);
+      }
+    }
+    List<ProposedGroup> groups = detector.group(candidates, acceptedBySynonym,
+        ExistingRelations.of(candidateRelations), project.getNomCode()).groups();
     List<ConflictCluster> conflicts = new ArrayList<>();
 
     for (ProposedGroup g : groups) {

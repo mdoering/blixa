@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import life.catalogue.api.vocab.NomRelType;
 import org.catalogueoflife.editor.child.NameRelationMapper;
 import org.catalogueoflife.editor.child.dto.NameRelationRequest;
 import org.catalogueoflife.editor.child.dto.NameRelationResponse;
@@ -56,11 +55,11 @@ public class HomotypyService {
   }
 
   public HomotypyProposal detect(int userId, int projectId, int acceptedId) {
-    projects.requireRole(userId, projectId);
+    Project project = projects.requireVisible(userId, projectId);
     NameUsage accepted = requireUsage(projectId, acceptedId);
     List<NameUsage> synonyms = loadSynonyms(projectId, acceptedId);
-    Set<String> existing = existingRelationKeys(projectId, accepted, synonyms);
-    return detector.detect(accepted, synonyms, existing);
+    return detector.detect(accepted, synonyms, existingRelations(projectId, accepted, synonyms),
+        project.getNomCode());
   }
 
   @Transactional
@@ -135,22 +134,13 @@ public class HomotypyService {
     return out;
   }
 
-  private Set<String> existingRelationKeys(int projectId, NameUsage accepted, List<NameUsage> synonyms) {
-    Set<String> keys = new HashSet<>();
-    List<Integer> ids = new ArrayList<>();
-    ids.add(accepted.getId());
-    synonyms.forEach(s -> ids.add(s.getId()));
-    for (Integer id : ids) {
-      for (NameRelationResponse r : nameRelations.findByUsage(projectId, id)) {
-        if (r.relatedUsageId() != null) {
-          NomRelType t = RelTypes.parse(r.type());
-          if (t != null) {
-            keys.add(r.usageId() + ":" + r.relatedUsageId() + ":" + RelTypes.label(t));
-          }
-        }
-      }
+  // The stored relations of the accepted name and its synonyms, the grouping's data evidence.
+  private ExistingRelations existingRelations(int projectId, NameUsage accepted, List<NameUsage> synonyms) {
+    List<NameRelationResponse> rels = new ArrayList<>(nameRelations.findByUsage(projectId, accepted.getId()));
+    for (NameUsage s : synonyms) {
+      rels.addAll(nameRelations.findByUsage(projectId, s.getId()));
     }
-    return keys;
+    return ExistingRelations.of(rels);
   }
 
   private SynonymEntry entry(NameUsage u, Project project) {

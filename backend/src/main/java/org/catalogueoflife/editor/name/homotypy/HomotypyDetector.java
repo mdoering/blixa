@@ -1,135 +1,225 @@
 package org.catalogueoflife.editor.name.homotypy;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
+import life.catalogue.api.model.Name;
 import life.catalogue.api.vocab.NomRelType;
+import life.catalogue.basgroup.BasionymSorter;
+import life.catalogue.basgroup.HomotypicGroup;
+import life.catalogue.basgroup.HomotypicRules;
 import life.catalogue.common.tax.AuthorshipNormalizer;
 import life.catalogue.common.tax.SciNameNormalizer;
+import life.catalogue.matching.authorship.AuthorComparator;
 import org.catalogueoflife.editor.name.NameUsage;
 import org.catalogueoflife.editor.name.Status;
-import org.catalogueoflife.editor.nomenclature.RelTypes;
 import org.catalogueoflife.editor.name.homotypy.dto.HomotypyProposal;
 import org.catalogueoflife.editor.name.homotypy.dto.ProposedGroup;
 import org.catalogueoflife.editor.name.homotypy.dto.ProposedRelation;
+import org.catalogueoflife.editor.nomenclature.ClbNames;
+import org.catalogueoflife.editor.nomenclature.RelTypes;
+import org.gbif.nameparser.api.NameType;
+import org.gbif.nameparser.api.NomCode;
 import org.springframework.stereotype.Component;
 
-// Compact BasionymSorter-lite. Buckets the accepted usage + its (non-misapplied) synonyms by
-// normalized terminal epithet, then clusters within a bucket by basionym-or-combination author team
-// (+ compatible year). A name WITHOUT parenthetical basionym authorship is the bucket's basionym;
-// names WITH it are recombinations. Pure/stateless: no DB, no name parser (reads the parsed fields
-// already stored on each usage). See docs/superpowers/specs/2026-07-20-homotypic-grouping-design.md.
+/**
+ * Groups names into homotypic groups with CLB's {@link BasionymSorter}, the way CLB's
+ * {@code HomotypicConsolidator} does: candidates are bucketed by normalized terminal epithet and
+ * each bucket is grouped by basionym-or-combination authorship ({@link AuthorComparator}, so "L."
+ * and "Linnaeus" or years a few apart match). Synonymy and stored relations are the data evidence
+ * that keeps original names of different genera together and keeps known misspellings from
+ * becoming the basionym. Each group proposes the relations the consolidator would create, minus
+ * those between names the stored relations already link or relate as later homonyms. Stateless,
+ * no DB.
+ */
 @Component
 public class HomotypyDetector {
 
-  private static final class Cluster {
-    final String epithetKey;
-    final String authorKey;
-    String year; // first non-null year seen (back-fills the group's reference year)
-    final List<NameUsage> members = new ArrayList<>();
-    Cluster(String epithetKey, String authorKey, String year) {
-      this.epithetKey = epithetKey; this.authorKey = authorKey; this.year = year;
-    }
-  }
+  private static final AuthorComparator AUTHORS = new AuthorComparator(AuthorshipNormalizer.INSTANCE);
+  private static final BasionymSorter<Name> SORTER = new BasionymSorter<>(AUTHORS, n -> 0);
 
-  public HomotypyProposal detect(NameUsage accepted, List<NameUsage> synonyms, Set<String> existingKeys) {
+  private static final String BASIONYM = RelTypes.label(NomRelType.BASIONYM);
+  private static final String HOMOTYPIC = RelTypes.label(NomRelType.HOMOTYPIC);
+  private static final String SPELLING_CORRECTION = RelTypes.label(NomRelType.SPELLING_CORRECTION);
+  private static final String BASED_ON = RelTypes.label(NomRelType.BASED_ON);
+
+  /** Groups an accepted name with its synonyms, misapplied names excluded. */
+  public HomotypyProposal detect(NameUsage accepted, List<NameUsage> synonyms, ExistingRelations existing,
+      @Nullable NomCode code) {
     List<NameUsage> candidates = new ArrayList<>();
-    candidates.add(accepted); // accepted first so its group is anchored on it
+    candidates.add(accepted); // accepted first so its group lists it first
+    Map<Integer, List<Integer>> acceptedBySynonym = new HashMap<>();
     for (NameUsage s : synonyms) {
-      if (s.getStatus() != Status.MISAPPLIED) candidates.add(s);
+      if (s.getStatus() != Status.MISAPPLIED) {
+        candidates.add(s);
+        acceptedBySynonym.put(s.getId(), List.of(accepted.getId()));
+      }
     }
-    return group(candidates, existingKeys);
+    return group(candidates, acceptedBySynonym, existing, code);
   }
 
-  // Status-agnostic clustering: clusters exactly the usages passed (callers pre-filter). Side 1
-  // passes an accepted + its non-misapplied synonyms; Side 2 passes a whole subtree's usages.
-  public HomotypyProposal group(List<NameUsage> candidates, Set<String> existingKeys) {
-    List<Cluster> clusters = new ArrayList<>();
+  /**
+   * Groups exactly the usages passed (callers pre-filter).
+   *
+   * @param acceptedBySynonym the accepted usage ids of each synonym, the synonymy evidence
+   */
+  public HomotypyProposal group(List<NameUsage> candidates, Map<Integer, List<Integer>> acceptedBySynonym,
+      ExistingRelations existing, @Nullable NomCode code) {
+    Map<Integer, NameUsage> usages = new HashMap<>();
+    Map<String, List<Name>> buckets = new LinkedHashMap<>();
     for (NameUsage u : candidates) {
-      String ek = epithetKey(u);
-      String ak = authorKey(u);
-      String yr = yearOf(u);
-      Cluster match = null;
-      if (!ak.isBlank()) {
-        for (Cluster c : clusters) {
-          if (c.epithetKey.equals(ek) && c.authorKey.equals(ak) && yearCompatible(c.year, yr)) {
-            match = c; break;
-          }
-        }
-      }
-      if (match == null) {
-        clusters.add(new Cluster(ek, ak, yr));
-        clusters.get(clusters.size() - 1).members.add(u);
-      } else {
-        match.members.add(u);
-        if (match.year == null) match.year = yr;
-      }
+      Name n = ClbNames.toName(u, code);
+      String epithet = epithetKey(n);
+      if (epithet == null) continue;
+      usages.put(u.getId(), u);
+      buckets.computeIfAbsent(epithet, k -> new ArrayList<>()).add(n);
     }
+
+    Linked linked = new Linked(acceptedBySynonym, existing);
+    HomotypicGroup.Evidence<Name> evidence = new HomotypicGroup.Evidence<>() {
+      @Override
+      public boolean isVariant(Name n) {
+        return existing.misspelling(id(n));
+      }
+
+      @Override
+      public int penalty(Name n) {
+        NameUsage u = usages.get(id(n));
+        int penalty = u != null && (u.getStatus() == Status.SYNONYM || u.getStatus() == Status.MISAPPLIED) ? 1 : 0;
+        return n.isAvailable() ? penalty : penalty + 1;
+      }
+    };
 
     List<ProposedGroup> groups = new ArrayList<>();
-    for (Cluster c : clusters) {
-      NameUsage basionym = null;
-      for (NameUsage m : c.members) {
-        if (!hasBasionymAuthorship(m)) { basionym = m; break; }
-      }
-      List<Integer> memberIds = c.members.stream().map(NameUsage::getId).toList();
-      List<ProposedRelation> relations = new ArrayList<>();
-      if (basionym != null) {
-        for (NameUsage m : c.members) {
-          if (m == basionym) continue;
-          String type = hasBasionymAuthorship(m) ? "basionym" : "homotypic";
-          relations.add(rel(m.getId(), basionym.getId(), type, existingKeys));
-        }
-      } else if (c.members.size() > 1) {
-        NameUsage head = c.members.get(0);
-        for (int i = 1; i < c.members.size(); i++) {
-          relations.add(rel(c.members.get(i).getId(), head.getId(), "homotypic", existingKeys));
+    for (var bucket : buckets.entrySet()) {
+      Collection<HomotypicGroup<Name>> hgs =
+          SORTER.groupBasionyms(code, bucket.getKey(), bucket.getValue(), n -> n, linked::test, evidence);
+      for (HomotypicGroup<Name> hg : hgs) {
+        if (!hg.isEmpty()) {
+          groups.add(toProposedGroup(hg, candidates, existing));
         }
       }
-      groups.add(new ProposedGroup(basionym == null ? null : basionym.getId(), memberIds, relations));
     }
     return new HomotypyProposal(groups);
   }
 
-  private static ProposedRelation rel(int usageId, int relatedId, String type, Set<String> existing) {
-    NomRelType t = RelTypes.parse(type);
-    boolean exists = t != null && existing.contains(usageId + ":" + relatedId + ":" + RelTypes.label(t));
-    return new ProposedRelation(usageId, relatedId, type, exists);
+  /**
+   * The relation types and directions of {@code HomotypicConsolidator}: recombinations have the
+   * basionym, other original names are spelling corrections or homotypic, and the primary name is
+   * based on the based-on name. Without a basionym the recombinations are homotypic with the first.
+   */
+  private static ProposedGroup toProposedGroup(HomotypicGroup<Name> hg, List<NameUsage> candidates,
+      ExistingRelations existing) {
+    List<ProposedRelation> rels = new ArrayList<>();
+    if (hg.hasBasionym()) {
+      Name basionym = hg.getBasionym();
+      for (Name r : hg.getRecombinations()) {
+        propose(rels, r, basionym, BASIONYM, existing);
+      }
+      for (Name v : hg.getBasionymVariations()) {
+        relateVariation(rels, basionym, v, existing);
+      }
+    } else if (hg.hasRecombinations()) {
+      var iter = hg.getRecombinations().iterator();
+      Name hom = iter.next();
+      while (iter.hasNext()) {
+        Name u = iter.next();
+        if (!HomotypicRules.isDuplicate(u, hom)) {
+          propose(rels, u, hom, HOMOTYPIC, existing);
+        }
+      }
+    }
+    if (hg.hasBasedOn()) {
+      Name basedOn = hg.getBasedOn();
+      propose(rels, hg.getPrimary(), basedOn, BASED_ON, existing);
+      for (Name v : hg.getBasedOnVariations()) {
+        relateVariation(rels, basedOn, v, existing);
+      }
+    }
+
+    // members in the callers' order, so detect() lists the accepted name first
+    Set<Integer> ids = new HashSet<>();
+    hg.getAll().forEach(n -> ids.add(id(n)));
+    if (hg.getPrimary() != null) ids.add(id(hg.getPrimary()));
+    List<Integer> members = candidates.stream().map(NameUsage::getId).filter(ids::contains).toList();
+    Integer basionymId = hg.hasBasionym() ? id(hg.getBasionym()) : null;
+    return new ProposedGroup(basionymId, members, rels);
   }
 
-  private static String epithetKey(NameUsage u) {
-    String terminal = notBlank(u.getInfraspecificEpithet()) ? u.getInfraspecificEpithet()
-        : notBlank(u.getSpecificEpithet()) ? u.getSpecificEpithet()
-        : u.getUninomial();
-    if (isBlank(terminal)) return "";
-    String norm = SciNameNormalizer.normalizeEpithet(terminal);
-    return norm == null ? "" : norm.toLowerCase(Locale.ROOT);
+  /**
+   * As {@code HomotypicConsolidator.relateVariation}: a duplicate gets no relation, an orthographic
+   * variant a spelling correction from the original to the variant, any other variation is
+   * homotypic with the original.
+   */
+  private static void relateVariation(List<ProposedRelation> rels, Name original, Name variation,
+      ExistingRelations existing) {
+    if (id(original) == id(variation) || HomotypicRules.isDuplicate(original, variation)) {
+      return;
+    }
+    if (HomotypicRules.isOrthographicVariant(original, variation)) {
+      propose(rels, original, variation, SPELLING_CORRECTION, existing);
+    } else {
+      propose(rels, variation, original, HOMOTYPIC, existing);
+    }
   }
 
-  // Basionym-or-combination author: the basionym (in-parentheses) author if the name has one, else
-  // the combination author. Normalized + alias-resolved so spelling variants of one author match.
-  private static String authorKey(NameUsage u) {
-    String team = hasBasionymAuthorship(u) ? u.getBasionymAuthorship() : u.getCombinationAuthorship();
-    if (isBlank(team)) return "";
-    String normalized = AuthorshipNormalizer.normalize(team);
-    if (normalized == null || normalized.isBlank()) return "";
-    String looked = AuthorshipNormalizer.INSTANCE.lookup(normalized);
-    return (looked == null || looked.isBlank() ? normalized : looked).toLowerCase(Locale.ROOT);
+  /**
+   * Adds the relation, marked if exactly it is stored already. A relation not yet stored is skipped
+   * when the stored relations already link both names homotypically (directly or through one other
+   * name) or relate them as later homonyms, so the cleanup never flags what the grouping proposes.
+   */
+  private static void propose(List<ProposedRelation> rels, Name from, Name to, String type,
+      ExistingRelations existing) {
+    int a = id(from);
+    int b = id(to);
+    if (a == b) return;
+    if (existing.exists(a, b, RelTypes.parse(type))) {
+      rels.add(new ProposedRelation(a, b, type, true));
+    } else if (!existing.linkedByData(a, b) && !existing.laterHomonyms(a, b)) {
+      rels.add(new ProposedRelation(a, b, type, false));
+    }
   }
 
-  private static String yearOf(NameUsage u) {
-    return hasBasionymAuthorship(u) ? u.getBasionymAuthorshipYear() : u.getCombinationAuthorshipYear();
+  /**
+   * The normalized terminal epithet, or null for names the grouping skips as the consolidator does:
+   * supraspecific names, autonyms, unparsable names and names without a usable terminal epithet.
+   */
+  @Nullable
+  private static String epithetKey(Name n) {
+    if (n.getType() == NameType.OTHER || n.getType() == NameType.IDENTIFIER
+        || n.getRank() != null && n.getRank().isSupraspecific() || n.isAutonym()) {
+      return null;
+    }
+    String terminal = n.getTerminalEpithet();
+    if (terminal == null || terminal.isBlank()) return null;
+    String norm = SciNameNormalizer.normalizeEpithet(terminal.trim().toLowerCase(Locale.ROOT));
+    return norm == null || norm.isEmpty() ? null : norm;
   }
 
-  private static boolean yearCompatible(String a, String b) {
-    return a == null || a.isBlank() || b == null || b.isBlank() || a.equals(b);
+  private static int id(Name n) {
+    return Integer.parseInt(n.getId());
   }
 
-  // Whether this usage carries parenthetical basionym authorship, i.e. is itself a recombination
-  // (as opposed to being the original combination / the cluster's basionym).
-  private static boolean hasBasionymAuthorship(NameUsage u) { return notBlank(u.getBasionymAuthorship()); }
-
-  private static boolean isBlank(String s) { return s == null || s.isBlank(); }
-  private static boolean notBlank(String s) { return !isBlank(s); }
+  /**
+   * As {@code HomotypicConsolidator.linked}: one is a synonym of the other, both are synonyms of the
+   * same accepted name, or the stored relations relate them homotypically.
+   */
+  private record Linked(Map<Integer, List<Integer>> acceptedBySynonym, ExistingRelations existing) {
+    boolean test(Name n1, Name n2) {
+      int a = id(n1);
+      int b = id(n2);
+      List<Integer> accA = acceptedBySynonym.getOrDefault(a, List.of());
+      List<Integer> accB = acceptedBySynonym.getOrDefault(b, List.of());
+      return accA.contains(b) || accB.contains(a)
+          || accA.stream().anyMatch(accB::contains)
+          || existing.homotypic(a).contains(b);
+    }
+  }
 }
