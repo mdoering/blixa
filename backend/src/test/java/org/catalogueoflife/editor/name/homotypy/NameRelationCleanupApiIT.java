@@ -28,7 +28,9 @@ import org.catalogueoflife.editor.project.Role;
 import org.catalogueoflife.editor.support.AbstractPostgresIT;
 import org.catalogueoflife.editor.user.AppUser;
 import org.catalogueoflife.editor.user.AppUserService;
+import org.catalogueoflife.editor.validation.BulkValidationEvent;
 import org.catalogueoflife.editor.validation.ValidationAsyncConfig;
+import org.catalogueoflife.editor.validation.ValidationEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -38,6 +40,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -47,6 +51,7 @@ import tools.jackson.databind.ObjectMapper;
 // bracketed authorship "(Smith, 1900)" marks the name with a basionym.
 @AutoConfigureMockMvc
 @WithMockUser(username = "relOwner")
+@RecordApplicationEvents
 class NameRelationCleanupApiIT extends AbstractPostgresIT {
 
   private static final String OWNER = "relOwner";
@@ -60,6 +65,7 @@ class NameRelationCleanupApiIT extends AbstractPostgresIT {
   @Autowired @Qualifier(ValidationAsyncConfig.EXECUTOR_BEAN) Executor validationExecutor;
   @MockitoSpyBean NameUsageMapper usageMapper;
   @MockitoSpyBean NameRelationMapper relationMapper;
+  @Autowired ApplicationEvents appEvents;
 
   // ---- helpers ----
 
@@ -558,19 +564,19 @@ class NameRelationCleanupApiIT extends AbstractPostgresIT {
   }
 
   // Two pairs, scanned first; the request is built from the scan result:
-  //  pair A: two basionym rows with different remarks -> the second is a content-carrying duplicate
-  //          (duplicate=true, preselected=false); no flag-only verdict fixture exists, so this stands
-  //          in for "listed but unticked" (the editor may still tick it);
+  //  pair A: a basionym given both ways between two original names (no basionym authorship, same
+  //          year): nothing tells the direction, so both rows are flag-only (issue, remove=false,
+  //          preselected=false); the editor ticks one of them anyway;
   //  pair B: basionym removed by the judge (referenced row kept, remove=true) with a bare twin
   //          (remove=true, preselected=true) that is deliberately NOT sent.
   @Test
   void applyDeletesExactlyTheSentRelations() throws Exception {
     long pid = createProject();
     long fam = family(pid, "Aidae");
-    long orig = species(pid, "Aus eus", "Smith, 1900", fam);
-    long comb = species(pid, "Bus eus", "(Smith, 1900)", fam);
-    long one = relate(pid, comb, orig, "basionym", null, null, "from WoRMS");
-    long two = relate(pid, comb, orig, "basionym", null, null, "see Smith 1900, p. 3");
+    long fus = species(pid, "Aus fus", "Smith, 1900", fam);
+    long gus = species(pid, "Bus gus", "Jones, 1900", fam);
+    long forward = relate(pid, fus, gus, "basionym");
+    long backward = relate(pid, gus, fus, "basionym");
     long bus = species(pid, "Aus bus", "Smith, 1900", fam);
     long buss = species(pid, "Aus buss", "Smith, 1900", fam);
     long bare = relate(pid, buss, bus, "basionym");
@@ -579,27 +585,63 @@ class NameRelationCleanupApiIT extends AbstractPostgresIT {
     awaitValidation();
 
     JsonNode pairs = scan(pid, null);
-    JsonNode dup = relation(pair(pairs, orig, comb), two);
-    assertThat(dup.get("duplicate").asBoolean()).isTrue();
-    assertThat(dup.get("preselected").asBoolean()).isFalse();
+    for (long id : new long[] {forward, backward}) {
+      JsonNode flagged = relation(pair(pairs, fus, gus), id);
+      assertThat(issues(flagged)).containsExactly("NAME_RELATION_CONFLICT");
+      assertThat(flagged.get("remove").asBoolean()).isFalse();
+      assertThat(flagged.get("preselected").asBoolean()).isFalse();
+    }
     JsonNode removed = relation(pair(pairs, bus, buss), referenced);
     assertThat(removed.get("remove").asBoolean()).isTrue();
     JsonNode twin = relation(pair(pairs, bus, buss), bare);
     assertThat(twin.get("remove").asBoolean()).isTrue();
     assertThat(twin.get("preselected").asBoolean()).isTrue();
 
-    cleanup(pid, refs(idVersion(pairs, orig, comb, two), idVersion(pairs, bus, buss, referenced)), OWNER)
+    cleanup(pid, refs(idVersion(pairs, fus, gus, forward), idVersion(pairs, bus, buss, referenced)), OWNER)
         .andExpect(status().isOk())
         .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.deleted").value(2));
 
-    // the preselected twin, the kept duplicate row and the spelling row were not sent: they survive
+    // the other flag-only row, the preselected twin and the spelling row were not sent: they survive
     List<Long> survivors = jdbc.queryForList("SELECT id FROM name_relation WHERE project_id = ? ORDER BY id",
         Long.class, pid);
-    assertThat(survivors).containsExactlyInAnyOrder(one, bare, spelling);
+    assertThat(survivors).containsExactlyInAnyOrder(backward, bare, spelling);
     assertThat(deleteAudits(pid)).isEqualTo(2);
-    assertBeforeImage(pid, two, comb, orig);
+    assertBeforeImage(pid, forward, fus, gus);
     assertBeforeImage(pid, referenced, buss, bus);
     awaitValidation();
+  }
+
+  // A cleanup revalidates the owning usages of all deleted relations in ONE bulk event, each usage
+  // once, instead of one event per relation that could overflow the bounded validation queue. A 409
+  // publishes nothing.
+  @Test
+  void applyPublishesOneBulkValidationEvent() throws Exception {
+    long pid = createProject();
+    long fam = family(pid, "Aidae");
+    long a = species(pid, "Aus mus", "Smith, 1900", fam);
+    long b = species(pid, "Bus mus", "(Smith, 1900)", fam);
+    long r1 = relate(pid, b, a, "basionym");
+    long r2 = relate(pid, b, a, "basionym");
+    long r3 = relate(pid, a, b, "basionym");
+    long r4 = relate(pid, a, b, "homotypic");
+    awaitValidation();
+
+    appEvents.clear();
+    cleanup(pid, refs(new long[] {r1, 0}, new long[] {r2, 0}, new long[] {r3, 0}), OWNER)
+        .andExpect(status().isOk());
+    List<BulkValidationEvent> bulk = appEvents.stream(BulkValidationEvent.class).toList();
+    assertThat(bulk).hasSize(1);
+    assertThat(bulk.get(0).projectId()).isEqualTo((int) pid);
+    assertThat(bulk.get(0).usageIds()).containsExactlyInAnyOrder((int) b, (int) a);
+    assertThat(appEvents.stream(ValidationEvent.class)).isEmpty();
+    awaitValidation();
+
+    // r1 is gone: the whole request fails, r4 survives and nothing is published
+    appEvents.clear();
+    cleanup(pid, refs(new long[] {r4, 0}, new long[] {r1, 0}), OWNER).andExpect(status().isConflict());
+    assertThat(appEvents.stream(BulkValidationEvent.class)).isEmpty();
+    assertThat(appEvents.stream(ValidationEvent.class)).isEmpty();
+    assertThat(relationCount(pid)).isEqualTo(1);
   }
 
   private void assertBeforeImage(long pid, long relationId, long usageId, long relatedId) throws Exception {
@@ -661,10 +703,13 @@ class NameRelationCleanupApiIT extends AbstractPostgresIT {
     JsonNode pairs = scan(pid, null);
     long[] a = idVersion(pairs, bus, buss, basionym);
     long[] b = idVersion(pairs, bus, buss, spelling);
+    appEvents.clear();
     mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
             .delete("/api/projects/" + pid + "/usages/" + buss + "/relations/" + spelling)
             .with(csrf()).with(user(OWNER)))
         .andExpect(status().isNoContent());
+    // the single delete still revalidates its usage on its own
+    assertThat(appEvents.stream(ValidationEvent.class)).containsExactly(ValidationEvent.forUsage((int) pid, (int) buss));
     long auditsBefore = deleteAudits(pid);
 
     cleanup(pid, refs(a, b), OWNER).andExpect(status().isConflict());

@@ -34,7 +34,9 @@ import org.catalogueoflife.editor.parse.NameParserService;
 import org.catalogueoflife.editor.project.Project;
 import org.catalogueoflife.editor.project.ProjectService;
 import org.catalogueoflife.editor.project.Role;
+import org.catalogueoflife.editor.validation.BulkValidationEvent;
 import org.gbif.nameparser.api.NomCode;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,11 +61,13 @@ public class NameRelationCleanupService {
   private final ProjectService projects;
   private final NameParserService parser;
   private final NameRelationService relationService;
+  private final ApplicationEventPublisher events;
 
   public NameRelationCleanupService(NameUsageMapper usages, SynonymAcceptedMapper synonymAccepted,
       NameRelationMapper nameRelations, ProjectService projects, NameParserService parser,
-      NameRelationService relationService) {
+      NameRelationService relationService, ApplicationEventPublisher events) {
     this.relationService = relationService;
+    this.events = events;
     this.usages = usages;
     this.synonymAccepted = synonymAccepted;
     this.nameRelations = nameRelations;
@@ -74,7 +78,9 @@ public class NameRelationCleanupService {
   /**
    * Deletes exactly the listed relations, each only if it still has the version the scan showed.
    * All or nothing: a missing or changed relation throws 409, which rolls the transaction back, so
-   * no relation, audit row or (after-commit) validation event survives. Repeated identical refs are
+   * no relation, audit row or (after-commit) validation event survives. The owning usages of the
+   * deleted relations are revalidated by ONE {@link BulkValidationEvent}, so a large cleanup cannot
+   * overflow the bounded validation queue. Repeated identical refs are
    * deleted once; the same id with two different versions is a 400. An empty list is a 400.
    * Like {@code NameRelationService.delete} this does not look at soft locks.
    *
@@ -101,7 +107,7 @@ public class NameRelationCleanupService {
             "relation " + ref.id() + " given with two versions");
       }
     }
-    int deleted = 0;
+    Set<Integer> revalidate = new LinkedHashSet<>();
     for (Map.Entry<Integer, Integer> e : wanted.entrySet()) {
       NameRelationResponse before = nameRelations.findById(projectId, e.getKey());
       // the version of the row read must be the one the editor saw; deleteWithAudit then re-checks
@@ -111,9 +117,10 @@ public class NameRelationCleanupService {
         throw new ResponseStatusException(HttpStatus.CONFLICT,
             "conflict: relation " + e.getKey() + " is missing or was changed");
       }
-      deleted++;
+      revalidate.add(before.usageId());
     }
-    return deleted;
+    events.publishEvent(new BulkValidationEvent(projectId, List.copyOf(revalidate)));
+    return wanted.size();
   }
 
   /**

@@ -91,26 +91,24 @@ public class NameRelationService {
     requireEditor(userId, projectId);
     NameRelationResponse before = requireInProject(projectId, id);
     mapper.delete(projectId, id);
-    recordDelete(userId, projectId, before);
+    audit.record(projectId, userId, ENTITY, id, Operation.DELETE, before, null);
+    events.publishEvent(ValidationEvent.forUsage(projectId, before.usageId()));
   }
 
   /**
    * Deletes the relation only if it still has the given version; returns false when it is missing
-   * or was changed. Audits like {@link #delete}. Must run inside the caller's transaction, which
-   * should be rolled back on false when deleting several relations all-or-nothing.
+   * or was changed. Audits like {@link #delete} but publishes no validation event: a caller deleting
+   * many relations publishes one {@code BulkValidationEvent} for all of them instead. Must run
+   * inside the caller's transaction, which should be rolled back on false when deleting several
+   * relations all-or-nothing.
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public boolean deleteWithAudit(int userId, int projectId, NameRelationResponse before) {
     if (mapper.deleteVersioned(projectId, before.id(), before.version()) == 0) {
       return false;
     }
-    recordDelete(userId, projectId, before);
-    return true;
-  }
-
-  private void recordDelete(int userId, int projectId, NameRelationResponse before) {
     audit.record(projectId, userId, ENTITY, before.id(), Operation.DELETE, before, null);
-    events.publishEvent(ValidationEvent.forUsage(projectId, before.usageId()));
+    return true;
   }
 
   private void requireUsage(int projectId, int usageId) {
