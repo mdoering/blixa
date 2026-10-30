@@ -60,7 +60,10 @@ holds references, `tree`, `project`, `validation`, `discussion`, `lock`, `auth`,
   `life.catalogue.*` and `org.gbif.txtree`: `ColdpTerm` + `TabWriter` for TSV (see
   `coldp/io/ColdpTsv.java`), `ColdpReader` for reading, `org.gbif.txtree.Tree` / `SimpleTreeNode`
   for TextTree (read on import under `coldp/imprt`, and `SimpleTreeNode.print(...)` to write).
-  Name/rank parsing comes from **name-parser 5.x** (ships Rust FFM native jars).
+  Name/rank parsing comes from **name-parser 6.x** (ships Rust FFM native jars). The pure
+  nomenclatural logic (homotypic grouping, author comparison, name relation judging) comes from
+  CLB's `org.catalogueoflife:nomenclature` module, used via
+  `org.catalogueoflife.editor.nomenclature.ClbNames`/`RelTypes`.
 - **Read model / search:** `GET /usages?q&rank&status&limit&offset` → `UsagePage{items,total}`
   (server-side pagination, `pg_trgm` fuzzy `q`); `GET /references?q&yearFrom&yearTo`. External
   calls go through SSRF-guarded `RestClient` `@Component`s: **ChecklistBank** (COL matching, merge,

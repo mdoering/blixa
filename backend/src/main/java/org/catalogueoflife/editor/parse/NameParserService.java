@@ -13,7 +13,7 @@ import org.gbif.nameparser.util.NameFormatter;
 import org.springframework.stereotype.Service;
 
 /**
- * Wraps the GBIF name-parser 5.x {@link NameParser} to atomize a {@link NameUsage}'s scientific
+ * Wraps the GBIF name-parser 6.x {@link NameParser} to atomize a {@link NameUsage}'s scientific
  * name + authorship, and to render formatted display names, per design-spec Appendix A.
  *
  * <p>At 5.0.0 the reference Java parser was dropped; the sole implementation is {@link
@@ -39,9 +39,9 @@ public class NameParserService {
    *
    * <p>Never throws: when the parser yields no atomized {@link org.gbif.nameparser.api.ParsedName}
    * -- an {@code Unparsable} name (virus names, BOLD BINs, hybrid formulas, placeholders, ...) --
-   * {@code u.parseState} is set to {@code "UNPARSABLE"} and
-   * {@code u.nameType} to the result's {@link org.gbif.nameparser.api.NameType}; the caller always
-   * gets back a usable, if unparsed, {@link NameUsage}.
+   * {@code u.parseState} is set to {@code "UNPARSABLE"} and {@code u.nameType} to the result's
+   * {@link org.gbif.nameparser.api.NameType}; the caller always gets back a usable, if unparsed,
+   * {@link NameUsage}.
    *
    * @param nomCode the project's nomenclatural code, or {@code null} if unknown
    */

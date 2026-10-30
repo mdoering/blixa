@@ -1,7 +1,7 @@
 # Reuse the CLB nomenclature module: homotypy, author matching and name relation cleanup
 
 *Design spec — 2026-10-29*
-**Status:** Approved 2026-10-30.
+**Status:** Implemented 2026-10-30; see `docs/superpowers/plans/2026-10-30-nomenclature-module.md`.
 
 ## Context
 
@@ -164,7 +164,8 @@ argument changes, see below. Inside:
   - with a basionym: each recombination → `basionym` relation from the recombination to the
     basionym. Each basionym variation → `spelling correction` if
     `HomotypicRules.isOrthographicVariant`, else `homotypic`. The relation runs in the direction
-    `HomotypicConsolidator.relateVariation` writes it: from the chosen original to the variant.
+    `HomotypicConsolidator.relateVariation` writes it: a spelling correction runs original → variant,
+    a homotypic relation runs variant → original.
     Duplicates are skipped (`HomotypicRules.isDuplicate`).
   - without a basionym: every further recombination → `homotypic` to the first one, skipping
     duplicates.

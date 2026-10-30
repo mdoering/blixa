@@ -149,13 +149,19 @@ Spec: `docs/superpowers/specs/2026-07-20-discussions-design.md`.
 
 - **DwC-A import adapter** — *shipped; spec `docs/superpowers/specs/2026-07-24-dwca-import-design.md`.* `DwcaAdapter` + `DwcaToColdp` read a Darwin Core Archive (`org.gbif:dwca-io`) and write a ColDP staging archive the existing importer loads. Content-sniffs `meta.xml` to tell a DwC-A `.zip` from a ColDP `.zip`. Taxon core → NameUsage (status normalized to the ColDP vocab); classification both normalized (`parentNameUsageID`/`acceptedNameUsageID`) and flat (synthesize higher taxa from the Linnaean columns, deduped by path); VernacularName + Distribution + SpeciesProfile (→ extinct/environment) extensions. *(No DwC-A export — out of scope. v1 excludes references/type/multimedia extensions, `higherClassification` string, multi-target pro-parte.)*
 - **Homotypic grouping** — *Side 1 shipped:* in-taxon detection + nested synonymy. Select an accepted
-  taxon, auto-detect basionym-anchored homotypic groups among its synonyms (BasionymSorter-lite over
-  parsed authorship), confirm, and persist as `name_relation` rows; the synonymy renders nested (≡/=)
+  taxon, auto-detect basionym-anchored homotypic groups among its synonyms (CLB's `BasionymSorter` and
+  `AuthorComparator` over parsed authorship), confirm, and persist as `name_relation` rows; the synonymy renders nested (≡/=)
   like the COL portal. `name_relation` is now the single source of truth for basionym (the
   `basionym_id` column was dropped; import/export go through the relation). *Side 2 shipped:* scan a focal taxon's accepted subtree for homotypic clusters resolving to >1
   accepted name (incl. via synonyms), pick a survivor (most descendants suggested), and demote the
   others to homotypic synonyms; pro-parte / dual-status flagged. Consolidation page + `GET/POST
   …/usages/{id}/homotypic/{conflicts,consolidate}`.
+- **Nomenclature module reuse** — *shipped; spec `docs/superpowers/specs/2026-10-29-nomenclature-module-design.md`.*
+  Homotypic grouping now runs on CLB's `BasionymSorter`/`AuthorComparator` (replacing the former
+  BasionymSorter-lite), merge author matching goes through `AuthorComparator`, and relation types use
+  CLB's `NomRelType`. New **name relation cleanup**: scan a subtree or the whole project for conflicting
+  name relations, review them on the "Clean name relations" page and delete the chosen ones (version
+  check + audit). `GET …/name-relations/conflicts`, `POST …/name-relations/cleanup`.
 - **GBIF occurrence import into TypeMaterial** — *shipped; spec `docs/superpowers/specs/2026-07-25-gbif-occurrence-type-material-design.md`.* The Types tab's "Import from GBIF" resolves the name to COL (its `col:` id, else name-match to COL — the GBIF backbone is deprecated), queries GBIF occurrences against GBIF's COL checklist (`checklistKey` + the COL taxonID), and lists type specimens as TypeMaterial candidates (deduped by `occurrenceId`) for the curator to tick + import via the normal create path.
 - **Distribution map preview** — *mostly shipped* as a bespoke maplibre-gl view (richer than
   portal-components: distribution polygons focal/children via CLB `/vocab/area/{gaz}:{id}` GeoJSON,
