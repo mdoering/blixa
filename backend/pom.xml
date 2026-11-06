@@ -18,9 +18,22 @@
   <properties>
     <java.version>25</java.version>
     <mybatis-starter.version>4.0.1</mybatis-starter.version>
-    <name-parser.version>6.0.0-SNAPSHOT</name-parser.version>
-    <name-parser-rust.version>0.4.1-SNAPSHOT</name-parser-rust.version>
+    <clb.version>1.7.0-SNAPSHOT</clb.version>
   </properties>
+
+  <!-- The CLB modules and the name parser pair they are built with come from the backend's BOM, so moving to another
+       backend version is this one property. It manages CoL and name parser artifacts only, nothing Spring Boot does. -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.catalogueoflife</groupId>
+        <artifactId>clb-bom</artifactId>
+        <version>${clb.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <!-- Official Anthropic Java SDK for the AI-assisted curation feature's Claude adapter. -->
@@ -117,17 +130,14 @@
          Rank/NomCode/NameType) is separate from the implementation. The reference Java impl
          (NameParserImpl) was dropped at 5.0.0; the sole implementation is now a Rust core reached
          over the JDK Foreign Function and Memory API (java.lang.foreign), which requires JDK 25.
-         Both track the latest snapshots, as the CLB backend does; the rust binding pins the api
-         version it implements, so bump the two together. -->
+         Their versions come from clb-bom, the pair the CLB backend is built with. -->
     <dependency>
       <groupId>org.gbif</groupId>
       <artifactId>name-parser-api</artifactId>
-      <version>${name-parser.version}</version>
     </dependency>
     <dependency>
       <groupId>org.gbif.nameparser</groupId>
       <artifactId>name-parser-rust</artifactId>
-      <version>${name-parser-rust.version}</version>
     </dependency>
     <!-- Native FFI libraries, one classifier jar per platform. Both are bundled so the SAME
          fat jar runs on the deploy/CI host (Linux x86_64) and local dev (macOS Apple Silicon);
@@ -136,13 +146,11 @@
     <dependency>
       <groupId>org.gbif.nameparser</groupId>
       <artifactId>name-parser-rust</artifactId>
-      <version>${name-parser-rust.version}</version>
       <classifier>linux-x86_64</classifier>
     </dependency>
     <dependency>
       <groupId>org.gbif.nameparser</groupId>
       <artifactId>name-parser-rust</artifactId>
-      <version>${name-parser-rust.version}</version>
       <classifier>osx-aarch_64</classifier>
     </dependency>
     <dependency>
@@ -153,7 +161,6 @@
     <dependency>
       <groupId>org.catalogueoflife</groupId>
       <artifactId>vocab</artifactId>
-      <version>1.7.0-SNAPSHOT</version>
     </dependency>
     <!-- ColDP io (ColdpTerm, ColdpReader, TabWriter); pulls in the CLB `api` module
          (Jackson 2 `com.fasterxml`, guava, commons, httpclient5, mapdb, kryo, fastutil) -
@@ -161,12 +168,6 @@
     <dependency>
       <groupId>org.catalogueoflife</groupId>
       <artifactId>reader</artifactId>
-      <version>1.7.0-SNAPSHOT</version>
-      <exclusions>
-        <!-- test engines / logging brought transitively; Spring Boot manages logback + JUnit 5 already -->
-        <exclusion><groupId>org.junit.vintage</groupId><artifactId>junit-vintage-engine</artifactId></exclusion>
-        <exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId></exclusion>
-      </exclusions>
     </dependency>
     <!-- CslFormatter/CslData (life.catalogue.common.csl / life.catalogue.api.model), same
          org.catalogueoflife:api transitive (already pulled in by `reader` above) that provides the
@@ -175,22 +176,14 @@
     <dependency>
       <groupId>org.catalogueoflife</groupId>
       <artifactId>reference</artifactId>
-      <version>1.7.0-SNAPSHOT</version>
-      <exclusions>
-        <exclusion><groupId>org.junit.vintage</groupId><artifactId>junit-vintage-engine</artifactId></exclusion>
-        <exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId></exclusion>
-      </exclusions>
     </dependency>
     <!-- CLB nomenclature module: name relation / homotypic grouping logic over life.catalogue.api.model.Name. -->
     <dependency>
       <groupId>org.catalogueoflife</groupId>
       <artifactId>nomenclature</artifactId>
-      <version>1.7.0-SNAPSHOT</version>
       <exclusions>
         <!-- its transitive rust binding carries an unresolved ${os.detected.classifier}; we declare the per-platform jars ourselves above -->
         <exclusion><groupId>org.gbif.nameparser</groupId><artifactId>name-parser-rust</artifactId></exclusion>
-        <exclusion><groupId>org.junit.vintage</groupId><artifactId>junit-vintage-engine</artifactId></exclusion>
-        <exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId></exclusion>
       </exclusions>
     </dependency>
     <!-- BibTeX parsing for reference import (see name/RefMapping.fromBibtex). -->
